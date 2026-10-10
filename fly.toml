@@ -1,20 +1,23 @@
-# ============================================
-# Liberty City Bot - Fly.io Configuration
-# استخدم: fly launch --copy-config  ثم  fly secrets set ...
-# ============================================
+# fly.toml app configuration file generated for liberty-city-bot on 2026-10-10T23:52:58+03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "liberty-city-bot"
-primary_region = "ams"
+app = 'liberty-city-bot'
+primary_region = 'ams'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  NODE_ENV = "production"
-  TZ = "UTC"
+  NODE_ENV = 'production'
+  TZ = 'UTC'
 
 [processes]
-  app = "node dist/index.js"
+  app = 'node dist/index.js'
 
-# البوت لا يحتاج منفذ HTTP — يعمل كعملية مستمرة
-# استخدم: fly scale count app=1  (الخطة المجانية = 1 نسخة، 256MB RAM)
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
