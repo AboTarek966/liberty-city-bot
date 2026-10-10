@@ -1,0 +1,207 @@
+{
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "on": "On",
+    "off": "Off",
+    "true": "True",
+    "false": "False",
+    "none": "None",
+    "all": "All",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "page": "Page",
+    "of": "of",
+    "total": "Total",
+    "count": "Count",
+    "time": "Time",
+    "date": "Date",
+    "reason": "Reason",
+    "duration": "Duration",
+    "user": "User",
+    "member": "Member",
+    "moderator": "Moderator",
+    "admin": "Admin",
+    "bot": "Bot",
+    "server": "Server",
+    "channel": "Channel",
+    "role": "Role",
+    "message": "Message",
+    "command": "Command",
+    "permission": "Permission",
+    "settings": "Settings",
+    "configuration": "Configuration",
+    "logs": "Logs",
+    "statistics": "Statistics"
+  },
+  "errors": {
+    "noPermission": "You don't have permission to use this command",
+    "botNoPermission": "Bot doesn't have sufficient permissions",
+    "invalidInput": "Invalid input",
+    "notFound": "Not found",
+    "alreadyExists": "Already exists",
+    "cooldown": "Please wait before using this command again",
+    "generic": "An unexpected error occurred",
+    "database": "Database error",
+    "api": "API connection error",
+    "timeout": "Request timed out",
+    "missingArgs": "Missing arguments",
+    "invalidUser": "Invalid user",
+    "invalidChannel": "Invalid channel",
+    "invalidRole": "Invalid role",
+    "invalidDuration": "Invalid duration",
+    "cannotModerateSelf": "You cannot moderate yourself",
+    "cannotModerateOwner": "You cannot moderate the server owner",
+    "cannotModerateHigher": "You cannot moderate someone higher than you",
+    "botCannotModerate": "Bot cannot moderate this member",
+    "hierarchyError": "Role hierarchy error"
+  },
+  "time": {
+    "seconds": "seconds",
+    "minutes": "minutes",
+    "hours": "hours",
+    "days": "days",
+    "weeks": "weeks",
+    "months": "months",
+    "years": "years",
+    "now": "now",
+    "never": "never"
+  },
+  "moderation": {
+    "ban": {
+      "success": "Banned {user} successfully",
+      "self": "You cannot ban yourself",
+      "owner": "You cannot ban the server owner",
+      "bot": "You cannot ban a bot",
+      "higher": "You cannot ban someone higher than you"
+    },
+    "kick": {
+      "success": "Kicked {user} successfully",
+      "self": "You cannot kick yourself",
+      "owner": "You cannot kick the server owner",
+      "bot": "You cannot kick a bot",
+      "higher": "You cannot kick someone higher than you"
+    },
+    "mute": {
+      "success": "Muted {user} for {duration}",
+      "self": "You cannot mute yourself",
+      "owner": "You cannot mute the server owner",
+      "bot": "You cannot mute a bot",
+      "higher": "You cannot mute someone higher than you",
+      "already": "Member is already muted"
+    },
+    "unmute": {
+      "success": "Unmuted {user}",
+      "notMuted": "Member is not muted"
+    },
+    "warn": {
+      "success": "Warned {user}",
+      "self": "You cannot warn yourself",
+      "count": "Warning count: {count}"
+    },
+    "timeout": {
+      "success": "Timed out {user} for {duration}",
+      "invalidDuration": "Invalid duration"
+    },
+    "purge": {
+      "success": "Purged {count} messages",
+      "noMessages": "No messages to purge"
+    }
+  },
+  "protection": {
+    "status": "Protection Status",
+    "antiraid": "Anti-Raid",
+    "antispam": "Anti-Spam",
+    "antilink": "Anti-Link",
+    "antiinvite": "Anti-Invite",
+    "antimention": "Anti-Mention",
+    "anticaps": "Anti-Caps",
+    "antiemoji": "Anti-Emoji",
+    "automod": "Auto-Mod",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "action": "Action",
+    "threshold": "Threshold",
+    "whitelist": "Whitelist",
+    "updated": "Updated {feature} settings successfully"
+  },
+  "tickets": {
+    "created": "Created ticket {id}",
+    "closed": "Ticket closed",
+    "claimed": "Ticket claimed by {user}",
+    "alreadyClosed": "Ticket is already closed",
+    "maxTickets": "You have reached the maximum open tickets",
+    "notTicket": "This is not a ticket channel",
+    "noPermission": "You don't have permission for this ticket",
+    "setup": "Ticket system setup successfully",
+    "panel": "Ticket panel created",
+    "stats": "Ticket Statistics"
+  },
+  "settings": {
+    "updated": "Settings updated successfully",
+    "view": "View Settings",
+    "prefix": "Prefix changed to {prefix}",
+    "language": "Language changed to {language}",
+    "welcome": "Welcome settings updated",
+    "leave": "Leave settings updated",
+    "logging": "Logging settings updated",
+    "automod": "AutoMod settings updated",
+    "ai": "AI settings updated"
+  },
+  "ai": {
+    "unavailable": "AI is currently unavailable",
+    "disabled": "AI is disabled in this server",
+    "cooldown": "Please wait {seconds} seconds before using AI again",
+    "cleared": "Chat history cleared",
+    "info": "AI Information",
+    "error": "Error connecting to AI"
+  },
+  "welcome": {
+    "title": "Welcome!",
+    "message": "Welcome {user}! You are member #{count} in {server} 🎉"
+  },
+  "leave": {
+    "title": "Goodbye",
+    "message": "{user} left the server. We now have {count} members 😢"
+  },
+  "help": {
+    "title": "📚 Liberty City Commands",
+    "description": "Hello {user}! Here are the available commands",
+    "noCommand": "Command {command} not found",
+    "categories": {
+      "moderation": "🛡️ Moderation",
+      "protection": "🔒 Protection",
+      "tickets": "🎫 Tickets",
+      "settings": "⚙️ Settings",
+      "ai": "🤖 AI",
+      "utility": "🔧 Utility",
+      "info": "ℹ️ Info"
+    }
+  },
+  "bot": {
+    "name": "Liberty City",
+    "description": "Comprehensive Discord bot with protection, tickets, AI and advanced settings",
+    "version": "Version 2.0.0",
+    "ping": "🏓 Pong!",
+    "uptime": "Uptime: {uptime}",
+    "servers": "Servers: {count}",
+    "users": "Users: {count}"
+  }
+}

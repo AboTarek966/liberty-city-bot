@@ -1,0 +1,25 @@
+# ============================================
+# النشر التلقائي — عند كل رفع تعديلات إلى GitHub
+# يبني البوت وينشره على Fly.io تلقائياً
+# ============================================
+
+name: Deploy Bot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # تشغيل يدوي من لوحة GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تجهيز Fly.io
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: البناء والنشر
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

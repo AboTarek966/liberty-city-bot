@@ -1,0 +1,631 @@
+﻿// ============================================
+// Liberty City Bot - Protection Command
+// ============================================
+
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  PermissionFlagsBits,
+  EmbedBuilder,
+} from 'discord.js';
+import { Command } from '../../handlers/CommandHandler';
+import { LibertyClient } from '../../LibertyClient';
+import { Colors } from '../../utils/embeds';
+import { getGuildSettings } from '../../models';
+
+const command: Command = {
+  data: new SlashCommandBuilder()
+    .setName('protection')
+    .setDescription('إعدادات الحماية المتقدمة')
+    .addSubcommand(sub =>
+      sub
+        .setName('status')
+        .setDescription('عرض حالة الحماية')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antiraid')
+        .setDescription('إعدادات مضاد الغارات')
+        .addBooleanOption(opt =>
+          opt
+            .setName('enabled')
+            .setDescription('تفعيل أو تعطيل')
+            .setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('threshold')
+            .setDescription('عدد الانضمامات المسموح بها (1-50)')
+            .setMinValue(1)
+            .setMaxValue(50)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('action')
+            .setDescription('الإجراء عند رصد هجوم')
+            .addChoices(
+              { name: 'طرد', value: 'kick' },
+              { name: 'حظر', value: 'ban' },
+              { name: 'إغلاق القنوات', value: 'lockdown' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antispam')
+        .setDescription('إعدادات مضاد السبام')
+        .addBooleanOption(opt =>
+          opt
+            .setName('enabled')
+            .setDescription('تفعيل أو تعطيل')
+            .setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('max_messages')
+            .setDescription('الحد الأقصى للرسائل (2-20)')
+            .setMinValue(2)
+            .setMaxValue(20)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('action')
+            .setDescription('الإجراء المتخذ')
+            .addChoices(
+              { name: 'تحذير', value: 'warn' },
+              { name: 'كتم', value: 'mute' },
+              { name: 'طرد', value: 'kick' },
+              { name: 'حظر', value: 'ban' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antilink')
+        .setDescription('إعدادات مضاد الروابط')
+        .addBooleanOption(opt =>
+          opt
+            .setName('enabled')
+            .setDescription('تفعيل أو تعطيل')
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('whitelist')
+            .setDescription('روابط مسموح بها مفصولة بفواصل')
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('action')
+            .setDescription('الإجراء المتخذ')
+            .addChoices(
+              { name: 'حذف', value: 'delete' },
+              { name: 'تحذير', value: 'warn' },
+              { name: 'كتم', value: 'mute' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antiinvite')
+        .setDescription('إعدادات مضاد الدعوات')
+        .addBooleanOption(opt =>
+          opt
+            .setName('enabled')
+            .setDescription('تفعيل أو تعطيل')
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('action')
+            .setDescription('الإجراء المتخذ')
+            .addChoices(
+              { name: 'حذف', value: 'delete' },
+              { name: 'تحذير', value: 'warn' },
+              { name: 'كتم', value: 'mute' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antinuke')
+        .setDescription('مضاد النيوك — كشف الحذف الجماعي وعقوبة المخالف')
+        .addBooleanOption(opt =>
+          opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('threshold')
+            .setDescription('عدد العناصر المحذوفة قبل التصعيد (2-20)')
+            .setMinValue(2)
+            .setMaxValue(20)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('window')
+            .setDescription('النافذة الزمنية بالثواني (3-60)')
+            .setMinValue(3)
+            .setMaxValue(60)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('action')
+            .setDescription('عقوبة المخالف')
+            .addChoices(
+              { name: 'تنبيه فقط', value: 'alert' },
+              { name: 'طرد', value: 'kick' },
+              { name: 'حظر', value: 'ban' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antibot')
+        .setDescription('مضاد البوتات — طرد البوتات غير المصرح بها')
+        .addBooleanOption(opt =>
+          opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
+        )
+        .addUserOption(opt =>
+          opt.setName('add').setDescription('إضافة بوت إلى القائمة البيضاء (استثناء)')
+        )
+        .addUserOption(opt =>
+          opt.setName('remove').setDescription('إزالة بوت من القائمة البيضاء')
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('antiadmin')
+        .setDescription('مراقبة منح صلاحية Administrator')
+        .addBooleanOption(opt =>
+          opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('action')
+            .setDescription('الإجراء عند رصد المنح')
+            .addChoices(
+              { name: 'تنبيه فقط', value: 'alert' },
+              { name: 'طرد المنفّذ', value: 'kick' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('autobackup')
+        .setDescription('النسخ الاحتياطي التلقائي لبنية السيرفر')
+        .addBooleanOption(opt =>
+          opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('interval')
+            .setDescription('الفاصل بالساعات (1-72)')
+            .setMinValue(1)
+            .setMaxValue(72)
+        )
+        .addBooleanOption(opt =>
+          opt.setName('create_now').setDescription('إنشاء نسخة احتياطية فورية الآن')
+        )
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
+
+  cooldown: 3,
+  permissions: [PermissionFlagsBits.ManageGuild],
+
+  async execute(interaction: ChatInputCommandInteraction) {
+    const subcommand = interaction.options.getSubcommand();
+    const settings = await getGuildSettings(interaction.guildId!);
+
+    await interaction.deferReply({ ephemeral: true });
+
+    switch (subcommand) {
+      case 'status':
+        return showStatus(interaction, settings);
+      case 'antiraid':
+        return configureAntiRaid(interaction, settings);
+      case 'antispam':
+        return configureAntiSpam(interaction, settings);
+      case 'antilink':
+        return configureAntiLink(interaction, settings);
+      case 'antiinvite':
+        return configureAntiInvite(interaction, settings);
+      case 'antinuke':
+        return configureAntiNuke(interaction, settings);
+      case 'antibot':
+        return configureAntiBot(interaction, settings);
+      case 'antiadmin':
+        return configureAntiAdmin(interaction, settings);
+      case 'autobackup':
+        return configureAutoBackup(interaction, settings);
+    }
+  },
+};
+
+// --------------------------------------------
+// Show Status
+// --------------------------------------------
+async function showStatus(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const p = settings.protection;
+
+  const embed = new EmbedBuilder()
+    .setTitle('🛡️ حالة الحماية')
+    .setDescription('حالة جميع أنظمة الحماية في السيرفر')
+    .setColor(Colors.primary)
+    .addFields(
+      {
+        name: '🚨 مضاد الغارات',
+        value: p.antiRaid.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '💬 مضاد السبام',
+        value: p.antiSpam.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '🔗 مضاد الروابط',
+        value: p.antiLink.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '📨 مضاد الدعوات',
+        value: p.antiInvite.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '@ مضاد المنشنز',
+        value: p.antiMention.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '🔠 مضاد الكابس',
+        value: p.antiCaps.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '😀 مضاد الإيموجي',
+        value: p.antiEmoji.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '🤖 أوتومود',
+        value: settings.automod?.enabled ? '✅ مفعل' : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '💣 مضاد النيوك',
+        value: p.antiNuke?.enabled
+          ? `✅ مفعل (${p.antiNuke?.threshold ?? 3} عنصر/${Math.round((p.antiNuke?.timeWindow ?? 10000) / 1000)}ث)`
+          : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '🤖 مضاد البوتات',
+        value: p.antiBot?.enabled
+          ? `✅ مفعل (${p.antiBot?.whitelist?.length || 0} استثناء)`
+          : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '⚠️ مراقبة الأدمن',
+        value: p.antiAdmin?.enabled ? `✅ مفعل (${p.antiAdmin?.action === 'kick' ? 'طرد' : 'تنبيه'})` : '❌ معطل',
+        inline: true,
+      },
+      {
+        name: '💾 نسخ تلقائي',
+        value: p.autoBackup?.enabled
+          ? `✅ مفعل (كل ${p.autoBackup?.interval ?? 6} ساعة)`
+          : '❌ معطل',
+        inline: true,
+      },
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Raid
+// --------------------------------------------
+async function configureAntiRaid(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const threshold = interaction.options.getInteger('threshold');
+  const action = interaction.options.getString('action');
+
+  settings.protection.antiRaid.enabled = enabled;
+  if (threshold) settings.protection.antiRaid.threshold = threshold;
+  if (action) settings.protection.antiRaid.action = action;
+
+  await settings.save();
+
+  const embed = new EmbedBuilder()
+    .setTitle('🚨 مضاد الغارات')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      { name: 'الحد', value: `${settings.protection.antiRaid.threshold} عضو/دقيقة`, inline: true },
+      { name: 'الإجراء', value: getActionName(settings.protection.antiRaid.action), inline: true },
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Spam
+// --------------------------------------------
+async function configureAntiSpam(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const maxMessages = interaction.options.getInteger('max_messages');
+  const action = interaction.options.getString('action');
+
+  settings.protection.antiSpam.enabled = enabled;
+  if (maxMessages) settings.protection.antiSpam.maxMessages = maxMessages;
+  if (action) settings.protection.antiSpam.action = action;
+
+  await settings.save();
+
+  const embed = new EmbedBuilder()
+    .setTitle('💬 مضاد السبام')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      { name: 'الحد الأقصى', value: `${settings.protection.antiSpam.maxMessages} رسائل/5 ثوانٍ`, inline: true },
+      { name: 'الإجراء', value: getActionName(settings.protection.antiSpam.action), inline: true },
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Link
+// --------------------------------------------
+async function configureAntiLink(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const whitelist = interaction.options.getString('whitelist');
+  const action = interaction.options.getString('action');
+
+  settings.protection.antiLink.enabled = enabled;
+  if (whitelist) settings.protection.antiLink.whitelist = whitelist.split(',').map(s => s.trim());
+  if (action) settings.protection.antiLink.action = action;
+
+  await settings.save();
+
+  const embed = new EmbedBuilder()
+    .setTitle('🔗 مضاد الروابط')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      { name: 'الإجراء', value: getActionName(settings.protection.antiLink.action), inline: true },
+      {
+        name: 'قائمة بيضاء',
+        value: settings.protection.antiLink.whitelist.length > 0
+          ? settings.protection.antiLink.whitelist.join(', ')
+          : 'لا يوجد',
+        inline: false,
+      },
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Invite
+// --------------------------------------------
+async function configureAntiInvite(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const action = interaction.options.getString('action');
+
+  settings.protection.antiInvite.enabled = enabled;
+  if (action) settings.protection.antiInvite.action = action;
+
+  await settings.save();
+
+  const embed = new EmbedBuilder()
+    .setTitle('📨 مضاد الدعوات')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      { name: 'الإجراء', value: getActionName(settings.protection.antiInvite.action), inline: true },
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Nuke
+// --------------------------------------------
+async function configureAntiNuke(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const threshold = interaction.options.getInteger('threshold');
+  const windowSec = interaction.options.getInteger('window');
+  const action = interaction.options.getString('action');
+
+  if (!settings.protection.antiNuke) settings.protection.antiNuke = {};
+  settings.protection.antiNuke.enabled = enabled;
+  if (threshold) settings.protection.antiNuke.threshold = threshold;
+  if (windowSec) settings.protection.antiNuke.timeWindow = windowSec * 1000;
+  if (action) settings.protection.antiNuke.action = action;
+
+  await settings.save();
+
+  const n = settings.protection.antiNuke;
+  const embed = new EmbedBuilder()
+    .setTitle('💣 مضاد النيوك')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      { name: 'العتاد', value: `${n.threshold ?? 3} عناصر / ${Math.round((n.timeWindow ?? 10000) / 1000)} ثانية`, inline: true },
+      { name: 'عقوبة المخالف', value: getActionName(n.action || 'kick'), inline: true },
+      {
+        name: 'كيف يعمل؟',
+        value: 'يرصد الحذف المكثف للقنوات/الرولات/الحظر، يحدد المنفّذ من سجلات التدقيق، ينفّذ العقوبة، ويذكّرك باستعادة `/backup restore`',
+        inline: false,
+      }
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Bot
+// --------------------------------------------
+async function configureAntiBot(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const add = interaction.options.getUser('add');
+  const remove = interaction.options.getUser('remove');
+
+  if (!settings.protection.antiBot) settings.protection.antiBot = { whitelist: [] };
+  if (!settings.protection.antiBot.whitelist) settings.protection.antiBot.whitelist = [];
+  settings.protection.antiBot.enabled = enabled;
+
+  const wl: string[] = settings.protection.antiBot.whitelist;
+  let note = '';
+
+  if (add) {
+    if (!add.bot) {
+      note = `⚠️ \`${add.tag}\` ليس بوتاً — تمت إضافته على أي حال كاستثناء`;
+    }
+    if (!wl.includes(add.id)) wl.push(add.id);
+  }
+  if (remove) {
+    const idx = wl.indexOf(remove.id);
+    if (idx >= 0) wl.splice(idx, 1);
+  }
+
+  await settings.save();
+
+  const whitelistText =
+    wl.length > 0
+      ? wl.map(id => `• <@${id}> (\`${id}\`)`).join('\n')
+      : 'لا يوجد — أي بوت جديد سيتم طرده عند التفعيل';
+
+  const embed = new EmbedBuilder()
+    .setTitle('🤖 مضاد البوتات')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      { name: 'ملاحظة', value: note || 'يطرد أي بوت ينضم دون إذن', inline: false },
+      { name: 'القائمة البيضاء (استثناءات)', value: whitelistText, inline: false }
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Anti-Admin
+// --------------------------------------------
+async function configureAntiAdmin(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const action = interaction.options.getString('action');
+
+  if (!settings.protection.antiAdmin) settings.protection.antiAdmin = {};
+  settings.protection.antiAdmin.enabled = enabled;
+  if (action) settings.protection.antiAdmin.action = action;
+
+  await settings.save();
+
+  const embed = new EmbedBuilder()
+    .setTitle('⚠️ مراقبة منح صلاحية Administrator')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      {
+        name: 'الإجراء',
+        value: settings.protection.antiAdmin.action === 'kick' ? '👢 طرد المنفّذ' : '📢 تنبيه فقط',
+        inline: true,
+      },
+      {
+        name: 'كيف يعمل؟',
+        value: 'يراقب أي رول (بما فيه @everyone) يحصل على Administrator — يحدّد المنفّذ من سجلات التدقيق وينبّهك فوراً',
+        inline: false,
+      }
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure Auto-Backup
+// --------------------------------------------
+async function configureAutoBackup(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
+  const enabled = interaction.options.getBoolean('enabled', true);
+  const interval = interaction.options.getInteger('interval');
+  const createNow = interaction.options.getBoolean('create_now');
+
+  if (!settings.protection.autoBackup)
+    settings.protection.autoBackup = { enabled: false, interval: 6, keep: 5 };
+  settings.protection.autoBackup.enabled = enabled;
+  if (interval) settings.protection.autoBackup.interval = interval;
+  if (!settings.protection.autoBackup.keep) settings.protection.autoBackup.keep = 5;
+
+  await settings.save();
+
+  const lc = interaction.client as LibertyClient;
+  await lc.securityHandler.syncAutoBackup(interaction.guild!, false);
+
+  let backupLine = '—';
+  if (createNow && enabled) {
+    try {
+      const r = await lc.securityHandler.createBackup(interaction.guild!);
+      backupLine = `✅ أُنشئت نسخة فورية: ${r.channels} قناة + ${r.roles} رول (${(r.size / 1024).toFixed(1)} KB)`;
+    } catch (err: any) {
+      backupLine = `⚠️ فشل: ${err.message}`;
+    }
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle('💾 النسخ الاحتياطي التلقائي')
+    .setColor(enabled ? Colors.success : Colors.error)
+    .addFields(
+      { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
+      {
+        name: 'الفاصل',
+        value: `كل ${settings.protection.autoBackup.interval ?? 6} ساعة (يحتفظ بآخر 5 نسخ)`,
+        inline: true,
+      },
+      { name: 'النسخة الفورية', value: backupLine, inline: false },
+      {
+        name: 'الأوامر',
+        value: '`/backup list` عرض النسخ • `/backup restore` الاستعادة بعد أي هجوم',
+        inline: false,
+      }
+    )
+    .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Helper
+// --------------------------------------------
+function getActionName(action: string): string {
+  const actions: Record<string, string> = {
+    kick: '👢 طرد',
+    ban: '🔨 حظر',
+    lockdown: '🔒 إغلاق القنوات',
+    warn: '⚠️ تحذير',
+    mute: '🔇 كتم',
+    delete: '🗑️ حذف',
+    alert: '📢 تنبيه فقط',
+  };
+  return actions[action] || action;
+}
+
+export default command;

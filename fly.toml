@@ -1,0 +1,20 @@
+# ============================================
+# Liberty City Bot - Fly.io Configuration
+# استخدم: fly launch --copy-config  ثم  fly secrets set ...
+# ============================================
+
+app = "liberty-city-bot"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  TZ = "UTC"
+
+[processes]
+  app = "node dist/index.js"
+
+# البوت لا يحتاج منفذ HTTP — يعمل كعملية مستمرة
+# استخدم: fly scale count app=1  (الخطة المجانية = 1 نسخة، 256MB RAM)

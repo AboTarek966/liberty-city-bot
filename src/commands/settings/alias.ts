@@ -1,0 +1,331 @@
+// ============================================
+// Liberty City Bot - Alias Command
+// Custom shortcuts for commands (e.g., "b" -> /ban)
+// ============================================
+
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  PermissionFlagsBits,
+} from 'discord.js';
+import { Command } from '../../handlers/CommandHandler';
+import { LibertyClient } from '../../LibertyClient';
+import { Colors } from '../../utils/embeds';
+import { CommandAlias } from '../../models';
+
+const command: Command = {
+  data: new SlashCommandBuilder()
+    .setName('alias')
+    .setDescription('إدارة اختصارات الأوامر')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addSubcommand(sub =>
+      sub
+        .setName('add')
+        .setDescription('إضافة اختصار لأمر')
+        .addStringOption(o =>
+          o
+            .setName('shortcut')
+            .setDescription('الاختصار الذي سكتبه في الشات (مثال: تايم)')
+            .setRequired(true)
+            .setMaxLength(15)
+        )
+        .addStringOption(o =>
+          o
+            .setName('command')
+            .setDescription('🎯 اختر الأمر من القائمة')
+            .setRequired(false)
+            .addChoices(
+              // ----- عقوبات (7) -----
+              { name: '🔨 حظر', value: 'ban' },
+              { name: '👢 طرد', value: 'kick' },
+              { name: '⏱️ تايم أوت (كتم مؤقت)', value: 'timeout' },
+              { name: '⚠️ تحذير', value: 'warn' },
+              { name: '🔇 كتم دائم (رول)', value: 'mute' },
+              { name: '🔊 فك الكتم', value: 'unmute' },
+              { name: '🗑️ مسح الرسائل', value: 'purge' },
+              // ----- أدوات (5) -----
+              { name: '🏓 بينج', value: 'ping' },
+              { name: '💬 رسالة نصية', value: 'say' },
+              { name: '🖼️ صورة الأفاتار', value: 'avatar' },
+              { name: '📝 إنشاء إمبد', value: 'embed' },
+              { name: '🏆 متصدرين (لوحة)', value: 'leaderboard' },
+              // ----- ترفيه ولعب (7) -----
+              { name: '🎱 كرة السحر 8ball', value: '8ball' },
+              { name: '🔀 اختيار عشوائي', value: 'choose' },
+              { name: '🎲 نرد', value: 'dice' },
+              { name: '🪙 رمية عملة', value: 'flip' },
+              { name: '😂 نكتة', value: 'joke' },
+              { name: '📊 تصويت', value: 'poll' },
+              { name: '💯 تقييم', value: 'rate' },
+              // ----- معلومات (4) -----
+              { name: '👤 معلومات عضو', value: 'userinfo' },
+              { name: '🏰 معلومات السيرفر', value: 'serverinfo' },
+              { name: '❓ مساعدة / قائمة الأوامر', value: 'help' },
+              { name: '📈 نشاط السيرفر', value: 'activity' },
+              // ----- تذاكر + ذكاء اصطناعي (2) -----
+              { name: '🎫 نظام التذاكر', value: 'ticket' },
+              { name: '🤖 ذكاء اصطناعي (شات)', value: 'ai' }
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('extra')
+            .setDescription('📦 أوامر إضافية (إعدادات وحماية ورولات)')
+            .setRequired(false)
+            .addChoices(
+              { name: '⚙️ إعدادات السيرفر', value: 'settings' },
+              { name: '🛡️ أنظمة الحماية', value: 'protection' },
+              { name: '💾 نسخة احتياطية', value: 'backup' },
+              { name: '⌨️ إدارة الاختصارات نفسها', value: 'alias' },
+              { name: '🎭 قائمة رولات (روليميو)', value: 'rolemenu' },
+              { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' }
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('remove')
+        .setDescription('حذف اختصار')
+        .addStringOption(o => o.setName('shortcut').setDescription('الاختصار').setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName('list').setDescription('عرض جميع الاختصارات')
+    ),
+
+  cooldown: 5,
+  permissions: [PermissionFlagsBits.ManageGuild],
+
+  async execute(interaction: ChatInputCommandInteraction) {
+    const client = interaction.client as LibertyClient;
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === 'add') {
+      await handleAdd(interaction, client);
+    } else if (sub === 'remove') {
+      await handleRemove(interaction);
+    } else if (sub === 'list') {
+      await handleList(interaction);
+    }
+  },
+};
+
+// --------------------------------------------
+// Add Alias
+// --------------------------------------------
+async function handleAdd(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+  let shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
+  const choice = interaction.options.getString('command');
+  const extra = interaction.options.getString('extra');
+
+  // 🎯 اختر من إحدى القائمتين (جميع أوامر البوت متاحة)
+  if (!choice && !extra) {
+    await interaction.reply({
+      content: '❌ **اختر الأمر من القائمة** — جميع أوامر البوت متاحة في القائمتين (`command` و `extra`)',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const commandName = (choice || extra || '').toLowerCase().trim();
+
+  // Remove prefix if user typed it (e.g., "/ban" -> "ban")
+  const cleanCommand = commandName.replace(/^\//, '');
+
+  // Validate shortcut: no spaces, reasonable length, not a reserved word
+  if (shortcut.includes(' ') || shortcut.length > 15) {
+    await interaction.reply({
+      content: '❌ الاختصار لا يمكن أن يحتوي على مسافات وألا يزيد عن 15 حرف',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Check if it starts with "/" (would conflict with slash commands)
+  if (shortcut.startsWith('/')) shortcut = shortcut.slice(1);
+
+  // Check if command exists
+  const targetCommand = client.commandHandler.getCommand(cleanCommand);
+  if (!targetCommand) {
+    await interaction.reply({
+      content: `❌ الأمر \`${cleanCommand}\` غير موجود. استخدم \`/help\` لعرض الأوامر`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Check if shortcut already exists
+  const existing = await CommandAlias.findOne({
+    guildId: interaction.guildId!,
+    alias: shortcut,
+  });
+
+  if (existing) {
+    await interaction.reply({
+      content: `❌ الاختصار \`${shortcut}\` مستخدم بالفعل للأمر \`/${existing.command}\``,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Check if shortcut conflicts with a built-in command name
+  if (client.commandHandler.getCommand(shortcut)) {
+    await interaction.reply({
+      content: `❌ الاختصار \`${shortcut}\` يتعارض مع أمر موجود. اختر اختصاراً آخر`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await CommandAlias.create({
+    guildId: interaction.guildId!,
+    alias: shortcut,
+    command: cleanCommand,
+    createdBy: interaction.user.id,
+  });
+
+  // مثال استخدام جاهز حسب نوع العقوبة/الأمر
+  const usageExamples: Record<string, string> = {
+    ban: `\`${shortcut} @عضو [السبب]\``,
+    kick: `\`${shortcut} @عضو [السبب]\``,
+    timeout: `\`${shortcut} @عضو 10m [السبب]\` • المدة: ` + '`10m` `1h` `1d`',
+    warn: `\`${shortcut} @عضو [السبب]\``,
+    mute: `\`${shortcut} @عضو [السبب]\``,
+    unmute: `\`${shortcut} @عضو [السبب]\``,
+    purge: `\`${shortcut} 50\``,
+    ping: `\`${shortcut}\``,
+    say: `\`${shortcut} نص الرسالة\``,
+    avatar: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
+    userinfo: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
+    serverinfo: `\`${shortcut}\``,
+    help: `\`${shortcut}\``,
+    activity: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
+    leaderboard: `\`${shortcut}\``,
+    embed: `\`${shortcut}\` (يفتح نافذة الإنشاء)`,
+    dice: `\`${shortcut}\` أو \`${shortcut} 20\``,
+    flip: `\`${shortcut}\``,
+    joke: `\`${shortcut}\``,
+    choose: `\`${shortcut} خيار1 خيار2\``,
+    rate: `\`${shortcut} الموضوع\``,
+    '8ball': `\`${shortcut} هل سأنجح؟\``,
+    poll: `\`${shortcut} السؤال خيار1 خيار2\``,
+    ai: `\`${shortcut} سؤالك هنا\``,
+    ticket: `\`${shortcut} close\` • \`${shortcut} list\``,
+    settings: `\`${shortcut}\` (يفتح لوحة الإعدادات)`,
+    protection: `\`${shortcut}\` (يفتح أنظمة الحماية)`,
+    backup: `\`${shortcut} create\``,
+    rolemenu: `\`${shortcut} create\``,
+    autorole: `\`${shortcut} @رول\``,
+  };
+  const example = usageExamples[cleanCommand] || `\`${shortcut}\``;
+
+  const embed = new EmbedBuilder()
+    .setTitle('✅ تمت إضافة الاختصار')
+    .setColor(Colors.success)
+    .addFields(
+      { name: 'الاختصار', value: `\`${shortcut}\``, inline: true },
+      { name: 'الأمر', value: `/${cleanCommand}`, inline: true },
+      { name: '🔎 جرّبه الآن في الشات', value: example, inline: false },
+    )
+    .setDescription(`اكتب \`${shortcut}\` في الشات لتنفيذ \`/${cleanCommand}\``)
+    .setFooter({ text: 'Liberty City Aliases' });
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Remove Alias
+// --------------------------------------------
+async function handleRemove(interaction: ChatInputCommandInteraction): Promise<void> {
+  const shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
+
+  const deleted = await CommandAlias.findOneAndDelete({
+    guildId: interaction.guildId!,
+    alias: shortcut,
+  });
+
+  if (!deleted) {
+    await interaction.reply({
+      content: `❌ الاختصار \`${shortcut}\` غير موجود`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.reply({
+    content: `✅ تم حذف الاختصار \`${shortcut}\``,
+    ephemeral: true,
+  });
+}
+
+// --------------------------------------------
+// List Aliases
+// --------------------------------------------
+async function handleList(interaction: ChatInputCommandInteraction): Promise<void> {
+  const aliases = await CommandAlias.find({ guildId: interaction.guildId! }).sort({ alias: 1 });
+
+  if (aliases.length === 0) {
+    await interaction.reply({
+      content: '📭 لا توجد اختصارات. أضف واحداً باستخدام `/alias add`',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // أسماء ملونة للعقوبات المعروفة
+  const LABELS: Record<string, string> = {
+    ban: '🔨 حظر',
+    kick: '👢 طرد',
+    timeout: '⏱️ تايم أوت',
+    warn: '⚠️ تحذير',
+    mute: '🔇 كتم',
+    unmute: '🔊 فك الكتم',
+    purge: '🗑️ مسح',
+    ping: '🏓 بينج',
+    say: '💬 رسالة',
+    avatar: '🖼️ أفاتار',
+    userinfo: '👤 معلومات',
+    serverinfo: '🏰 معلومات السيرفر',
+    help: '❓ مساعدة',
+    activity: '📈 نشاط',
+    leaderboard: '🏆 متصدرين',
+    embed: '📝 إمبد',
+    dice: '🎲 نرد',
+    flip: '🪙 عملة',
+    joke: '😂 نكتة',
+    choose: '🔀 اختيار',
+    rate: '💯 تقييم',
+    '8ball': '🎱 كرة السحر',
+    poll: '📊 تصويت',
+    ai: '🤖 ذكاء اصطناعي',
+    ticket: '🎫 تذاكر',
+    settings: '⚙️ إعدادات',
+    protection: '🛡️ حماية',
+    backup: '💾 نسخة احتياطية',
+    alias: '⌨️ اختصارات',
+    rolemenu: '🎭 روليميو',
+    autorole: '➕ رول تلقائي',
+  };
+
+  const lines = aliases.slice(0, 30).map((a: any) => {
+    const label = LABELS[a.command];
+    return label
+      ? `\`${a.alias}\` → ${label} \`/${a.command}\``
+      : `\`${a.alias}\` → \`/${a.command}\``;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle(`⌨️ اختصارات الأوامر [${aliases.length}]`)
+    .setDescription(lines.join('\n'))
+    .setColor(Colors.primary)
+    .setFooter({ text: 'Liberty City Aliases' })
+    .setTimestamp();
+
+  if (aliases.length > 30) {
+    embed.setFooter({ text: `Liberty City Aliases | عرض 30 من ${aliases.length}` });
+  }
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+export default command;
