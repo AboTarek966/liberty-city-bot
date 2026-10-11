@@ -2,9 +2,9 @@
 // Settings Panel - Modals (بادئة، رسائل، ترحيب، تذاكر، شخصية...)
 // ============================================
 
-import { ModalSubmitInteraction } from 'discord.js';
+import { ModalSubmitInteraction, PermissionFlagsBits } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, canManageSettings, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 
@@ -15,7 +15,25 @@ const handler: ModalHandler = {
       await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
       return;
     }
-    if (!canManageSettings(interaction as any)) {
+
+    const parts0 = interaction.customId.split(':');
+    const section0 = parts0[1];
+    const field0 = parts0[2];
+
+    // 🔐 مودال كلمة المرور: يتحقق فقط من صلاحية الإدارة (لا يشترط كلمة المرور بعد، فهي ما سيتحقق منها الآن)
+    if (section0 === 'password') {
+      const member = interaction.member as any;
+      const perms = member?.permissions;
+      const hasAdminPerms = !!perms && (
+        perms.has(PermissionFlagsBits.ManageGuild) ||
+        perms.has(PermissionFlagsBits.Administrator)
+      );
+      const isOwner = interaction.user.id === interaction.guild.ownerId;
+      if (!hasAdminPerms && !isOwner) {
+        await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+        return;
+      }
+    } else if (!canManageSettings(interaction as any)) {
       await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
       return;
     }
@@ -37,6 +55,33 @@ const handler: ModalHandler = {
     const guildId = interaction.guild.id;
     const settings = await getGuildSettings(guildId);
     let panelEdited = false;
+
+    // 🔐 كلمة المرور تُعالج هنا قبل السويتش (لأن customId = settings_modal:password بدون حقل ثانٍ)
+    if (parts0[1] === 'password') {
+      const correctPassword = settings.settingsPassword || '7421';
+
+      if (value === correctPassword) {
+        setPasswordVerified(interaction.user.id);
+
+        // فتح لوحة الإعدادات مباشرة بعد التحقق بنجاح
+        const panel = await buildPanel('home', interaction.guild!, interaction.user.id);
+        await interaction.editReply({
+          embeds: panel.embeds,
+          components: panel.components as any,
+        });
+        await interaction.followUp({
+          content: '✅ **كلمة المرور صحيحة!** تم فتح لوحة الإعدادات.',
+          ephemeral: true,
+        });
+      } else {
+        await interaction.editReply({
+          content: '❌ **كلمة المرور خاطئة!** اضغط أي زر وحاول مرة أخرى.',
+          components: [],
+          embeds: [],
+        });
+      }
+      return;
+    }
 
     switch (`${section}:${field}`) {
       case 'general:prefix':
@@ -70,6 +115,79 @@ const handler: ModalHandler = {
         }
         settings.set('welcome.imageBackground', value || null);
         break;
+      case 'welcome:cardurl':
+        if (value && !/^https?:\/\//i.test(value)) {
+          await interaction.editReply({ content: '❌ يجب أن يبدأ الرابط بـ http:// أو https://' });
+          return;
+        }
+        settings.set('welcome.card.backgroundUrl', value || null);
+        await settings.save();
+        {
+          await sendWelcomeCardPanel(interaction, settings);
+          await interaction.followUp({
+            content: value ? '✅ تم ضبط خلفية البطاقة' : '↩️ تمت الإزالة — الخلفية تدرّج افتراضي',
+            ephemeral: true,
+          });
+        }
+        return;
+      case 'welcome:cardpos': {
+        // 📍 حفظ إحداثيات عنصر البطاقة (X، Y، الحجم، اللون)
+        const element = parts[3];
+        if (!['avatar', 'name', 'count'].includes(element)) {
+          await interaction.editReply({ content: '❌ عنصر غير معروف' });
+          return;
+        }
+        const readNum = (id: string): number => {
+          try {
+            return Number.parseInt(interaction.fields.getTextInputValue(id).trim(), 10);
+          } catch {
+            return NaN;
+          }
+        };
+        const x = readNum('x');
+        const y = readNum('y');
+        const size = readNum('size');
+        if (!Number.isFinite(x) || x < 0 || x > 800 || !Number.isFinite(y) || y < 0 || y > 300) {
+          await interaction.editReply({ content: '❌ الإحداثيات خارج النطاق — X بين 0 و800 و Y بين 0 و300' });
+          return;
+        }
+        if (!Number.isFinite(size) || size < 8 || size > 300) {
+          await interaction.editReply({ content: '❌ الحجم غير صالح (من 8 إلى 300 بكسل)' });
+          return;
+        }
+        let color = '';
+        if (element !== 'avatar') {
+          try {
+            color = interaction.fields.getTextInputValue('color').trim();
+          } catch {
+            /* لون اختياري */
+          }
+        }
+        if (color && !/^#?([0-9a-fA-F]{6})$/.test(color)) {
+          await interaction.editReply({ content: '❌ لون غير صالح — استخدم صيغة HEX مثل #FFFFFF' });
+          return;
+        }
+        const card = (settings.welcome as any).card || ((settings.welcome as any).card = {});
+        if (element === 'avatar') {
+          card.avatarX = x;
+          card.avatarY = y;
+          card.avatarSize = size;
+        } else if (element === 'name') {
+          card.nameX = x;
+          card.nameY = y;
+          card.nameSize = size;
+          if (color) card.nameColor = color.startsWith('#') ? color : `#${color}`;
+        } else {
+          card.countX = x;
+          card.countY = y;
+          card.countSize = size;
+          if (color) card.countColor = color.startsWith('#') ? color : `#${color}`;
+        }
+        await settings.save();
+        await sendWelcomeCardPanel(interaction, settings);
+        await interaction.followUp({ content: '✅ تم الضبط — الصورة أدناه محدّثة', ephemeral: true });
+        return;
+      }
       case 'tickets:autotext':
         settings.tickets.autoMessage = value.substring(0, 1500);
         break;
@@ -145,7 +263,7 @@ const handler: ModalHandler = {
         return;
       }
       case 'automod:words':
-        settings.automod.badWords = value.split(',').map(w => w.trim()).filter(w => w.length > 0);
+        settings.automod.badWords = value.split(/\r?\n/).map(w => w.trim()).filter(w => w.length > 0);
         break;
       case 'ai:personality': {
         await settings.save();

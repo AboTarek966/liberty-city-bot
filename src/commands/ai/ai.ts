@@ -164,6 +164,23 @@ async function handleChat(
     // Set cooldown
     client.aiHandler.setCooldown(interaction.user.id, interaction.guildId || undefined);
 
+    // 📡 بث مباشر — الرد يظهر تدريجياً أثناء التوليد
+    let lastEditAt = 0;
+    const preview = (text: string): string =>
+      text.length > 1900 ? text.slice(0, 1900) + '\n…' : text;
+    const stream = {
+      onFirstChunk: async (text: string) => {
+        lastEditAt = Date.now();
+        await interaction.editReply({ content: preview(text) }).catch(() => {});
+      },
+      onUpdate: async (text: string) => {
+        const now = Date.now();
+        if (now - lastEditAt < 1200) return;
+        lastEditAt = now;
+        await interaction.editReply({ content: preview(text) }).catch(() => {});
+      },
+    };
+
     // Generate response (isMention=true for slash command usage)
     const response = await client.aiHandler.generateResponse(
       interaction.user.id,
@@ -171,7 +188,9 @@ async function handleChat(
       interaction.channelId,
       message,
       [],
-      true
+      true,
+      false,
+      { stream }
     );
 
     if (!response) {
@@ -198,7 +217,10 @@ async function handleChat(
 
     // Send remaining chunks
     for (let i = 1; i < chunks.length; i++) {
-      await interaction.followUp({ content: chunks[i] });
+      await interaction.followUp({ 
+        content: chunks[i],
+        allowedMentions: { parse: ['users', 'roles', 'everyone'] as const }
+      });
     }
   } catch (error: any) {
     const errorMessage = error.message;

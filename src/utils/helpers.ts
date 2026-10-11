@@ -272,9 +272,45 @@ export function isValidUrl(url: string): boolean {
   }
 }
 
+// TLDs شائعة — لتفادي الالتقاط الخاطئ مثل file.js أو 1.2.3
+const COMMON_TLDS = [
+  'com', 'net', 'org', 'io', 'dev', 'gg', 'co', 'me', 'ai', 'app', 'xyz',
+  'site', 'online', 'top', 'info', 'biz', 'ru', 'tv', 'link', 'click',
+  'shop', 'store', 'cloud', 'tech', 'pro', 'life', 'live', 'news', 'blog',
+  'club', 'fun', 'world', 'today', 'sa', 'eg', 'ae', 'uk', 'us', 'de',
+  'fr', 'tr', 'cn', 'in', 'id', 'ph', 'qa', 'kw', 'ma', 'dz', 'tn', 'iq',
+  'sy', 'jo', 'bh', 'om', 'pk', 'ng', 'za', 'it', 'es', 'pt', 'nl', 'se',
+  'no', 'dk', 'fi', 'pl', 'cz', 'gr', 'il', 'kr', 'jp', 'au', 'ca', 'mx',
+  'br', 'ar', 'ml', 'tk', 'ga', 'cf', 'gq', 'cc', 'pw', 'ws', 'icu',
+  'cfd', 'rest', 'sbs', 'be', 'at', 'ch', 'ro', 'hu', 'bg', 'ua', 'by',
+  'kz', 'vn', 'th', 'my', 'sg', 'hk', 'tw',
+];
+
+/**
+ * استخراج الروابط من النص — يلتقط الروابط الكاملة (https://…)
+ * والنطاقات بدون بروتوكول (example.com/path) مع تجنب
+ * الالتقاط الخاطئ مثل أسماء الملفات (bot.js).
+ */
 export function extractUrls(text: string): string[] {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return text.match(urlRegex) || [];
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+([a-z]{2,})(?:[/?#][^\s]*)?/gi;
+  const found: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    const raw = match[0];
+    // استبعد التطابق إذا كان جزءاً من كلمة (يسبقه حرف أو رقم)
+    const prev = match.index > 0 ? text[match.index - 1] : '';
+    if (prev && /[a-z0-9]/i.test(prev)) continue;
+
+    const hasScheme = /^https?:\/\//i.test(raw);
+    const tld = match[1].toLowerCase();
+    // بدون بروتوكول: اسم النطاق يجب أن ينتهي بـ TLD معروف
+    if (!hasScheme && !COMMON_TLDS.includes(tld)) continue;
+
+    found.push(raw);
+  }
+
+  return [...new Set(found)];
 }
 
 export function containsInvite(text: string): boolean {

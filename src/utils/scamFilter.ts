@@ -3,7 +3,7 @@
 // حماية من روابط صيد النيترو والمشاريع المزيفة (ديسكورد/ستيم/إيлон ماسك...)
 // ============================================
 
-import { Message, PermissionFlagsBits } from 'discord.js';
+import { Message } from 'discord.js';
 import { LibertyClient } from '../LibertyClient';
 import { getGuildSettings } from '../models';
 import { createLogger } from './helpers';
@@ -34,7 +34,8 @@ const SCAM_KEYWORDS = [
   'btc giveaway', 'crypto airdrop',
 ];
 
-const URL_REGEX = /https?:\/\/(?:www\.)?([^\s/\\]+)/gi;
+// يلتقط روابط http(s) والنطاقات المشبوهة بدون بروتوكول (dlscord.xyz)
+const URL_REGEX = /(?:https?:\/\/)?(?:www\.)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:[/?#][^\s]*)?/gi;
 const INVITE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/([a-zA-Z0-9-]+)/gi;
 
 export interface ScamCheckResult {
@@ -81,13 +82,8 @@ export async function handleScamFilter(message: Message, client: LibertyClient):
   const settings = await getGuildSettings(message.guild.id);
   if (!settings.protection?.scamFilter?.enabled) return false;
 
-  // التجاهل: الإداريون والبوتات
-  if (
-    message.member?.permissions.has(PermissionFlagsBits.ManageMessages) ||
-    message.member?.permissions.has(PermissionFlagsBits.Administrator)
-  ) {
-    return false;
-  }
+  // ⚠️ لا يوجد أي تجاوز: الروابط الاحتيالية تُحذف للجميع
+  // (حتى الإدارة وأصحاب الرتب الخاصة — الاحتيال يهدد الجميع)
 
   const result = checkScamContent(message.content);
   if (!result.isScam) return false;

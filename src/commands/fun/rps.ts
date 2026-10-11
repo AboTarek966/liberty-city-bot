@@ -2,7 +2,7 @@
 // Liberty City Bot - Rock Paper Scissors (حجر ورقة مقص)
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ColorResolvable } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { Colors } from '../../utils/embeds';
 
@@ -37,7 +37,7 @@ const command: Command = {
     const bot = keys[Math.floor(Math.random() * keys.length)];
 
     let title: string;
-    let color: number;
+    let color: ColorResolvable;
     if (player === bot) {
       title = '🤝 تعادل!';
       color = Colors.warning;

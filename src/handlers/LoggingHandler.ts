@@ -9,6 +9,7 @@ import {
   ChannelType,
   EmbedBuilder,
   AuditLogEvent,
+  PermissionFlagsBits,
 } from 'discord.js';
 import { createLogger } from '../utils/helpers';
 import { getGuildSettings } from '../models';
@@ -24,6 +25,7 @@ export const LOG_EVENTS = [
   'memberBan',
   'memberUnban',
   'memberUpdate',
+  'memberTimeout',
   'roleCreate',
   'roleDelete',
   'roleUpdate',
@@ -41,6 +43,15 @@ export const LOG_EVENTS = [
   'emojiDelete',
   'stickerCreate',
   'stickerDelete',
+  // تكتات
+  'ticketCreate',
+  'ticketClose',
+  'ticketReopen',
+  'ticketDelete',
+  'ticketClaim',
+  'ticketTransfer',
+  'ticketAddUser',
+  'ticketRemoveUser',
 ] as const;
 
 export type LogEventType = typeof LOG_EVENTS[number];
@@ -67,6 +78,7 @@ const EVENT_COLORS: Record<LogEventType, number> = {
   memberBan: CATEGORY_COLORS.moderation,
   memberUnban: CATEGORY_COLORS.moderation,
   memberUpdate: CATEGORY_COLORS.member,
+  memberTimeout: CATEGORY_COLORS.moderation,
   roleCreate: CATEGORY_COLORS.role,
   roleDelete: CATEGORY_COLORS.role,
   roleUpdate: CATEGORY_COLORS.role,
@@ -84,45 +96,57 @@ const EVENT_COLORS: Record<LogEventType, number> = {
   emojiDelete: CATEGORY_COLORS.guild,
   stickerCreate: CATEGORY_COLORS.guild,
   stickerDelete: CATEGORY_COLORS.guild,
+  // تكتات
+  ticketCreate: CATEGORY_COLORS.channel,
+  ticketClose: CATEGORY_COLORS.moderation,
+  ticketReopen: CATEGORY_COLORS.member,
+  ticketDelete: CATEGORY_COLORS.moderation,
+  ticketClaim: CATEGORY_COLORS.member,
+  ticketTransfer: CATEGORY_COLORS.member,
+  ticketAddUser: CATEGORY_COLORS.member,
+  ticketRemoveUser: CATEGORY_COLORS.member,
 };
 
 // --------------------------------------------
-// Logging Handler Class
-// --------------------------------------------
-export class LoggingHandler {
-  private client: Client;
-  private enabledCache: Map<string, { channelId: string; types: Set<string> }> = new Map();
+  // Logging Handler Class
+  // --------------------------------------------
+  export class LoggingHandler {
+    private client: Client;
+    private enabledCache: Map<string, { channelId?: string; splits: Record<string, string>; types: Set<string>; timestamp: number }> = new Map();
+    private readonly CACHE_TTL = 30000; // 30 ثانية
 
-  constructor(client: Client) {
-    this.client = client;
-  }
+    constructor(client: Client) {
+      this.client = client;
+    }
 
   // --------------------------------------------
   // Check if event should be logged
   // --------------------------------------------
-  private async getLogConfig(guild: Guild): Promise<{ channelId: string; types: Set<string> } | null> {
-    // Check cache first
+  private async getLogConfig(
+    guild: Guild
+  ): Promise<{ channelId?: string; splits: Record<string, string>; types: Set<string>; timestamp: number } | null> {
+    // Check cache first (with TTL)
     const cached = this.enabledCache.get(guild.id);
-    if (cached) return cached;
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) return cached;
 
     try {
       const settings = await getGuildSettings(guild.id);
 
-      if (!settings.logging?.enabled || !settings.logging.channelId) {
-        return null;
-      }
+      if (!settings.logging?.enabled) return null;
 
-      const logChannel = guild.channels.cache.get(settings.logging.channelId);
-      if (!logChannel || logChannel.type !== ChannelType.GuildText) {
-        return null;
-      }
+      // 🔀 تقسيم: كل نوع حدث قد يملك قناة خاصة (وإلا → القناة الرئيسية)
+      const splits: Record<string, string> = {
+        ...(((settings.logging as any).channels as Record<string, string>) || {}),
+      };
+
+      const channelId = settings.logging.channelId;
+      if (!channelId && Object.keys(splits).length === 0) return null;
 
       const types = new Set(settings.logging.types || []);
-      const config = { channelId: settings.logging.channelId, types };
+      const config = { channelId, splits, types, timestamp: Date.now() };
 
-      // Cache for 30 seconds
+      // Cache with timestamp
       this.enabledCache.set(guild.id, config);
-      setTimeout(() => this.enabledCache.delete(guild.id), 30000);
 
       return config;
     } catch (error) {
@@ -137,7 +161,7 @@ export class LoggingHandler {
   }
 
   // --------------------------------------------
-  // Send log embed
+  // Send log embed (مُوجَّه لقناة نوع الحدث إن وُجدت)
   // --------------------------------------------
   private async sendLog(
     guild: Guild,
@@ -148,17 +172,40 @@ export class LoggingHandler {
       const config = await this.getLogConfig(guild);
       if (!config) return;
 
-      // If types array is empty, log everything; otherwise check inclusion
-      if (config.types.size > 0 && !config.types.has(eventType)) return;
+      // ملاحظة: memberTimeout تُقبل ضمن memberUpdate للتوافق القديم
+      const allowedByTypes =
+        config.types.size === 0 ||
+        config.types.has(eventType) ||
+        (eventType === 'memberTimeout' && config.types.has('memberUpdate'));
+      if (!allowedByTypes) return;
 
-      const channel = guild.channels.cache.get(config.channelId) as TextChannel;
-      if (!channel) return;
+      const targetId = config.splits[eventType] || config.channelId;
+      if (!targetId) return;
+
+      const channel = guild.channels.cache.get(targetId) as TextChannel;
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        logger.warn(`Log channel ${targetId} not found or not a text channel for ${eventType} in ${guild.name}`);
+        // Invalidate cache to force refresh next time
+        this.enabledCache.delete(guild.id);
+        return;
+      }
+
+      // Check bot permissions in the channel
+      const perms = channel.permissionsFor(guild.members.me!);
+      if (!perms?.has(PermissionFlagsBits.SendMessages) || !perms?.has(PermissionFlagsBits.EmbedLinks)) {
+        logger.warn(`Missing SendMessages/EmbedLinks in log channel ${targetId} for ${eventType} in ${guild.name}`);
+        return;
+      }
 
       embed.setFooter({ text: `Liberty City • ${eventType}` });
       embed.setTimestamp();
 
-      await channel.send({ embeds: [embed] }).catch(() => {});
-      logger.debug(`Logged event: ${eventType} in ${guild.name}`);
+      await channel.send({ embeds: [embed] }).catch((err) => {
+        logger.error(`Failed to send log to channel ${targetId}:`, err);
+        // Invalidate cache on send failure
+        this.enabledCache.delete(guild.id);
+      });
+      logger.debug(`Logged event: ${eventType} in ${guild.name} → #${channel.name}`);
     } catch (error) {
       logger.error(`Error sending log for ${eventType}:`, error);
     }
@@ -439,20 +486,37 @@ export class LoggingHandler {
       changes.push(newMember.avatar ? '**الصورة الشخصية:** تم تغيير الصورة' : '**الصورة الشخصية:** تمت الإزالة');
     }
 
-    // Timeout (communication disable) change
+    // Timeout (communication disable) change → حدث مستقل يذهب لقناة memberTimeout
     const oldTimeout = oldMember.communicationDisabledUntilTimestamp ?? 0;
     const newTimeout = newMember.communicationDisabledUntilTimestamp ?? 0;
-    if (oldTimeout !== newTimeout) {
-      changes.push(
-        newTimeout > Date.now()
-          ? `**الكتم المؤقت:** حتى <t:${Math.floor(newTimeout / 1000)}:F>`
-          : '**الكتم المؤقت:** تم رفع الكتم'
-      );
+    const timeoutChanged = oldTimeout !== newTimeout;
+
+    if (changes.length === 0 && !timeoutChanged) return;
+
+    const audit = await this.fetchAuditInfo(guild, AuditLogEvent.MemberUpdate, newMember.id);
+
+    // ⏳ التايم أوت → إمبده خاصة (تسمح بتجهيز روم مخصص للكتم فقط)
+    if (timeoutChanged) {
+      const active = newTimeout > Date.now();
+      const timeoutEmbed = new EmbedBuilder()
+        .setTitle(active ? '🔇 كتم مؤقت (Timeout)' : '🔊 رفع الكتم المؤقت')
+        .setColor(active ? EVENT_COLORS.memberTimeout : CATEGORY_COLORS.member)
+        .setDescription(`${newMember}`)
+        .addFields(
+          { name: '👮 المسؤول', value: this.executorValue(audit?.executor), inline: true },
+          {
+            name: '📅 المدة',
+            value: active ? `حتى <t:${Math.floor(newTimeout / 1000)}:F>` : 'تم رفع الكتم',
+            inline: true,
+          }
+        );
+      if (newMember.user && typeof newMember.user.displayAvatarURL === 'function') {
+        timeoutEmbed.setThumbnail(newMember.user.displayAvatarURL());
+      }
+      await this.sendLog(guild, 'memberTimeout', timeoutEmbed);
     }
 
     if (changes.length === 0) return;
-
-    const audit = await this.fetchAuditInfo(guild, AuditLogEvent.MemberUpdate, newMember.id);
 
     const embed = new EmbedBuilder()
       .setTitle('👤 تحديث عضو')
@@ -916,6 +980,151 @@ export class LoggingHandler {
       16: 'وسائط',
     };
     return types[type] || 'غير معروف';
+  }
+
+  // --------------------------------------------
+  // Ticket Events (سجل التكتات)
+  // --------------------------------------------
+  async handleTicketCreate(data: {
+    guild: any;
+    channel: any;
+    creator: any;
+    panelName?: string;
+  }): Promise<void> {
+    const { guild, channel, creator, panelName } = data;
+    const fields = [
+      { name: '👤 المنشئ', value: this.formatUser(creator), inline: true },
+      { name: '🎫 التذكرة', value: `<#${channel.id}> (\`${channel.id}\`)`, inline: true },
+      { name: '📋 اللوحة', value: panelName || 'غير محددة', inline: true },
+    ];
+    const embed = new EmbedBuilder()
+      .setTitle('🎫 إنشاء تذكرة')
+      .setColor(EVENT_COLORS.ticketCreate)
+      .addFields(fields);
+    await this.sendLog(guild, 'ticketCreate', embed);
+  }
+
+  async handleTicketClose(data: {
+    guild: any;
+    channel: any;
+    closer: any;
+    reason?: string;
+    transcriptUrl?: string;
+  }): Promise<void> {
+    const { guild, channel, closer, reason, transcriptUrl } = data;
+    const fields = [
+      { name: '👤 المغلق', value: this.formatUser(closer), inline: true },
+      { name: '🎫 التذكرة', value: `<#${channel.id}> (\`${channel.id}\`)`, inline: true },
+      { name: '📋 السبب', value: reason || 'لم يُحدد', inline: false },
+    ];
+    if (transcriptUrl) fields.push({ name: '📄 النسخ', value: transcriptUrl, inline: false });
+    const embed = new EmbedBuilder()
+      .setTitle('🔒 إغلاق تذكرة')
+      .setColor(EVENT_COLORS.ticketClose)
+      .addFields(fields);
+    await this.sendLog(guild, 'ticketClose', embed);
+  }
+
+  async handleTicketReopen(data: {
+    guild: any;
+    channel: any;
+    reopener: any;
+  }): Promise<void> {
+    const { guild, channel, reopener } = data;
+    const embed = new EmbedBuilder()
+      .setTitle('🔓 إعادة فتح تذكرة')
+      .setColor(EVENT_COLORS.ticketReopen)
+      .addFields(
+        { name: '👤 المُعيد', value: this.formatUser(reopener), inline: true },
+        { name: '🎫 التذكرة', value: `<#${channel.id}>`, inline: true },
+      );
+    await this.sendLog(guild, 'ticketReopen', embed);
+  }
+
+  async handleTicketDelete(data: {
+    guild: any;
+    channelId: string;
+    deleter: any;
+  }): Promise<void> {
+    const { guild, channelId, deleter } = data;
+    const embed = new EmbedBuilder()
+      .setTitle('🗑️ حذف تذكرة')
+      .setColor(EVENT_COLORS.ticketDelete)
+      .addFields(
+        { name: '👤 المحذوف', value: this.formatUser(deleter), inline: true },
+        { name: '🎫 التذكرة', value: `\`${channelId}\``, inline: true },
+      );
+    await this.sendLog(guild, 'ticketDelete', embed);
+  }
+
+  async handleTicketClaim(data: {
+    guild: any;
+    channel: any;
+    claimer: any;
+  }): Promise<void> {
+    const { guild, channel, claimer } = data;
+    const embed = new EmbedBuilder()
+      .setTitle('📌 استلام تذكرة')
+      .setColor(EVENT_COLORS.ticketClaim)
+      .addFields(
+        { name: '👤 المستلم', value: this.formatUser(claimer), inline: true },
+        { name: '🎫 التذكرة', value: `<#${channel.id}>`, inline: true },
+      );
+    await this.sendLog(guild, 'ticketClaim', embed);
+  }
+
+  async handleTicketTransfer(data: {
+    guild: any;
+    channel: any;
+    from: any;
+    to: any;
+  }): Promise<void> {
+    const { guild, channel, from, to } = data;
+    const embed = new EmbedBuilder()
+      .setTitle('🔄 نقل تذكرة')
+      .setColor(EVENT_COLORS.ticketTransfer)
+      .addFields(
+        { name: '👤 من', value: this.formatUser(from), inline: true },
+        { name: '👤 إلى', value: this.formatUser(to), inline: true },
+        { name: '🎫 التذكرة', value: `<#${channel.id}>`, inline: true },
+      );
+    await this.sendLog(guild, 'ticketTransfer', embed);
+  }
+
+  async handleTicketAddUser(data: {
+    guild: any;
+    channel: any;
+    adder: any;
+    added: any;
+  }): Promise<void> {
+    const { guild, channel, adder, added } = data;
+    const embed = new EmbedBuilder()
+      .setTitle('➕ إضافة عضو للتذكرة')
+      .setColor(EVENT_COLORS.ticketAddUser)
+      .addFields(
+        { name: '👤 المضيف', value: this.formatUser(adder), inline: true },
+        { name: '👤 المضاف', value: this.formatUser(added), inline: true },
+        { name: '🎫 التذكرة', value: `<#${channel.id}>`, inline: true },
+      );
+    await this.sendLog(guild, 'ticketAddUser', embed);
+  }
+
+  async handleTicketRemoveUser(data: {
+    guild: any;
+    channel: any;
+    remover: any;
+    removed: any;
+  }): Promise<void> {
+    const { guild, channel, remover, removed } = data;
+    const embed = new EmbedBuilder()
+      .setTitle('➖ إزالة عضو من التذكرة')
+      .setColor(EVENT_COLORS.ticketRemoveUser)
+      .addFields(
+        { name: '👤 المزيل', value: this.formatUser(remover), inline: true },
+        { name: '👤 المزول', value: this.formatUser(removed), inline: true },
+        { name: '🎫 التذكرة', value: `<#${channel.id}>`, inline: true },
+      );
+    await this.sendLog(guild, 'ticketRemoveUser', embed);
   }
 
   // --------------------------------------------

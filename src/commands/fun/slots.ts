@@ -3,7 +3,7 @@
 // رهان من الرصيد — ثلاث نفسية = فوز ×5
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ColorResolvable } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { UserProfile } from '../../models';
 import { Colors } from '../../utils/embeds';
@@ -42,7 +42,7 @@ const command: Command = {
     const a = spin(), b = spin(), c = spin();
 
     let title: string;
-    let color: number;
+    let color: ColorResolvable;
     let payout = 0;
 
     if (a === b && b === c) {

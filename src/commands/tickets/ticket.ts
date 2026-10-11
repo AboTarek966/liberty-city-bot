@@ -94,6 +94,16 @@ const command: Command = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('mystats')
+        .setDescription('📊 عرض عدد التذاكر التي استلمتها')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('top')
+        .setDescription('🏆 أعلى 10 إداريين في استلام التذاكر')
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('add')
         .setDescription('إضافة عضو للتذكرة')
         .addUserOption(opt =>
@@ -185,6 +195,10 @@ const command: Command = {
         return handleClaim(interaction, client);
       case 'stats':
         return handleStats(interaction, client);
+      case 'mystats':
+        return handleMyStats(interaction);
+      case 'top':
+        return handleTop(interaction);
       case 'add':
         return handleAdd(interaction);
       case 'remove':
@@ -534,6 +548,61 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Lib
       { name: '🟡 بالانتظار', value: `${stats.waiting}`, inline: true },
       { name: '🔴 مغلقة', value: `${stats.closed}`, inline: true },
     )
+    .setFooter({ text: 'Liberty City Tickets' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// My Stats (عدد التذاكر المستلمة لهذا الإداري)
+// --------------------------------------------
+async function handleMyStats(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+  const settings = await getGuildSettings(interaction.guildId!);
+  const count = settings.tickets.claimStats?.get(interaction.user.id) || 0;
+
+  const embed = new EmbedBuilder()
+    .setTitle('📊 إحصائياتك في التذاكر')
+    .setColor(Colors.primary)
+    .setDescription(
+      `👤 ${interaction.user}\n\n` +
+      `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
+      `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`
+    )
+    .setFooter({ text: 'Liberty City Tickets' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Top (أعلى 10 إداريين في استلام التذاكر)
+// --------------------------------------------
+async function handleTop(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply();
+  const settings = await getGuildSettings(interaction.guildId!);
+  const stats = settings.tickets.claimStats;
+
+  if (!stats || stats.size === 0) {
+    await interaction.editReply({ content: '📊 لا توجد إحصائيات استلام بعد.' });
+    return;
+  }
+
+  const sorted = [...stats.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const medals = ['🥇', '🥈', '🥉'];
+  const lines = sorted.map(([userId, count], i) => {
+    const medal = medals[i] || `\`${i + 1}.\``;
+    return `${medal} <@${userId}> — **${count}** تذكرة`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle('🏆 أعلى 10 إداريين في استلام التذاكر')
+    .setColor(Colors.primary)
+    .setDescription(lines.join('\n'))
     .setFooter({ text: 'Liberty City Tickets' })
     .setTimestamp();
 

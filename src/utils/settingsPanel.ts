@@ -13,11 +13,16 @@ import {
   ChannelSelectMenuBuilder,
   StringSelectMenuBuilder,
   Guild,
+  GuildMember,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
 import { getGuildSettings } from '../models';
 import { Colors } from './embeds';
+import { renderWelcomeCard, CARD_DEFAULTS } from './welcomeCard';
 
 export type SettingsCategory =
   | 'home'
@@ -41,17 +46,71 @@ export interface BuiltPanel {
 }
 
 // --------------------------------------------
+// Password Session Store (جلسات التحقق من كلمة المرور)
+// --------------------------------------------
+const DEFAULT_SETTINGS_PASSWORD = '7421';
+const passwordVerifiedUsers = new Map<string, { verified: boolean; expiresAt: number }>();
+
+/**
+ * التحقق مما إذا كان المستخدم محقق بكلمة المرور
+ */
+export function isPasswordVerified(userId: string): boolean {
+  const session = passwordVerifiedUsers.get(userId);
+  if (!session) return false;
+  if (Date.now() > session.expiresAt) {
+    passwordVerifiedUsers.delete(userId);
+    return false;
+  }
+  return session.verified;
+}
+
+/**
+ * تعيين المستخدم كمحقق بكلمة المرور (تنتهي صلاحيته بعد 30 دقيقة)
+ */
+export function setPasswordVerified(userId: string): void {
+  passwordVerifiedUsers.set(userId, {
+    verified: true,
+    expiresAt: Date.now() + 30 * 60 * 1000, // 30 دقيقة
+  });
+}
+
+/**
+ * إزالة تحقق كلمة المرور
+ */
+export function clearPasswordVerified(userId: string): void {
+  passwordVerifiedUsers.delete(userId);
+}
+
+/**
+ * الحصول على كلمة مرور الإعدادات من قاعدة البيانات (أو الافتراضية)
+ */
+export async function getSettingsPassword(guildId: string): Promise<string> {
+  const settings = await getGuildSettings(guildId);
+  return settings.settingsPassword || DEFAULT_SETTINGS_PASSWORD;
+}
+
+// --------------------------------------------
 // Permission helper
 // --------------------------------------------
 export function canManageSettings(
-  interaction: ChatInputCommandInteraction | { member: any; user: any }
+  interaction: ChatInputCommandInteraction | { member: any; user: any; guildId: string }
 ): boolean {
   const perms = (interaction.member as any)?.permissions;
-  return (
-    !!perms &&
-    (perms.has(PermissionFlagsBits.ManageGuild) ||
-      perms.has(PermissionFlagsBits.Administrator))
+  const hasAdminPerms = !!perms && (
+    perms.has(PermissionFlagsBits.ManageGuild) ||
+    perms.has(PermissionFlagsBits.Administrator)
   );
+  
+  // إذا لم يكن لديه صلاحيات إدارية، ارفض
+  if (!hasAdminPerms) return false;
+  
+  // تحقق من كلمة المرور (إذا كان المستخدم محقق مسبقاً، السماح)
+  // 🔐 لا يوجد تجاوز للمالك — الجميع يُدخل كلمة المرور
+  const userId = interaction.user.id;
+  if (isPasswordVerified(userId)) return true;
+  
+  // وإلا، يحتاج إدخال كلمة المرور
+  return false;
 }
 
 // --------------------------------------------
@@ -88,7 +147,7 @@ export const TITLES: Record<SettingsCategory, string> = {
 };
 
 export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
-  home: Colors.primary,
+  home: 0x00d4ff,
   general: 0x5865f2,
   protection: 0x57f287,
   tickets: 0xfee75c,
@@ -173,7 +232,6 @@ function categoryEmbed(category: SettingsCategory, guild: Guild, desc: string): 
       `━━━━━━━━━━━━━━━━━━━━━\n${desc}\n━━━━━━━━━━━━━━━━━━━━━`
     )
     .setColor(CATEGORY_COLORS[category])
-    .setThumbnail(guild.iconURL({ size: 128 }) || null)
     .setFooter({ text: `${guild.name} • Liberty City Settings` })
     .setTimestamp();
 }
@@ -212,7 +270,6 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
       { name: '🔇 الأوتو مود', value: `${on(s.automod.enabled)} ${s.automod.enabled ? 'مفعّل' : 'معطّل'}`, inline: true },
       { name: '📝 أوامر مخصصة', value: `${(s.customCommands || []).length} أمر`, inline: true },
     )
-    .setThumbnail(guild.iconURL({ size: 256 }) || null)
     .setFooter({ text: `الأعضاء: ${guild.memberCount} • اضغط زر للانتقال إلى القسم` })
     .setTimestamp();
 
@@ -334,7 +391,17 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
-  return { embeds: [embed], components: [row1, row2, row3, row4] };
+  // Row 5: Jail channel selection
+  const jailChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:jail:channel')
+      .setPlaceholder('🔒 اختر روم السجن (الذي يبقى العضو المسجون قادراً على رؤيته)')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+  );
+
+  return { embeds: [embed], components: [row1, row2, row3, row4, jailChannelSelect] };
 }
 
 // --------------------------------------------
@@ -359,7 +426,6 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
         `⚠️ *ارفع رتبة البوت فوق رول التوثيق حتى يعمل*`
     )
     .setColor(v.enabled ? 0x2ecc71 : 0xe74c3c)
-    .setThumbnail(guild.iconURL({ size: 128 }) || null)
     .setFooter({ text: `${guild.name} • Liberty City` })
     .setTimestamp();
 
@@ -534,7 +600,8 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     `> 🛡️ **فريق الدعم:**\n${roleList || '> 🔴 لا يوجد — اختر من القائمة بالأسفل'}\n` +
     `> 🎨 **لوحة التذاكر:** ${panelLine}\n` +
     `> 🏷️ **أنواع التذاكر** (اسم الخيار = اسم قناة التذكرة):\n${typesLine}\n` +
-    `> 🤖 **رسالة تلقائية:** ${on(t.autoMessageEnabled)} ${t.autoMessageEnabled ? 'مفعّلة داخل التذكرة' : 'معطّلة'}\n` +
+    `> 🎫 **رسالة الترحيب:** ${on(t.welcomeEnabled)} ${t.welcomeEnabled ? 'تُرسل عند فتح التذكرة' : 'معطّلة (أزرار فقط)'}\n` +
+    `> 🔒 **قفل حتى الاستلام:** ${on(t.lockUntilClaim)} ${t.lockUntilClaim ? 'صاحب التذكرة لا يكتب حتى يستلمها إداري' : 'صاحب التذكرة يكتب مباشرة'}\n` +
     `> ⏳ **الإغلاق التلقائي:** ${t.autoCloseHours > 0 ? `\`${t.autoCloseHours}\` ساعة بدون نشاط` : '🔴 معطّل'} *(اضبطه: \`/ticket idle\`)*\n` +
     `> ⭐ **استبيان الرضا:** ${on(t.surveyEnabled)} ${t.surveyEnabled ? 'يُرسل لصاحب التذكرة بعد الإغلاق' : 'معطّل'}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -579,12 +646,6 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
       .setLabel('+')
       .setStyle(ButtonStyle.Success),
     btn(
-      'settings_btn:tickets:auto',
-      `رسالة تلقائية: ${t.autoMessageEnabled ? '🟢' : '🔴'}`,
-      t.autoMessageEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
-      '🤖'
-    ),
-    btn(
       'settings_tog:tickets:survey',
       `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`,
       t.surveyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
@@ -593,13 +654,26 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:tickets:advanced', 'إعدادات متقدمة', ButtonStyle.Secondary, '⚙️'),
   );
 
-  const rowEdit = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  // 🔒 خيارات القفل ورسالة الترحيب
+  const rowLock = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn(
+      'settings_tog:tickets:lockclaim',
+      `قفل حتى الاستلام: ${t.lockUntilClaim ? '🟢' : '🔴'}`,
+      t.lockUntilClaim ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🔒'
+    ),
+    btn(
+      'settings_tog:tickets:welcome',
+      `رسالة الترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`,
+      t.welcomeEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🎫'
+    ),
     btn('settings_btn:tickets:panel', 'محتوى اللوحة', ButtonStyle.Primary, '📝'),
     btn('settings_btn:tickets:types', 'أنواع التذاكر', ButtonStyle.Primary, '🏷️'),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
-  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowEdit] };
+  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowLock] };
 }
 
 // --------------------------------------------
@@ -620,7 +694,6 @@ export function buildTicketMovePanel(guild: Guild, s: any): BuiltPanel {
         `💡 *عدّل النصوص من أزرار **محتوى اللوحة** و**أنواع التذاكر** — التغييرات تظهر في رسالة اللوحة فوراً*`
     )
     .setColor('#5865F2')
-    .setThumbnail(guild.iconURL({ size: 128 }) || null)
     .setFooter({ text: `${guild.name} • Liberty City Tickets` })
     .setTimestamp();
 
@@ -743,7 +816,8 @@ function buildWelcome(guild: Guild, s: any): BuiltPanel {
     `> 📩 **رسالة خاصة (DM):** ${on(w.dmEnabled)} ${w.dmEnabled ? 'مفعّل' : 'معطّل'}\n` +
     `> 📌 **العنوان:** ${w.embedTitle || 'مرحباً بك!'}\n` +
     `> 🎨 **اللون:** \`${w.embedColor || '#00D4FF'}\`\n` +
-    `> 🖼️ **الصورة:** ${on(w.imageEnabled)} ${w.imageEnabled ? (w.imageBackground ? 'رابط مخصص 🌐' : 'بانر السيرفر 🏞️') : 'معطّلة'}\n\n` +
+    `> 🖼️ **الصورة:** ${on(w.imageEnabled)} ${w.imageEnabled ? (w.imageBackground ? 'رابط مخصص 🌐' : 'بانر السيرفر 🏞️') : 'معطّلة'}\n` +
+    `> 🎴 **بطاقة مخصصة:** ${on(w.card?.enabled)} ${w.card?.enabled ? 'مفعّلة (مثل ProBot)' : 'معطّلة'}\n\n` +
     `━━━━━━━ **معاينة الرسالة** ━━━━━━━\n` +
     `📌 **${w.embedTitle || 'مرحباً بك!'}**\n` +
     `${preview.substring(0, 400)}\n` +
@@ -782,7 +856,173 @@ function buildWelcome(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:welcome:test', 'تجربة الآن', ButtonStyle.Success, '🧪'),
   );
 
-  return { embeds: [embed], components: [channelSelect, row1, row2] };
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:welcome:card', 'بطاقة مخصصة', ButtonStyle.Primary, '🎴'),
+  );
+
+  return { embeds: [embed], components: [channelSelect, row1, row2, row3] };
+}
+
+// --------------------------------------------
+// Welcome — 🎴 لوحة البطاقة المخصصة (ProBot-style)
+// --------------------------------------------
+// --------------------------------------------
+// 🎴 محرر بطاقة الترحيب (حية — مثل ProBot)
+// تحكم بالأسهم وأزرار الحجم، والصورة تتحدث فوراً أمامك
+// --------------------------------------------
+// --------------------------------------------
+// 🎴 محرر بطاقة الترحيب (حية — مثل ProBot) — تحكم كامل بكل تفصيل
+// --------------------------------------------
+export const CARD_ELEMENTS = {
+  background: { emoji: '🖼️', label: 'الخلفية' },
+  avatar: { emoji: '👤', label: 'الصورة الشخصية' },
+  name: { emoji: '📝', label: 'الاسم' },
+  count: { emoji: '#️⃣', label: 'الرقم' },
+  customTexts: { emoji: '➕', label: 'نصوص مخصصة' },
+} as const;
+export type CardElement = keyof typeof CARD_ELEMENTS;
+
+const CARD_STEPS = [5, 10, 25, 50];
+
+interface CardEditorState {
+  element: CardElement;
+  step: number;
+  customTextIndex: number;
+}
+
+const cardEditorState = new Map<string, CardEditorState>();
+
+/** الحصول على حالة المحرر للمستخدم */
+export function getCardEditor(userId: string): CardEditorState {
+  let st = cardEditorState.get(userId);
+  if (!st) {
+    st = { element: 'avatar', step: 10, customTextIndex: 0 };
+    cardEditorState.set(userId, st);
+  }
+  return st;
+}
+
+/** قيم عنصر البطاقة الحالي */
+export function getCardElementValues(c: any, element: CardElement): { x: number; y: number; size: number; rotation: number } {
+  if (element === 'background') return { x: c?.backgroundX ?? 0, y: c?.backgroundY ?? 0, size: Math.round((c?.backgroundScale || 1) * 100), rotation: c?.backgroundRotation ?? 0 };
+  if (element === 'avatar') return { x: c?.avatarX ?? 130, y: c?.avatarY ?? 150, size: c?.avatarSize ?? 170, rotation: c?.avatarRotation ?? 0 };
+  if (element === 'name') return { x: c?.nameX ?? 350, y: c?.nameY ?? 130, size: c?.nameSize ?? 52, rotation: c?.nameRotation ?? 0 };
+  if (element === 'count') return { x: c?.countX ?? 350, y: c?.countY ?? 195, size: c?.countSize ?? 28, rotation: c?.countRotation ?? 0 };
+  return { x: 100, y: 100, size: 24, rotation: 0 };
+}
+
+/** دورة الخطوة: 5 ← 10 ← 25 ← 50 */
+export function nextCardStep(step: number): number {
+  const i = CARD_STEPS.indexOf(step);
+  return CARD_STEPS[(i + 1) % CARD_STEPS.length];
+}
+
+/** دورة العناصر */
+export function nextCardElement(element: CardElement): CardElement {
+  const order: CardElement[] = ['background', 'avatar', 'name', 'count', 'customTexts'];
+  const i = order.indexOf(element);
+  return order[(i + 1) % order.length];
+}
+
+export function buildWelcomeCardPanel(guild: Guild, s: any, userId = 'default'): BuiltPanel {
+  const c = { ...CARD_DEFAULTS, ...(s.welcome.card || {}) };
+  const st = getCardEditor(userId);
+  const el = CARD_ELEMENTS[st.element];
+  const vals = getCardElementValues(c, st.element);
+  const bg = c.backgroundUrl ? '🌐 صورة مخصصة' : '🎨 تدرّج لوني';
+
+  // نص وصفي للعنصر الحالي
+  const elementDesc = (() => {
+    switch (st.element) {
+      case 'background': return `🖼️ الخلفية: \`fit=${c.backgroundFit}\` \`opacity=${Math.round((c.backgroundOpacity||1)*100)}%\` \`rotation=${c.backgroundRotation}°\``;
+      case 'avatar': return `👤 الصورة: \`حجم=${c.avatarSize}\` \`إطار=${c.avatarBorderWidth}px ${c.avatarBorderColor}\` \`ظل=${c.avatarShadow?'✅':'❌'}\` \`rotation=${c.avatarRotation}°\``;
+      case 'name': return `📝 الاسم: \`حجم=${c.nameSize}\` \`لون=${c.nameColor}\` \`خط=${c.nameFont}\` \`ظل=${c.nameShadow?'✅':'❌'}\` \`rotation=${c.nameRotation}°\``;
+      case 'count': return `#️⃣ الرقم: \`حجم=${c.countSize}\` \`لون=${c.countColor}\` \`خط=${c.countFont}\` \`rotation=${c.countRotation}°\``;
+      case 'customTexts':
+        const idx = getCardEditor(userId).customTextIndex;
+        const ct = c.customTexts?.[idx];
+        if (ct) return `➕ نص ${idx+1}: "${ct.text.slice(0,30)}..." \`حجم=${ct.size}\` \`لون=${ct.color}\` \`rotation=${ct.rotation}°\``;
+        return '➕ نصوص مخصصة: لا توجد نصوص بعد — اضغط "إضافة نص"';
+    }
+  })();
+
+  const embed = new EmbedBuilder()
+    .setTitle('🎴 محرر بطاقة الترحيب — تحكم كامل (ProBot Style)')
+    .setColor(CATEGORY_COLORS.welcome)
+    .setDescription(
+      `صمم بطاقة الترحيب **بكامل حريتك** — كل عنصر قابل للتخصيص كاملاً\n\n` +
+      `> ${el.emoji} **العنصر الحالي:** **${el.label}** *(بدّله بزر 🔄)*\n` +
+      `> 📍 **الموضع:** \`X=${vals.x}, Y=${vals.y}\` • **الحجم/المقياس:** \`${vals.size}\` • **التدوير:** \`${vals.rotation}°\`\n` +
+      `> ⚡ **خطوة الحركة:** \`${st.step}px\`\n` +
+      `> ${elementDesc}\n\n` +
+      `🖼️ **الخلفية:** ${bg}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 **طريقة الاستخدام:** اختر العنصر (🔄) ← حرّك بالأسهم (◀️▶️🔼🔽) ← عدّل حجم/تدوير (➖➕/🔄) ← عدّل خصائص أخرى في القائمة\n` +
+      `📐 مساحة الرسم 800×300 — النص يتقلص تلقائياً ولا يُقص أبداً`
+    );
+
+  // صف الأسهم (حركة)
+  const arrowsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:welcome:cardmv:l', 'يسار ◀️', ButtonStyle.Secondary, '◀️'),
+    btn('settings_btn:welcome:cardmv:r', 'يمين ▶️', ButtonStyle.Secondary, '▶️'),
+    btn('settings_btn:welcome:cardmv:u', 'أعلى 🔼', ButtonStyle.Secondary, '🔼'),
+    btn('settings_btn:welcome:cardmv:d', 'أسفل 🔽', ButtonStyle.Secondary, '🔽'),
+  );
+
+  // صف الحجم + التدوير + تبديل عنصر + خطوة
+  const sizeRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:welcome:cardsz:out', 'أصغر ➖', ButtonStyle.Danger, '➖'),
+    btn('settings_btn:welcome:cardsz:in', 'أكبر ➕', ButtonStyle.Success, '➕'),
+    btn('settings_btn:welcome:cardrot:dec', 'تدوير ➖', ButtonStyle.Secondary, '↶'),
+    btn('settings_btn:welcome:cardrot:inc', 'تدوير ➕', ButtonStyle.Secondary, '↷'),
+    btn('settings_btn:welcome:cardsel', `${el.emoji} ${el.label}`, ButtonStyle.Primary, '🔄'),
+    btn('settings_btn:welcome:cardstep', `الخطوة ${st.step}px`, ButtonStyle.Secondary, '⚡'),
+  );
+
+  // صف الخصائص المتقدمة (حسب العنصر)
+  const propsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:welcome:cardprop:color', 'اللون 🎨', ButtonStyle.Primary, '🎨'),
+    btn('settings_btn:welcome:cardprop:shadow', 'الظل ☁️', ButtonStyle.Secondary, '☁️'),
+    btn('settings_btn:welcome:cardprop:border', 'الإطار 🖼️', ButtonStyle.Secondary, '🖼️'),
+    btn('settings_btn:welcome:cardprop:font', 'الخط 🔤', ButtonStyle.Secondary, '🔤'),
+    btn('settings_btn:welcome:cardprop:opacity', 'الشفافية 🌫️', ButtonStyle.Secondary, '🌫️'),
+  );
+
+  // صف الخلفيات والإجراءات
+  const actionsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:welcome:cardup', 'رفع خلفية 📤', ButtonStyle.Success, '📤'),
+    btn('settings_btn:welcome:cardurl', 'رابط خلفية 🔗', ButtonStyle.Secondary, '🔗'),
+    btn('settings_btn:welcome:cardbgfit', `Fit: ${c.backgroundFit}`, ButtonStyle.Secondary, '📐'),
+    btn('settings_btn:welcome:cardcustom', 'نصوص مخصصة ➕', ButtonStyle.Primary, '➕'),
+    btn('settings_btn:welcome:cardreset', 'تخطيط تلقائي ✨', ButtonStyle.Secondary, '✨'),
+    btn('settings_cat:welcome', 'رجوع 🏠', ButtonStyle.Secondary, '🏠'),
+  );
+
+  return { embeds: [embed], components: [arrowsRow, sizeRow, propsRow, actionsRow] };
+}
+
+/**
+ * إرسال المحرر مع صورة معاينة حية (تُحدَّث مع كل ضغطة زر)
+ * — الصورة المعروضة = الصورة نفسها التي يراها العضو عند الترحيب
+ */
+export async function sendWelcomeCardPanel(interaction: any, settings: any): Promise<void> {
+  const panel = buildWelcomeCardPanel(interaction.guild, settings, interaction.user.id);
+  let files: Array<{ attachment: Buffer; name: string }> = [];
+  try {
+    const member = interaction.member as GuildMember;
+    if (member?.user) {
+      const { CARD_DEFAULTS } = await import('./welcomeCard');
+      const buffer = await renderWelcomeCard(member, { ...CARD_DEFAULTS, ...(settings.welcome?.card || {}) });
+      files = [{ attachment: buffer, name: 'card-preview.png' }];
+    }
+  } catch (error) {
+    // المعاينة اختيارية — اللوحة تعمل بدونها
+  }
+  await interaction.editReply({
+    embeds: panel.embeds,
+    components: panel.components as any,
+    files,
+  });
 }
 
 // --------------------------------------------
@@ -832,6 +1072,7 @@ function buildLeave(guild: Guild, s: any): BuiltPanel {
 function buildLogging(guild: Guild, s: any): BuiltPanel {
   const l = s.logging;
   const eventsLabel = !l.types || l.types.length === 0 ? '🔴 لا شيء' : `🟢 ${l.types.length} حدث`;
+  const splitCount = Object.keys(l.channels || {}).length;
 
   const embed = categoryEmbed(
     'logging',
@@ -839,10 +1080,12 @@ function buildLogging(guild: Guild, s: any): BuiltPanel {
     `تسجيل أحداث السيرفر تلقائياً في قناة مخصصة\n\n` +
     `> ⚡ **الحالة:** ${on(l.enabled)} ${l.enabled ? 'مفعّل' : 'معطّل'}\n` +
     `> 📢 **القناة:** ${l.channelId ? `<#${l.channelId}>` : '🔴 غير محددة'}\n` +
-    `> 📊 **الأحداث:** ${eventsLabel}\n\n` +
+    `> 📊 **الأحداث:** ${eventsLabel}\n` +
+    `> 🔀 **تقسيم الرومات:** ${splitCount > 0 ? `🟢 ${splitCount} نوع في رومات خاصة` : 'الكل في القناة الرئيسية'}\n` +
+    `> 🕵️ **السنايب (رسائل محذوفة):** ${on(s.snipe?.enabled ?? true)} ${s.snipe?.enabled !== false ? 'مفعّل' : 'معطّل'}\n\n` +
     `📝 **الأحداث المسجلة:**\n` +
     `> ${l.types && l.types.length ? l.types.slice(0, 10).join('، ') + (l.types.length > 10 ? `... (+${l.types.length - 10})` : '') : 'الكل — حذف/تعديل رسائل، أعضاء، قنوات، رتب، صوت، دعوات...'}\n\n` +
-    `💡 *اختر الأنواع من القائمة بالأسفل (الكل / رسائل / أعضاء...)*`
+    `💡 *اختر الأنواع من القائمة بالأسفل، أو استخدم 🔀 لتقسيم كل نوع لروم خاص*`
   );
 
   const channelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
@@ -861,7 +1104,7 @@ function buildLogging(guild: Guild, s: any): BuiltPanel {
       .addOptions([
         { label: 'الكل', value: 'all', description: 'تسجيل كل الأحداث', emoji: { name: '📋' } },
         { label: 'الرسائل', value: 'messages', description: 'حذف وتعديل الرسائل', emoji: { name: '🗑️' } },
-        { label: 'الأعضاء', value: 'members', description: 'دخول/خروج/حظر', emoji: { name: '👥' } },
+        { label: 'الأعضاء', value: 'members', description: 'دخول/خروج/حظر/كتم', emoji: { name: '👥' } },
         { label: 'القنوات', value: 'channels', description: 'إنشاء/حذف/تعديل', emoji: { name: '📢' } },
         { label: 'الرتب', value: 'roles', description: 'إنشاء/حذف الرتب', emoji: { name: '📛' } },
         { label: 'الصوت', value: 'voice', description: 'دخول/خروج الغرف الصوتية', emoji: { name: '🔊' } },
@@ -872,10 +1115,77 @@ function buildLogging(guild: Guild, s: any): BuiltPanel {
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('logging', 'enabled', 'السجلات', '⚡', l.enabled),
+    toggleBtn('logging', 'snipe', 'السنايب', '🕵️', s.snipe?.enabled ?? true),
+    btn('settings_btn:logging:split', 'تقسيم الرومات', ButtonStyle.Primary, '🔀'),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
   return { embeds: [embed], components: [channelSelect, eventsSelect, row1] };
+}
+
+// --------------------------------------------
+// Logging — 🔀 لوحة تقسيم كل نوع سجلات لروم مخصص
+// --------------------------------------------
+export const LOG_SPLIT_GROUPS: Array<{ id: string; emoji: string; label: string; types: string[] }> = [
+  { id: 'ban', emoji: '🔨', label: 'الحظر (بان)', types: ['memberBan'] },
+  { id: 'unban', emoji: '🔓', label: 'فك الحظر', types: ['memberUnban'] },
+  { id: 'timeout', emoji: '🔇', label: 'الكتم (تايم أوت)', types: ['memberTimeout'] },
+  { id: 'members', emoji: '👥', label: 'دخول وخروج الأعضاء', types: ['memberJoin', 'memberLeave'] },
+  { id: 'memberupd', emoji: '🔄', label: 'تحديثات الأعضاء (رتب وأسماء)', types: ['memberUpdate'] },
+  { id: 'messages', emoji: '💬', label: 'الرسائل (حذف وتعديل)', types: ['messageDelete', 'messageEdit'] },
+  { id: 'roles', emoji: '📛', label: 'الرتب', types: ['roleCreate', 'roleDelete', 'roleUpdate'] },
+  { id: 'channels', emoji: '📢', label: 'القنوات', types: ['channelCreate', 'channelDelete', 'channelUpdate'] },
+  { id: 'voice', emoji: '🔊', label: 'الصوت', types: ['voiceStateUpdate'] },
+  { id: 'invites', emoji: '📩', label: 'الدعوات', types: ['inviteCreate', 'inviteDelete'] },
+];
+
+export function buildLoggingSplitPanel(guild: Guild, s: any): BuiltPanel {
+  const l = s.logging;
+  const splits: Record<string, string> = l.channels || {};
+  const mainLabel = l.channelId ? `<#${l.channelId}>` : '🔴 غير محددة';
+
+  const lines = LOG_SPLIT_GROUPS.map((g) => {
+    const chId = splits[g.types[0]];
+    const target = chId ? `<#${chId}>` : mainLabel;
+    return `${g.emoji} **${g.label}** — ${target}`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle('🔀 تقسيم سجلات الأحداث')
+    .setColor(CATEGORY_COLORS.logging)
+    .setDescription(
+      `وجّه كل مجموعة أحداث إلى روم خاص — والمجموعات غير المحددة تذهب للقناة الرئيسية\n\n` +
+      `> 📢 **القناة الرئيسية:** ${mainLabel}\n\n` +
+      `**الرومات المخصصة:**\n${lines.map((x) => `> ${x}`).join('\n')}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 *اختر مجموعة من القائمة ← اختر الروم، أو اختر القناة الرئيسية لإلغاء التقسيم*`
+    );
+
+  const select = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('settings_sel:logging:split')
+      .setPlaceholder('🔀 اختر مجموعة لتعيين روم مخصص')
+      .addOptions(
+        LOG_SPLIT_GROUPS.map((g) => {
+          const chId = splits[g.types[0]];
+          const ch: any = chId ? guild.channels.cache.get(chId) : null;
+          const desc = chId ? `الحالي: #${ch?.name || 'محذوفة'}` : 'القناة الرئيسية';
+          return {
+            label: g.label,
+            value: g.id,
+            emoji: { name: g.emoji },
+            description: desc.substring(0, 100),
+          };
+        })
+      )
+  );
+
+  const back = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_cat:logging', 'رجوع للسجلات', ButtonStyle.Secondary, '↩️'),
+    btn('settings_cat:home', 'الرئيسية', ButtonStyle.Secondary, '🏠'),
+  );
+
+  return { embeds: [embed], components: [select, back] };
 }
 
 // --------------------------------------------
@@ -889,6 +1199,7 @@ function buildLevels(guild: Guild, s: any): BuiltPanel {
   const lv = s.leveling;
   const cooldownSec = Math.round((lv.xpCooldown || 60000) / 1000);
   const rewardsCount = Array.isArray(lv.levelRewards) ? lv.levelRewards.length : 0;
+  const multiplier = lv.xpGainMultiplier || 1;
 
   const embed = categoryEmbed(
     'levels',
@@ -896,6 +1207,7 @@ function buildLevels(guild: Guild, s: any): BuiltPanel {
     `نظام XP والمستويات — الأعضاء يربحون خبرة بالمشاركة في الشات والصوت\n\n` +
     `> ⚡ **الحالة:** ${on(lv.enabled)} ${lv.enabled ? 'مفعّل' : 'معطّل'}\n` +
     `> ✨ **XP لكل رسالة:** \`${lv.xpPerMessage}\`\n` +
+    `> 🔥 **مضاعف XP:** \`${multiplier}x\`\n` +
     `> ⏱️ **كولداون XP:** \`${cooldownSec} ثانية\`\n` +
     `> 🔊 **XP الصوت (لكل دقيقة):** \`${lv.voiceXpPerMinute}\`\n` +
     `> 📢 **قناة الترقية:** ${lv.levelUpChannelId ? `<#${lv.levelUpChannelId}>` : 'قناة الحالية'}\n` +
@@ -915,30 +1227,32 @@ function buildLevels(guild: Guild, s: any): BuiltPanel {
       .setMaxValues(1)
   );
 
-  // التفاصيل: تفعيل + XP ± + النمط + رسالة الترقية
+  // التفاصيل: تفعيل + XP ± + المضاعف + النمط + رسالة الترقية
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('levels', 'enabled', 'المستويات', '⚡', lv.enabled),
     new ButtonBuilder().setCustomId('settings_btn:levels:inc').setLabel('XP +').setStyle(ButtonStyle.Success).setEmoji('✨'),
     new ButtonBuilder().setCustomId('settings_btn:levels:dec').setLabel('XP −').setStyle(ButtonStyle.Danger).setEmoji('✨'),
+    new ButtonBuilder().setCustomId('settings_btn:levels:mult_inc').setLabel('مضاعف +').setStyle(ButtonStyle.Success).setEmoji('🔥'),
+    new ButtonBuilder().setCustomId('settings_btn:levels:mult_dec').setLabel('مضاعف −').setStyle(ButtonStyle.Danger).setEmoji('🔥'),
+  );
+
+  // النمط + رسالة الترقية + صوت ± + كولداون ±
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('settings_btn:levels:style')
       .setLabel(`النمط: ${lv.levelUpStyle === 'text' ? 'نص' : 'إمبد'}`)
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('🎨'),
     new ButtonBuilder().setCustomId('settings_btn:levels:msg').setLabel('رسالة الترقية').setStyle(ButtonStyle.Primary).setEmoji('📝'),
-  );
-
-  // صوت ± + كولداون ± + المكافآت
-  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId('settings_btn:levels:voice_inc').setLabel('صوت +').setStyle(ButtonStyle.Success).setEmoji('🔊'),
     new ButtonBuilder().setCustomId('settings_btn:levels:voice_dec').setLabel('صوت −').setStyle(ButtonStyle.Danger).setEmoji('🔊'),
-    new ButtonBuilder().setCustomId('settings_btn:levels:cooldown_inc').setLabel('كولداون +').setStyle(ButtonStyle.Success).setEmoji('⏱️'),
-    new ButtonBuilder().setCustomId('settings_btn:levels:cooldown_dec').setLabel('كولداون −').setStyle(ButtonStyle.Danger).setEmoji('⏱️'),
     new ButtonBuilder().setCustomId('settings_btn:levels:rewards').setLabel(`المكافآت (${rewardsCount})`).setStyle(ButtonStyle.Success).setEmoji('🎁'),
   );
 
-  // تجربة + تجاهل + رجوع
+  // كولداون ± + تجربة + تجاهل + رجوع
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId('settings_btn:levels:cooldown_inc').setLabel('كولداون +').setStyle(ButtonStyle.Success).setEmoji('⏱️'),
+    new ButtonBuilder().setCustomId('settings_btn:levels:cooldown_dec').setLabel('كولداون −').setStyle(ButtonStyle.Danger).setEmoji('⏱️'),
     new ButtonBuilder().setCustomId('settings_btn:levels:test').setLabel('تجربة الترقية').setStyle(ButtonStyle.Primary).setEmoji('🧪'),
     new ButtonBuilder().setCustomId('settings_btn:levels:ignore').setLabel('التجاهل').setStyle(ButtonStyle.Secondary).setEmoji('🔇'),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
@@ -970,7 +1284,6 @@ export function buildLevelIgnorePanel(guild: Guild, s: any): BuiltPanel {
       `> 🔇 **رولات متجاهلة:**\n${roleList}`
     )
     .setColor(CATEGORY_COLORS.levels)
-    .setThumbnail(guild.iconURL({ size: 128 }) || null)
     .setFooter({ text: `${guild.name} • اختر صفر للإزالة` })
     .setTimestamp();
 
@@ -1025,7 +1338,6 @@ export function buildLevelRewardsPanel(guild: Guild, s: any): BuiltPanel {
       `💡 *يُمنح الرول عند بلوغ المستوى — والأعلى يشمل الأدنى (تراكمي)*`
     )
     .setColor(CATEGORY_COLORS.levels)
-    .setThumbnail(guild.iconURL({ size: 128 }) || null)
     .setFooter({ text: `${guild.name} • اضغط ❌ بجانب المكافأة لحذفها` })
     .setTimestamp();
 

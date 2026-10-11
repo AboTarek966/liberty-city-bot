@@ -100,7 +100,10 @@ class AliasInteraction {
   // ----- خصائص -----
   get client() { return this.message.client; }
   get user() { return this.message.author; }
-  get member() { return this.message.member; }
+  // عضو المنفذ — يجب أن يكون GuildMember حقيقياً بـ roles كاملة (لا نعيد Promise أبداً)
+  get member() {
+    return this.message.member;
+  }
   get guild() { return this.message.guild; }
   get channel() { return this.message.channel; }
   get channelId() { return this.message.channel.id; }
@@ -139,8 +142,19 @@ class AliasInteraction {
     getInteger: (name: string, required?: boolean) => this.read(name, required),
     getNumber: (name: string, required?: boolean) => this.read(name, required),
     getBoolean: (name: string, required?: boolean) => this.read(name, required),
-    getUser: (name: string, required?: boolean) => this.read(name, required),
-    getMember: (name: string, required?: boolean) => this.read(name, required),
+    getUser: (name: string, required?: boolean) => {
+      const value = this.read(name, required);
+      // لو القيمة GuildMember نُرجع المستخدم بداخله، ولو User نُرجعه كما هو
+      if (value && value.user && value.roles !== undefined) return value.user;
+      return value;
+    },
+    getMember: (name: string, required?: boolean) => {
+      const value = this.read(name, required);
+      // نُعيد العضو فقط إذا كان GuildMember حقيقياً يملك roles (وإلا فالمستخدم ليس في السيرفر)
+      if (value && value.roles !== undefined) return value;
+      if (required) throw new Error('العضو غير موجود في السيرفر');
+      return null;
+    },
     getRole: (name: string, required?: boolean) => this.read(name, required),
     getChannel: (name: string, required?: boolean) => this.read(name, required),
     getMentionable: (name: string, required?: boolean) => this.read(name, required),
@@ -197,8 +211,16 @@ class AliasInteraction {
 
   async deferUpdate() {}
 
-  async showModal() {
-    throw new Error('هذا الأمر يحتاج نافذة إدخال ولا يمكن تنفيذه من الاختصار');
+  async showModal(modal?: any) {
+    // النوافذ (Modals) لا يمكن فتحها من رسالة عادية في ديسكورد.
+    // نرسل رسالة إرشادية بلطف بدل رمي خطأ.
+    const title = modal?.data?.title || 'هذه النافذة';
+    await respond(
+      this.message,
+      `🔐 ${title} — لا يمكن فتح نافذة الإدخال من الاختصار.\n` +
+        `استخدم أمر السلاش مباشرة: \`/${this.commandName}\`\n` +
+        `> 💡 بعد إدخال كلمة المرور مرة واحدة، يصبح الاختصار متاحاً لمدة 30 دقيقة.`
+    );
   }
 }
 
@@ -384,6 +406,13 @@ export async function executeCommandFromMessage(
     // ----- جلب المستخدمين/الرولات/القنوات -----
     for (const [name, p] of prefetch) {
       if (p.kind === 'user' || p.kind === 'mentionable') {
+        // نجلب GuildMember حقيقياً (يملك roles) أولاً — أوامر الإشراف (ترقية/حظر/كتم) تحتاج roles
+        const member = await guild.members.fetch(p.id).catch(() => null);
+        if (member) {
+          // GuildMember يحتوي .user و roles — يعمل مع getUser و getMember معاً
+          values.set(name, member);
+          continue;
+        }
         const user = await client.users.fetch(p.id).catch(() => null);
         if (user) {
           values.set(name, user);

@@ -7,13 +7,17 @@
 // والتنفيذ حتمي (regex) وليس بقرار الذكاء الاصطناعي.
 // ============================================
 
-import { Message, GuildMember, User, PermissionFlagsBits } from 'discord.js';
+import { Message, GuildMember, User, PermissionFlagsBits, EmbedBuilder, ChannelType, TextChannel, ColorResolvable } from 'discord.js';
 import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
+import { getGuildSettings } from '../models';
+import { Colors } from '../utils/embeds';
 
 const logger = createLogger('AIModeration');
 
-type ModerationAction = 'ban' | 'kick' | 'timeout' | 'untimeout' | 'warn';
+type ModerationAction = 
+  'ban' | 'kick' | 'timeout' | 'untimeout' | 'warn' |
+  'role_create' | 'role_delete' | 'role_add' | 'role_remove' | 'promote' | 'jail' | 'lockdown';
 
 interface ActionDef {
   action: ModerationAction;
@@ -54,6 +58,49 @@ const ACTIONS: ActionDef[] = [
     patterns: /تحذير|إنذار|انذار|(?:^|\W)warn(?:$|\W)/i,
     permission: PermissionFlagsBits.ModerateMembers,
     label: 'تحذير',
+  },
+  // ========== أوامر إدارة السيرفر الجديدة ==========
+  {
+    action: 'role_create',
+    patterns: /إنشاء\s*رول|انشاء\s*رول|عمل\s*رول|اضافة\s*رول|create\s*role|make\s*role/i,
+    permission: PermissionFlagsBits.ManageRoles,
+    label: 'إنشاء رول',
+  },
+  {
+    action: 'role_delete',
+    patterns: /حذف\s*رول|مسح\s*رول|إزالة\s*رول|delete\s*role|remove\s*role/i,
+    permission: PermissionFlagsBits.ManageRoles,
+    label: 'حذف رول',
+  },
+  {
+    action: 'role_add',
+    patterns: /اعطِ?\s*رول|أضف\s*رول|اعطاء\s*رول|اعطِ?\s*دور|اعطِ?\s* رتبه|اعطِ?\s*رتبة|give\s*role|add\s*role|grant\s*role/i,
+    permission: PermissionFlagsBits.ManageRoles,
+    label: 'إضافة رول لعضو',
+  },
+  {
+    action: 'role_remove',
+    patterns: /أزل\s*رول|إزالة\s*رول|حذف\s*رول\s*من|سحب\s*رول|مسح\s*رول\s*من|remove\s*role|take\s*role/i,
+    permission: PermissionFlagsBits.ManageRoles,
+    label: 'إزالة رول من عضو',
+  },
+  {
+    action: 'promote',
+    patterns: /ترقيه|ترقية|رقِ?ه|رقى|promote|upgrade\s*role/i,
+    permission: PermissionFlagsBits.ManageRoles,
+    label: 'ترقية عضو',
+  },
+  {
+    action: 'jail',
+    patterns: /سجن|حبس|عزل|jail|put\s*in\s*jail/i,
+    permission: PermissionFlagsBits.ManageRoles | PermissionFlagsBits.ManageChannels,
+    label: 'سجن عضو',
+  },
+  {
+    action: 'lockdown',
+    patterns: /طوارئ|اقفال|اقفال\s*السيرفر|اقفال\s*الكل|lockdown|lock\s*server/i,
+    permission: PermissionFlagsBits.Administrator,
+    label: 'وضع الطوارئ',
   },
 ];
 
@@ -308,6 +355,246 @@ export async function executeAIModeration(
           reason,
         });
         embed = result.embed;
+        break;
+      }
+      // ========== أوامر إدارة السيرفر الجديدة ==========
+      case 'role_create': {
+        const roleName = question.match(/رول\s+(?:اسمه|اسمه\s*)?([^ل]+?)(?:\s+بلون|\s*$)/i)?.[1]?.trim() || 'رول جديد';
+        const colorMatch = question.match(/لون\s*(?:#?[0-9a-fA-F]{6})/i);
+        const color = colorMatch ? colorMatch[0].replace(/لون\s*/i, '') : '#5865F2';
+        
+        const newRole = await guild.roles.create({
+          name: roleName.substring(0, 100),
+          color: color as ColorResolvable,
+          reason: `${reason} | بواسطة ${moderator.user.tag}`,
+        });
+        
+        embed = new EmbedBuilder()
+          .setTitle('✅ تم إنشاء الرول')
+          .setColor(Colors.success)
+          .addFields(
+            { name: '🎭 الرول', value: `${newRole}`, inline: true },
+            { name: '🎨 اللون', value: color, inline: true },
+            { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
+          )
+          .setTimestamp();
+        break;
+      }
+      case 'role_delete': {
+        const role = message.mentions.roles.first() || 
+          guild.roles.cache.find(r => r.name.toLowerCase().includes(question.replace(/حذف\s*رول|مسح\s*رول|إزالة\s*رول|delete\s*role/i, '').trim().toLowerCase()));
+        if (!role) throw new Error('لم يتم العثور على الرول — منشن الرول أو اكتب اسمه');
+        
+        if (role.managed) throw new Error('لا يمكن حذف رول مدار (بوتات/تكاملات)');
+        if (role.position >= guild.members.me!.roles.highest.position) 
+          throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد حذفه');
+        
+        await role.delete(`${reason} | بواسطة ${moderator.user.tag}`);
+        
+        embed = new EmbedBuilder()
+          .setTitle('🗑️ تم حذف الرول')
+          .setColor(Colors.error)
+          .addFields(
+            { name: '🎭 الرول', value: role.name, inline: true },
+            { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
+          )
+          .setTimestamp();
+        break;
+      }
+      case 'role_add': {
+        const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+        if (!member) throw new Error('العضو غير موجود في السيرفر');
+        
+        const role = message.mentions.roles.first() || 
+          guild.roles.cache.find(r => r.name.toLowerCase().includes(question.replace(/اعطِ?\s*رول|أضف\s*رول|اعطاء\s*رول|give\s*role|add\s*role/i, '').trim().toLowerCase()));
+        if (!role) throw new Error('لم يتم العثور على الرول — منشن الرول أو اكتب اسمه');
+        
+        if (member.roles.cache.has(role.id)) throw new Error('العضو يملك هذا الرول بالفعل');
+        if (role.position >= guild.members.me!.roles.highest.position)
+          throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المضاف');
+        
+        const isOwner = message.author.id === guild.ownerId;
+        const executorMember = message.member as GuildMember;
+        if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0)
+          throw new Error('رتبتك يجب أن تكون أعلى من الرول المضاف');
+        
+        await member.roles.add(role, `${reason} | بواسطة ${moderator.user.tag}`);
+        
+        embed = new EmbedBuilder()
+          .setTitle('➕ تم إضافة الرول')
+          .setColor(Colors.success)
+          .addFields(
+            { name: '👤 العضو', value: `${member}`, inline: true },
+            { name: '🎭 الرول', value: `${role}`, inline: true },
+            { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
+          )
+          .setTimestamp();
+        break;
+      }
+      case 'role_remove': {
+        const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+        if (!member) throw new Error('العضو غير موجود في السيرفر');
+        
+        const role = message.mentions.roles.first() || 
+          guild.roles.cache.find(r => r.name.toLowerCase().includes(question.replace(/أزل\s*رول|إزالة\s*رول|سحب\s*رول|remove\s*role/i, '').trim().toLowerCase()));
+        if (!role) throw new Error('لم يتم العثور على الرول — منشن الرول أو اكتب اسمه');
+        
+        if (!member.roles.cache.has(role.id)) throw new Error('العضو لا يملك هذا الرول أصلاً');
+        if (role.position >= guild.members.me!.roles.highest.position)
+          throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد إزالته');
+        
+        const isOwner = message.author.id === guild.ownerId;
+        const executorMember = message.member as GuildMember;
+        if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0)
+          throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد إزالته');
+        
+        await member.roles.remove(role, `${reason} | بواسطة ${moderator.user.tag}`);
+        
+        embed = new EmbedBuilder()
+          .setTitle('➖ تم إزالة الرول')
+          .setColor(Colors.warning)
+          .addFields(
+            { name: '👤 العضو', value: `${member}`, inline: true },
+            { name: '🎭 الرول', value: `${role}`, inline: true },
+            { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
+          )
+          .setTimestamp();
+        break;
+      }
+      case 'promote': {
+        const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+        if (!member) throw new Error('العضو غير موجود في السيرفر');
+        
+        const botTopRole = guild.members.me!.roles.highest;
+        const executorTopRole = (message.member as GuildMember).roles.highest;
+        const memberTopRole = member.roles.highest;
+        const isOwner = message.author.id === guild.ownerId;
+        
+        const higherRoles = guild.roles.cache
+          .filter(r => 
+            r.position > memberTopRole.position &&
+            r.position < botTopRole.position &&
+            r.id !== guild.id &&
+            !r.managed
+          )
+          .filter(r => isOwner || r.position <= executorTopRole.position)
+          .sort((a, b) => a.position - b.position);
+        
+        if (higherRoles.size === 0) throw new Error('لا يوجد رول أعلى متاح للترقية');
+        
+        const newRole = higherRoles.first()!;
+        await member.roles.add(newRole, `${reason} | بواسطة ${message.author.tag}`);
+        
+        embed = new EmbedBuilder()
+          .setTitle('⬆️ تم ترقية العضو')
+          .setColor(Colors.success)
+          .addFields(
+            { name: '👤 العضو', value: `${member}`, inline: true },
+            { name: '🎭 الرول الجديد', value: `${newRole}`, inline: true },
+            { name: '🛡️ المنفذ', value: `${message.author.tag}`, inline: true },
+          )
+          .setTimestamp();
+        break;
+      }
+      case 'jail': {
+        const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+        if (!member) throw new Error('العضو غير موجود في السيرفر');
+        
+        const settings = await getGuildSettings(guild.id);
+        let jailChannel = message.mentions.channels.first();
+        if (!jailChannel && settings.jail?.channelId) {
+          jailChannel = guild.channels.cache.get(settings.jail.channelId) as TextChannel;
+        }
+        if (!jailChannel) throw new Error('لم يتم تحديد روم السجن — منشن الروم أو اضبطه في الإعدادات');
+        
+        let jailRole = guild.roles.cache.find(r => r.name === '🔒 جايـل' || r.name === 'Jail');
+        if (!jailRole) {
+          jailRole = await guild.roles.create({
+            name: '🔒 جايـل',
+            color: 0x555555,
+            reason: 'رول السجن التلقائي',
+            permissions: [],
+          });
+        }
+        
+        if (member.roles.cache.has(jailRole.id)) throw new Error('العضو مسجون بالفعل');
+        if (jailRole.position >= guild.members.me!.roles.highest.position)
+          throw new Error('رتبة البوت يجب أن تكون أعلى من رول السجن');
+        
+        // Save current roles
+        const currentRoles = member.roles.cache
+          .filter(r => r.id !== guild.id && r.id !== jailRole.id)
+          .map(r => r.id);
+        
+        await member.roles.add(jailRole, `${reason} | بواسطة ${message.author.tag}`);
+        
+        // Apply channel overwrites
+        const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
+        for (const channel of channels.values()) {
+          if (channel.id === jailChannel.id) continue;
+          if ('permissionOverwrites' in channel) {
+            try {
+              await channel.permissionOverwrites.edit(jailRole, { ViewChannel: false, SendMessages: false, Connect: false }, { reason: `سجن ${member.user.tag}` });
+            } catch {}
+          }
+        }
+        
+        // Allow in jail channel
+        try {
+          if ('permissionOverwrites' in jailChannel) {
+            await jailChannel.permissionOverwrites.edit(jailRole, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: `سجن ${member.user.tag}` });
+          }
+        } catch {}
+        
+        // Save jail data
+        const { JailData } = await import('../models');
+        await JailData.findOneAndUpdate(
+          { guildId: guild.id, userId: member.id },
+          { guildId: guild.id, userId: member.id, previousRoles: currentRoles, jailRoleId: jailRole.id, jailedBy: message.author.id, reason, jailedAt: new Date(), jailChannelId: jailChannel.id },
+          { upsert: true }
+        );
+        
+        embed = new EmbedBuilder()
+          .setTitle('🔒 تم سجن العضو')
+          .setColor(Colors.error)
+          .addFields(
+            { name: '👤 العضو', value: `${member}`, inline: true },
+            { name: '🔒 روم السجن', value: `${jailChannel}`, inline: true },
+            { name: '🛡️ المنفذ', value: `${message.author.tag}`, inline: true },
+          )
+          .setTimestamp();
+        break;
+      }
+      case 'lockdown': {
+        const state = question.includes('إلغاء') || question.includes('إيقاف') || question.includes('off') ? false : true;
+        
+        if (state) {
+          const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
+          for (const channel of channels.values()) {
+            if ('permissionOverwrites' in channel) {
+              try {
+                await channel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false, Connect: false }, { reason: `Lockdown by ${message.author.tag}` });
+              } catch {}
+            }
+          }
+          embed = new EmbedBuilder()
+            .setTitle('🔒 تم تفعيل وضع الطوارئ')
+            .setColor(Colors.error)
+            .setDescription('تم قفل جميع القنوات — لا يستطيع الأعضاء إرسال رسائل أو دخول الغرف الصوتية');
+        } else {
+          const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
+          for (const channel of channels.values()) {
+            if ('permissionOverwrites' in channel) {
+              try {
+                await channel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: null, Connect: null }, { reason: `Lockdown removed by ${message.author.tag}` });
+              } catch {}
+            }
+          }
+          embed = new EmbedBuilder()
+            .setTitle('🔓 تم إلغاء وضع الطوارئ')
+            .setColor(Colors.success)
+            .setDescription('تم فتح جميع القنوات — عاد الأعضاء للكتابة والدخول');
+        }
         break;
       }
     }

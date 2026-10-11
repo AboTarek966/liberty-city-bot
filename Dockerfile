@@ -19,5 +19,6 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
+COPY assets ./assets
 
 CMD ["node", "dist/index.js"]

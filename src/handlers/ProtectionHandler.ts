@@ -78,19 +78,25 @@ export class ProtectionHandler {
     // Skip if channel is ignored
     if (this.isIgnoredChannel(message.channel.id, settings)) return null;
 
-    // Check each protection type
+    const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator) ||
+                    message.member.permissions.has(PermissionFlagsBits.ManageMessages);
+
+    // Check each protection type — الإدارين يتجاوزون الحماية العامة فقط
     const checks = [
-      this.checkAntiSpam.bind(this),
-      this.checkAntiLink.bind(this),
-      this.checkAntiInvite.bind(this),
-      this.checkAntiMention.bind(this),
-      this.checkAntiCaps.bind(this),
-      this.checkAntiEmoji.bind(this),
-      this.checkAutoMod.bind(this),
-      this.checkZalgo.bind(this),
+      { name: 'antiSpam', check: this.checkAntiSpam.bind(this), adminBypass: true },
+      { name: 'antiLink', check: this.checkAntiLink.bind(this), adminBypass: true },
+      { name: 'antiInvite', check: this.checkAntiInvite.bind(this), adminBypass: true },
+      { name: 'antiMention', check: this.checkAntiMention.bind(this), adminBypass: true },
+      { name: 'antiCaps', check: this.checkAntiCaps.bind(this), adminBypass: true },
+      { name: 'antiEmoji', check: this.checkAntiEmoji.bind(this), adminBypass: true },
+      { name: 'autoMod', check: this.checkAutoMod.bind(this), adminBypass: false }, // للكل
+      { name: 'zalgo', check: this.checkZalgo.bind(this), adminBypass: false }, // للكل
     ];
 
-    for (const check of checks) {
+    for (const { name, check, adminBypass } of checks) {
+      // ⚡ الإدارين يتجاوزون هذا الفحص؟
+      if (isAdmin && adminBypass) continue;
+      
       const action = await check(message, settings);
       if (action) {
         await this.executeAction(message, action, settings);

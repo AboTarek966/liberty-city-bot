@@ -252,6 +252,17 @@ export class TicketHandler {
       .map((roleId: string) => guild.roles.cache.get(roleId))
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
 
+    const lockClaim = settings.tickets.lockUntilClaim;
+
+    // صلاحيات صاحب التذكرة: عرض + قراءة + مرفقات دائماً، والكتابة حسب خيار القفل
+    const userAllow: bigint[] = [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AttachFiles,
+      PermissionFlagsBits.EmbedLinks,
+    ];
+    if (!lockClaim) userAllow.push(PermissionFlagsBits.SendMessages);
+
     const permissionOverwrites = [
       {
         id: guild.roles.everyone.id,
@@ -259,13 +270,9 @@ export class TicketHandler {
       },
       {
         id: user.id,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory,
-          PermissionFlagsBits.AttachFiles,
-          PermissionFlagsBits.EmbedLinks,
-        ],
+        allow: userAllow,
+        // 🔒 خيار قفل التذكرة: صاحبها لا يكتب حتى يستلمها إداري
+        ...(lockClaim ? { deny: [PermissionFlagsBits.SendMessages] } : {}),
       },
       {
         id: this.client.user!.id,
@@ -281,17 +288,21 @@ export class TicketHandler {
       },
     ];
 
+    // صلاحيات فريق الدعم: قراءة + أدوات دائماً، والكتابة حسب خيار القفل
+    const supportAllow: bigint[] = [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AttachFiles,
+      PermissionFlagsBits.EmbedLinks,
+      PermissionFlagsBits.ManageMessages,
+    ];
+    if (!lockClaim) supportAllow.push(PermissionFlagsBits.SendMessages);
+
     for (const role of supportRoles) {
       permissionOverwrites.push({
         id: role.id,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory,
-          PermissionFlagsBits.AttachFiles,
-          PermissionFlagsBits.EmbedLinks,
-          PermissionFlagsBits.ManageMessages,
-        ],
+        allow: supportAllow,
+        ...(lockClaim ? { deny: [PermissionFlagsBits.SendMessages] } : {}),
       });
     }
 
@@ -317,10 +328,14 @@ export class TicketHandler {
 
     this.activeTickets.set(channel.id, ticket);
 
-    const welcomeEmbed = ticketEmbed({
-      title: `تذكرة ${type}`,
-      description:
-        `مرحباً ${user}! تم إنشاء تذكرتك بنجاح.\n\n` +
+    const pingContent = supportRoles.length > 0
+      ? supportRoles.map(r => `<@&${r.id}>`).join(' ')
+      : user.toString();
+
+    // 🎫 رسالة الترحيب — يمكن تفعيلها/تعطيلها من الإعدادات (الافتراضي: معطّلة)
+    if (settings.tickets.welcomeEnabled) {
+      const welcomeMessage =
+        `مرحباً ${user}! تم إنشاء تذكرتك بنجاح ✅\n\n` +
         `**رقم التذكرة:** \`${ticketId}\`\n` +
         `**النوع:** ${type}\n\n` +
         `فريق الدعم سيتواصل معك في أقرب وقت.\n` +
@@ -329,34 +344,18 @@ export class TicketHandler {
         `⚙️ **اختر من قائمة الخيارات بالأسفل:**\n` +
         `> ➕ إضافة عضو أو إداري • 👑 استدعاء الإدارة العليا\n` +
         `> 🤝 استلام التذكرة •↩️ إلغاء الاستلام\n` +
-        `> 🔒 إغلاق • 🗑️ حذف • 📄 نسخة المحادثة`,
-      user: user.user,
-      type,
-      status: 'open',
-      priority: 'medium',
-      fields,
-    });
+        `> 🔒 إغلاق • 🗑️ حذف • 📄 نسخة المحادثة`;
 
-    await channel.send({
-      content: supportRoles.length > 0
-        ? supportRoles.map(r => `<@&${r.id}>`).join(' ')
-        : user.toString(),
-      embeds: [welcomeEmbed],
-      components: this.buildTicketControls(false),
-    });
-
-    // الرسالة التلقائية المخصصة داخل التذكرة (إن كانت مفعّلة من الإعدادات)
-    const autoMessage =
-      settings.tickets.autoMessage ||
-      '🎫 تم فتح تذكرتك رقم **{ticket}**!\nفريق الدعم سيرد عليك في أقرب وقت — صف مشكلتك بوضوح لتسريع الرد 💬';
-    if (settings.tickets.autoMessageEnabled) {
-      const autoText = autoMessage
-        .replace(/\{user\}/g, `<@${user.id}>`)
-        .replace(/\{ticket\}/g, ticketId)
-        .replace(/\{server\}/g, guild.name);
-      if (autoText.trim()) {
-        await channel.send({ content: autoText.substring(0, 2000) }).catch(() => {});
-      }
+      await channel.send({
+        content: `${pingContent}\n\n${welcomeMessage}`,
+        components: this.buildTicketControls(false),
+      });
+    } else {
+      // بدون رسالة ترحيب — أرسل فقط أزرار التحكم
+      await channel.send({
+        content: pingContent,
+        components: this.buildTicketControls(false),
+      });
     }
 
     await this.logTicketEvent(guild, 'create', ticket, user.user);
@@ -560,22 +559,37 @@ export class TicketHandler {
     ticket.claimedBy = claimedBy.id;
     await ticket.save();
 
+    // 📊 تحديث إحصائيات الاستلام لهذا الإداري
+    const settings = await getGuildSettings(claimedBy.guild.id);
+    const currentCount = settings.tickets.claimStats?.get(claimedBy.id) || 0;
+    settings.tickets.claimStats.set(claimedBy.id, currentCount + 1);
+    await settings.save();
+
     this.activeTickets.set(channelId, ticket);
 
     const channel = claimedBy.guild.channels.cache.get(channelId) as TextChannel;
     if (channel) {
-      // 🔒 قفل التذكرة: الكتابة للمستلم والإدارة العليا فقط
+      // 🔒 قفل التذكرة: الكتابة للمستلم + الأدمن فقط
       await this.applyClaimLock(claimedBy.guild, ticket, channel, claimedBy).catch(err =>
         logger.warn('Failed to apply claim lock:', err)
       );
+
+      // ✅ منح صاحب التذكرة صلاحية الكتابة إن كان القفل مفعّلاً عند الفتح
+      if (settings.tickets.lockUntilClaim && ticket.userId !== claimedBy.id) {
+        await channel.permissionOverwrites
+          .edit(ticket.userId, {
+            SendMessages: true,
+          })
+          .catch(() => {});
+      }
 
       const claimEmbed = createEmbed({
         title: '🤝 تم استلام التذكرة',
         description:
           `تم استلام التذكرة بواسطة ${claimedBy}\n\n` +
-          `🔒 **تم قفل التذكرة:** فريق الدعم يمكنهم **القراءة فقط** — الكتابة للمستلم والإدارة العليا.\n` +
+          `🔒 **تم قفل التذكرة:** الكتابة للمستلم + الأدمن فقط — بقية فريق الدعم للقراءة فقط.\n` +
           `📌 لمنح إداري معيّن صلاحية الكتابة اختر **➕ إضافة عضو أو إداري** من قائمة الخيارات.\n\n` +
-          `يمكن لغيره طلب **إلغاء الاستلام** إذا لزم الأمر.`,
+          `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``,
         color: Colors.success,
         footer: { text: 'Liberty City Tickets' },
       });
@@ -696,15 +710,15 @@ export class TicketHandler {
       }
     }
 
-    // 3) الإدارة العليا (Administrator أو ManageGuild) — منح كتابة للأعضاء
-    const seniorRoles = guild.roles.cache.filter(
+    // 3) الإدارة العليا (Administrator فقط) — يمكنهم الكتابة دائماً
+    // ⚠️ لا يُمنح صلاحية الكتابة لمن يملك ManageGuild فقط — المستلم فقط + الأدمن
+    const adminRoles = guild.roles.cache.filter(
       r =>
         r.id !== guild.roles.everyone.id &&
-        (r.permissions.has(PermissionFlagsBits.Administrator) ||
-          r.permissions.has(PermissionFlagsBits.ManageGuild))
+        r.permissions.has(PermissionFlagsBits.Administrator)
     );
 
-    for (const role of seniorRoles.values()) {
+    for (const role of adminRoles.values()) {
       for (const [memberId, member] of guild.members.cache) {
         if (granted.includes(memberId)) continue;
         if (member.id === ticket.userId) continue; // صاحب التذكرة يملك الوصول أصلاً
@@ -1010,6 +1024,47 @@ export class TicketHandler {
       }
 
       await logChannel.send({ embeds: [logEmbed] });
+      
+      // Also send to LoggingHandler for ticket event tracking
+      const libertyClient = this.client as any; // LibertyClient
+      const loggingHandler = libertyClient.loggingHandler;
+      if (loggingHandler) {
+        const map: Record<string, 'ticketCreate' | 'ticketClose' | 'ticketReopen' | 'ticketDelete' | 'ticketClaim' | 'ticketTransfer' | 'ticketAddUser' | 'ticketRemoveUser'> = {
+          create: 'ticketCreate',
+          close: 'ticketClose',
+          claim: 'ticketClaim',
+          delete: 'ticketDelete',
+          unclaim: 'ticketReopen',
+          call_admin: 'ticketTransfer', // closest match
+          add_member: 'ticketAddUser',
+        };
+        const logEvent = map[event];
+        if (logEvent) {
+          const ticketData = {
+            guild,
+            channel: { id: ticket.channelId },
+            creator: user,
+            panelName: 'Ticket',
+            closer: user,
+            reason: reason,
+            transcriptUrl: undefined,
+            reopener: user,
+            deleter: user,
+            claimer: user,
+            from: user,
+            to: user,
+            adder: user,
+            added: user,
+            removed: user,
+          };
+          // Call the appropriate handler
+          if (logEvent === 'ticketCreate') loggingHandler.handleTicketCreate({ guild, channel: { id: ticket.channelId }, creator: user });
+          else if (logEvent === 'ticketClose') loggingHandler.handleTicketClose({ guild, channel: { id: ticket.channelId }, closer: user, reason });
+          else if (logEvent === 'ticketReopen') loggingHandler.handleTicketReopen({ guild, channel: { id: ticket.channelId }, reopener: user });
+          else if (logEvent === 'ticketDelete') loggingHandler.handleTicketDelete({ guild, channelId: ticket.channelId, deleter: user });
+          else if (logEvent === 'ticketClaim') loggingHandler.handleTicketClaim({ guild, channel: { id: ticket.channelId }, claimer: user });
+        }
+      }
     } catch (error) {
       logger.error('Failed to log ticket event:', error);
     }
@@ -1150,8 +1205,16 @@ export class TicketHandler {
 
     const selectRow = new ActionRowBuilder<any>().addComponents(selectMenu);
 
-    // زر "تذكرة عامة" أُزيل بناءً على طلب المالك — القائمة المنسدلة هي الوسيلة الوحيدة لفتح تذكرة
-    return [selectRow];
+    // زر "إعادة تعيين الطلب" — يحذف تذكرتك المفتوحة حتى تتمكن من فتح تذكرة جديدة
+    const resetBtn = new ButtonBuilder()
+      .setCustomId('ticket_reset')
+      .setLabel('إعادة تعيين الطلب')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('🔄');
+
+    const buttonRow = new ActionRowBuilder<any>().addComponents(resetBtn);
+
+    return [selectRow, buttonRow];
   }
 
   // --------------------------------------------

@@ -10,6 +10,7 @@ import {
   TextChannel,
   ChannelType,
   PermissionFlagsBits,
+  ColorResolvable,
 } from 'discord.js';
 import { createLogger, parseDuration, formatDuration } from '../utils/helpers';
 import {
@@ -346,6 +347,62 @@ export class ModerationHandler {
   }
 
   // --------------------------------------------
+  // Unwarn (إزالة تحذير)
+  // --------------------------------------------
+  async unwarn(options: ModerationOptions): Promise<{ case: any; embed: any; warningCount: number }> {
+    const { guild, moderator, target, reason } = options;
+    const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
+
+    const warningCount = await Warning.countDocuments({
+      guildId: guild.id,
+      userId: target.id,
+    });
+
+    if (warningCount === 0) {
+      throw new Error('هذا العضو ليس لديه أي تحذيرات');
+    }
+
+    // إزالة أحدث تحذير
+    const latest = await Warning.findOne({ guildId: guild.id, userId: target.id })
+      .sort({ createdAt: -1 });
+    if (latest) {
+      await Warning.findByIdAndDelete(latest._id);
+    }
+
+    const remaining = Math.max(0, warningCount - 1);
+
+    const caseId = await getNextCaseId(guild.id);
+    const moderationCase = await ModerationCase.create({
+      guildId: guild.id,
+      caseId,
+      type: 'unwarn',
+      moderatorId: moderator.id,
+      targetId: target.id,
+      reason,
+      active: false,
+    });
+
+    await this.sendDM(target, {
+      title: '✅ إزالة تحذير',
+      description: `تم إزالة أحد تحذيراتك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**التحذيرات المتبقية:** ${remaining}\n\n**المشرف:** ${moderator.user.tag}`,
+      color: Colors.success,
+    });
+
+    const embed = moderationEmbed({
+      type: 'unwarn',
+      moderator: moderator.user,
+      target,
+      reason,
+      caseId,
+    });
+
+    await this.logAction(guild, embed);
+
+    logger.info(`Unwarned ${target.id} in ${guild.id} by ${moderator.id} (remaining: ${remaining})`);
+    return { case: moderationCase, embed, warningCount: remaining };
+  }
+
+  // --------------------------------------------
   // Check Warning Threshold
   // --------------------------------------------
   private async checkWarningThreshold(guild: Guild, userId: string, warningCount: number): Promise<void> {
@@ -490,6 +547,124 @@ export class ModerationHandler {
   }
 
   // --------------------------------------------
+  // Add Role (إضافة رول)
+  // --------------------------------------------
+  async addRole(options: {
+    guild: Guild;
+    moderator: GuildMember;
+    target: GuildMember;
+    reason: string;
+    roleId: string;
+  }): Promise<{ case: any; embed: any; simpleMsg: string }> {
+    const { guild, moderator, target, reason, roleId } = options;
+    const role = guild.roles.cache.get(roleId);
+    if (!role) throw new Error('الرول غير موجود');
+
+    if (!this.canModerate(moderator, target)) {
+      throw new Error('لا يمكنك إضافة رول لهذا العضو');
+    }
+    if (target.roles.cache.has(role.id)) {
+      throw new Error(`العضو يملك رول ${role.name} بالفعل`);
+    }
+    const isOwner = moderator.id === guild.ownerId;
+    if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
+      throw new Error('رتبتك يجب أن تكون أعلى من الرول المضاف');
+    }
+    if (guild.members.me!.roles.highest.comparePositionTo(role) <= 0) {
+      throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المضاف');
+    }
+
+    await target.roles.add(role, `${reason} | بواسطة ${moderator.user.tag}`);
+
+    const caseId = await getNextCaseId(guild.id);
+    const moderationCase = await ModerationCase.create({
+      guildId: guild.id,
+      caseId,
+      type: 'role_add',
+      moderatorId: moderator.id,
+      targetId: target.id,
+      reason,
+      active: false,
+    });
+
+    const embed = moderationEmbed({
+      type: 'role_add',
+      moderator: moderator.user,
+      target,
+      reason,
+      caseId,
+      extraFields: [{ name: 'الرول', value: `${role}`, inline: true }],
+    });
+    await this.logAction(guild, embed);
+
+    logger.info(`Added role ${roleId} to ${target.id} by ${moderator.id}`);
+    return {
+      case: moderationCase,
+      embed,
+      simpleMsg: `✅ **تم إضافة رول ${role} للعضو ${target} من قبل ${moderator}**`,
+    };
+  }
+
+  // --------------------------------------------
+  // Remove Role (إزالة رول)
+  // --------------------------------------------
+  async removeRole(options: {
+    guild: Guild;
+    moderator: GuildMember;
+    target: GuildMember;
+    reason: string;
+    roleId: string;
+  }): Promise<{ case: any; embed: any; simpleMsg: string }> {
+    const { guild, moderator, target, reason, roleId } = options;
+    const role = guild.roles.cache.get(roleId);
+    if (!role) throw new Error('الرول غير موجود');
+
+    if (!this.canModerate(moderator, target)) {
+      throw new Error('لا يمكنك إزالة رول من هذا العضو');
+    }
+    if (!target.roles.cache.has(role.id)) {
+      throw new Error(`العضو لا يملك رول ${role.name}`);
+    }
+    const isOwner = moderator.id === guild.ownerId;
+    if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
+      throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد إزالتها');
+    }
+    if (guild.members.me!.roles.highest.comparePositionTo(role) <= 0) {
+      throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد إزالتها');
+    }
+
+    await target.roles.remove(role, `${reason} | بواسطة ${moderator.user.tag}`);
+
+    const caseId = await getNextCaseId(guild.id);
+    const moderationCase = await ModerationCase.create({
+      guildId: guild.id,
+      caseId,
+      type: 'role_remove',
+      moderatorId: moderator.id,
+      targetId: target.id,
+      reason,
+      active: false,
+    });
+
+    const embed = moderationEmbed({
+      type: 'role_remove',
+      moderator: moderator.user,
+      target,
+      reason,
+      caseId,
+      extraFields: [{ name: 'الرول', value: `${role}`, inline: true }],
+    });
+    await this.logAction(guild, embed);
+
+    logger.info(`Removed role ${roleId} from ${target.id} by ${moderator.id}`);
+    return {
+      case: moderationCase,
+      embed,
+      simpleMsg: `✅ **تم إزالة رول ${role} من العضو ${target} من قبل ${moderator}**`,
+    };
+  }
+
+  // --------------------------------------------
   // Get or Create Mute Role
   // --------------------------------------------
   private async getMuteRole(guild: Guild): Promise<any> {
@@ -571,7 +746,7 @@ export class ModerationHandler {
   private async sendDM(user: User | GuildMember, data: {
     title: string;
     description: string;
-    color: string;
+    color: ColorResolvable;
   }): Promise<void> {
     try {
       const userObj = user instanceof GuildMember ? user.user : user;

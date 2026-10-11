@@ -20,6 +20,9 @@ export interface IGuildSettings extends Document {
   language: string;
   timezone: string;
   
+  // إعدادات الحماية بكلمة مرور
+  settingsPassword?: string; // كلمة مرور لوحة الإعدادات (افتراضي: 7421)
+  
   // Protection
   protection: {
     antiRaid: {
@@ -116,6 +119,12 @@ export interface IGuildSettings extends Document {
     surveyEnabled: boolean;
     /** رولات الإدارة العليا — تُمنشن فقط عند زر استدعاء الإدارة */
     adminRoleIds: string[];
+    /** 🔒 قفل التذكرة — لا يكتب صاحب التذكرة حتى يستلمها إداري */
+    lockUntilClaim: boolean;
+    /** 🎫 إرسال رسالة الترحيب داخل التذكرة (الزرار والخيارات) */
+    welcomeEnabled: boolean;
+    /** 📊 إحصائيات استلام التذاكر لكل إداري (userId → عدد التذاكر المستلمة) */
+    claimStats: Map<string, number>;
   };
   
   // Logging
@@ -123,10 +132,17 @@ export interface IGuildSettings extends Document {
     enabled: boolean;
     channelId?: string;
     types: string[];
+    /** 🔀 تقسيم: نوع الحدث → قناة مخصصة (وإلا يذهب للقناة الرئيسية) */
+    channels: Record<string, string>;
     ignoredChannels: string[];
     ignoredRoles: string[];
   };
-  
+
+  // 🕵️ سنايب — استرجاع الرسائل المحذوفة
+  snipe: {
+    enabled: boolean;
+  };
+
   // Welcome/Leave
   welcome: {
     enabled: boolean;
@@ -139,6 +155,22 @@ export interface IGuildSettings extends Document {
     embedColor: string;
     embedTitle: string;
     embedThumbnail?: string;
+    /** 🖼️ بطاقة ترحيب مخصصة على صورة (مثل ProBot) */
+    card: {
+      enabled: boolean;
+      backgroundUrl?: string;
+      avatarX: number;
+      avatarY: number;
+      avatarSize: number;
+      nameX: number;
+      nameY: number;
+      nameSize: number;
+      nameColor: string;
+      countX: number;
+      countY: number;
+      countSize: number;
+      countColor: string;
+    };
   };
   
   leave: {
@@ -146,6 +178,12 @@ export interface IGuildSettings extends Document {
     channelId?: string;
     message: string;
     embedColor: string;
+  };
+  // Jail (السجن)
+  jail: {
+    enabled: boolean;
+    channelId?: string; // روم السجن
+    jailRoleId?: string; // رول السجن
   };
   
   // AutoMod
@@ -313,7 +351,7 @@ export interface IRoleMenu {
 export interface IModerationCase extends Document {
   guildId: string;
   caseId: number;
-  type: 'ban' | 'kick' | 'mute' | 'unmute' | 'warn' | 'unwarn' | 'timeout' | 'untimeout' | 'softban' | 'note';
+  type: 'ban' | 'kick' | 'mute' | 'unmute' | 'warn' | 'unwarn' | 'timeout' | 'untimeout' | 'softban' | 'note' | 'role_add' | 'role_remove';
   moderatorId: string;
   targetId: string;
   reason: string;
@@ -332,6 +370,22 @@ export interface IWarning extends Document {
   reason: string;
   caseId: number;
   createdAt: Date;
+}
+
+/** بيانات السجن */
+export interface IJailData extends Document {
+  guildId: string;
+  userId: string;
+  previousRoles: string[];
+  jailRoleId: string;
+  jailedBy: string;
+  reason: string;
+  jailedAt: Date;
+  duration?: number; // ms, null = دائم
+  jailChannelId: string;
+  expiresAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ITicket extends Document {
@@ -541,6 +595,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   prefix: { type: String, default: 'lc!' },
   language: { type: String, default: 'ar' },
   timezone: { type: String, default: 'Asia/Riyadh' },
+  settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
   
   protection: {
     antiRaid: {
@@ -634,16 +689,25 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     counter: { type: Number, default: 0 },
     surveyEnabled: { type: Boolean, default: true },
     adminRoleIds: { type: [String], default: [] },
+    lockUntilClaim: { type: Boolean, default: false },
+    welcomeEnabled: { type: Boolean, default: false },
+    claimStats: { type: Map, of: Number, default: {} },
   },
   
   logging: {
     enabled: { type: Boolean, default: true },
     channelId: { type: String },
     types: [{ type: String }],
+    channels: { type: Schema.Types.Mixed, default: {} },
     ignoredChannels: [{ type: String }],
     ignoredRoles: [{ type: String }],
   },
-  
+
+  // 🕵️ سنايب (استرجاع الرسائل المحذوفة)
+  snipe: {
+    enabled: { type: Boolean, default: true },
+  },
+
   welcome: {
     enabled: { type: Boolean, default: true },
     channelId: { type: String },
@@ -655,6 +719,22 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     embedColor: { type: String, default: '#00D4FF' },
     embedTitle: { type: String, default: 'مرحباً بك!' },
     embedThumbnail: { type: String },
+    // 🖼️ بطاقة مخصصة (مساحة الرسم 800×300 — الإحداثيات من مركز كل عنصر)
+    card: {
+      enabled: { type: Boolean, default: false },
+      backgroundUrl: { type: String },
+      avatarX: { type: Number, default: 130 },
+      avatarY: { type: Number, default: 150 },
+      avatarSize: { type: Number, default: 170 },
+      nameX: { type: Number, default: 350 },
+      nameY: { type: Number, default: 130 },
+      nameSize: { type: Number, default: 52 },
+      nameColor: { type: String, default: '#FFFFFF' },
+      countX: { type: Number, default: 350 },
+      countY: { type: Number, default: 195 },
+      countSize: { type: Number, default: 28 },
+      countColor: { type: String, default: '#C7CED8' },
+    },
   },
   
   leave: {
@@ -755,7 +835,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
 const ModerationCaseSchema = new Schema<IModerationCase>({
   guildId: { type: String, required: true, index: true },
   caseId: { type: Number, required: true },
-  type: { type: String, enum: ['ban', 'kick', 'mute', 'unmute', 'warn', 'unwarn', 'timeout', 'untimeout', 'softban', 'note'], required: true },
+  type: { type: String, enum: ['ban', 'kick', 'mute', 'unmute', 'warn', 'unwarn', 'timeout', 'untimeout', 'softban', 'note', 'role_add', 'role_remove'], required: true },
   moderatorId: { type: String, required: true },
   targetId: { type: String, required: true, index: true },
   reason: { type: String, required: true },
@@ -778,6 +858,24 @@ const WarningSchema = new Schema<IWarning>({
   caseId: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now },
 });
+
+// Jail Data Schema
+const JailDataSchema = new Schema<IJailData>({
+  guildId: { type: String, required: true, index: true },
+  userId: { type: String, required: true, index: true },
+  previousRoles: [{ type: String }],
+  jailRoleId: { type: String, required: true },
+  jailedBy: { type: String, required: true },
+  reason: { type: String, required: true },
+  jailedAt: { type: Date, default: Date.now },
+  duration: { type: Number }, // ms, null = دائم
+  jailChannelId: { type: String, required: true },
+  expiresAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+JailDataSchema.index({ guildId: 1, userId: 1 }, { unique: true });
 
 // Ticket Schema
 const TicketFieldResponseSchema = new Schema<ITicketFieldResponse>({
@@ -880,6 +978,7 @@ const MuteRoleSchema = new Schema<IMuteRole>({
 export const GuildSettings = mongoose.model<IGuildSettings>('GuildSettings', GuildSettingsSchema);
 export const ModerationCase = mongoose.model<IModerationCase>('ModerationCase', ModerationCaseSchema);
 export const Warning = mongoose.model<IWarning>('Warning', WarningSchema);
+export const JailData = mongoose.model<IJailData>('JailData', JailDataSchema);
 export const Ticket = mongoose.model<ITicket>('Ticket', TicketSchema);
 export const AISession = mongoose.model<IAISession>('AISession', AISessionSchema);
 export const UserProfile = mongoose.model<IUserProfile>('UserProfile', UserProfileSchema);

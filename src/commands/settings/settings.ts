@@ -9,20 +9,29 @@ import {
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
-import { buildPanel, canManageSettings } from '../../utils/settingsPanel';
+import { buildPanel } from '../../utils/settingsPanel';
 
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName('settings')
     .setDescription('🎛️ لوحة إعدادات السيرفر — واجهة سهلة وجميلة لكل الإعدادات')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false),
 
   cooldown: 3,
-  permissions: [PermissionFlagsBits.ManageGuild],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!canManageSettings(interaction)) {
+    const member = interaction.member as any;
+    const perms = member?.permissions;
+    const hasAdminPerms = !!perms && (
+      perms.has(PermissionFlagsBits.ManageGuild) ||
+      perms.has(PermissionFlagsBits.Administrator)
+    );
+
+    // المالك دائماً مسموح له (حتى لو لم تظهر له الصلاحية صراحةً)
+    const isOwner = interaction.user.id === interaction.guild?.ownerId;
+
+    // إذا لم يكن لديه صلاحيات إدارية ولا هو المالك → ارفض
+    if (!hasAdminPerms && !isOwner) {
       await interaction.reply({
         content: '❌ تحتاج صلاحية **إدارة السيرفر** لفتح الإعدادات',
         ephemeral: true,
@@ -30,6 +39,8 @@ const command: Command = {
       return;
     }
 
+    // فتح اللوحة مباشرة — كلمة المرور تُطلب تلقائياً عند الضغط على أي زر للتعديل
+    // (الأزرار تعرض نافذة كلمة المرور، وهذا يعمل حتى لو فُتحت اللوحة من الاختصار)
     const panel = await buildPanel('home', interaction.guild!, interaction.user.id);
 
     await interaction.reply({

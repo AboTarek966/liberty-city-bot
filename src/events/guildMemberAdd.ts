@@ -82,6 +82,32 @@ async function handleAutoRole(member: GuildMember): Promise<void> {
 // --------------------------------------------
 export type WelcomeResult = 'sent' | 'disabled' | 'no-channel' | 'bad-channel' | 'failed';
 
+/** رسالة الترحيب الخاصة (مشتركة بين الإمبد والبطاقة المرسومة) */
+async function sendWelcomeDm(member: GuildMember, settings: any): Promise<void> {
+  if (!settings.welcome.dmEnabled) return;
+
+  const dmMessage = (settings.welcome.dmMessage || 'مرحباً بك في {server}! نتمنى لك وقتاً ممتعاً.')
+    .replace(/{user}/g, member.user.username)
+    .replace(/{server}/g, member.guild.name)
+    .replace(/{count}/g, member.guild.memberCount.toString());
+
+  const guildIcon = member.guild.iconURL();
+  await member
+    .send({
+      embeds: [
+        {
+          color: 0x00d4ff,
+          title: `👋 مرحباً بك في ${member.guild.name}!`,
+          description: dmMessage,
+          ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
+          footer: { text: 'Liberty City' },
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    })
+    .catch(() => {}); // Ignore DM failures
+}
+
 export async function handleWelcome(
   member: GuildMember,
   opts: { force?: boolean } = {}
@@ -104,6 +130,28 @@ export async function handleWelcome(
     .replace(/{server}/g, member.guild.name)
     .replace(/{count}/g, member.guild.memberCount.toString())
     .replace(/{member\.count}/g, member.guild.memberCount.toString());
+
+  // 🖼️ بطاقة مخصصة (ProBot-style): صورة مرسومة بدل الإمبد
+  const cardCfg = settings.welcome.card;
+  if (cardCfg?.enabled) {
+    try {
+      const { renderWelcomeCard, CARD_DEFAULTS } = await import('../utils/welcomeCard');
+      // دمج مع القيم الافتراضية لضمان وجود كل الخصائص الجديدة
+      const fullConfig = { ...CARD_DEFAULTS, ...cardCfg };
+      const buffer = await renderWelcomeCard(member, fullConfig);
+      const cardContent = message.trim() || `<@${member.id}>`;
+      await channel.send({
+        content: cardContent,
+        files: [{ attachment: buffer, name: 'welcome-card.png' }],
+      });
+      logger.info(`Welcomed ${member.user.tag} to ${member.guild.name} (card)`);
+      await sendWelcomeDm(member, settings);
+      return 'sent';
+    } catch (error) {
+      logger.error('Welcome card failed, falling back to embed:', error);
+      // فشل الرسم → نتابع للإمبد العادي
+    }
+  }
 
   // Send welcome embed
   const embed = welcomeEmbed({
@@ -128,24 +176,7 @@ export async function handleWelcome(
   if (!ok) return 'failed';
 
   // Send DM if enabled
-  if (settings.welcome.dmEnabled) {
-    const dmMessage = (settings.welcome.dmMessage || 'مرحباً بك في {server}! نتمنى لك وقتاً ممتعاً.')
-      .replace(/{user}/g, member.user.username)
-      .replace(/{server}/g, member.guild.name)
-      .replace(/{count}/g, member.guild.memberCount.toString());
-
-    const guildIcon = member.guild.iconURL();
-    await member.send({
-      embeds: [{
-        color: 0x00D4FF,
-        title: `👋 مرحباً بك في ${member.guild.name}!`,
-        description: dmMessage,
-        ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
-        footer: { text: 'Liberty City' },
-        timestamp: new Date().toISOString(),
-      }],
-    }).catch(() => {}); // Ignore DM failures
-  }
+  await sendWelcomeDm(member, settings);
 
   logger.info(`Welcomed ${member.user.tag} to ${member.guild.name}`);
   return 'sent';

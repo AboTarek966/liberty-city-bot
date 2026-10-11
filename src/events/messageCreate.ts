@@ -43,6 +43,18 @@ const event: Event = {
           const attachment = message.attachments.first();
           if (attachment && /\.(png|jpe?g|gif|webp)$/i.test(attachment.name || attachment.url)) {
             const settings = await getGuildSettings(message.guild.id);
+
+            // 🎴 خلفية بطاقة الترحيب
+            if (upload.kind === 'welcomeCard') {
+              settings.set('welcome.card.backgroundUrl', attachment.url);
+              await settings.save();
+              await message
+                .reply('✅ تم ضبط الصورة كخلفية لبطاقة الترحيب — افتح الإعدادات ← الترحيب ← 🎴 للتعديل والمعاينة')
+                .catch(() => {});
+              return;
+            }
+
+            // 🎫 صورة لوحة التذاكر
             const panels = settings.tickets.panels;
             const panel = panels[panels.length - 1];
             if (panel) {
@@ -171,7 +183,7 @@ async function handleAliasCommand(message: Message, client: LibertyClient): Prom
 // --------------------------------------------
 async function respond(
   message: Message,
-  payload: string | { embeds: EmbedBuilder[] }
+  payload: string | { embeds: EmbedBuilder[]; content?: string; components?: any[] }
 ): Promise<void> {
   const body = typeof payload === 'string' ? { content: payload } : payload;
 
@@ -214,6 +226,57 @@ async function executeAliasCommand(
   args: string[],
   shortcut: string
 ): Promise<void> {
+  // 🎫 أوامر تذاكر مخصصة (لا تحتاج أمر سلاش منفصل)
+  if (commandName === 'ticket_mystats' || commandName === 'ticket_top') {
+    const member = message.member;
+    if (!member) return;
+    if (!member.permissions.has(PermissionFlagsBits.SendMessages)) {
+      await respond(message, '❌ ليس لديك الصلاحيات الكافية');
+      return;
+    }
+    const settings = await getGuildSettings(message.guild!.id);
+
+    if (commandName === 'ticket_mystats') {
+      const count = settings.tickets.claimStats?.get(message.author.id) || 0;
+      const embed = new EmbedBuilder()
+        .setTitle('📊 إحصائياتك في التذاكر')
+        .setColor(Colors.primary)
+        .setDescription(
+          `👤 ${message.author}\n\n` +
+          `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
+          `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`
+        )
+        .setFooter({ text: 'Liberty City Tickets' })
+        .setTimestamp();
+      await respond(message, { embeds: [embed] });
+      await message.delete().catch(() => {});
+      return;
+    }
+
+    // ticket_top
+    const stats = settings.tickets.claimStats;
+    if (!stats || stats.size === 0) {
+      await respond(message, '📊 لا توجد إحصائيات استلام بعد.');
+      await message.delete().catch(() => {});
+      return;
+    }
+    const sorted = [...stats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const medals = ['🥇', '🥈', '🥉'];
+    const lines = sorted.map(([userId, count], i) => {
+      const medal = medals[i] || `\`${i + 1}.\``;
+      return `${medal} <@${userId}> — **${count}** تذكرة`;
+    });
+    const embed = new EmbedBuilder()
+      .setTitle('🏆 أعلى 10 إداريين في استلام التذاكر')
+      .setColor(Colors.primary)
+      .setDescription(lines.join('\n'))
+      .setFooter({ text: 'Liberty City Tickets' })
+      .setTimestamp();
+    await respond(message, { embeds: [embed] });
+    await message.delete().catch(() => {});
+    return;
+  }
+
   const command = client.commandHandler.getCommand(commandName);
   if (!command) {
     logger.warn(`Alias target command not found: "${commandName}"`);
@@ -375,6 +438,100 @@ async function runAliasCommand(
         reason,
       });
       return respond(message, { embeds: [result.embed] });
+    }
+
+    case 'untimeout': {
+      const userId = parseUserId(args[0]);
+      if (!userId) return usage('<@المستخدم>');
+      const target = await guild.members.fetch(userId).catch(() => null);
+      if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
+      if (!target.moderatable)
+        return respond(message, '❌ لا أستطيع إلغاء كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
+      if (!target.isCommunicationDisabled())
+        return respond(message, 'ℹ️ هذا العضو غير مكتوم أصلاً');
+
+      await target.timeout(null, `إلغاء تايم أوت بواسطة ${member.user.tag}`).catch(() => {
+        return respond(message, '❌ فشل إلغاء التايم أوت — تحقق من صلاحيات البوت');
+      });
+      return respond(message, `✅ **تم إلغاء تايم أوت** <@${userId}>`);
+    }
+
+    case 'unban': {
+      const userId = parseUserId(args[0]);
+      if (!userId) return usage('<@المستخدم / ID>');
+      const reason = args.slice(1).join(' ') || 'إلغاء حظر';
+      try {
+        await guild.members.unban(userId, reason).catch(() => {
+          return respond(message, '❌ فشل إلغاء الحظر — المستخدم غير محظور أو صلاحيات البوت');
+        });
+        return respond(message, `✅ **تم إلغاء الحظر** عن \`${userId}\``);
+      } catch {
+        return respond(message, '❌ فشل إلغاء الحظر');
+      }
+    }
+
+    case 'roleadd': {
+      const userId = parseUserId(args[0]);
+      const roleId = args[1]?.replace(/[<@&>]/g, '');
+      if (!userId) return usage('<@المستخدم> [@رول — أو اختر من القائمة]');
+
+      const target = await guild.members.fetch(userId).catch(() => null);
+      if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
+
+      // إذا لم يُحدد رول → أرسل قائمة اختيار الرولات
+      if (!roleId) {
+        const { RoleSelectMenuBuilder, ActionRowBuilder } = await import('discord.js') as any;
+        const select = new RoleSelectMenuBuilder()
+          .setCustomId(`alias_roleadd:${target.id}`)
+          .setPlaceholder(`➕ اختر الرول الذي تريد إضافته لـ ${target.user.username}`)
+          .setMinValues(1)
+          .setMaxValues(1);
+        const row = new ActionRowBuilder().addComponents(select);
+        await respond(message, {
+          content: `➕ **اختر الرول** الذي تريد إضافته لـ ${target}:`,
+          components: [row],
+        } as any);
+        return;
+      }
+
+      const role = guild.roles.cache.get(roleId);
+      if (!role) return respond(message, '❌ الرول غير موجود');
+      const reason = args.slice(2).join(' ') || 'إضافة رول';
+      try {
+        const result = await client.moderationHandler.addRole({
+          guild,
+          moderator: member,
+          target,
+          reason,
+          roleId,
+        });
+        return respond(message, { embeds: [result.embed] });
+      } catch (e: any) {
+        return respond(message, `❌ ${e.message}`);
+      }
+    }
+
+    case 'roleremove': {
+      const userId = parseUserId(args[0]);
+      const roleId = args[1]?.replace(/[<@&>]/g, '');
+      if (!userId || !roleId) return usage('<@المستخدم> <@الرول / ID>');
+      const reason = args.slice(2).join(' ') || 'إزالة رول';
+      const target = await guild.members.fetch(userId).catch(() => null);
+      if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
+      const role = guild.roles.cache.get(roleId);
+      if (!role) return respond(message, '❌ الرول غير موجود');
+      try {
+        const result = await client.moderationHandler.removeRole({
+          guild,
+          moderator: member,
+          target,
+          reason,
+          roleId,
+        });
+        return respond(message, { embeds: [result.embed] });
+      } catch (e: any) {
+        return respond(message, `❌ ${e.message}`);
+      }
     }
 
     // ---------- UTILITY ----------
@@ -548,6 +705,32 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
         .slice(0, 20) || [],
   };
 
+  // 📡 بث مباشر — أول كلمات من الذكاء الاصطناعي تظهر فوراً
+  let streamedMsg: any = null;
+  let lastEditAt = 0;
+  const preview = (text: string): string =>
+    text.length > 1900 ? text.slice(0, 1900) + '\n…' : text;
+
+  // خيارات الرسالة للإيموجي والمنشنز بشكل صحيح
+  const msgOptions = (text: string) => ({
+    content: text,
+    allowedMentions: { parse: ['users', 'roles', 'everyone'] as const },
+  });
+
+  const stream = {
+    onFirstChunk: async (text: string) => {
+      streamedMsg = await message.reply(msgOptions(preview(text)));
+      lastEditAt = Date.now();
+    },
+    onUpdate: async (text: string) => {
+      if (!streamedMsg) return;
+      const now = Date.now();
+      if (now - lastEditAt < 1000) return;
+      lastEditAt = now;
+      await streamedMsg.edit(msgOptions(preview(text))).catch(() => {});
+    },
+  };
+
   const response = await client.aiHandler.generateResponse(
     message.author.id,
     message.guild!.id,
@@ -556,12 +739,50 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
     memberRoles,
     isMention,
     repliedToBot,
-    { userContext }
+    { userContext, stream }
   );
 
   if (response) {
-    await message.reply(response.content).catch(() => {});
+    const parts = splitAiText(response.content, 1900);
+
+    if (streamedMsg) {
+      // الرد الأول مُرسَل أثناء البث — نضبطه بالمحتوى النهائي ثم نُكمل البقية
+      await streamedMsg.edit(msgOptions(parts[0])).catch(() => {});
+      for (let i = 1; i < parts.length; i++) {
+        if (message.channel.isTextBased() && 'send' in message.channel) {
+          await message.channel.send(msgOptions(parts[i])).catch(() => {});
+        }
+      }
+    } else {
+      // بدون بث (رزيرف/فشل) — رد عادي مع تقسيم الردود الطويلة
+      await message.reply(msgOptions(parts[0])).catch(async () => {
+        if (message.channel.isTextBased() && 'send' in message.channel) {
+          await message.channel.send(msgOptions(`<@${message.author.id}> ${parts[0]}`)).catch(() => {});
+        }
+      });
+      for (let i = 1; i < parts.length; i++) {
+        if (message.channel.isTextBased() && 'send' in message.channel) {
+          await message.channel.send(msgOptions(parts[i])).catch(() => {});
+        }
+      }
+    }
   }
+}
+
+// تقسيم نص الرد حسب حد ديسكورد (2000 حرف) عند أقرب سطر/مسافة
+function splitAiText(text: string, max: number): string[] {
+  if (text.length <= max) return [text];
+  const parts: string[] = [];
+  let rest = text;
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf('\n', max);
+    if (cut < max * 0.5) cut = rest.lastIndexOf(' ', max);
+    if (cut < max * 0.5) cut = max;
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) parts.push(rest);
+  return parts;
 }
 
 export default event;

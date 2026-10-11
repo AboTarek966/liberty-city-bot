@@ -13,9 +13,13 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  ChannelSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 
@@ -55,6 +59,66 @@ const handler: SelectMenuHandler = {
         .setCustomId(`settings_modal:levels:reward:${roleId}`)
         .setTitle('مستوى المكافأة')
         .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(levelInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // ✅ اختيار عنصر بطاقة الترحيب → مودال الإحداثيات (showModal كأول استجابة)
+    if (interaction.customId === 'settings_sel:welcome:cardpos') {
+      const element = interaction.values[0];
+      if (!['avatar', 'name', 'count'].includes(element)) {
+        await interaction.reply({ content: '❌ عنصر غير معروف', ephemeral: true });
+        return;
+      }
+      const st = await getGuildSettings(interaction.guild.id);
+      const c = (st.welcome as any).card || {};
+      const pos =
+        element === 'avatar'
+          ? { x: c.avatarX ?? 130, y: c.avatarY ?? 150, size: c.avatarSize ?? 170, color: '' }
+          : element === 'name'
+            ? { x: c.nameX ?? 350, y: c.nameY ?? 130, size: c.nameSize ?? 52, color: c.nameColor ?? '#FFFFFF' }
+            : { x: c.countX ?? 350, y: c.countY ?? 195, size: c.countSize ?? 28, color: c.countColor ?? '#C7CED8' };
+
+      const xInput = new TextInputBuilder()
+        .setCustomId('x')
+        .setLabel('الإحداثي الأفقي X (0-800)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setValue(String(pos.x))
+        .setRequired(true);
+      const yInput = new TextInputBuilder()
+        .setCustomId('y')
+        .setLabel('الإحداثي العمودي Y (0-300)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setValue(String(pos.y))
+        .setRequired(true);
+      const sizeInput = new TextInputBuilder()
+        .setCustomId('size')
+        .setLabel('الحجم بالبكسل')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setValue(String(pos.size))
+        .setRequired(true);
+
+      const modal = new ModalBuilder()
+        .setCustomId(`settings_modal:welcome:cardpos:${element}`)
+        .setTitle('📍 مواضع العنصر على البطاقة')
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(xInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(yInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(sizeInput)
+        );
+      if (element !== 'avatar') {
+        const colorInput = new TextInputBuilder()
+          .setCustomId('color')
+          .setLabel('اللون HEX (اختياري)')
+          .setStyle(TextInputStyle.Short)
+          .setMaxLength(7)
+          .setValue(pos.color || '')
+          .setRequired(false);
+        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(colorInput));
+      }
       await interaction.showModal(modal);
       return;
     }
@@ -177,6 +241,71 @@ const handler: SelectMenuHandler = {
       case 'logging:channel':
         (settings.logging as any).channelId = values[0] || null;
         break;
+      case 'jail:channel':
+        (settings.jail as any).channelId = values[0] || null;
+        break;
+      case 'logging:split': {
+        // 🔀 اختيار مجموعة → عرض قائمة قنوات لتعيين روم مخصص
+        const group = LOG_SPLIT_GROUPS.find((g) => g.id === values[0]);
+        if (!group) {
+          await interaction.editReply({ content: '❌ مجموعة غير معروفة', embeds: [], components: [] });
+          return;
+        }
+        const hint = new EmbedBuilder()
+          .setTitle(`${group.emoji} ${group.label}`)
+          .setColor(0x3498db)
+          .setDescription(
+            `اختر **الروم** الذي تُسجَّل فيه هذه الأحداث — أو اختر **0 قنوات** (زر Clear) لإرجاعها للقناة الرئيسية\n\n` +
+              `> الأنواع المشمولة: ${group.types.map((t) => `\`${t}\``).join('، ')}`
+          );
+        const channelRow = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+          new ChannelSelectMenuBuilder()
+            .setCustomId(`settings_sel:logging:split_ch:${group.id}`)
+            .setPlaceholder(`📤 اختر روم «${group.label}»`)
+            .setChannelTypes(ChannelType.GuildText)
+            .setMinValues(0)
+            .setMaxValues(1)
+        );
+        const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId('settings_btn:logging:split')
+            .setLabel('رجوع')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('↩️')
+        );
+        await interaction.editReply({ content: undefined, embeds: [hint], components: [channelRow, backRow] });
+        return;
+      }
+      case 'logging:split_ch': {
+        // 🔀 حفظ روم المجموعة (أو الإلغاء عند اختيار 0 قنوات)
+        const group = LOG_SPLIT_GROUPS.find((g) => g.id === parts[3]);
+        if (!group) {
+          await interaction.editReply({ content: '❌ مجموعة غير معروفة', embeds: [], components: [] });
+          return;
+        }
+        const channelId = values[0];
+        const channels: Record<string, string> = { ...(((settings.logging as any).channels as Record<string, string>) || {}) };
+        if (channelId) {
+          for (const t of group.types) channels[t] = channelId;
+        } else {
+          for (const t of group.types) delete channels[t];
+        }
+        (settings.logging as any).channels = channels;
+        await settings.save();
+        {
+          const client = interaction.client as LibertyClient;
+          client.loggingHandler?.invalidateCache?.(guildId);
+        }
+        const splitPanel = buildLoggingSplitPanel(interaction.guild!, settings);
+        await interaction.editReply({ content: undefined, embeds: splitPanel.embeds, components: splitPanel.components as any });
+        await interaction.followUp({
+          content: channelId
+            ? `✅ **${group.label}** ← <#${channelId}> — سيتم توجيهها هناك فوراً`
+            : `↩️ **${group.label}** — عادت للقناة الرئيسية`,
+          ephemeral: true,
+        });
+        return;
+      }
       case 'levels:channel':
         (settings.leveling as any).levelUpChannelId = values[0] || null;
         break;
@@ -198,7 +327,7 @@ const handler: SelectMenuHandler = {
         const preset = values[0];
         const ALL = [
           'messageDelete', 'messageEdit', 'memberJoin', 'memberLeave',
-          'memberBan', 'memberUnban', 'memberUpdate',
+          'memberBan', 'memberUnban', 'memberUpdate', 'memberTimeout',
           'channelCreate', 'channelDelete', 'channelUpdate',
           'roleCreate', 'roleDelete',
           'voiceStateUpdate', 'inviteCreate', 'inviteDelete',
@@ -206,7 +335,7 @@ const handler: SelectMenuHandler = {
         if (preset === 'all') settings.logging.types = ALL;
         else if (preset === 'none') settings.logging.types = [];
         else if (preset === 'messages') settings.logging.types = ['messageDelete', 'messageEdit'];
-        else if (preset === 'members') settings.logging.types = ['memberJoin', 'memberLeave', 'memberBan', 'memberUnban', 'memberUpdate'];
+        else if (preset === 'members') settings.logging.types = ['memberJoin', 'memberLeave', 'memberBan', 'memberUnban', 'memberUpdate', 'memberTimeout'];
         else if (preset === 'channels') settings.logging.types = ['channelCreate', 'channelDelete', 'channelUpdate'];
         else if (preset === 'roles') settings.logging.types = ['roleCreate', 'roleDelete'];
         else if (preset === 'voice') settings.logging.types = ['voiceStateUpdate'];

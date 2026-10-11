@@ -40,7 +40,7 @@ const command: Command = {
               { name: '🔨 حظر', value: 'ban' },
               { name: '👢 طرد', value: 'kick' },
               { name: '⏱️ تايم أوت (كتم مؤقت)', value: 'timeout' },
-              { name: '⚠️ تحذير', value: 'warn' },
+                            { name: '⚠️ تحذير', value: 'warn' },
               { name: '🔇 كتم دائم (رول)', value: 'mute' },
               { name: '🔊 فك الكتم', value: 'unmute' },
               { name: '🗑️ مسح الرسائل', value: 'purge' },
@@ -76,10 +76,21 @@ const command: Command = {
             .addChoices(
               { name: '⚙️ إعدادات السيرفر', value: 'settings' },
               { name: '🛡️ أنظمة الحماية', value: 'protection' },
+              { name: '🕵️ استرجاع رسالة محذوفة (سنايب)', value: 'snipe' },
               { name: '💾 نسخة احتياطية', value: 'backup' },
               { name: '⌨️ إدارة الاختصارات نفسها', value: 'alias' },
               { name: '🎭 قائمة رولات (روليميو)', value: 'rolemenu' },
-              { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' }
+              { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' },
+              { name: '➕ إضافة رول لعضو', value: 'roleadd' },
+              { name: '➖ إزالة رول من عضو', value: 'roleremove' },
+              { name: '🔓 إلغاء تايم أوت', value: 'untimeout' },
+              { name: '🔓 إلغاء حظر', value: 'unban' },
+              { name: '✅ إزالة تحذير', value: 'unwarn' },
+              { name: '⬆️ ترقية', value: 'promote' },
+              { name: '🚨 وضع الطوارئ', value: 'lockdown' },
+              { name: '🔒 سجن', value: 'jail' },
+              { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' },
+              { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' }
             )
         )
     )
@@ -189,10 +200,15 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     ban: `\`${shortcut} @عضو [السبب]\``,
     kick: `\`${shortcut} @عضو [السبب]\``,
     timeout: `\`${shortcut} @عضو 10m [السبب]\` • المدة: ` + '`10m` `1h` `1d`',
+    promote: `\${shortcut} @عضو [@رول] [السبب]`,
     warn: `\`${shortcut} @عضو [السبب]\``,
+    unwarn: `\`${shortcut} @عضو [السبب]\``,
     mute: `\`${shortcut} @عضو [السبب]\``,
     unmute: `\`${shortcut} @عضو [السبب]\``,
     purge: `\`${shortcut} 50\``,
+    snipe: `\`${shortcut}\` أو \`${shortcut} 2\` (رسالة أقدم)`,
+    untimeout: `\`${shortcut} @عضو\``,
+    unban: `\`${shortcut} @عضو\``,
     ping: `\`${shortcut}\``,
     say: `\`${shortcut} نص الرسالة\``,
     avatar: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
@@ -211,11 +227,15 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     poll: `\`${shortcut} السؤال خيار1 خيار2\``,
     ai: `\`${shortcut} سؤالك هنا\``,
     ticket: `\`${shortcut} close\` • \`${shortcut} list\``,
+    ticket_mystats: `\`${shortcut}\``,
+    ticket_top: `\`${shortcut}\``,
     settings: `\`${shortcut}\` (يفتح لوحة الإعدادات)`,
     protection: `\`${shortcut}\` (يفتح أنظمة الحماية)`,
     backup: `\`${shortcut} create\``,
     rolemenu: `\`${shortcut} create\``,
     autorole: `\`${shortcut} @رول\``,
+    roleadd: `${shortcut} @عضو @رول [السبب]`,
+    roleremove: `${shortcut} @عضو @رول [السبب]`
   };
   const example = usageExamples[cleanCommand] || `\`${shortcut}\``;
 
@@ -277,10 +297,14 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     ban: '🔨 حظر',
     kick: '👢 طرد',
     timeout: '⏱️ تايم أوت',
-    warn: '⚠️ تحذير',
+        warn: '⚠️ تحذير',
+    unwarn: '✅ إزالة تحذير',
     mute: '🔇 كتم',
     unmute: '🔊 فك الكتم',
     purge: '🗑️ مسح',
+    untimeout: '🔓 إلغاء تايم أوت',
+    unban: '🔓 إلغاء حظر',
+    snipe: '🕵️ سنايب',
     ping: '🏓 بينج',
     say: '💬 رسالة',
     avatar: '🖼️ أفاتار',
@@ -299,12 +323,16 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     poll: '📊 تصويت',
     ai: '🤖 ذكاء اصطناعي',
     ticket: '🎫 تذاكر',
+    ticket_mystats: '📊 تذاكري المستلمة',
+    ticket_top: '🏆 أعلى المستلمين',
     settings: '⚙️ إعدادات',
     protection: '🛡️ حماية',
     backup: '💾 نسخة احتياطية',
     alias: '⌨️ اختصارات',
     rolemenu: '🎭 روليميو',
     autorole: '➕ رول تلقائي',
+    roleadd: '➕ إضافة رول',
+    roleremove: '➖ إزالة رول',
   };
 
   const lines = aliases.slice(0, 30).map((a: any) => {

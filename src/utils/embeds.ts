@@ -10,13 +10,13 @@ import 'moment-duration-format';
 // --------------------------------------------
 // Color Helpers
 // --------------------------------------------
-export const Colors: Record<string, any> = {
-  primary: config.discord.colors.primary,
-  success: config.discord.colors.success,
-  warning: config.discord.colors.warning,
-  error: config.discord.colors.error,
-  info: config.discord.colors.info,
-  // Discord.js colors
+export const Colors: Record<string, ColorResolvable> = {
+  primary: config.discord.colors.primary as ColorResolvable,
+  success: config.discord.colors.success as ColorResolvable,
+  warning: config.discord.colors.warning as ColorResolvable,
+  error: config.discord.colors.error as ColorResolvable,
+  info: config.discord.colors.info as ColorResolvable,
+  // Discord.js colors (numeric values)
   ...DiscordColors,
 };
 
@@ -26,7 +26,7 @@ export const Colors: Record<string, any> = {
 export function createEmbed(options: {
   title?: string;
   description?: string;
-  color?: any;
+  color?: ColorResolvable;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   footer?: { text: string; iconURL?: string };
   thumbnail?: string;
@@ -103,13 +103,14 @@ export function primaryEmbed(title: string, description: string, footer?: string
 // Moderation Embeds
 // --------------------------------------------
 export function moderationEmbed(data: {
-  type: 'ban' | 'kick' | 'mute' | 'unmute' | 'warn' | 'timeout' | 'untimeout' | 'softban' | 'note';
+  type: 'ban' | 'kick' | 'mute' | 'unmute' | 'warn' | 'unwarn' | 'timeout' | 'untimeout' | 'softban' | 'note' | 'role_add' | 'role_remove';
   moderator: User | GuildMember;
   target: User | GuildMember;
   reason: string;
   caseId: number;
   duration?: string;
   proof?: string;
+  extraFields?: { name: string; value: string; inline?: boolean }[];
 }): EmbedBuilder {
   const typeEmojis: Record<string, string> = {
     ban: '🔨',
@@ -117,10 +118,13 @@ export function moderationEmbed(data: {
     mute: '🔇',
     unmute: '🔊',
     warn: '⚠️',
+    unwarn: '✅',
     timeout: '⏱️',
     untimeout: '▶️',
     softban: '🔨',
     note: '📝',
+    role_add: '➕',
+    role_remove: '➖',
   };
 
   const typeNames: Record<string, string> = {
@@ -129,17 +133,20 @@ export function moderationEmbed(data: {
     mute: 'كتم',
     unmute: 'إلغاء كتم',
     warn: 'تحذير',
+    unwarn: 'إزالة تحذير',
     timeout: 'مهلة زمنية',
     untimeout: 'إلغاء مهلة',
     softban: 'حظر ناعم',
     note: 'ملاحظة',
+    role_add: 'إضافة رول',
+    role_remove: 'إزالة رول',
   };
 
   const embed = createEmbed({
     title: `${typeEmojis[data.type]} ${typeNames[data.type]}`,
-    color: data.type === 'ban' || data.type === 'kick' ? Colors.error : 
-           data.type === 'mute' || data.type === 'timeout' ? Colors.warning :
-           data.type === 'warn' ? Colors.warning : Colors.success,
+    color: (data.type === 'ban' || data.type === 'kick' ? Colors.error :
+           data.type === 'mute' || data.type === 'timeout' || data.type === 'role_remove' ? Colors.warning :
+           data.type === 'warn' ? Colors.warning : Colors.success) as ColorResolvable,
     fields: [
       { name: '👤 العضو', value: `${data.target} (\`${data.target.id}\`)`, inline: true },
       { name: '🛡️ المنفذ', value: `${data.moderator} (\`${data.moderator.id}\`)`, inline: true },
@@ -156,6 +163,10 @@ export function moderationEmbed(data: {
 
   if (data.proof) {
     embed.addFields({ name: '📸 الدليل', value: data.proof, inline: false });
+  }
+
+  if (data.extraFields?.length) {
+    embed.addFields(...data.extraFields);
   }
 
   return embed;
@@ -266,10 +277,50 @@ export function ticketTranscriptEmbed(data: {
 // --------------------------------------------
 // Logging Embeds
 // --------------------------------------------
+// --------------------------------------------
+// Simple Moderation Messages (مختصرة)
+// --------------------------------------------
+export function simpleModMessage(
+  action: 'ban' | 'kick' | 'timeout' | 'untimeout' | 'warn' | 'unwarn' | 'mute' | 'unmute' | 'role_add' | 'role_remove' | 'promote' | 'jail' | 'lockdown',
+  target: User | GuildMember,
+  moderator: User | GuildMember,
+  reason: string,
+  duration?: string
+): string {
+  const actionMap: Record<string, string> = {
+    ban: 'حظر',
+    kick: 'طرد',
+    timeout: 'تايم أوت',
+    untimeout: 'فك تايم أوت',
+    warn: 'تحذير',
+    unwarn: 'إزالة تحذير',
+    mute: 'كتم',
+    unmute: 'فك كتم',
+    role_add: 'إضافة رول',
+    role_remove: 'إزالة رول',
+    promote: 'ترقية',
+    jail: 'سجن',
+    lockdown: 'طوارئ',
+  };
+
+  const actionText = actionMap[action] || action;
+  const targetMention = target instanceof GuildMember ? target.toString() : `<@${target.id}>`;
+  const modMention = moderator instanceof GuildMember ? moderator.toString() : `<@${moderator.id}>`;
+  
+  let msg = `✅ **تم ${actionText} للعضو ${targetMention} من قبل ${modMention}**`;
+  if (reason && reason !== 'سبب غير محدد') {
+    msg += `\n📝 **السبب:** ${reason}`;
+  }
+  if (duration) {
+    msg += `\n⏱️ **المدة:** ${duration}`;
+  }
+  return msg;
+}
+
 export function logEmbed(data: {
   title: string;
   description: string;
-  color: string;
+  color: ColorResolvable;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   user?: User;
   channel?: TextChannel;
@@ -320,7 +371,7 @@ export function welcomeEmbed(data: {
       .replace('{user}', data.user.toString())
       .replace('{server}', data.guild.name)
       .replace('{count}', data.memberCount.toLocaleString()),
-    color: data.embedColor,
+    color: data.embedColor as ColorResolvable,
     thumbnail: data.embedThumbnail || data.user.displayAvatarURL({ size: 256 }),
     image: banner,
     footer: { text: `${data.guild.name} | العضو #${data.memberCount}`, iconURL: data.guild.iconURL() || undefined },
@@ -341,7 +392,7 @@ export function leaveEmbed(data: {
       .replace('{user}', data.user.tag)
       .replace('{server}', data.guild.name)
       .replace('{count}', data.memberCount.toLocaleString()),
-    color: data.embedColor,
+    color: data.embedColor as ColorResolvable,
     thumbnail: data.user.displayAvatarURL({ size: 256 }),
     footer: { text: `${data.guild.name} | ${data.memberCount} أعضاء`, iconURL: data.guild.iconURL() || undefined },
     timestamp: true,
@@ -462,7 +513,7 @@ export function createPaginationEmbeds(
   items: string[],
   options: {
     title: string;
-    color?: string;
+    color?: ColorResolvable;
     itemsPerPage?: number;
     footer?: string;
   }

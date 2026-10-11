@@ -15,12 +15,16 @@ import {
   RoleSelectMenuBuilder,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
 import { setPendingImageUpload } from '../../utils/pendingUploads';
+import { CARD_DEFAULTS } from '../../utils/welcomeCard';
+
+const clampNum = (v: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, v));
 
 const handler: ButtonHandler = {
   id: 'settings_btn',
@@ -38,6 +42,21 @@ const handler: ButtonHandler = {
     const section = parts[1] as SettingsCategory;
     const action = parts[2];
     const guildId = interaction.guild.id;
+    const key = `${section}:${action}`;
+
+    // الإجراءات التي ترد فوراً (مودال أو رد مباشر) — لا يمكن deferUpdate قبلها
+    const immediateKeys = new Set([
+      'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
+      'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
+      'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
+      'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
+      'commands:add', 'welcome:cardnum', 'shop:add',
+    ]);
+
+    // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
+    if (!immediateKeys.has(key)) {
+      await interaction.deferUpdate();
+    }
 
     const settings = await getGuildSettings(guildId);
 
@@ -185,7 +204,7 @@ const handler: ButtonHandler = {
     const modalActions = [
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality',
-      'welcome:title', 'welcome:color', 'welcome:imgurl',
+      'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
       'tickets:autotext', 'tickets:pimg', 'tickets:types',
     ];
     if (modalActions.includes(`${section}:${action}`)) {
@@ -199,7 +218,7 @@ const handler: ButtonHandler = {
         case 'leave:msg':
           return openModal('رسالة المغادرة', '{user} {server} {count}', TextInputStyle.Paragraph, 1000);
         case 'automod:words':
-          return openModal('الكلمات المحظورة', 'كلمة1, كلمة2, كلمة3 (مفصولة بفواصل)', TextInputStyle.Paragraph, 1000);
+          return openModal('الكلمات المحظورة', 'اكتب كل كلمة في سطر جديد:\nكلمة1\nكلمة2\nكلمة3', TextInputStyle.Paragraph, 1000);
         case 'ai:personality': {
           const aiConfig = await AIConfig.findOne({ guildId }).catch(() => null);
           return openModal(
@@ -233,6 +252,15 @@ const handler: ButtonHandler = {
             TextInputStyle.Short,
             500,
             settings.welcome.imageBackground || '',
+            false
+          );
+        case 'welcome:cardurl':
+          return openModal(
+            'رابط خلفية البطاقة',
+            'https://... — اتركه فارغاً للخلفية الافتراضية',
+            TextInputStyle.Short,
+            500,
+            settings.welcome.card?.backgroundUrl || '',
             false
           );
         case 'tickets:autotext':
@@ -282,8 +310,97 @@ const handler: ButtonHandler = {
       }
     }
 
-    // ---------- إجراءات تحدث اللوحة (تحتاج deferUpdate) ----------
-    await interaction.deferUpdate(); // ✅ منع انتهاء صلاحية التفاعل
+    // ---------- إجراءات ترد فوراً (مودال أو رسالة + قائمة اختيار) ----------
+    // ⚠️ يجب أن تتم قبل deferUpdate — لا يمكن فتح مودال أو رد بعد التأكيد
+    if (`${section}:${action}` === 'commands:add') {
+      // مودال بحقلين: اسم الأمر + الرد
+      const nameInput = new TextInputBuilder()
+        .setCustomId('name')
+        .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(50)
+        .setRequired(true);
+      const contentInput = new TextInputBuilder()
+        .setCustomId('content')
+        .setLabel('رد البوت (حتى 1900 حرف) — {user} {server}')
+        .setStyle(TextInputStyle.Paragraph)
+        .setMaxLength(1900)
+        .setRequired(true);
+      const modal = new ModalBuilder()
+        .setCustomId('settings_modal:commands:add')
+        .setTitle('➕ إضافة أمر مخصص')
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(contentInput)
+        );
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (`${section}:${action}` === 'shop:add') {
+      // الخطوة الأولى: اختيار رول العنصر — ثم يفتح مودال الاسم والسعر
+      const roleSelect = new RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:shop:role')
+        .setPlaceholder('🛍️ اختر الرول الذي يحصل عليه المشتري')
+        .setMinValues(1)
+        .setMaxValues(1);
+      await interaction.reply({
+        content: '🛍️ اختر **الرول** الذي سيحصل عليه المشتري عند شراء هذا العنصر:',
+        components: [new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(roleSelect)],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (`${section}:${action}` === 'welcome:cardnum') {
+      // 🔢 إدخال أرقام مباشرة للعنصر الحالي (أسهل من الحركة بالأسهم للأرقام الكبيرة)
+      const el = getCardEditor(interaction.user.id).element;
+      const pos = getCardElementValues(settings.welcome.card, el);
+      const xInput = new TextInputBuilder()
+        .setCustomId('x')
+        .setLabel('المسافة من اليسار X (0-800)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setValue(String(pos.x))
+        .setRequired(true);
+      const yInput = new TextInputBuilder()
+        .setCustomId('y')
+        .setLabel('المسافة من الأعلى Y (0-300)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setValue(String(pos.y))
+        .setRequired(true);
+      const sizeInput = new TextInputBuilder()
+        .setCustomId('size')
+        .setLabel('الحجم بالبكسل')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setValue(String(pos.size))
+        .setRequired(true);
+      const modal = new ModalBuilder()
+        .setCustomId(`settings_modal:welcome:cardpos:${el}`)
+        .setTitle('🔢 إدخال مباشر')
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(xInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(yInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(sizeInput)
+        );
+      if (el !== 'avatar') {
+        const cur = el === 'name' ? settings.welcome.card?.nameColor : settings.welcome.card?.countColor;
+        const colorInput = new TextInputBuilder()
+          .setCustomId('color')
+          .setLabel('اللون HEX (اختياري)')
+          .setStyle(TextInputStyle.Short)
+          .setMaxLength(7)
+          .setValue(cur || '')
+          .setRequired(false);
+        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(colorInput));
+      }
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // ---------- إجراءات تحدث اللوحة (تم تأكيدها deferUpdate في الأعلى) ----------
 
     switch (`${section}:${action}`) {
       case 'general:lang': {
@@ -300,6 +417,109 @@ const handler: ButtonHandler = {
         settings.welcome.imageEnabled = !settings.welcome.imageEnabled;
         await settings.save();
         break;
+      }
+      case 'logging:split': {
+        // 🔀 لوحة فرعية: توجيه كل نوع سجلات لروم مخصص
+        const splitPanel = buildLoggingSplitPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: splitPanel.embeds, components: splitPanel.components as any });
+        return;
+      }
+      case 'welcome:card': {
+        // 🎴 محرر بطاقة الترحيب — معاينة حية مع كل ضغطة
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
+      }
+      case 'welcome:cardup': {
+        // رفع مباشر: أول رسالة مرفقة خلال 60 ثانية = خلفية البطاقة
+        setPendingImageUpload(interaction.user.id, interaction.guildId!, interaction.channelId, 'welcomeCard');
+        await sendWelcomeCardPanel(interaction, settings);
+        await interaction.followUp({
+          content:
+            '📤 **ارفع صورة خلفية البطاقة الآن** — أرسل أي صورة في هذه القناة خلال 60 ثانية وستصبح الخلفية تلقائياً',
+          ephemeral: true,
+        });
+        return;
+      }
+      case 'welcome:cardprev': {
+        // (زر قديم) — المعاينة الآن حية دائماً في اللوحة
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
+      }
+      case 'welcome:cardmv': {
+        // 🔀 تحريك العنصر المحدد (المعاينة تتحدث فوراً)
+        const st = getCardEditor(interaction.user.id);
+        const card = (settings.welcome as any).card || ((settings.welcome as any).card = { enabled: true });
+        const dir = parts[3];
+        const cur = getCardElementValues(card, st.element);
+        let { x, y } = cur;
+        if (dir === 'l') x -= st.step;
+        else if (dir === 'r') x += st.step;
+        else if (dir === 'u') y -= st.step;
+        else if (dir === 'd') y += st.step;
+        x = clampNum(Math.round(x), 0, 800);
+        y = clampNum(Math.round(y), 0, 300);
+        if (st.element === 'avatar') {
+          card.avatarX = x;
+          card.avatarY = y;
+        } else if (st.element === 'name') {
+          card.nameX = x;
+          card.nameY = y;
+        } else {
+          card.countX = x;
+          card.countY = y;
+        }
+        await settings.save();
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
+      }
+      case 'welcome:cardsz': {
+        // 📏 تكبير/تصغير العنصر المحدد
+        const st = getCardEditor(interaction.user.id);
+        const card = (settings.welcome as any).card || ((settings.welcome as any).card = { enabled: true });
+        const cur = getCardElementValues(card, st.element);
+        const delta = parts[3] === 'in' ? st.step : -st.step;
+        const min = st.element === 'avatar' ? 40 : 8;
+        const size = clampNum(Math.round(cur.size + delta), min, 300);
+        if (st.element === 'avatar') card.avatarSize = size;
+        else if (st.element === 'name') card.nameSize = size;
+        else card.countSize = size;
+        await settings.save();
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
+      }
+      case 'welcome:cardsel': {
+        // 🔄 تبديل العنصر: صورة ← اسم ← رقم
+        const st = getCardEditor(interaction.user.id);
+        st.element = nextCardElement(st.element);
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
+      }
+      case 'welcome:cardstep': {
+        // ⚡ تغيير خطوة الحركة: 5 ← 10 ← 25 ← 50
+        const st = getCardEditor(interaction.user.id);
+        st.step = nextCardStep(st.step);
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
+      }
+      case 'welcome:cardreset': {
+        // ✨ تخطيط تلقائي — العودة للقيم الجاهزة المرتبة
+        const card = (settings.welcome as any).card || ((settings.welcome as any).card = {});
+        Object.assign(card, {
+          avatarX: CARD_DEFAULTS.avatarX,
+          avatarY: CARD_DEFAULTS.avatarY,
+          avatarSize: CARD_DEFAULTS.avatarSize,
+          nameX: CARD_DEFAULTS.nameX,
+          nameY: CARD_DEFAULTS.nameY,
+          nameSize: CARD_DEFAULTS.nameSize,
+          nameColor: CARD_DEFAULTS.nameColor,
+          countX: CARD_DEFAULTS.countX,
+          countY: CARD_DEFAULTS.countY,
+          countSize: CARD_DEFAULTS.countSize,
+          countColor: CARD_DEFAULTS.countColor,
+        });
+        await settings.save();
+        await sendWelcomeCardPanel(interaction, settings);
+        return;
       }
       case 'tickets:auto': {
         settings.tickets.autoMessageEnabled = !settings.tickets.autoMessageEnabled;
@@ -459,6 +679,13 @@ const handler: ButtonHandler = {
         await settings.save();
         break;
       }
+      case 'levels:mult_inc':
+      case 'levels:mult_dec': {
+        const delta = action === 'mult_inc' ? 0.5 : -0.5;
+        settings.leveling.xpGainMultiplier = Math.min(10, Math.max(0.5, (settings.leveling.xpGainMultiplier || 1) + delta));
+        await settings.save();
+        break;
+      }
       case 'levels:voice_inc':
       case 'levels:voice_dec': {
         const delta = action === 'levels:voice_inc' ? 5 : -5;
@@ -526,49 +753,11 @@ const handler: ButtonHandler = {
         await interaction.editReply({ embeds: sPanel.embeds, components: sPanel.components as any });
         return;
       }
-      case 'commands:add': {
-        // مودال بحقلين: اسم الأمر + الرد
-        const nameInput = new TextInputBuilder()
-          .setCustomId('name')
-          .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
-          .setStyle(TextInputStyle.Short)
-          .setMaxLength(50)
-          .setRequired(true);
-        const contentInput = new TextInputBuilder()
-          .setCustomId('content')
-          .setLabel('رد البوت (حتى 1900 حرف) — متغيرات: {user} {server}')
-          .setStyle(TextInputStyle.Paragraph)
-          .setMaxLength(1900)
-          .setRequired(true);
-        const modal = new ModalBuilder()
-          .setCustomId('settings_modal:commands:add')
-          .setTitle('➕ إضافة أمر مخصص')
-          .addComponents(
-            new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-            new ActionRowBuilder<TextInputBuilder>().addComponents(contentInput)
-          );
-        await interaction.showModal(modal);
-        return;
-      }
       case 'commands:clear': {
         settings.customCommands = [];
         await settings.save();
         const cPanel = buildCommands(interaction.guild!, settings);
         await interaction.editReply({ embeds: cPanel.embeds, components: cPanel.components as any });
-        return;
-      }
-      case 'shop:add': {
-        // الخطوة الأولى: اختيار رول العنصر — ثم يفتح مودال الاسم والسعر
-        const roleSelect = new RoleSelectMenuBuilder()
-          .setCustomId('settings_sel:shop:role')
-          .setPlaceholder('🛍️ اختر الرول الذي يحصل عليه المشتري')
-          .setMinValues(1)
-          .setMaxValues(1);
-        await interaction.reply({
-          content: '🛍️ اختر **الرول** الذي سيحصل عليه المشتري عند شراء هذا العنصر:',
-          components: [new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(roleSelect)],
-          ephemeral: true,
-        });
         return;
       }
       default:

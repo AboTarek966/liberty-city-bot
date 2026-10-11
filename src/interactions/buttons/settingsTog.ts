@@ -4,7 +4,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildVerificationPanel, buildShop, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, canManageSettings, buildVerificationPanel, buildShop, sendWelcomeCardPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { setLockdown } from '../../utils/lockdown';
@@ -54,13 +54,25 @@ const handler: ButtonHandler = {
         break;
       }
       case 'welcome':
-        settings.welcome.enabled = !settings.welcome.enabled;
+        if (field === 'card') {
+          // 🎴 تفعيل/تعطيل بطاقة الترحيب المرسومة
+          const card = (settings.welcome as any).card;
+          if (card) card.enabled = !card.enabled;
+        } else {
+          settings.welcome.enabled = !settings.welcome.enabled;
+        }
         break;
       case 'leave':
         settings.leave.enabled = !settings.leave.enabled;
         break;
       case 'logging':
-        settings.logging.enabled = !settings.logging.enabled;
+        if (field === 'snipe') {
+          // 🕵️ تفعيل/تعطيل السنايب (استرجاع الرسائل المحذوفة)
+          if (!settings.snipe) settings.snipe = { enabled: true };
+          settings.snipe.enabled = !settings.snipe.enabled;
+        } else {
+          settings.logging.enabled = !settings.logging.enabled;
+        }
         break;
       case 'levels':
         settings.leveling.enabled = !settings.leveling.enabled;
@@ -92,6 +104,14 @@ const handler: ButtonHandler = {
           settings.tickets.surveyEnabled = !settings.tickets.surveyEnabled;
           break;
         }
+        if (field === 'lockclaim') {
+          settings.tickets.lockUntilClaim = !settings.tickets.lockUntilClaim;
+          break;
+        }
+        if (field === 'welcome') {
+          settings.tickets.welcomeEnabled = !settings.tickets.welcomeEnabled;
+          break;
+        }
         await interaction.editReply({ content: '❌ إعداد غير معروف' });
         return;
       }
@@ -113,6 +133,12 @@ const handler: ButtonHandler = {
       const client = interaction.client as LibertyClient;
       const nowEnabled = (settings.protection as any).autoBackup?.enabled;
       await client.securityHandler?.syncAutoBackup(interaction.guild, !!nowEnabled).catch(() => {});
+    }
+
+    if ((section as string) === 'welcome' && field === 'card') {
+      // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
+      await sendWelcomeCardPanel(interaction, settings);
+      return;
     }
 
     const panel =
