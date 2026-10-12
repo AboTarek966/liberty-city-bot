@@ -15,7 +15,10 @@ const handler: ButtonHandler = {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      const member = await interaction.guild.members.fetch(interaction.user.id);
+      // ⚡ الكاش أولاً — تجنّب طلب شبكة إضافي قبل الرد
+      const member =
+        interaction.guild.members.cache.get(interaction.user.id) ??
+        (await interaction.guild.members.fetch(interaction.user.id));
 
       if (!member.permissions.has(PermissionFlagsBits.ManageChannels)) {
         await interaction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لاستلام التذاكر' });

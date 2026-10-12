@@ -548,7 +548,12 @@ export class TicketHandler {
   // Claim Ticket
   // --------------------------------------------
   async claimTicket(channelId: string, claimedBy: GuildMember): Promise<ITicket> {
-    const ticket = await TicketModel.findOne({ channelId });
+    // ⚡ قراءتان متوازيتان ثم نُعيد النتيجة فوراً — كل الأعمال الثقيلة في الخلفية
+    const [ticket, settings] = await Promise.all([
+      TicketModel.findOne({ channelId }),
+      getGuildSettings(claimedBy.guild.id),
+    ]);
+
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
     if (ticket.status === 'claimed') {
       const claimer = claimedBy.guild.members.cache.get(ticket.claimedBy!);
@@ -557,63 +562,86 @@ export class TicketHandler {
 
     ticket.status = 'claimed';
     ticket.claimedBy = claimedBy.id;
-    await ticket.save();
 
     // 📊 تحديث إحصائيات الاستلام لهذا الإداري
-    const settings = await getGuildSettings(claimedBy.guild.id);
     const currentCount = settings.tickets.claimStats?.get(claimedBy.id) || 0;
     settings.tickets.claimStats.set(claimedBy.id, currentCount + 1);
-    await settings.save();
+
+    await Promise.all([ticket.save(), settings.save()]);
 
     this.activeTickets.set(channelId, ticket);
 
-    const channel = claimedBy.guild.channels.cache.get(channelId) as TextChannel;
-    if (channel) {
-      // 🔒 قفل التذكرة: الكتابة للمستلم + الأدمن فقط
-      await this.applyClaimLock(claimedBy.guild, ticket, channel, claimedBy).catch(err =>
-        logger.warn('Failed to apply claim lock:', err)
-      );
+    const channel = claimedBy.guild.channels.cache.get(channelId) as TextChannel | undefined;
+    logger.info(`Claimed ticket by ${claimedBy.user.tag}`);
 
-      // ✅ منح صاحب التذكرة صلاحية الكتابة إن كان القفل مفعّلاً عند الفتح
-      if (settings.tickets.lockUntilClaim && ticket.userId !== claimedBy.id) {
-        await channel.permissionOverwrites
-          .edit(ticket.userId, {
-            SendMessages: true,
-          })
-          .catch(() => {});
+    // 🔒 القفل + رسالة القناة + الأزرار + السجل → تعمل بعد الرد حتى لا يتأخر البوت
+    void this.finalizeClaim(claimedBy.guild, ticket, channel, claimedBy, settings, currentCount);
+
+    return ticket;
+  }
+
+  /** الأعمال الثقيلة بعد الاستلام — تعمل في الخلفية حتى يظهر الرد فوراً */
+  private async finalizeClaim(
+    guild: Guild,
+    ticket: ITicket,
+    channel: TextChannel | undefined,
+    claimedBy: GuildMember,
+    settings: Awaited<ReturnType<typeof getGuildSettings>>,
+    currentCount: number
+  ): Promise<void> {
+    try {
+      const jobs: Promise<unknown>[] = [];
+
+      if (channel) {
+        // 🔒 قفل التذكرة: الكتابة للمستلم + الأدمن فقط
+        jobs.push(
+          this.applyClaimLock(guild, ticket, channel, claimedBy).catch(err =>
+            logger.warn('Failed to apply claim lock:', err)
+          )
+        );
+
+        // ✅ منح صاحب التذكرة صلاحية الكتابة إن كان القفل مفعّلاً عند الفتح
+        if (settings.tickets.lockUntilClaim && ticket.userId !== claimedBy.id) {
+          jobs.push(
+            channel.permissionOverwrites
+              .edit(ticket.userId, { SendMessages: true })
+              .catch(() => {})
+          );
+        }
+
+        const claimEmbed = createEmbed({
+          title: '🤝 تم استلام التذكرة',
+          description:
+            `تم استلام التذكرة بواسطة ${claimedBy}\n\n` +
+            `🔒 **تم قفل التذكرة:** الكتابة للمستلم + الأدمن فقط — بقية فريق الدعم للقراءة فقط.\n` +
+            `📌 لمنح إداري معيّن صلاحية الكتابة اختر **➕ إضافة عضو أو إداري** من قائمة الخيارات.\n\n` +
+            `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``,
+          color: Colors.success,
+          footer: { text: 'Liberty City Tickets' },
+        });
+
+        jobs.push(channel.send({ embeds: [claimEmbed] }));
+
+        // Update buttons (show unclaim instead of claim)
+        jobs.push(this.updateTicketButtons(channel, true));
       }
 
-      const claimEmbed = createEmbed({
-        title: '🤝 تم استلام التذكرة',
-        description:
-          `تم استلام التذكرة بواسطة ${claimedBy}\n\n` +
-          `🔒 **تم قفل التذكرة:** الكتابة للمستلم + الأدمن فقط — بقية فريق الدعم للقراءة فقط.\n` +
-          `📌 لمنح إداري معيّن صلاحية الكتابة اختر **➕ إضافة عضو أو إداري** من قائمة الخيارات.\n\n` +
-          `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``,
-        color: Colors.success,
-        footer: { text: 'Liberty City Tickets' },
-      });
-
-      await channel.send({ embeds: [claimEmbed] });
-
-      // Update buttons (show unclaim instead of claim)
-      await this.updateTicketButtons(channel, true);
+      jobs.push(this.logTicketEvent(guild, 'claim', ticket, claimedBy.user));
+      await Promise.allSettled(jobs);
+    } catch (err) {
+      logger.warn('finalizeClaim failed:', err);
     }
-
-    await this.logTicketEvent(claimedBy.guild, 'claim', ticket, claimedBy.user);
-    logger.info(`Claimed ticket by ${claimedBy.user.tag}`);
-    return ticket;
   }
 
   // --------------------------------------------
   // Unclaim Ticket
   // --------------------------------------------
   async unclaimTicket(channelId: string, unclaimedBy: GuildMember): Promise<ITicket> {
+    const guild = unclaimedBy.guild;
     const ticket = await TicketModel.findOne({ channelId });
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
     if (ticket.status !== 'claimed') throw new Error('التذكرة غير مستلمة');
 
-    const guild = unclaimedBy.guild;
     const isClaimer = ticket.claimedBy === unclaimedBy.id;
     const canManage = unclaimedBy.permissions.has(PermissionFlagsBits.ManageChannels);
 
@@ -628,33 +656,56 @@ export class TicketHandler {
 
     this.activeTickets.set(channelId, ticket);
 
-    const channel = guild.channels.cache.get(channelId) as TextChannel;
-    if (channel) {
-      // 🔓 إلغاء القفل وإرجاع صلاحيات الكتابة لفريق الدعم
-      if (ticket.locked) {
-        await this.releaseClaimLock(guild, ticket, channel).catch(err =>
-          logger.warn('Failed to release claim lock:', err)
-        );
+    const channel = guild.channels.cache.get(channelId) as TextChannel | undefined;
+    logger.info(`Unclaimed ticket by ${unclaimedBy.user.tag}`);
+
+    // 🔓 إلغاء القفل والرسائل والأزرار والسجل → في الخلفية بعد الرد
+    void this.finalizeUnclaim(guild, ticket, channel, unclaimedBy, previousClaimer);
+
+    return ticket;
+  }
+
+  /** الأعمال الثقيلة بعد إلغاء الاستلام — تعمل في الخلفية حتى يظهر الرد فوراً */
+  private async finalizeUnclaim(
+    guild: Guild,
+    ticket: ITicket,
+    channel: TextChannel | undefined,
+    unclaimedBy: GuildMember,
+    previousClaimer?: GuildMember | null
+  ): Promise<void> {
+    try {
+      const jobs: Promise<unknown>[] = [];
+
+      if (channel) {
+        // 🔓 إلغاء القفل وإرجاع صلاحيات الكتابة لفريق الدعم
+        if (ticket.locked) {
+          jobs.push(
+            this.releaseClaimLock(guild, ticket, channel).catch(err =>
+              logger.warn('Failed to release claim lock:', err)
+            )
+          );
+        }
+
+        const embed = createEmbed({
+          title: '↩️ تم إلغاء استلام التذكرة',
+          description:
+            `تم تحرير التذكرة${previousClaimer ? ` من ${previousClaimer}` : ''}\n` +
+            `تم إلغاء الاستلام بواسطة ${unclaimedBy}\n\n` +
+            `🔓 تم إلغاء القفل — يمكن لفريق الدعم الكتابة مجدداً.\n` +
+            `يمكن لأي مشرف استلامها الآن.`,
+          color: Colors.warning,
+          footer: { text: 'Liberty City Tickets' },
+        });
+
+        jobs.push(channel.send({ embeds: [embed] }));
+        jobs.push(this.updateTicketButtons(channel, false));
       }
 
-      const embed = createEmbed({
-        title: '↩️ تم إلغاء استلام التذكرة',
-        description:
-          `تم تحرير التذكرة${previousClaimer ? ` من ${previousClaimer}` : ''}\n` +
-          `تم إلغاء الاستلام بواسطة ${unclaimedBy}\n\n` +
-          `🔓 تم إلغاء القفل — يمكن لفريق الدعم الكتابة مجدداً.\n` +
-          `يمكن لأي مشرف استلامها الآن.`,
-        color: Colors.warning,
-        footer: { text: 'Liberty City Tickets' },
-      });
-
-      await channel.send({ embeds: [embed] });
-      await this.updateTicketButtons(channel, false);
+      jobs.push(this.logTicketEvent(guild, 'unclaim', ticket, unclaimedBy.user));
+      await Promise.allSettled(jobs);
+    } catch (err) {
+      logger.warn('finalizeUnclaim failed:', err);
     }
-
-    await this.logTicketEvent(guild, 'unclaim', ticket, unclaimedBy.user);
-    logger.info(`Unclaimed ticket by ${unclaimedBy.user.tag}`);
-    return ticket;
   }
 
   // --------------------------------------------
@@ -672,6 +723,15 @@ export class TicketHandler {
     const granted: string[] = [];
     // لقطة لحالة كل overwrite قبل تعديله — لنُرجعها كما كانت عند إلغاء القفل
     const snapshots: ITicketLockSnapshot[] = [];
+    // 📝 نجمع الأهداف أولاً ثم ننفّذ كل التعديلات بالتوازي (بدل تتابعها)
+    const supportRoleIds: string[] = [];
+    const grantTargets: string[] = [];
+    const seenTargets = new Set<string>();
+    const grantWrite = (id: string) => {
+      if (seenTargets.has(id)) return;
+      seenTargets.add(id);
+      grantTargets.push(id);
+    };
 
     const snapshotOverwrite = (id: string) => {
       const ow = channel.permissionOverwrites.cache.get(id);
@@ -687,9 +747,7 @@ export class TicketHandler {
       const role = guild.roles.cache.get(roleId);
       if (!role) continue;
       snapshotOverwrite(roleId);
-      await channel.permissionOverwrites
-        .edit(roleId, { SendMessages: false })
-        .catch(() => {});
+      supportRoleIds.push(roleId);
     }
 
     // 2) المستلم يكتب دائماً (overwrite عضو يتفوق على رفض الرولات)
@@ -697,50 +755,52 @@ export class TicketHandler {
       const ow = channel.permissionOverwrites.cache.get(claimedBy.id);
       if (!ow?.allow.has(PermissionFlagsBits.SendMessages)) {
         snapshotOverwrite(claimedBy.id);
-        await channel.permissionOverwrites
-          .edit(claimedBy.id, {
-            ViewChannel: true,
-            SendMessages: true,
-            ReadMessageHistory: true,
-            AttachFiles: true,
-            EmbedLinks: true,
-          })
-          .catch(() => {});
         granted.push(claimedBy.id);
+        grantWrite(claimedBy.id);
       }
     }
 
     // 3) الإدارة العليا (Administrator فقط) — يمكنهم الكتابة دائماً
     // ⚠️ لا يُمنح صلاحية الكتابة لمن يملك ManageGuild فقط — المستلم فقط + الأدمن
-    const adminRoles = guild.roles.cache.filter(
-      r =>
-        r.id !== guild.roles.everyone.id &&
-        r.permissions.has(PermissionFlagsBits.Administrator)
+    const adminRoleIds = new Set(
+      guild.roles.cache
+        .filter(
+          r => r.id !== guild.roles.everyone.id && r.permissions.has(PermissionFlagsBits.Administrator)
+        )
+        .map(r => r.id)
     );
 
-    for (const role of adminRoles.values()) {
-      for (const [memberId, member] of guild.members.cache) {
-        if (granted.includes(memberId)) continue;
-        if (member.id === ticket.userId) continue; // صاحب التذكرة يملك الوصول أصلاً
-        if (member.id === this.client.user?.id) continue; // البوت
-        if (!member.roles.cache.has(role.id)) continue;
+    for (const [memberId, member] of guild.members.cache) {
+      if (granted.includes(memberId)) continue;
+      if (member.id === ticket.userId) continue; // صاحب التذكرة يملك الوصول أصلاً
+      if (member.id === this.client.user?.id) continue; // البوت
+      if (!member.roles.cache.some(r => adminRoleIds.has(r.id))) continue;
 
-        const ow = channel.permissionOverwrites.cache.get(memberId);
-        if (ow?.allow.has(PermissionFlagsBits.SendMessages)) continue; // يملك الكتابة أصلاً
+      const ow = channel.permissionOverwrites.cache.get(memberId);
+      if (ow?.allow.has(PermissionFlagsBits.SendMessages)) continue; // يملك الكتابة أصلاً
 
-        snapshotOverwrite(memberId);
-        await channel.permissionOverwrites
-          .edit(memberId, {
+      snapshotOverwrite(memberId);
+      granted.push(memberId);
+      grantWrite(memberId);
+    }
+
+    // ⚡ كل التعديلات في نفس اللحظة — كانت تُنفَّذ واحدة تلو الأخرى وهو سبب البطء
+    await Promise.all([
+      ...supportRoleIds.map(id =>
+        channel.permissionOverwrites.edit(id, { SendMessages: false }).catch(() => {})
+      ),
+      ...grantTargets.map(id =>
+        channel.permissionOverwrites
+          .edit(id, {
             ViewChannel: true,
             SendMessages: true,
             ReadMessageHistory: true,
             AttachFiles: true,
             EmbedLinks: true,
           })
-          .catch(() => {});
-        granted.push(memberId);
-      }
-    }
+          .catch(() => {})
+      ),
+    ]);
 
     ticket.locked = true;
     ticket.lockGrantedUsers = granted;

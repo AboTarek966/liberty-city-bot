@@ -11,7 +11,9 @@ const handler = {
             return;
         await interaction.deferReply({ ephemeral: true });
         try {
-            const member = await interaction.guild.members.fetch(interaction.user.id);
+            // ⚡ الكاش أولاً — تجنّب طلب شبكة إضافي قبل الرد
+            const member = interaction.guild.members.cache.get(interaction.user.id) ??
+                (await interaction.guild.members.fetch(interaction.user.id));
             await client.ticketHandler.unclaimTicket(interaction.channelId, member);
             await interaction.editReply({ content: '↩️ تم إلغاء استلام التذكرة' });
         }

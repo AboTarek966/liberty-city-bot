@@ -54,7 +54,11 @@ export declare class TicketHandler {
     sweepInactiveTickets(client: Client): Promise<void>;
     deleteTicket(channelId: string, deletedBy: GuildMember): Promise<void>;
     claimTicket(channelId: string, claimedBy: GuildMember): Promise<ITicket>;
+    /** الأعمال الثقيلة بعد الاستلام — تعمل في الخلفية حتى يظهر الرد فوراً */
+    private finalizeClaim;
     unclaimTicket(channelId: string, unclaimedBy: GuildMember): Promise<ITicket>;
+    /** الأعمال الثقيلة بعد إلغاء الاستلام — تعمل في الخلفية حتى يظهر الرد فوراً */
+    private finalizeUnclaim;
     private applyClaimLock;
     private releaseClaimLock;
     callAdmin(channelId: string, calledBy: GuildMember): Promise<void>;
