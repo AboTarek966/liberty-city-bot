@@ -93,18 +93,36 @@ const command = {
                 return;
             }
             const jailRole = guild.roles.cache.get(jailData.jailRoleId);
-            if (!jailRole) {
-                await interaction.editReply({ content: '❌ رول السجن غير موجود (ربما تم حذفه)' });
-                return;
+            // إزالة رول السجن (إن كان موجوداً — قد يحذفه بوت آخر)
+            if (jailRole && guild.members.me.roles.highest.comparePositionTo(jailRole) > 0) {
+                if (member.roles.cache.has(jailRole.id)) {
+                    await member.roles.remove(jailRole, reason).catch(() => { });
+                }
             }
-            // التحقق من أن البوت أعلى من رول السجن
-            if (guild.members.me.roles.highest.comparePositionTo(jailRole) <= 0) {
-                await interaction.editReply({ content: '❌ رتبة البوت يجب أن تكون أعلى من رول السجن' });
-                return;
+            // 🔓 حذف صلاحيات العضو المباشرة (member overwrites) من كل الرومات
+            // هذه هي الصلاحيات الأساسية التي تمنع العضو من رؤية الرومات
+            const { ChannelType } = await Promise.resolve().then(() => __importStar(require('discord.js')));
+            const allChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildCategory);
+            let removedOverwrites = 0;
+            for (const channel of allChannels.values()) {
+                try {
+                    if (channel.permissionOverwrites?.cache?.has(member.id)) {
+                        await channel.permissionOverwrites.delete(member, reason).catch(() => { });
+                        removedOverwrites++;
+                    }
+                }
+                catch { }
             }
-            // إزالة رول السجن
-            if (member.roles.cache.has(jailRole.id)) {
-                await member.roles.remove(jailRole, reason);
+            // حذف صلاحيات رول السجن أيضاً (إن بقيت)
+            if (jailRole) {
+                for (const channel of allChannels.values()) {
+                    try {
+                        if (channel.permissionOverwrites?.cache?.has(jailRole.id)) {
+                            await channel.permissionOverwrites.delete(jailRole, reason).catch(() => { });
+                        }
+                    }
+                    catch { }
+                }
             }
             // استعادة الرولات السابقة
             const previousRoles = jailData.previousRoles || [];

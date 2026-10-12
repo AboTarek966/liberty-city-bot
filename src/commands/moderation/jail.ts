@@ -156,7 +156,19 @@ const command: Command = {
 
       // roles.set() يستبدل كل الرولات دفعة واحدة — أسرع وأأمن من إزالتها واحداً واحداً
       // (يتجنب أخطاء "Unknown Role" من رولات محذوفة في الكاش)
-      await member.roles.set([jailRole], `سجن: ${reason}`);
+      // ⚠️ قد يحذف بوت آخر (مثل NaZahaBot) رول السجن فور إنشائه — نعيد الإنشاء عند الحاجة
+      try {
+        await member.roles.set([jailRole], `سجن: ${reason}`);
+      } catch (setErr) {
+        logger.warn('roles.set with jail role failed — role may have been deleted, recreating:', setErr);
+        jailRole = await guild.roles.create({
+          name: '🔒 جايـل',
+          color: 0x555555,
+          reason: 'رول السجن التلقائي (إعادة إنشاء)',
+          permissions: [],
+        });
+        await member.roles.set([jailRole], `سجن: ${reason}`);
+      }
       
       // تخزين بيانات السجن في قاعدة البيانات
       const { JailData } = await import('../../models');
@@ -177,7 +189,9 @@ const command: Command = {
       );
 
       // 🔒 إعداد الصلاحيات: منع رؤية جميع القنوات (نصية + صوتية + كاتيجوريز) إلا روم السجن
-      // الاستراتيجية: تعديل الكاتيجوريز أولاً (ينتقل للأبناء)، ثم القنوات التي لها overwrites خاصة
+      // ⚠️ نستخدم member overwrite (صلاحيات العضو المباشرة) وليس role overwrite
+      // لأن بوتات أخرى (مثل NaZahaBot) قد تحذف رول السجن فور إنشائه فيختفي كل شيء
+      // صلاحيات العضو المباشرة لا يمكن لأي بوت حذفها
       const allChannels = guild.channels.cache.filter(
         c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildCategory
       );
@@ -189,7 +203,7 @@ const command: Command = {
         if (channel.id === targetJailChannel.id) continue;
 
         try {
-          await channel.permissionOverwrites.edit(jailRole, {
+          await channel.permissionOverwrites.edit(member, {
             ViewChannel: false,
             SendMessages: false,
             Connect: false,
@@ -203,7 +217,7 @@ const command: Command = {
 
       // السماح بالرؤية في روم السجن (مع صلاحيات كاملة للكتابة)
       try {
-        await targetJailChannel.permissionOverwrites.edit(jailRole, {
+        await targetJailChannel.permissionOverwrites.edit(member, {
           ViewChannel: true,
           SendMessages: true,
           ReadMessageHistory: true,
@@ -217,6 +231,23 @@ const command: Command = {
         await interaction.editReply({ content: '❌ فشل إعداد صلاحيات روم السجن — تأكد أن رتبة البوت أعلى من رول السجن ولديه Manage Roles' });
         return;
       }
+
+      // محاولة تطبيق صلاحيات الرول أيضاً (احتياطي — إن لم يُحذف الرول من البوots)
+      try {
+        for (const channel of allChannels.values()) {
+          if (channel.id === targetJailChannel.id) continue;
+          await channel.permissionOverwrites.edit(jailRole, {
+            ViewChannel: false,
+            SendMessages: false,
+            Connect: false,
+          }, { reason: `سجن ${member.user.tag}` }).catch(() => {});
+        }
+        await targetJailChannel.permissionOverwrites.edit(jailRole, {
+          ViewChannel: true,
+          SendMessages: true,
+          ReadMessageHistory: true,
+        }, { reason: `سجن ${member.user.tag}` }).catch(() => {});
+      } catch {}
 
       // تسجيل القنوات التي فشلت (للتشخيص)
       if (failedChannels.length > 0) {
