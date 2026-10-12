@@ -32,6 +32,7 @@ export declare class AIHandler {
         fromCommand?: boolean;
         userContext?: AIUserContext;
         stream?: AIStreamHandlers;
+        safeMode?: boolean;
     }): Promise<AIResponse | null>;
     /**
      * Detects if an AI response is just (a near copy of) the user's question.

@@ -889,33 +889,42 @@ async function handleAIResponse(message, client) {
         await message.reply('👋 نعم؟ اكتب سؤالك وسأجيبك!').catch(() => { });
         return;
     }
-    // أوامر العقوبات باللغة الطبيعية (تنفيذ حتمي وسريع قبل الذكاء الاصطناعي)
-    try {
-        const executed = await (0, AIModeration_1.executeAIModeration)(message, client, question);
-        if (executed)
-            return;
-    }
-    catch (error) {
-        logger.error('Error in AI moderation:', error);
+    // أوامر العقوبات باللغة الطبيعية (فقط في السيرفرات)
+    if (message.guild) {
+        try {
+            const executed = await (0, AIModeration_1.executeAIModeration)(message, client, question);
+            if (executed)
+                return;
+        }
+        catch (error) {
+            logger.error('Error in AI moderation:', error);
+        }
     }
     // Typing indicator
     if ('sendTyping' in message.channel) {
         await message.channel.sendTyping().catch(() => { });
     }
+    // التعامل مع DMs — لا يوجد guild أو member
+    const isDM = !message.guild;
     const memberRoles = message.member?.roles.cache.map(r => r.id) || [];
+    const guildId = message.guild?.id;
     // سياق المستخدم: هل هو إداري؟ (يحدد ما يمكن للـ AI إظهاره)
-    const memberPerms = message.member?.permissions;
-    const isPrivileged = !!memberPerms &&
-        (memberPerms.has(discord_js_1.PermissionFlagsBits.Administrator) ||
-            memberPerms.has(discord_js_1.PermissionFlagsBits.ManageGuild));
+    let isPrivileged = false;
     const userContext = {
         username: message.member?.displayName || message.author.username,
-        isPrivileged,
-        roleNames: message.member?.roles.cache
+        isPrivileged: false,
+        roleNames: [],
+    };
+    if (message.member) {
+        const memberPerms = message.member.permissions;
+        isPrivileged = !!memberPerms && (memberPerms.has(discord_js_1.PermissionFlagsBits.Administrator) || memberPerms.has(discord_js_1.PermissionFlagsBits.ManageGuild));
+        userContext.isPrivileged = isPrivileged;
+        userContext.username = message.member.displayName || message.author.username;
+        userContext.roleNames = message.member.roles.cache
             .filter(r => r.name !== '@everyone')
             .map(r => r.name)
-            .slice(0, 20) || [],
-    };
+            .slice(0, 20);
+    }
     // 📡 بث مباشر — أول كلمات من الذكاء الاصطناعي تظهر فوراً
     let streamedMsg = null;
     let lastEditAt = 0;
@@ -940,7 +949,7 @@ async function handleAIResponse(message, client) {
             await streamedMsg.edit(msgOptions(preview(text))).catch(() => { });
         },
     };
-    const response = await client.aiHandler.generateResponse(message.author.id, message.guild.id, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream });
+    const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM });
     if (response) {
         const parts = splitAiText(response.content, 1900);
         if (streamedMsg) {

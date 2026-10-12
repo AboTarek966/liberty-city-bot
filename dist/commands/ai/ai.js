@@ -17,7 +17,11 @@ const command = {
         .setName('message')
         .setDescription('رسالتك للذكاء الاصطناعي')
         .setRequired(true)
-        .setMaxLength(2000)))
+        .setMaxLength(2000))
+        .addBooleanOption(opt => opt
+        .setName('safe')
+        .setDescription('وضع آمن: لا يكشف أي معلومات عن السيرفر')
+        .setRequired(false)))
         .addSubcommand(sub => sub
         .setName('ask')
         .setDescription('اسأل سؤالاً محدداً')
@@ -25,7 +29,11 @@ const command = {
         .setName('question')
         .setDescription('سؤالك')
         .setRequired(true)
-        .setMaxLength(2000)))
+        .setMaxLength(2000))
+        .addBooleanOption(opt => opt
+        .setName('safe')
+        .setDescription('وضع آمن: لا يكشف أي معلومات عن السيرفر')
+        .setRequired(false)))
         .addSubcommand(sub => sub
         .setName('clear')
         .setDescription('مسح سجل المحادثة'))
@@ -71,6 +79,7 @@ const command = {
 // --------------------------------------------
 async function handleChat(interaction, client, type) {
     const message = interaction.options.getString(type === 'chat' ? 'message' : 'question', true);
+    const safeMode = interaction.options.getBoolean('safe') || false;
     // Check if AI is available
     if (!client.aiHandler.isAvailable()) {
         await interaction.reply({
@@ -137,7 +146,7 @@ async function handleChat(interaction, client, type) {
             },
         };
         // Generate response (isMention=true for slash command usage)
-        const response = await client.aiHandler.generateResponse(interaction.user.id, interaction.guildId || undefined, interaction.channelId, message, [], true, false, { stream });
+        const response = await client.aiHandler.generateResponse(interaction.user.id, interaction.guildId || undefined, interaction.channelId, message, [], true, false, { stream, safeMode });
         if (!response) {
             await interaction.editReply({
                 content: '❌ لم أتمكن من توليد رد. حاول مرة أخرى لاحقاً',

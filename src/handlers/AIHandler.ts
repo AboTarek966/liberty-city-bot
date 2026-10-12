@@ -144,9 +144,9 @@ export class AIHandler {
     userRoles: string[] = [],
     isMention: boolean = false,
     repliedToBot: boolean = false,
-    opts: { fromCommand?: boolean; userContext?: AIUserContext; stream?: AIStreamHandlers } = {}
+    opts: { fromCommand?: boolean; userContext?: AIUserContext; stream?: AIStreamHandlers; safeMode?: boolean } = {}
   ): Promise<AIResponse | null> {
-    const { fromCommand = false, userContext, stream } = opts;
+    const { fromCommand = false, userContext, stream, safeMode = false } = opts;
     try {
       // Get AI config for guild (auto-create with defaults if missing)
       let aiConfig: any = guildId ? await AIConfig.findOne({ guildId }) : null;

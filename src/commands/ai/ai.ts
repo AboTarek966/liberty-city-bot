@@ -29,6 +29,12 @@ const command: Command = {
             .setRequired(true)
             .setMaxLength(2000)
         )
+        .addBooleanOption(opt =>
+          opt
+            .setName('safe')
+            .setDescription('وضع آمن: لا يكشف أي معلومات عن السيرفر')
+            .setRequired(false)
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -40,6 +46,12 @@ const command: Command = {
             .setDescription('سؤالك')
             .setRequired(true)
             .setMaxLength(2000)
+        )
+        .addBooleanOption(opt =>
+          opt
+            .setName('safe')
+            .setDescription('وضع آمن: لا يكشف أي معلومات عن السيرفر')
+            .setRequired(false)
         )
     )
     .addSubcommand(sub =>
@@ -107,6 +119,7 @@ async function handleChat(
   type: 'chat' | 'ask'
 ): Promise<void> {
   const message = interaction.options.getString(type === 'chat' ? 'message' : 'question', true);
+  const safeMode = interaction.options.getBoolean('safe') || false;
 
   // Check if AI is available
   if (!client.aiHandler.isAvailable()) {
@@ -190,7 +203,7 @@ async function handleChat(
       [],
       true,
       false,
-      { stream }
+      { stream, safeMode }
     );
 
     if (!response) {

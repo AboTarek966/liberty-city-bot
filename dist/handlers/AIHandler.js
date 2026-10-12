@@ -98,7 +98,7 @@ class AIHandler {
     // Main Response Generation
     // --------------------------------------------
     async generateResponse(userId, guildId, channelId, message, userRoles = [], isMention = false, repliedToBot = false, opts = {}) {
-        const { fromCommand = false, userContext, stream } = opts;
+        const { fromCommand = false, userContext, stream, safeMode = false } = opts;
         try {
             // Get AI config for guild (auto-create with defaults if missing)
             let aiConfig = guildId ? await models_1.AIConfig.findOne({ guildId }) : null;
