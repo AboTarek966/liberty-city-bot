@@ -1,1 +1,1 @@
-{"version":3,"file":"roleadd.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/roleadd.ts"],"names":[],"mappings":"AAYA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA+Fd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"roleadd.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/roleadd.ts"],"names":[],"mappings":"AAYA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AASxD,QAAA,MAAM,OAAO,EAAE,OAwHd,CAAC;AAEF,eAAe,OAAO,CAAC"}

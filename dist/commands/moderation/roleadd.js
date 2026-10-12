@@ -38,13 +38,17 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
+const rolePicker_1 = require("../../utils/rolePicker");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('roleadd')
         .setDescription('إضافة رول لعضو')
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageRoles)
         .addUserOption(o => o.setName('user').setDescription('العضو المراد إضافة الرول له').setRequired(true))
-        .addRoleOption(o => o.setName('role').setDescription('الرول المراد إضافته').setRequired(true))
+        .addRoleOption(o => o
+        .setName('role')
+        .setDescription('الرول المراد إضافته (اتركه فارغاً لفتح لوحة الاختيار)')
+        .setRequired(false))
         .addStringOption(o => o.setName('reason').setDescription('السبب').setRequired(false)),
     cooldown: 5,
     permissions: [discord_js_1.PermissionFlagsBits.ManageRoles],
@@ -52,7 +56,7 @@ const command = {
         const client = interaction.client;
         const guild = interaction.guild;
         const member = interaction.options.getMember('user');
-        const role = interaction.options.getRole('role', true);
+        const roleOption = interaction.options.getRole('role');
         const reason = interaction.options.getString('reason') || 'إضافة رول';
         if (!member) {
             await interaction.reply({ content: '❌ لم يتم العثور على العضو', ephemeral: true });
@@ -63,11 +67,29 @@ const command = {
             await interaction.reply({ content: '❌ لا يمكن تعديل رولات مالك السيرفر', ephemeral: true });
             return;
         }
+        const executorMember = interaction.member;
+        // --------------------------------------------
+        // لوحة اختيار الرولات (لم يتم تحديد رول)
+        // --------------------------------------------
+        if (!roleOption) {
+            const grantable = (0, rolePicker_1.getGrantableRoles)(guild, executorMember);
+            if (grantable.length === 0) {
+                await interaction.reply({
+                    content: '❌ لا توجد رولات يمكنك إعطاؤها — تأكد من رتبتك ورتبة البوت',
+                    ephemeral: true,
+                });
+                return;
+            }
+            const state = (0, rolePicker_1.createRolePickerState)(interaction.user.id, member.id, reason);
+            const { content, components } = (0, rolePicker_1.buildRolePicker)(state, guild, executorMember);
+            await interaction.reply({ content, components });
+            return;
+        }
+        const role = roleOption;
         if (member.roles.cache.has(role.id)) {
             await interaction.reply({ content: `❌ العضو يملك رول ${role} بالفعل`, ephemeral: true });
             return;
         }
-        const executorMember = interaction.member;
         const isOwner = interaction.user.id === guild.ownerId;
         if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0) {
             await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من الرول المضاف', ephemeral: true });
