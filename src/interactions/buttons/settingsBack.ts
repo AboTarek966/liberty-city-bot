@@ -4,7 +4,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal } from '../../utils/settingsPanel';
 
 const handler: ButtonHandler = {
   id: 'settings_back',
@@ -14,8 +14,14 @@ const handler: ButtonHandler = {
       return;
     }
 
-    if (!canManageSettings(interaction as any)) {
+    const access = checkSettingsAccess(interaction);
+    if (access === 'noperm') {
       await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+      return;
+    }
+    if (access === 'needpassword') {
+      // 🔐 انتهت الجلسة → إعادة فتح نافذة كلمة المرور
+      await interaction.showModal(buildSettingsPasswordModal());
       return;
     }
 

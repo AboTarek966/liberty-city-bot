@@ -19,7 +19,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 
@@ -36,8 +36,14 @@ const handler: SelectMenuHandler = {
       await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
       return;
     }
-    if (!canManageSettings(interaction as any)) {
+    const access = checkSettingsAccess(interaction);
+    if (access === 'noperm') {
       await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+      return;
+    }
+    if (access === 'needpassword') {
+      // 🔐 انتهت الجلسة → إعادة فتح نافذة كلمة المرور (قبل أي استجابة أخرى)
+      await interaction.showModal(buildSettingsPasswordModal());
       return;
     }
 

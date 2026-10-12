@@ -28,9 +28,21 @@ const handler = {
                 return;
             }
         }
-        else if (!(0, settingsPanel_1.canManageSettings)(interaction)) {
-            await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
-            return;
+        else {
+            // 🔐 مودالات الإعدادات الأخرى: فحص الصلاحيات + الجلسة (رسالة مميزة لكل حالة)
+            const access = (0, settingsPanel_1.checkSettingsAccess)(interaction);
+            if (access === 'noperm') {
+                await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+                return;
+            }
+            if (access === 'needpassword') {
+                // لا يمكن فتح مودال من مودال → رسالة إرشادية لإعادة الفتح
+                await interaction.reply({
+                    content: '❌ انتهت جلسة كلمة المرور — افتح لوحة الإعدادات من جديد (`/settings`) وأعد إدخالها ثم كرر المحاولة',
+                    ephemeral: true,
+                });
+                return;
+            }
         }
         await interaction.deferUpdate(); // ✅ منع انتهاء صلاحية التفاعل (فوراً!)
         const parts = interaction.customId.split(':');
@@ -64,10 +76,12 @@ const handler = {
                 });
             }
             else {
+                // ❌ كلمة خاطئة → نبقي اللوحة وأزرارها للاختبار مباشرة
+                const retryPanel = await (0, settingsPanel_1.buildPanel)('home', interaction.guild, interaction.user.id);
                 await interaction.editReply({
                     content: '❌ **كلمة المرور خاطئة!** اضغط أي زر وحاول مرة أخرى.',
-                    components: [],
-                    embeds: [],
+                    embeds: retryPanel.embeds,
+                    components: retryPanel.components,
                 });
             }
             return;

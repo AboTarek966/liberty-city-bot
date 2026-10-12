@@ -1,4 +1,4 @@
-import { ActionRowBuilder, EmbedBuilder, Guild, ChatInputCommandInteraction } from 'discord.js';
+import { ActionRowBuilder, EmbedBuilder, Guild, ChatInputCommandInteraction, ModalBuilder } from 'discord.js';
 export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'commands';
 type PanelComponent = ActionRowBuilder<any>;
 export interface BuiltPanel {
@@ -26,6 +26,9 @@ export declare function canManageSettings(interaction: ChatInputCommandInteracti
     user: any;
     guildId: string;
 }): boolean;
+export type SettingsAccess = 'ok' | 'noperm' | 'needpassword';
+export declare function checkSettingsAccess(interaction: any): SettingsAccess;
+export declare function buildSettingsPasswordModal(): ModalBuilder;
 export declare const ICONS: Record<SettingsCategory, string>;
 export declare const TITLES: Record<SettingsCategory, string>;
 export declare const CATEGORY_COLORS: Record<SettingsCategory, number>;

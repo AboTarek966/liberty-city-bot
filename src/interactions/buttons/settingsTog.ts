@@ -4,7 +4,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildVerificationPanel, buildShop, sendWelcomeCardPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerificationPanel, buildShop, sendWelcomeCardPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { setLockdown } from '../../utils/lockdown';
@@ -16,8 +16,14 @@ const handler: ButtonHandler = {
       await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
       return;
     }
-    if (!canManageSettings(interaction as any)) {
+    const access = checkSettingsAccess(interaction);
+    if (access === 'noperm') {
       await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+      return;
+    }
+    if (access === 'needpassword') {
+      // 🔐 انتهت الجلسة → إعادة فتح نافذة كلمة المرور
+      await interaction.showModal(buildSettingsPasswordModal());
       return;
     }
 

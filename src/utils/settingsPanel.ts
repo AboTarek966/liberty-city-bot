@@ -16,6 +16,7 @@ import {
   GuildMember,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
+  PermissionsBitField,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -95,22 +96,63 @@ export async function getSettingsPassword(guildId: string): Promise<string> {
 export function canManageSettings(
   interaction: ChatInputCommandInteraction | { member: any; user: any; guildId: string }
 ): boolean {
+  return checkSettingsAccess(interaction as any) === 'ok';
+}
+
+// --------------------------------------------
+// نتيجة فحص الوصول للوحة الإعدادات
+// - ok: مسموح (وتُمدَّد الجلسة تلقائياً أثناء الاستخدام)
+// - noperm: لا تملك صلاحية إدارة السيرفر
+// - needpassword: انتهت جلسة كلمة المرور → أعد فتح النافذة بدل خطأ ميت
+// --------------------------------------------
+export type SettingsAccess = 'ok' | 'noperm' | 'needpassword';
+
+export function checkSettingsAccess(interaction: any): SettingsAccess {
   const perms = (interaction.member as any)?.permissions;
-  const hasAdminPerms = !!perms && (
-    perms.has(PermissionFlagsBits.ManageGuild) ||
-    perms.has(PermissionFlagsBits.Administrator)
-  );
-  
-  // إذا لم يكن لديه صلاحيات إدارية، ارفض
-  if (!hasAdminPerms) return false;
-  
-  // تحقق من كلمة المرور (إذا كان المستخدم محقق مسبقاً، السماح)
-  // 🔐 لا يوجد تجاوز للمالك — الجميع يُدخل كلمة المرور
-  const userId = interaction.user.id;
-  if (isPasswordVerified(userId)) return true;
-  
-  // وإلا، يحتاج إدخال كلمة المرور
-  return false;
+  const isOwner =
+    !!interaction.guild && interaction.user.id === interaction.guild.ownerId;
+
+  let hasAdminPerms = isOwner;
+  if (!hasAdminPerms) {
+    try {
+      if (perms && typeof perms.has === 'function') {
+        hasAdminPerms =
+          perms.has(PermissionFlagsBits.ManageGuild) ||
+          perms.has(PermissionFlagsBits.Administrator);
+      } else if (typeof perms === 'string' || Array.isArray(perms) || typeof perms === 'bigint') {
+        // member لم يُحلّل (دفعة تفاعل خام) — نحلل الصلاحيات يدوياً
+        const bitfield = new PermissionsBitField(perms as any);
+        hasAdminPerms = bitfield.has(PermissionFlagsBits.ManageGuild) || bitfield.has(PermissionFlagsBits.Administrator);
+      }
+    } catch {
+      hasAdminPerms = false;
+    }
+  }
+
+  if (!hasAdminPerms) return 'noperm';
+  if (!isPasswordVerified(interaction.user.id)) return 'needpassword';
+
+  // ⏱️ تمديد الجلسة أثناء الاستخدام النشط (نافذة منزلقة 30 دقيقة)
+  setPasswordVerified(interaction.user.id);
+  return 'ok';
+}
+
+// نافذة إدخال كلمة المرور — تُفتح تلقائياً عند انتهاء الجلسة
+export function buildSettingsPasswordModal(): ModalBuilder {
+  return new ModalBuilder()
+    .setCustomId('settings_modal:password')
+    .setTitle('🔐 التحقق من كلمة المرور')
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId('value')
+          .setLabel('أدخل كلمة مرور لوحة الإعدادات')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('••••••••')
+          .setRequired(true)
+          .setMaxLength(20)
+      )
+    );
 }
 
 // --------------------------------------------

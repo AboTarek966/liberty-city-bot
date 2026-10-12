@@ -4,7 +4,7 @@
 
 import { ModalSubmitInteraction, PermissionFlagsBits } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 
@@ -33,9 +33,21 @@ const handler: ModalHandler = {
         await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
         return;
       }
-    } else if (!canManageSettings(interaction as any)) {
-      await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
-      return;
+    } else {
+      // 🔐 مودالات الإعدادات الأخرى: فحص الصلاحيات + الجلسة (رسالة مميزة لكل حالة)
+      const access = checkSettingsAccess(interaction);
+      if (access === 'noperm') {
+        await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+        return;
+      }
+      if (access === 'needpassword') {
+        // لا يمكن فتح مودال من مودال → رسالة إرشادية لإعادة الفتح
+        await interaction.reply({
+          content: '❌ انتهت جلسة كلمة المرور — افتح لوحة الإعدادات من جديد (`/settings`) وأعد إدخالها ثم كرر المحاولة',
+          ephemeral: true,
+        });
+        return;
+      }
     }
 
     await interaction.deferUpdate(); // ✅ منع انتهاء صلاحية التفاعل (فوراً!)
@@ -74,10 +86,12 @@ const handler: ModalHandler = {
           ephemeral: true,
         });
       } else {
+        // ❌ كلمة خاطئة → نبقي اللوحة وأزرارها للاختبار مباشرة
+        const retryPanel = await buildPanel('home', interaction.guild!, interaction.user.id);
         await interaction.editReply({
           content: '❌ **كلمة المرور خاطئة!** اضغط أي زر وحاول مرة أخرى.',
-          components: [],
-          embeds: [],
+          embeds: retryPanel.embeds,
+          components: retryPanel.components as any,
         });
       }
       return;

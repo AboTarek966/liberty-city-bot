@@ -43,6 +43,8 @@ exports.setPasswordVerified = setPasswordVerified;
 exports.clearPasswordVerified = clearPasswordVerified;
 exports.getSettingsPassword = getSettingsPassword;
 exports.canManageSettings = canManageSettings;
+exports.checkSettingsAccess = checkSettingsAccess;
+exports.buildSettingsPasswordModal = buildSettingsPasswordModal;
 exports.buildPanel = buildPanel;
 exports.buildVerificationPanel = buildVerificationPanel;
 exports.buildWarnRolesPanel = buildWarnRolesPanel;
@@ -108,19 +110,49 @@ async function getSettingsPassword(guildId) {
 // Permission helper
 // --------------------------------------------
 function canManageSettings(interaction) {
+    return checkSettingsAccess(interaction) === 'ok';
+}
+function checkSettingsAccess(interaction) {
     const perms = interaction.member?.permissions;
-    const hasAdminPerms = !!perms && (perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
-        perms.has(discord_js_1.PermissionFlagsBits.Administrator));
-    // إذا لم يكن لديه صلاحيات إدارية، ارفض
+    const isOwner = !!interaction.guild && interaction.user.id === interaction.guild.ownerId;
+    let hasAdminPerms = isOwner;
+    if (!hasAdminPerms) {
+        try {
+            if (perms && typeof perms.has === 'function') {
+                hasAdminPerms =
+                    perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+                        perms.has(discord_js_1.PermissionFlagsBits.Administrator);
+            }
+            else if (typeof perms === 'string' || Array.isArray(perms) || typeof perms === 'bigint') {
+                // member لم يُحلّل (دفعة تفاعل خام) — نحلل الصلاحيات يدوياً
+                const bitfield = new discord_js_1.PermissionsBitField(perms);
+                hasAdminPerms = bitfield.has(discord_js_1.PermissionFlagsBits.ManageGuild) || bitfield.has(discord_js_1.PermissionFlagsBits.Administrator);
+            }
+        }
+        catch {
+            hasAdminPerms = false;
+        }
+    }
     if (!hasAdminPerms)
-        return false;
-    // تحقق من كلمة المرور (إذا كان المستخدم محقق مسبقاً، السماح)
-    // 🔐 لا يوجد تجاوز للمالك — الجميع يُدخل كلمة المرور
-    const userId = interaction.user.id;
-    if (isPasswordVerified(userId))
-        return true;
-    // وإلا، يحتاج إدخال كلمة المرور
-    return false;
+        return 'noperm';
+    if (!isPasswordVerified(interaction.user.id))
+        return 'needpassword';
+    // ⏱️ تمديد الجلسة أثناء الاستخدام النشط (نافذة منزلقة 30 دقيقة)
+    setPasswordVerified(interaction.user.id);
+    return 'ok';
+}
+// نافذة إدخال كلمة المرور — تُفتح تلقائياً عند انتهاء الجلسة
+function buildSettingsPasswordModal() {
+    return new discord_js_1.ModalBuilder()
+        .setCustomId('settings_modal:password')
+        .setTitle('🔐 التحقق من كلمة المرور')
+        .addComponents(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.TextInputBuilder()
+        .setCustomId('value')
+        .setLabel('أدخل كلمة مرور لوحة الإعدادات')
+        .setStyle(discord_js_1.TextInputStyle.Short)
+        .setPlaceholder('••••••••')
+        .setRequired(true)
+        .setMaxLength(20)));
 }
 // --------------------------------------------
 // Visual helpers

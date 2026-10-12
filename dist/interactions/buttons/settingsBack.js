@@ -11,8 +11,14 @@ const handler = {
             await interaction.reply({ content: '❌ هذا الزر يعمل في السيرفر فقط', ephemeral: true });
             return;
         }
-        if (!(0, settingsPanel_1.canManageSettings)(interaction)) {
+        const access = (0, settingsPanel_1.checkSettingsAccess)(interaction);
+        if (access === 'noperm') {
             await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+            return;
+        }
+        if (access === 'needpassword') {
+            // 🔐 انتهت الجلسة → إعادة فتح نافذة كلمة المرور
+            await interaction.showModal((0, settingsPanel_1.buildSettingsPasswordModal)());
             return;
         }
         await interaction.deferUpdate(); // ✅ منع انتهاء صلاحية التفاعل

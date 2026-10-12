@@ -2,10 +2,9 @@
 // Settings Panel - Category Navigation Button
 // ============================================
 
-import { ButtonInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, PermissionFlagsBits } from 'discord.js';
+import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, SettingsCategory, isPasswordVerified, setPasswordVerified, getSettingsPassword } from '../../utils/settingsPanel';
-import { getGuildSettings } from '../../models';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, SettingsCategory } from '../../utils/settingsPanel';
 
 const handler: ButtonHandler = {
   id: 'settings_cat',
@@ -15,42 +14,15 @@ const handler: ButtonHandler = {
       return;
     }
 
-    // التحقق من صلاحيات الإدارة أولاً
-    const member = interaction.member as any;
-    const perms = member?.permissions;
-    const hasAdminPerms = !!perms && (
-      perms.has(PermissionFlagsBits.ManageGuild) ||
-      perms.has(PermissionFlagsBits.Administrator)
-    );
-    
-    if (!hasAdminPerms) {
+    // 🔐 فحص الوصول: الصلاحيات + جلسة كلمة المرور
+    // (عند انتهاء الجلسة تُفتح نافذة كلمة المرور تلقائياً بدل خطأ ميت)
+    const access = checkSettingsAccess(interaction);
+    if (access === 'noperm') {
       await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
       return;
     }
-
-    // التحقق من كلمة المرور
-    const userId = interaction.user.id;
-    if (!isPasswordVerified(userId)) {
-      // عرض مودال إدخال كلمة المرور
-      const settings = await getGuildSettings(interaction.guild.id);
-      const password = settings.settingsPassword || '7421';
-      
-      const modal = new ModalBuilder()
-        .setCustomId('settings_modal:password')
-        .setTitle('🔐 التحقق من كلمة المرور')
-        .addComponents(
-          new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId('value')
-              .setLabel('أدخل كلمة مرور لوحة الإعدادات')
-              .setStyle(TextInputStyle.Short)
-              .setPlaceholder('••••••••')
-              .setRequired(true)
-              .setMaxLength(20)
-          )
-        );
-      
-      await interaction.showModal(modal);
+    if (access === 'needpassword') {
+      await interaction.showModal(buildSettingsPasswordModal());
       return;
     }
 

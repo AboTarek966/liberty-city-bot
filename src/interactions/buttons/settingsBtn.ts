@@ -15,7 +15,7 @@ import {
   RoleSelectMenuBuilder,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
@@ -33,8 +33,14 @@ const handler: ButtonHandler = {
       await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
       return;
     }
-    if (!canManageSettings(interaction as any)) {
+    const access = checkSettingsAccess(interaction);
+    if (access === 'noperm') {
       await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+      return;
+    }
+    if (access === 'needpassword') {
+      // 🔐 انتهت الجلسة (مثال: بعد إعادة تشغيل البوت) → إعادة فتح نافذة كلمة المرور
+      await interaction.showModal(buildSettingsPasswordModal());
       return;
     }
 
