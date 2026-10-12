@@ -1,1 +1,1 @@
-{"version":3,"file":"jail.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/jail.ts"],"names":[],"mappings":"AAcA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAQxD,QAAA,MAAM,OAAO,EAAE,OAiQd,CAAC;AA+CF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"jail.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/jail.ts"],"names":[],"mappings":"AAcA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAQxD,QAAA,MAAM,OAAO,EAAE,OAkQd,CAAC;AA+CF,eAAe,OAAO,CAAC"}

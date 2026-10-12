@@ -120,11 +120,12 @@ const command: Command = {
         return;
       }
 
-      // التحقق من أن البوت يملك ManageChannels في روم السجن (لازم لتعديل الصلاحيات)
-      if (!botPermsInJail?.has(PermissionFlagsBits.ManageChannels)) {
+      // التحقق من أن البوت يملك ManageRoles في روم السجن
+      // ⚠️ تعديل صلاحيات الرولات (Permission Overwrites) يحتاج ManageRoles وليس ManageChannels!
+      if (!botPermsInJail?.has(PermissionFlagsBits.ManageRoles)) {
         await interaction.editReply({
-          content: '❌ البوت لا يملك صلاحية **Manage Channels** في روم السجن.\n\n' +
-            '**الحل:** اذهب إلى إعدادات السيرفر → الرتب → رول البوت → فعّل "Manage Channels" (إدارة القنوات) ثم أعد المحاولة.',
+          content: '❌ البوت لا يملك صلاحية **Manage Roles** (إدارة الرتب).\n\n' +
+            '**الحل:** إعدادات السيرفر → الرتب → رول البوت → فعّل "Manage Roles" ✅',
         });
         return;
       }
@@ -213,7 +214,7 @@ const command: Command = {
         }, { reason: `سجن ${member.user.tag}` });
       } catch (e) {
         logger.error('Failed to set jail channel permissions:', e);
-        await interaction.editReply({ content: '❌ فشل إعداد صلاحيات روم السجن — تأكد أن رتبة البوت أعلى من رول السجن ولديه ManageChannels' });
+        await interaction.editReply({ content: '❌ فشل إعداد صلاحيات روم السجن — تأكد أن رتبة البوت أعلى من رول السجن ولديه Manage Roles' });
         return;
       }
 
