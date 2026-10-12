@@ -58,24 +58,17 @@ const command = {
 // --------------------------------------------
 function buildPollEmbed(poll, authorName) {
     const totalVotes = poll.options.reduce((sum, o) => sum + o.votes.length, 0);
-    const embed = new discord_js_1.EmbedBuilder()
-        .setTitle(`📊 ${poll.question}`)
-        .setColor(embeds_1.Colors.primary)
-        .addFields(poll.options.map((o, i) => {
+    const tally = poll.options
+        .map((o, i) => {
         const count = o.votes.length;
         const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-        const filled = Math.round(pct / 10);
-        const bar = '🟦'.repeat(filled) + '⬜'.repeat(10 - filled);
-        return {
-            name: `${i + 1}️⃣ ${o.text}`.substring(0, 256),
-            value: `${bar} **${pct}%** — ${count} صوت`,
-            inline: false,
-        };
-    }))
-        .setFooter({
-        text: `صوّت بالأزرار بالأسفل${authorName ? ` • صنع بواسطة ${authorName}` : ''} • يمكنك تغيير صوتك`,
+        return `${i + 1}️⃣ ${o.text} — **${pct}%** (${count} صوت)`;
     })
-        .setTimestamp();
+        .join('\n') || 'لا أصوات بعد';
+    const embed = new discord_js_1.EmbedBuilder()
+        .setTitle(`📊 ${poll.question}`.substring(0, 256))
+        .setColor(embeds_1.Colors.primary)
+        .setDescription(tally);
     const rows = [];
     let current = new discord_js_1.ActionRowBuilder();
     poll.options.forEach((o, i) => {

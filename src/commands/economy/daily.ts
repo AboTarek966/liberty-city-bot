@@ -2,10 +2,9 @@
 // Liberty City Bot - Daily Command (المكافأة اليومية)
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { UserProfile } from '../../models';
-import { Colors } from '../../utils/embeds';
 import { formatNumber } from '../../utils/helpers';
 
 const DAILY_MIN = 100;
@@ -35,13 +34,7 @@ const command: Command = {
       const hours = Math.floor(remaining / 3600_000);
       const minutes = Math.ceil((remaining % 3600_000) / 60_000);
       await interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(Colors.warning)
-            .setTitle('⏳ المكافأة اليومية مستخدمة')
-            .setDescription(`جرّب مرة أخرى بعد **${hours}س ${minutes}د**`)
-            .setTimestamp(),
-        ],
+        content: `⏳ المكافأة اليومية مستخدمة — جرّب مرة أخرى بعد ${hours}س ${minutes}د`,
         ephemeral: true,
       });
       return;
@@ -53,17 +46,7 @@ const command: Command = {
     await profile.save();
 
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(Colors.success)
-          .setTitle('🎁 تم استلام مكافأتك اليومية!')
-          .setDescription(
-            `حصلت على **${formatNumber(reward)}** عملة 💰\n` +
-            `رصيدك الآن: **${formatNumber(profile.balance)}**\n\n` +
-            `🛍️ تفقد المتجر: \`/shop\``
-          )
-          .setTimestamp(),
-      ],
+      content: `🎁 حصلت على ${formatNumber(reward)} عملة — رصيدك الآن ${formatNumber(profile.balance)}`,
     });
   },
 };

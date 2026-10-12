@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('rate')
@@ -35,13 +34,7 @@ const command = {
         else
             reaction = '💀 كارثة';
         const bar = '🟩'.repeat(Math.round(score / 10)) + '🟥'.repeat(10 - Math.round(score / 10));
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('💯 تقييمي')
-            .setColor(embeds_1.Colors.primary)
-            .setDescription(`**${thing}**\n\n${bar} **${score}/100** — ${reaction}`)
-            .setFooter({ text: `قيّمه ${interaction.user.username}` })
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ content: `💯 تقييمي لـ **${thing}**: ${bar} **${score}/100** — ${reaction}` });
     },
 };
 exports.default = command;

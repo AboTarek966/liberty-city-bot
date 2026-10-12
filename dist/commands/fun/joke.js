@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const JOKES = [
     'لماذا لا يحب الحاسوب الرياضيات؟\nلأنه يخاف من المتغيرات! 😄',
     '👩‍💻 قلت للحاسوب: أحتاج مساعدة...\nقال: تمام، جرّب Ctrl+Z على حياتك! 💀',
@@ -29,13 +28,7 @@ const command = {
     cooldown: 5,
     async execute(interaction) {
         const joke = JOKES[Math.floor(Math.random() * JOKES.length)];
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('😂 نكتة اليوم')
-            .setColor(embeds_1.Colors.warning)
-            .setDescription(joke)
-            .setFooter({ text: `طلبها ${interaction.user.username} — اكتب /joke لمزيد!` })
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ content: `😂 ${joke.replace(/\n/g, ' ')}` });
     },
 };
 exports.default = command;

@@ -1,1 +1,1 @@
-{"version":3,"file":"pay.d.ts","sourceRoot":"","sources":["../../../src/commands/economy/pay.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAKxD,QAAA,MAAM,OAAO,EAAE,OA8Dd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"pay.d.ts","sourceRoot":"","sources":["../../../src/commands/economy/pay.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OAuDd,CAAC;AAEF,eAAe,OAAO,CAAC"}

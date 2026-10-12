@@ -7,7 +7,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const snipeCache_1 = require("../../utils/snipeCache");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('snipe')
@@ -49,37 +48,14 @@ const command = {
             return;
         }
         const minutesAgo = Math.max(1, Math.round((Date.now() - entry.deletedAt) / 60000));
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(index === 0 ? '🕵️ آخر رسالة محذوفة' : `🕵️ رسالة محذوفة #${index + 1}`)
-            .setColor(embeds_1.Colors.error || 0xed4245)
-            .setAuthor({
-            name: entry.authorTag,
-            ...(entry.authorAvatar ? { iconURL: entry.authorAvatar } : {}),
-        })
-            .setDescription((entry.content || '*(بدون نص — انظر المرفقات أدناه)*').substring(0, 1900))
-            .addFields({
-            name: '📅 نُشرت',
-            value: `<t:${Math.floor(entry.postedAt / 1000)}:R>`,
-            inline: true,
-        }, {
-            name: '🗑️ حُذفت',
-            value: `منذ ${minutesAgo} دقيقة`,
-            inline: true,
-        })
-            .setFooter({
-            text: `Liberty City Snipe • ${entry.channelId} • ${(0, snipeCache_1.getSnipeCount)(interaction.guildId, interaction.channelId)} محفوظة`,
-        })
-            .setTimestamp();
-        if (entry.attachments.length > 0) {
-            embed.addFields({
-                name: `📎 المرفقات (${entry.attachments.length})`,
-                value: entry.attachments.map((a, i) => `[${a.name}](${a.url})`).join('\n').substring(0, 1000),
-            });
-        }
-        if (entry.pinned) {
-            embed.addFields({ name: '📌', value: 'كانت رسالة مثبتة', inline: true });
-        }
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        const raw = (entry.content || '*(بدون نص)*').replace(/\s+/g, ' ').trim();
+        const short = raw.length > 150 ? `${raw.substring(0, 150)}…` : raw;
+        let content = `${index === 0 ? '🕵️ آخر رسالة محذوفة' : `🕵️ رسالة محذوفة #${index + 1}`} — ${entry.authorTag} (قبل ${minutesAgo} دقيقة): ${short}`;
+        if (entry.attachments.length > 0)
+            content += ` 📎 ${entry.attachments.length} مرفق`;
+        if (entry.pinned)
+            content += ' 📌 كانت مثبتة';
+        await interaction.reply({ content, ephemeral: true });
     },
 };
 exports.default = command;

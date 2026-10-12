@@ -14,28 +14,34 @@ export declare class ModerationHandler {
     ban(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
+        simpleMsg: string;
     }>;
     kick(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
+        simpleMsg: string;
     }>;
     timeout(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
+        simpleMsg: string;
     }>;
     removeTimeout(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
+        simpleMsg: string;
     }>;
     warn(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
         warningCount: number;
+        simpleMsg: string;
     }>;
     unwarn(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
         warningCount: number;
+        simpleMsg: string;
     }>;
     private checkWarningThreshold;
     mute(options: ModerationOptions): Promise<{

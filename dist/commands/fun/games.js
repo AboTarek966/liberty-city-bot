@@ -33,9 +33,7 @@ const command = {
             .setColor(embeds_1.Colors.primary)
             .setTitle('🎮 قائمة الألعاب')
             .setDescription(`**اختر لعبة من القائمة بالأسفل** — توصلك طريقة اللعب فوراً\n\n` +
-            exports.GAMES_LIST.map(g => `${g.label}`).join('  •  '))
-            .setFooter({ text: 'بعض الألعاب تستخدم رصيدك — اجمعه بـ /daily والنشر' })
-            .setTimestamp();
+            exports.GAMES_LIST.map(g => `${g.label}`).join('  •  '));
         const select = new discord_js_1.StringSelectMenuBuilder()
             .setCustomId('games_menu')
             .setPlaceholder('🎮 اختر لعبة')

@@ -203,17 +203,10 @@ async function handleChat(
     // Split long responses
     const chunks = splitMessage(response.content, 4000);
 
-    const embed = new EmbedBuilder()
-      .setTitle('🤖 Liberty City AI')
-      .setDescription(chunks[0])
-      .setColor(Colors.primary)
-      .setFooter({
-        text: ` بواسطة ${interaction.user.tag} | ${response.model} | ${response.tokensUsed} tokens`,
-        iconURL: interaction.user.displayAvatarURL(),
-      })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({
+      content: chunks[0],
+      allowedMentions: { parse: ['users', 'roles', 'everyone'] as const },
+    });
 
     // Send remaining chunks
     for (let i = 1; i < chunks.length; i++) {
@@ -268,55 +261,12 @@ async function handleInfo(interaction: ChatInputCommandInteraction, client: Libe
     interaction.channelId
   );
 
-  const embed = new EmbedBuilder()
-    .setTitle('🤖 معلومات الذكاء الاصطناعي')
-    .setColor(Colors.primary)
-    .addFields(
-      {
-        name: '🔧 المزود',
-        value: providerInfo.provider,
-        inline: true,
-      },
-      {
-        name: '🧠 النموذج',
-        value: providerInfo.model,
-        inline: true,
-      },
-      {
-        name: '✅ الحالة',
-        value: client.aiHandler.isAvailable() ? '✅ متاح' : '❌ غير متاح',
-        inline: true,
-      },
-      {
-        name: '💬 رسائلك في هذه القناة',
-        value: `${sessionInfo.messageCount}`,
-        inline: true,
-      },
-      {
-        name: '🔑 Groq (مجاني)',
-        value: providerInfo.groqAvailable ? '✅' : '❌',
-        inline: true,
-      },
-      {
-        name: '🔑 OpenAI',
-        value: providerInfo.openaiAvailable ? '✅' : '❌',
-        inline: true,
-      },
-      {
-        name: '🔑 Anthropic',
-        value: providerInfo.anthropicAvailable ? '✅' : '❌',
-        inline: true,
-      },
-      {
-        name: '⏱️ الكولداون',
-        value: `${config.ai.cooldown / 1000} ثانية`,
-        inline: true,
-      },
-    )
-    .setFooter({ text: 'Liberty City AI' })
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
+  await interaction.editReply({
+    content:
+      `🤖 المزود: ${providerInfo.provider} • النموذج: ${providerInfo.model} • ${
+        client.aiHandler.isAvailable() ? '✅ متاح' : '❌ غير متاح'
+      } • رسائلك هنا: ${sessionInfo.messageCount} • الكولداون: ${config.ai.cooldown / 1000}ث`,
+  });
 }
 
 // --------------------------------------------
@@ -352,18 +302,9 @@ async function handleConfig(interaction: ChatInputCommandInteraction, client: Li
 
   await settings.save();
 
-  const embed = new EmbedBuilder()
-    .setTitle('✅ تم تحديث إعدادات AI')
-    .setColor(Colors.success)
-    .addFields(
-      { name: 'الحالة', value: settings.ai.enabled ? '✅ مفعل' : '❌ معطل', inline: true },
-      { name: 'درجة الإبداع', value: `${settings.ai.temperature}`, inline: true },
-      { name: 'موجه النظام', value: settings.ai.systemPrompt.substring(0, 200), inline: false },
-    )
-    .setFooter({ text: 'Liberty City AI Settings' })
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
+  await interaction.editReply({
+    content: `✅ تم تحديث إعدادات AI — الحالة: ${settings.ai.enabled ? '✅ مفعل' : '❌ معطل'} • الإبداع: ${settings.ai.temperature}`,
+  });
 }
 
 // --------------------------------------------

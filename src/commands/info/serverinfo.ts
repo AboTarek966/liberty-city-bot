@@ -41,85 +41,38 @@ const command: Command = {
 
     const onlineMembers = members.filter(m => m.presence?.status !== 'offline').size;
 
+    const totalChannels = textChannels + voiceChannels + categories;
+
+    const lines = [
+      `👑 المالك: ${owner} • 🆔 \`${guild.id}\``,
+      `📅 إنشاء: <t:${Math.floor(guild.createdTimestamp / 1000)}:R> • 🔒 ${getVerificationLevel(guild.verificationLevel)}`,
+      `👥 ${guild.memberCount} عضو — 🟢 ${onlineMembers} متصل • 👤 ${humans} بشر • 🤖 ${bots} بوت`,
+      `📁 ${totalChannels} قناة — 💬 ${textChannels} نصية • 🔊 ${voiceChannels} صوتية • 📂 ${categories} فئات`,
+      `🎭 ${guild.roles.cache.size} رتبة • 😀 ${guild.emojis.cache.size} إيموجي • 💎 بوست المستوى ${guild.premiumTier} (${guild.premiumSubscriptionCount ?? 0})`,
+    ];
+
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${guild.name}`)
       .setColor(Colors.primary)
       .setThumbnail(guild.iconURL({ size: 512 }))
-      .setFooter({ text: 'Liberty City Bot' })
-      .setTimestamp();
+      .setDescription(lines.join('\n'));
 
-    if (guild.bannerURL()) {
-      embed.setImage(guild.bannerURL({ size: 1024 })!);
-    }
-
-    embed.addFields(
-      {
-        name: '👑 المالك',
-        value: `${owner}`,
-        inline: true,
-      },
-      {
-        name: '🆔 المعرف',
-        value: `\`${guild.id}\``,
-        inline: true,
-      },
-      {
-        name: '📅 إنشاء السيرفر',
-        value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`,
-        inline: true,
-      },
-      {
-        name: `👥 الأعضاء [${guild.memberCount}]`,
-        value: `🟢 ${onlineMembers} متصل | 👤 ${humans} بشر | 🤖 ${bots} بوت`,
-        inline: true,
-      },
-      {
-        name: `📁 القنوات [${textChannels + voiceChannels + categories}]`,
-        value: `💬 ${textChannels} نصية | 🔊 ${voiceChannels} صوتية | 📂 ${categories} فئات`,
-        inline: true,
-      },
-      {
-        name: `🎭 الأدوار [${guild.roles.cache.size}]`,
-        value: guild.roles.cache.size > 0
-          ? guild.roles.cache
-              .filter(r => r.id !== guild.id)
-              .sort((a, b) => b.position - a.position)
-              .first(5)
-              .map(r => r.toString())
-              .join(' ') + (guild.roles.cache.size > 6 ? '...' : '')
-          : 'لا يوجد',
-        inline: true,
-      },
-      {
-        name: '😀 الإيموجيز',
-        value: `${guild.emojis.cache.size}/${guild.emojis.cache.filter(e => !e.animated).size + guild.emojis.cache.filter(e => e.animated).size} (${guild.emojis.cache.filter(e => e.animated).size} متحرك)`,
-        inline: true,
-      },
-      {
-        name: '💎 البوست',
-        value: `المستوى ${guild.premiumTier} (${guild.premiumSubscriptionCount} بوست)`,
-        inline: true,
-      },
-      {
-        name: '🔒 التحقق',
-        value: getVerificationLevel(guild.verificationLevel),
-        inline: true,
-      },
-      {
-        name: '📢 قناة الترحيب',
-        value: guild.publicUpdatesChannelId
-          ? `<#${guild.publicUpdatesChannelId}>`
-          : 'غير محددة',
-        inline: true,
-      },
-    );
+    const topRoles = guild.roles.cache.size > 0
+      ? guild.roles.cache
+          .filter(r => r.id !== guild.id)
+          .sort((a, b) => b.position - a.position)
+          .first(5)
+          .map(r => r.toString())
+          .join(' ') + (guild.roles.cache.size > 6 ? '...' : '')
+      : 'لا يوجد';
+    embed.addFields({ name: '🎭 أهم الرتب', value: topRoles, inline: true });
 
     // Add features
     if (guild.features.length > 0) {
       embed.addFields({
         name: '✨ المميزات',
         value: guild.features.map(f => getFeatureName(f)).join(', ').substring(0, 1000),
-        inline: false,
+        inline: true,
       });
     }
 

@@ -291,6 +291,7 @@ async function executeAIModeration(message, client, question) {
     // 7) التنفيذ
     try {
         let embed;
+        let msg = null; // ✅ رد نصي سطر واحد بدل الإيمبد الكبير
         switch (hit.action) {
             case 'ban': {
                 const result = await client.moderationHandler.ban({
@@ -300,6 +301,7 @@ async function executeAIModeration(message, client, question) {
                     reason,
                 });
                 embed = result.embed;
+                msg = result.simpleMsg;
                 break;
             }
             case 'kick': {
@@ -313,6 +315,7 @@ async function executeAIModeration(message, client, question) {
                     reason,
                 });
                 embed = result.embed;
+                msg = result.simpleMsg;
                 break;
             }
             case 'timeout': {
@@ -329,6 +332,7 @@ async function executeAIModeration(message, client, question) {
                     duration: `${durationMs}ms`,
                 });
                 embed = result.embed;
+                msg = result.simpleMsg;
                 break;
             }
             case 'untimeout': {
@@ -342,6 +346,7 @@ async function executeAIModeration(message, client, question) {
                     reason,
                 });
                 embed = result.embed;
+                msg = result.simpleMsg;
                 break;
             }
             case 'warn': {
@@ -353,6 +358,7 @@ async function executeAIModeration(message, client, question) {
                     reason,
                 });
                 embed = result.embed;
+                msg = result.simpleMsg;
                 break;
             }
             // ========== أوامر إدارة السيرفر الجديدة ==========
@@ -370,6 +376,7 @@ async function executeAIModeration(message, client, question) {
                     .setColor(embeds_1.Colors.success)
                     .addFields({ name: '🎭 الرول', value: `${newRole}`, inline: true }, { name: '🎨 اللون', value: color, inline: true }, { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true })
                     .setTimestamp();
+                msg = `✅ تم إنشاء الرول **${newRole.name}**`;
                 break;
             }
             case 'role_delete': {
@@ -387,6 +394,7 @@ async function executeAIModeration(message, client, question) {
                     .setColor(embeds_1.Colors.error)
                     .addFields({ name: '🎭 الرول', value: role.name, inline: true }, { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true })
                     .setTimestamp();
+                msg = `🗑️ تم حذف الرول **${role.name}**`;
                 break;
             }
             case 'role_add': {
@@ -411,6 +419,7 @@ async function executeAIModeration(message, client, question) {
                     .setColor(embeds_1.Colors.success)
                     .addFields({ name: '👤 العضو', value: `${member}`, inline: true }, { name: '🎭 الرول', value: `${role}`, inline: true }, { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true })
                     .setTimestamp();
+                msg = `➕ ${member} ← ${role}`;
                 break;
             }
             case 'role_remove': {
@@ -435,6 +444,7 @@ async function executeAIModeration(message, client, question) {
                     .setColor(embeds_1.Colors.warning)
                     .addFields({ name: '👤 العضو', value: `${member}`, inline: true }, { name: '🎭 الرول', value: `${role}`, inline: true }, { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true })
                     .setTimestamp();
+                msg = `➖ ${member} ← ${role} (تمت الإزالة)`;
                 break;
             }
             case 'promote': {
@@ -461,6 +471,7 @@ async function executeAIModeration(message, client, question) {
                     .setColor(embeds_1.Colors.success)
                     .addFields({ name: '👤 العضو', value: `${member}`, inline: true }, { name: '🎭 الرول الجديد', value: `${newRole}`, inline: true }, { name: '🛡️ المنفذ', value: `${message.author.tag}`, inline: true })
                     .setTimestamp();
+                msg = `⬆️ ${member} ← ${newRole}`;
                 break;
             }
             case 'jail': {
@@ -519,6 +530,7 @@ async function executeAIModeration(message, client, question) {
                     .setColor(embeds_1.Colors.error)
                     .addFields({ name: '👤 العضو', value: `${member}`, inline: true }, { name: '🔒 روم السجن', value: `${jailChannel}`, inline: true }, { name: '🛡️ المنفذ', value: `${message.author.tag}`, inline: true })
                     .setTimestamp();
+                msg = `🔒 ${member} تم سجنه في ${jailChannel}`;
                 break;
             }
             case 'lockdown': {
@@ -537,6 +549,7 @@ async function executeAIModeration(message, client, question) {
                         .setTitle('🔒 تم تفعيل وضع الطوارئ')
                         .setColor(embeds_1.Colors.error)
                         .setDescription('تم قفل جميع القنوات — لا يستطيع الأعضاء إرسال رسائل أو دخول الغرف الصوتية');
+                    msg = '🔒 تم تفعيل وضع الطوارئ — كل القنوات مقفلة';
                 }
                 else {
                     const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
@@ -552,14 +565,12 @@ async function executeAIModeration(message, client, question) {
                         .setTitle('🔓 تم إلغاء وضع الطوارئ')
                         .setColor(embeds_1.Colors.success)
                         .setDescription('تم فتح جميع القنوات — عاد الأعضاء للكتابة والدخول');
+                    msg = '🔓 تم إلغاء وضع الطوارئ — القنوات مفتوحة';
                 }
                 break;
             }
         }
-        await respond(message, {
-            content: `✅ **تم تنفيذ أمر الـ ${hit.label} بنجاح** — ${target.user}`,
-            embeds: [embed],
-        });
+        await respond(message, msg || `✅ **تم تنفيذ أمر الـ ${hit.label} بنجاح** — ${target.user}`);
         logger.info(`✅ AI-Moderation executed: ${hit.action} on ${target.user.id} by ${message.author.id}`);
         return true;
     }

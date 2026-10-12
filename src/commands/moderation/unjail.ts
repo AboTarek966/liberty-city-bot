@@ -157,15 +157,9 @@ const command: Command = {
 
       // إشعار العضو في الخاص
       try {
-        await member.send({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle('🔓 تم إلغاء سجنك')
-              .setColor(Colors.success)
-              .setDescription(`**السيرفر:** ${guild.name}\n**السبب:** ${reason}\n\nيمكنك الآن الوصول لجميع القنوات حسب رولاتك.`)
-              .setTimestamp(),
-          ],
-        }).catch(() => {});
+        await member.send(
+          `🔓 تم إلغاء سجنك في **${guild.name}** — يمكنك الآن الوصول لجميع القنوات | 📝 السبب: ${reason}`
+        ).catch(() => {});
       } catch {}
 
       logger.info(`Manual unjail: ${member.id} by ${interaction.user.id} in ${guild.name}`);

@@ -2,10 +2,9 @@
 // Liberty City Bot - Pay Command (تحويل الرصيد)
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { UserProfile } from '../../models';
-import { Colors } from '../../utils/embeds';
 import { formatNumber } from '../../utils/helpers';
 
 const command: Command = {
@@ -58,16 +57,9 @@ const command: Command = {
     ).exec();
 
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(Colors.success)
-          .setTitle('💸 تم التحويل بنجاح')
-          .setDescription(
-            `حوّلت **${formatNumber(amount)}** عملة إلى ${target}\n` +
-            `رصيدك الآن: **${formatNumber(sender.balance)}**`
-          )
-          .setTimestamp(),
-      ],
+      content:
+        `💸 حوّلت **${formatNumber(amount)}** عملة إلى ${target} • ` +
+        `رصيدك الآن: **${formatNumber(sender.balance)}**`,
     });
   },
 };

@@ -45,19 +45,17 @@ const command: Command = {
     const balance = profile?.balance || 0;
 
     const list = items
-      .map((it: any) => `> 🛍️ **${it.name}** — 💰 \`${formatNumber(it.price)}\` → <@&${it.roleId}>`)
-      .join('\n');
+      .map((it: any) => `**${it.name}** — 💰 \`${formatNumber(it.price)}\` → <@&${it.roleId}>`)
+      .join(' • ');
 
     const embed = new EmbedBuilder()
       .setColor(Colors.primary)
       .setTitle('🛍️ متجر السيرفر')
       .setDescription(
-        `**رصيدك الحالي:** 💰 \`${formatNumber(balance)}\`\n\n` +
-        `${list}\n\n` +
-        `اختر عنصراً من القائمة بالأسفل للشراء — سيُخصم المبلغ ويصلك الرول فوراً`
-      )
-      .setFooter({ text: 'اجمع الرصيد بـ /daily والنشر في الشات' })
-      .setTimestamp();
+        `**رصيدك الحالي:** 💰 \`${formatNumber(balance)}\` • ` +
+        `اختر عنصراً من القائمة بالأسفل للشراء — سيُخصم المبلغ ويصلك الرول فوراً\n\n` +
+        `${list}`
+      );
 
     const select = new StringSelectMenuBuilder()
       .setCustomId('shop_buy')

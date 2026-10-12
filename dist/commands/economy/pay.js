@@ -5,7 +5,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
-const embeds_1 = require("../../utils/embeds");
 const helpers_1 = require("../../utils/helpers");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -42,14 +41,8 @@ const command = {
         await sender.save();
         await models_1.UserProfile.updateOne({ userId: target.id, guildId: interaction.guildId }, { $inc: { balance: amount } }, { upsert: true }).exec();
         await interaction.reply({
-            embeds: [
-                new discord_js_1.EmbedBuilder()
-                    .setColor(embeds_1.Colors.success)
-                    .setTitle('💸 تم التحويل بنجاح')
-                    .setDescription(`حوّلت **${(0, helpers_1.formatNumber)(amount)}** عملة إلى ${target}\n` +
-                    `رصيدك الآن: **${(0, helpers_1.formatNumber)(sender.balance)}**`)
-                    .setTimestamp(),
-            ],
+            content: `💸 حوّلت **${(0, helpers_1.formatNumber)(amount)}** عملة إلى ${target} • ` +
+                `رصيدك الآن: **${(0, helpers_1.formatNumber)(sender.balance)}**`,
         });
     },
 };

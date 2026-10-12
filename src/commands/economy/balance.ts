@@ -2,10 +2,9 @@
 // Liberty City Bot - Balance Command (الرصيد)
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { UserProfile } from '../../models';
-import { Colors } from '../../utils/embeds';
 import { formatNumber } from '../../utils/helpers';
 
 const command: Command = {
@@ -30,19 +29,9 @@ const command: Command = {
     const wallet = profile?.balance || 0;
     const bank = profile?.bank || 0;
 
-    const embed = new EmbedBuilder()
-      .setColor(Colors.primary)
-      .setTitle(`💰 رصيد ${target.username}`)
-      .setThumbnail(target.displayAvatarURL({ size: 256 }))
-      .addFields(
-        { name: '👛 المحفظة', value: `\`${formatNumber(wallet)}\``, inline: true },
-        { name: '🏦 البنك', value: `\`${formatNumber(bank)}\``, inline: true },
-        { name: '📊 الإجمالي', value: `\`${formatNumber(wallet + bank)}\``, inline: true },
-      )
-      .setFooter({ text: 'اجمع الرصيد بالنشر و/daily ثم اصرفه من /shop' })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({
+      content: `💰 رصيد ${target.username} — 👛 ${formatNumber(wallet)} • 🏦 ${formatNumber(bank)} • 📊 ${formatNumber(wallet + bank)}`,
+    });
   },
 };
 

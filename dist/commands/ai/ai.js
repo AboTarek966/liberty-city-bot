@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
 const config_1 = require("../../config");
 const command = {
@@ -147,16 +146,10 @@ async function handleChat(interaction, client, type) {
         }
         // Split long responses
         const chunks = splitMessage(response.content, 4000);
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('🤖 Liberty City AI')
-            .setDescription(chunks[0])
-            .setColor(embeds_1.Colors.primary)
-            .setFooter({
-            text: ` بواسطة ${interaction.user.tag} | ${response.model} | ${response.tokensUsed} tokens`,
-            iconURL: interaction.user.displayAvatarURL(),
-        })
-            .setTimestamp();
-        await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({
+            content: chunks[0],
+            allowedMentions: { parse: ['users', 'roles', 'everyone'] },
+        });
         // Send remaining chunks
         for (let i = 1; i < chunks.length; i++) {
             await interaction.followUp({
@@ -197,45 +190,9 @@ async function handleInfo(interaction, client) {
     await interaction.deferReply({ ephemeral: true });
     const providerInfo = client.aiHandler.getProviderInfo();
     const sessionInfo = await client.aiHandler.getSessionInfo(interaction.user.id, interaction.guildId || 'dm', interaction.channelId);
-    const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('🤖 معلومات الذكاء الاصطناعي')
-        .setColor(embeds_1.Colors.primary)
-        .addFields({
-        name: '🔧 المزود',
-        value: providerInfo.provider,
-        inline: true,
-    }, {
-        name: '🧠 النموذج',
-        value: providerInfo.model,
-        inline: true,
-    }, {
-        name: '✅ الحالة',
-        value: client.aiHandler.isAvailable() ? '✅ متاح' : '❌ غير متاح',
-        inline: true,
-    }, {
-        name: '💬 رسائلك في هذه القناة',
-        value: `${sessionInfo.messageCount}`,
-        inline: true,
-    }, {
-        name: '🔑 Groq (مجاني)',
-        value: providerInfo.groqAvailable ? '✅' : '❌',
-        inline: true,
-    }, {
-        name: '🔑 OpenAI',
-        value: providerInfo.openaiAvailable ? '✅' : '❌',
-        inline: true,
-    }, {
-        name: '🔑 Anthropic',
-        value: providerInfo.anthropicAvailable ? '✅' : '❌',
-        inline: true,
-    }, {
-        name: '⏱️ الكولداون',
-        value: `${config_1.config.ai.cooldown / 1000} ثانية`,
-        inline: true,
-    })
-        .setFooter({ text: 'Liberty City AI' })
-        .setTimestamp();
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({
+        content: `🤖 المزود: ${providerInfo.provider} • النموذج: ${providerInfo.model} • ${client.aiHandler.isAvailable() ? '✅ متاح' : '❌ غير متاح'} • رسائلك هنا: ${sessionInfo.messageCount} • الكولداون: ${config_1.config.ai.cooldown / 1000}ث`,
+    });
 }
 // --------------------------------------------
 // Config
@@ -267,13 +224,9 @@ async function handleConfig(interaction, client) {
     if (temperature !== null)
         settings.ai.temperature = temperature;
     await settings.save();
-    const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('✅ تم تحديث إعدادات AI')
-        .setColor(embeds_1.Colors.success)
-        .addFields({ name: 'الحالة', value: settings.ai.enabled ? '✅ مفعل' : '❌ معطل', inline: true }, { name: 'درجة الإبداع', value: `${settings.ai.temperature}`, inline: true }, { name: 'موجه النظام', value: settings.ai.systemPrompt.substring(0, 200), inline: false })
-        .setFooter({ text: 'Liberty City AI Settings' })
-        .setTimestamp();
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({
+        content: `✅ تم تحديث إعدادات AI — الحالة: ${settings.ai.enabled ? '✅ مفعل' : '❌ معطل'} • الإبداع: ${settings.ai.temperature}`,
+    });
 }
 // --------------------------------------------
 // Helper: Split Message

@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('choose')
@@ -29,13 +28,7 @@ const command = {
             return;
         }
         const picked = options[Math.floor(Math.random() * options.length)];
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('🎲 اختياري لك')
-            .setColor(embeds_1.Colors.primary)
-            .setDescription(`أختار: **${picked}** ✨\n\n*من بين ${options.length} خيارات*`)
-            .setFooter({ text: `طلبها ${interaction.user.username}` })
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ content: `🎲 أختار: **${picked}** ✨ — من بين ${options.length} خيارات` });
     },
 };
 exports.default = command;

@@ -613,7 +613,7 @@ async function runAliasCommand(
         target,
         reason,
       });
-      return respond(message, { embeds: [result.embed] });
+      return respond(message, result.simpleMsg);
     }
 
     case 'kick': {
@@ -631,7 +631,7 @@ async function runAliasCommand(
         target,
         reason,
       });
-      return respond(message, { embeds: [result.embed] });
+      return respond(message, result.simpleMsg);
     }
 
     case 'timeout': {
@@ -653,7 +653,7 @@ async function runAliasCommand(
         reason,
         duration,
       });
-      return respond(message, { embeds: [result.embed] });
+      return respond(message, result.simpleMsg);
     }
 
     case 'warn': {
@@ -685,11 +685,10 @@ async function runAliasCommand(
           reply: payload => respond(message, payload),
         });
       }
-      if (warnRoleNote) {
-        result.embed.addFields({ name: '🎭 رول التحذير', value: warnRoleNote, inline: false });
-      }
-
-      return respond(message, { embeds: [result.embed] });
+      return respond(
+        message,
+        warnRoleNote ? `${result.simpleMsg} | 🎭 ${warnRoleNote}` : result.simpleMsg
+      );
     }
 
     case 'mute': {
@@ -706,7 +705,7 @@ async function runAliasCommand(
         target,
         reason,
       });
-      return respond(message, { embeds: [result.embed] });
+      return respond(message, result.simpleMsg);
     }
 
     case 'unmute': {
@@ -723,7 +722,7 @@ async function runAliasCommand(
         target,
         reason,
       });
-      return respond(message, { embeds: [result.embed] });
+      return respond(message, result.simpleMsg);
     }
 
     case 'untimeout': {
@@ -802,7 +801,7 @@ async function runAliasCommand(
           reason,
           roleIds,
         });
-        return respond(message, { embeds: [result.embed] });
+        return respond(message, result.simpleMsg);
       } catch (e: any) {
         return respond(message, `❌ ${e.message}`);
       }
@@ -825,7 +824,7 @@ async function runAliasCommand(
           reason,
           roleId,
         });
-        return respond(message, { embeds: [result.embed] });
+        return respond(message, result.simpleMsg);
       } catch (e: any) {
         return respond(message, `❌ ${e.message}`);
       }

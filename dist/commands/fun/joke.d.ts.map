@@ -1,1 +1,1 @@
-{"version":3,"file":"joke.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/joke.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAsBxD,QAAA,MAAM,OAAO,EAAE,OAmBd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"joke.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/joke.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAqBxD,QAAA,MAAM,OAAO,EAAE,OAYd,CAAC;AAEF,eAAe,OAAO,CAAC"}

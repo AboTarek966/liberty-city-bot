@@ -32,16 +32,14 @@ const command = {
         }).catch(() => null);
         const balance = profile?.balance || 0;
         const list = items
-            .map((it) => `> 🛍️ **${it.name}** — 💰 \`${(0, helpers_1.formatNumber)(it.price)}\` → <@&${it.roleId}>`)
-            .join('\n');
+            .map((it) => `**${it.name}** — 💰 \`${(0, helpers_1.formatNumber)(it.price)}\` → <@&${it.roleId}>`)
+            .join(' • ');
         const embed = new discord_js_1.EmbedBuilder()
             .setColor(embeds_1.Colors.primary)
             .setTitle('🛍️ متجر السيرفر')
-            .setDescription(`**رصيدك الحالي:** 💰 \`${(0, helpers_1.formatNumber)(balance)}\`\n\n` +
-            `${list}\n\n` +
-            `اختر عنصراً من القائمة بالأسفل للشراء — سيُخصم المبلغ ويصلك الرول فوراً`)
-            .setFooter({ text: 'اجمع الرصيد بـ /daily والنشر في الشات' })
-            .setTimestamp();
+            .setDescription(`**رصيدك الحالي:** 💰 \`${(0, helpers_1.formatNumber)(balance)}\` • ` +
+            `اختر عنصراً من القائمة بالأسفل للشراء — سيُخصم المبلغ ويصلك الرول فوراً\n\n` +
+            `${list}`);
         const select = new discord_js_1.StringSelectMenuBuilder()
             .setCustomId('shop_buy')
             .setPlaceholder('🛍️ اختر العنصر الذي تريد شراؤه')

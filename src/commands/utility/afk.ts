@@ -3,9 +3,8 @@
 // /afk [السبب] — تفعيل أو إلغاء وضع AFK
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { Colors } from '../../utils/embeds';
 import { getAFK, setAFK, removeAFK } from '../../utils/afk';
 import { formatDuration } from '../../utils/helpers';
 
@@ -36,16 +35,7 @@ const command: Command = {
     if (existing) {
       await removeAFK(guildId, userId);
       const duration = formatDuration(Date.now() - existing.since, { compact: true });
-      const embed = new EmbedBuilder()
-        .setTitle('👋 مرحباً بعودتك!')
-        .setColor(Colors.success)
-        .setDescription(
-          `تم إلغاء وضع AFK — **كنت غائباً لمدة ${duration}**\n\n` +
-          `💬 ارجع للدردشة بحرية، وسيُبلغ البوت من يذكرك أنك عدت`
-        )
-        .setFooter({ text: 'Liberty City Bot' })
-        .setTimestamp();
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ content: `👋 أهلاً بعودتك — كنت غائباً لمدة ${duration}` });
       return;
     }
 
@@ -53,18 +43,9 @@ const command: Command = {
     const finalReason = reason || 'غائب حالياً';
     await setAFK(guildId, userId, finalReason);
 
-    const embed = new EmbedBuilder()
-      .setTitle('💤 تم تفعيل وضع AFK')
-      .setColor(Colors.primary)
-      .setDescription(
-        `**السبب:** ${finalReason}\n\n` +
-        `✅ سيُلغى تلقائياً عند أول رسالة تكتبها\n` +
-        `📣 من يذكرك في رسالة سيظهر له سبب غيابك فوراً`
-      )
-      .setFooter({ text: 'Liberty City Bot' })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({
+      content: `💤 تم تفعيل AFK — السبب: ${finalReason} (يُلغى تلقائياً عند أول رسالة)`,
+    });
   },
 };
 

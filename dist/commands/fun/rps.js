@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const CHOICES = {
     حجر: { name: 'حجر', emoji: '🪨', beats: 'مقص' },
     ورقة: { name: 'ورقة', emoji: '📄', beats: 'حجر' },
@@ -26,29 +25,18 @@ const command = {
         const keys = Object.keys(CHOICES);
         const bot = keys[Math.floor(Math.random() * keys.length)];
         let title;
-        let color;
         if (player === bot) {
             title = '🤝 تعادل!';
-            color = embeds_1.Colors.warning;
         }
         else if (CHOICES[player].beats === bot) {
             title = '🎉 فزت!';
-            color = embeds_1.Colors.success;
         }
         else {
             title = '💀 البوت فاز!';
-            color = embeds_1.Colors.error;
         }
         await interaction.reply({
-            embeds: [
-                new discord_js_1.EmbedBuilder()
-                    .setColor(color)
-                    .setTitle(title)
-                    .setDescription(`**أنت:** ${CHOICES[player].emoji} ${CHOICES[player].name}\n` +
-                    `**البوت:** ${CHOICES[bot].emoji} ${CHOICES[bot].name}\n\n` +
-                    `_جولة جديدة؟ اكتب الأمر مرة أخرى!_`)
-                    .setTimestamp(),
-            ],
+            content: `${title} • أنت: ${CHOICES[player].emoji} ${CHOICES[player].name} • ` +
+                `البوت: ${CHOICES[bot].emoji} ${CHOICES[bot].name}`,
         });
     },
 };

@@ -5,7 +5,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
-const embeds_1 = require("../../utils/embeds");
 const helpers_1 = require("../../utils/helpers");
 const DAILY_MIN = 100;
 const DAILY_MAX = 300;
@@ -29,13 +28,7 @@ const command = {
             const hours = Math.floor(remaining / 3600_000);
             const minutes = Math.ceil((remaining % 3600_000) / 60_000);
             await interaction.reply({
-                embeds: [
-                    new discord_js_1.EmbedBuilder()
-                        .setColor(embeds_1.Colors.warning)
-                        .setTitle('⏳ المكافأة اليومية مستخدمة')
-                        .setDescription(`جرّب مرة أخرى بعد **${hours}س ${minutes}د**`)
-                        .setTimestamp(),
-                ],
+                content: `⏳ المكافأة اليومية مستخدمة — جرّب مرة أخرى بعد ${hours}س ${minutes}د`,
                 ephemeral: true,
             });
             return;
@@ -45,15 +38,7 @@ const command = {
         profile.lastDaily = new Date();
         await profile.save();
         await interaction.reply({
-            embeds: [
-                new discord_js_1.EmbedBuilder()
-                    .setColor(embeds_1.Colors.success)
-                    .setTitle('🎁 تم استلام مكافأتك اليومية!')
-                    .setDescription(`حصلت على **${(0, helpers_1.formatNumber)(reward)}** عملة 💰\n` +
-                    `رصيدك الآن: **${(0, helpers_1.formatNumber)(profile.balance)}**\n\n` +
-                    `🛍️ تفقد المتجر: \`/shop\``)
-                    .setTimestamp(),
-            ],
+            content: `🎁 حصلت على ${(0, helpers_1.formatNumber)(reward)} عملة — رصيدك الآن ${(0, helpers_1.formatNumber)(profile.balance)}`,
         });
     },
 };

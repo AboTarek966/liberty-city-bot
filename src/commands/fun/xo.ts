@@ -36,11 +36,10 @@ const command: Command = {
       .setColor(Colors.primary)
       .setTitle('❌⭕ تحدي XO!')
       .setDescription(
-        `${interaction.user} يتحدى ${opponent}!\n\n` +
+        `${interaction.user} يتحدى ${opponent}! • ` +
         `${interaction.user} = **X** (يبدأ أولاً) | ${opponent} = **O**\n` +
         `الأزرار الفارغة قابلة للضغط — اللعبة تنتهي خلال 3 دقائق`
-      )
-      .setTimestamp();
+      );
 
     await interaction.reply({
       embeds: [embed],

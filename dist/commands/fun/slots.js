@@ -6,7 +6,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
-const embeds_1 = require("../../utils/embeds");
 const helpers_1 = require("../../utils/helpers");
 const SYMBOLS = ['🍒', '🍋', '💎', '🔔', '⭐', '7️⃣'];
 const command = {
@@ -32,35 +31,24 @@ const command = {
         const spin = () => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
         const a = spin(), b = spin(), c = spin();
         let title;
-        let color;
         let payout = 0;
         if (a === b && b === c) {
             payout = amount * 5;
             title = '💎💎💎 جاكبوت! ثلاث نفسية — ربحت ×5!';
-            color = embeds_1.Colors.success;
         }
         else if (a === b || b === c || a === c) {
             payout = amount * 2;
             title = '🎉 زوجان! ربحت ×2';
-            color = embeds_1.Colors.success;
         }
         else {
             title = '💀 حظ أوفر هذه المرة';
-            color = embeds_1.Colors.error;
         }
         profile.balance += payout;
         await profile.save();
         await interaction.reply({
-            embeds: [
-                new discord_js_1.EmbedBuilder()
-                    .setColor(color)
-                    .setTitle('🎰 ماكينة الحظ')
-                    .setDescription(`> │ ${a} │ ${b} │ ${c} │\n\n` +
-                    `${title}\n\n` +
-                    `**الرهان:** \`${(0, helpers_1.formatNumber)(amount)}\` — **الربح:** \`${(0, helpers_1.formatNumber)(payout)}\`\n` +
-                    `**رصيدك:** \`${(0, helpers_1.formatNumber)(profile.balance)}\``)
-                    .setTimestamp(),
-            ],
+            content: `🎰 │ ${a} │ ${b} │ ${c} │ — ${title} • ` +
+                `الرهان: \`${(0, helpers_1.formatNumber)(amount)}\` • الربح: \`${(0, helpers_1.formatNumber)(payout)}\` • ` +
+                `رصيدك: \`${(0, helpers_1.formatNumber)(profile.balance)}\``,
         });
     },
 };

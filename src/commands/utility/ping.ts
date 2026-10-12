@@ -2,7 +2,7 @@
 // Liberty City Bot - Ping Command
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { Colors } from '../../utils/embeds';
 
@@ -19,30 +19,9 @@ const command: Command = {
     const roundtrip = sent.createdTimestamp - interaction.createdTimestamp;
     const websocket = interaction.client.ws.ping;
 
-    const embed = new EmbedBuilder()
-      .setTitle('🏓 Pong!')
-      .setColor(roundtrip < 200 ? Colors.success : roundtrip < 500 ? Colors.warning : Colors.error)
-      .addFields(
-        {
-          name: '📡 زمن الاستجابة',
-          value: `\`${roundtrip}ms\``,
-          inline: true,
-        },
-        {
-          name: '💓 قلب البوت (WebSocket)',
-          value: `\`${websocket}ms\``,
-          inline: true,
-        },
-        {
-          name: '📊 التقييم',
-          value: getRating(roundtrip),
-          inline: true,
-        },
-      )
-      .setFooter({ text: 'Liberty City Bot' })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({
+      content: `🏓 Pong! — الاستجابة \`${roundtrip}ms\` • الـ WebSocket \`${websocket}ms\` • ${getRating(roundtrip)}`,
+    });
   },
 };
 

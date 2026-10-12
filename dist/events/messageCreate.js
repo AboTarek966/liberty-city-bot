@@ -549,7 +549,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                 target,
                 reason,
             });
-            return respond(message, { embeds: [result.embed] });
+            return respond(message, result.simpleMsg);
         }
         case 'kick': {
             const userId = parseUserId(args[0]);
@@ -567,7 +567,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                 target,
                 reason,
             });
-            return respond(message, { embeds: [result.embed] });
+            return respond(message, result.simpleMsg);
         }
         case 'timeout': {
             const userId = parseUserId(args[0]);
@@ -589,7 +589,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                 reason,
                 duration,
             });
-            return respond(message, { embeds: [result.embed] });
+            return respond(message, result.simpleMsg);
         }
         case 'warn': {
             const userId = parseUserId(args[0]);
@@ -619,10 +619,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                     reply: payload => respond(message, payload),
                 });
             }
-            if (warnRoleNote) {
-                result.embed.addFields({ name: '🎭 رول التحذير', value: warnRoleNote, inline: false });
-            }
-            return respond(message, { embeds: [result.embed] });
+            return respond(message, warnRoleNote ? `${result.simpleMsg} | 🎭 ${warnRoleNote}` : result.simpleMsg);
         }
         case 'mute': {
             const userId = parseUserId(args[0]);
@@ -638,7 +635,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                 target,
                 reason,
             });
-            return respond(message, { embeds: [result.embed] });
+            return respond(message, result.simpleMsg);
         }
         case 'unmute': {
             const userId = parseUserId(args[0]);
@@ -654,7 +651,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                 target,
                 reason,
             });
-            return respond(message, { embeds: [result.embed] });
+            return respond(message, result.simpleMsg);
         }
         case 'untimeout': {
             const userId = parseUserId(args[0]);
@@ -734,7 +731,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                     reason,
                     roleIds,
                 });
-                return respond(message, { embeds: [result.embed] });
+                return respond(message, result.simpleMsg);
             }
             catch (e) {
                 return respond(message, `❌ ${e.message}`);
@@ -760,7 +757,7 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                     reason,
                     roleId,
                 });
-                return respond(message, { embeds: [result.embed] });
+                return respond(message, result.simpleMsg);
             }
             catch (e) {
                 return respond(message, `❌ ${e.message}`);

@@ -1,1 +1,1 @@
-{"version":3,"file":"autorole.d.ts","sourceRoot":"","sources":["../../../src/commands/roles/autorole.ts"],"names":[],"mappings":"AAUA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAKxD,QAAA,MAAM,OAAO,EAAE,OAmGd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"autorole.d.ts","sourceRoot":"","sources":["../../../src/commands/roles/autorole.ts"],"names":[],"mappings":"AASA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA2Ed,CAAC;AAEF,eAAe,OAAO,CAAC"}

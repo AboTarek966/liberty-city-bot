@@ -5,7 +5,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 function formatMinutes(total) {
     if (total < 60)
         return `${total} دقيقة`;
@@ -39,30 +38,12 @@ const command = {
         const target = interaction.options.getUser('user') || interaction.user;
         const period = interaction.options.getString('period') || 'all';
         const stats = await client.activityTracker.getStatsAllPeriods(interaction.guildId, target.id);
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`📊 إحصائيات النشاط - ${target.username}`)
-            .setThumbnail(target.displayAvatarURL({ size: 256 }))
-            .setColor(embeds_1.Colors.primary)
-            .addFields({
-            name: '📅 اليوم',
-            value: `📝 رسائل: **${stats.day.messages}**\n🔊 صوت: **${formatMinutes(stats.day.voiceMinutes)}** (${stats.day.voiceJoins} انضمام)`,
-            inline: true,
-        }, {
-            name: '📆 هذا الأسبوع',
-            value: `📝 رسائل: **${stats.week.messages}**\n🔊 صوت: **${formatMinutes(stats.week.voiceMinutes)}** (${stats.week.voiceJoins} انضمام)`,
-            inline: true,
-        }, {
-            name: '🗓️ هذا الشهر',
-            value: `📝 رسائل: **${stats.month.messages}**\n🔊 صوت: **${formatMinutes(stats.month.voiceMinutes)}** (${stats.month.voiceJoins} انضمام)`,
-            inline: true,
-        }, {
-            name: '📈 الإجمالي',
-            value: `📝 رسائل: **${stats.total.messages}**\n🔊 صوت: **${formatMinutes(stats.total.voiceMinutes)}** (${stats.total.voiceJoins} انضمام)`,
-            inline: false,
-        })
-            .setFooter({ text: 'Liberty City Activity Tracker' })
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        const content = `📊 نشاط **${target.username}** —` +
+            ` 📈 الإجمالي: ${stats.total.messages} رسالة • ${formatMinutes(stats.total.voiceMinutes)} صوت |` +
+            ` 📅 اليوم: ${stats.day.messages} رسالة • ${formatMinutes(stats.day.voiceMinutes)} |` +
+            ` 📆 أسبوع: ${stats.week.messages} رسالة • ${formatMinutes(stats.week.voiceMinutes)} |` +
+            ` 🗓️ شهر: ${stats.month.messages} رسالة • ${formatMinutes(stats.month.voiceMinutes)}`;
+        await interaction.reply({ content });
     },
 };
 exports.default = command;

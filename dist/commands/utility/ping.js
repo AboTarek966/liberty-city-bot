@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('ping')
@@ -14,25 +13,9 @@ const command = {
         const sent = await interaction.deferReply({ fetchReply: true });
         const roundtrip = sent.createdTimestamp - interaction.createdTimestamp;
         const websocket = interaction.client.ws.ping;
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('🏓 Pong!')
-            .setColor(roundtrip < 200 ? embeds_1.Colors.success : roundtrip < 500 ? embeds_1.Colors.warning : embeds_1.Colors.error)
-            .addFields({
-            name: '📡 زمن الاستجابة',
-            value: `\`${roundtrip}ms\``,
-            inline: true,
-        }, {
-            name: '💓 قلب البوت (WebSocket)',
-            value: `\`${websocket}ms\``,
-            inline: true,
-        }, {
-            name: '📊 التقييم',
-            value: getRating(roundtrip),
-            inline: true,
-        })
-            .setFooter({ text: 'Liberty City Bot' })
-            .setTimestamp();
-        await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({
+            content: `🏓 Pong! — الاستجابة \`${roundtrip}ms\` • الـ WebSocket \`${websocket}ms\` • ${getRating(roundtrip)}`,
+        });
     },
 };
 function getRating(ms) {

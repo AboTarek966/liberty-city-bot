@@ -32,59 +32,15 @@ const command = {
         const xp = profile?.xp || 0;
         const level = (0, helpers_1.calculateLevel)(xp);
         const progress = (0, helpers_1.getXpProgress)(xp);
-        // شريط التقدم
-        const filled = Math.round(progress.progress / 10);
-        const bar = '█'.repeat(filled) + '▒'.repeat(10 - filled);
-        // إنشاء ملف شخصي جديد في العرض إن لم يوجد (بدون كتابة في القاعدة)
+        // بيانات العرض
         const balance = profile?.balance ?? 0;
         const bank = profile?.bank ?? 0;
-        const messagesSent = profile?.messagesSent ?? 0;
-        const voiceTime = profile?.voiceTime ?? 0; // بالدقائق
         const reputation = profile?.reputation ?? 0;
-        const joinedAt = member.joinedTimestamp
-            ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`
-            : 'غير معروف';
-        const createdAt = `<t:${Math.floor(target.createdTimestamp / 1000)}:R>`;
-        // أعلى رتبة
-        const topRole = member.roles.cache
-            .filter(r => r.id !== interaction.guildId)
-            .sort((a, b) => b.position - a.position)
-            .first()?.toString() || 'بدون رتب';
-        const color = member.displayHexColor !== '#000000' ? member.displayHexColor : '#00D4FF';
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`👤 بطاقة ${member.displayName}`)
-            .setColor(color)
-            .setThumbnail(member.displayAvatarURL({ size: 256 }))
-            .setDescription(`> ${topRole}\n` +
-            `> ${target.bot ? '🤖 بوت' : '✅ عضو'} • \`#${rank > 0 ? rank : '—'}\` في الترتيب`)
-            .addFields({
-            name: '🏆 المستوى',
-            value: `**${level}**\n\`${bar}\` ${progress.current}/${progress.next} XP`,
-            inline: true,
-        }, {
-            name: '💰 الرصيد',
-            value: `💵 المحفظة: **${(0, helpers_1.formatNumber)(balance)}**\n🏦 البنك: **${(0, helpers_1.formatNumber)(bank)}**`,
-            inline: true,
-        }, {
-            name: '📊 النشاط',
-            value: `💬 الرسائل: **${(0, helpers_1.formatNumber)(messagesSent)}**\n⏱️ الصوت: **${(0, helpers_1.formatDuration)(voiceTime * 60000, { compact: true })}**`,
-            inline: true,
-        }, {
-            name: '⭐ السمعة',
-            value: `**${(0, helpers_1.formatNumber)(reputation)}**`,
-            inline: true,
-        }, {
-            name: '⚠️ التحذيرات',
-            value: `**${warnCount}**`,
-            inline: true,
-        }, {
-            name: '📅 التاريخ',
-            value: `📥 انضم: ${joinedAt}\n🎂 الحساب: ${createdAt}`,
-            inline: false,
-        })
-            .setFooter({ text: `ID: ${target.id}` })
-            .setTimestamp();
-        await interaction.editReply({ embeds: [embed] });
+        const rankText = rank > 0 ? ` • الترتيب \`#${rank}\`` : '';
+        const content = `👤 **${member.displayName}** — 🏆 المستوى **${level}** (${progress.current}/${progress.next} XP)` +
+            ` • 💵 ${(0, helpers_1.formatNumber)(balance)} محفظة • 🏦 ${(0, helpers_1.formatNumber)(bank)} بنك` +
+            ` • ⭐ ${(0, helpers_1.formatNumber)(reputation)} سمعة • ⚠️ ${warnCount} تحذير${rankText}`;
+        await interaction.editReply({ content });
     },
 };
 exports.default = command;

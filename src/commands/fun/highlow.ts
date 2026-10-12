@@ -3,10 +3,9 @@
 // بطاقة مخفية — خمن أعلى أو أقل من رقم البوت
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { UserProfile } from '../../models';
-import { Colors } from '../../utils/embeds';
 import { formatNumber } from '../../utils/helpers';
 
 const command: Command = {
@@ -60,18 +59,13 @@ const command: Command = {
     }
     await profile.save();
 
+    const result = won ? '🎉 ربحت!' : mine === botCard ? '🤝 تعادل (نفس الرقم)' : '💀 خسرت';
+
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(won ? Colors.success : mine === botCard ? Colors.warning : Colors.error)
-          .setTitle(won ? '🎉 ربحت!' : mine === botCard ? '🤝 تعادل (نفس الرقم)' : '💀 خسرت')
-          .setDescription(
-            `> **بطاقتك:** \`${mine}\`\n> **بطاقة البوت:** \`${botCard}\`\n\n` +
-            `**الرهان:** \`${formatNumber(amount)}\` — **الربح:** \`${formatNumber(won ? amount * 2 : 0)}\`\n` +
-            `**رصيدك:** \`${formatNumber(profile.balance)}\``
-          )
-          .setTimestamp(),
-      ],
+      content:
+        `${result} • بطاقتك: \`${mine}\` • بطاقة البوت: \`${botCard}\` • ` +
+        `الرهان: \`${formatNumber(amount)}\` • الربح: \`${formatNumber(won ? amount * 2 : 0)}\` • ` +
+        `رصيدك: \`${formatNumber(profile.balance)}\``,
     });
   },
 };

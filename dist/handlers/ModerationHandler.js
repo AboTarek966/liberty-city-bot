@@ -63,7 +63,11 @@ class ModerationHandler {
         });
         void this.logAction(guild, embed);
         logger.info(`Banned ${target.id} from ${guild.id} by ${moderator.id}`);
-        return { case: null, embed };
+        return {
+            case: null,
+            embed,
+            simpleMsg: `🔨 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم حظره | ${reason}`,
+        };
     }
     // --------------------------------------------
     // Kick
@@ -107,7 +111,11 @@ class ModerationHandler {
         });
         void this.logAction(guild, embed);
         logger.info(`Kicked ${target.id} from ${guild.id} by ${moderator.id}`);
-        return { case: null, embed };
+        return {
+            case: null,
+            embed,
+            simpleMsg: `👢 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم طرده | ${reason}`,
+        };
     }
     // --------------------------------------------
     // Timeout
@@ -159,7 +167,11 @@ class ModerationHandler {
         });
         void this.logAction(guild, embed);
         logger.info(`Timed out ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: null, embed };
+        return {
+            case: null,
+            embed,
+            simpleMsg: `⏱️ **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** كتم حتى ${(0, helpers_1.formatDuration)(durationMs)} | ${reason}`,
+        };
     }
     // --------------------------------------------
     // Remove Timeout
@@ -203,7 +215,11 @@ class ModerationHandler {
         });
         void this.logAction(guild, embed);
         logger.info(`Removed timeout for ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: null, embed };
+        return {
+            case: null,
+            embed,
+            simpleMsg: `🔓 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم فك الكتم عنه | ${reason}`,
+        };
     }
     // --------------------------------------------
     // Warn
@@ -254,7 +270,12 @@ class ModerationHandler {
         // Check if should auto-mute/ban at threshold
         void this.checkWarningThreshold(guild, target.id, warningCount + 1);
         logger.info(`Warned ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: null, embed, warningCount: warningCount + 1 };
+        return {
+            case: null,
+            embed,
+            warningCount: warningCount + 1,
+            simpleMsg: `⚠️ **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم تحذيره (${warningCount + 1} تحذير) | ${reason}`,
+        };
     }
     // --------------------------------------------
     // Unwarn (إزالة تحذير)
@@ -300,7 +321,12 @@ class ModerationHandler {
         });
         void this.logAction(guild, embed);
         logger.info(`Unwarned ${target.id} in ${guild.id} by ${moderator.id} (remaining: ${remaining})`);
-        return { case: null, embed, warningCount: remaining };
+        return {
+            case: null,
+            embed,
+            warningCount: remaining,
+            simpleMsg: `✅ **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم إزالة تحذير (المتبقي: ${remaining}) | ${reason}`,
+        };
     }
     // --------------------------------------------
     // Check Warning Threshold

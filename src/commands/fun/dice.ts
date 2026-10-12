@@ -2,10 +2,9 @@
 // Liberty City Bot - Dice Command
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
-import { Colors } from '../../utils/embeds';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -39,18 +38,11 @@ const command: Command = {
 
     const total = rolls.reduce((a, b) => a + b, 0);
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎲 رمية النرد')
-      .setColor(Colors.primary)
-      .addFields(
-        { name: 'الرميات', value: rolls.map(r => `\`${r}\``).join(' • '), inline: true },
-        { name: 'الأوجه', value: `\`${sides}\``, inline: true },
-        ...(count > 1 ? [{ name: 'المجموع', value: `\`${total}\``, inline: true }] : []),
-      )
-      .setFooter({ text: `رمتها ${interaction.user.username}` })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({
+      content:
+        `🎲 رمية النرد: ${rolls.map(r => `\`${r}\``).join(' • ')} • الأوجه: \`${sides}\`` +
+        (count > 1 ? ` • المجموع: \`${total}\`` : ''),
+    });
   },
 };
 

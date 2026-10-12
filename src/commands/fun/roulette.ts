@@ -3,9 +3,8 @@
 // يختار شخصاً عشوائياً من المذكورين (أو من الأعضاء النشطين)
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { Colors } from '../../utils/embeds';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -44,35 +43,24 @@ const command: Command = {
       return;
     }
 
-    const lines = players.map(p => `> 🔘 <@${p}>`).join('\n');
+    const playersLine = players.map(p => `🔘 <@${p}>`).join(' • ');
 
-    const start = new EmbedBuilder()
-      .setColor(Colors.warning)
-      .setTitle('🔫 لعبة الروليت!')
-      .setDescription(`**المشاركون:**\n${lines}\n\nالبارودة تدور...`)
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [start] });
+    await interaction.editReply({ content: `🔫 لعبة الروليت! • المشاركون: ${playersLine} • البارودة تدور...` });
     await new Promise(r => setTimeout(r, 1500));
     await interaction.editReply({
-      embeds: [start.setFields({ name: '🔊', value: 'جرررررخ...' })],
+      content: `🔫 اللعبة تدور... 🔊 جرررررخ...`,
     }).catch(() => {});
     await new Promise(r => setTimeout(r, 1500));
 
     const victimId = players[Math.floor(Math.random() * players.length)];
     const survivors = players.filter(p => p !== victimId);
 
-    const result = new EmbedBuilder()
-      .setColor(Colors.error)
-      .setTitle('💥 البارودة أصابت!')
-      .setDescription(
-        `> 💀 **الضحية:** <@${victimId}>\n\n` +
-        `**الناجون:**\n${survivors.map(s => `> ✅ <@${s}>`).join('\n')}\n\n` +
-        `_جرّب حظك مرة أخرى!_`
-      )
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [result] });
+    await interaction.editReply({
+      content:
+        `💥 البارودة أصابت! 💀 الضحية: <@${victimId}> • ` +
+        `الناجون: ${survivors.map(s => `✅ <@${s}>`).join(' • ') || 'لا أحد'} • ` +
+        `_جرّب حظك مرة أخرى!_`,
+    });
   },
 };
 

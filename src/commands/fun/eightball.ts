@@ -2,10 +2,9 @@
 // Liberty City Bot - 8ball Command
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
-import { Colors } from '../../utils/embeds';
 
 const ANSWERS = [
   '🔮 بلا شك — نعم!',
@@ -58,17 +57,7 @@ const command: Command = {
     // إزالة نصوص مكسورة سابقة
     const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎱 كرة السحر')
-      .setColor(0x1A1A2E)
-      .addFields(
-        { name: '❓ سؤالك', value: question.substring(0, 300), inline: false },
-        { name: '🔮 الإجابة', value: answer, inline: false },
-      )
-      .setFooter({ text: `سأله ${interaction.user.username}` })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ content: `🎱 سؤالك: ${question.substring(0, 300)} — 🔮 ${answer}` });
   },
 };
 

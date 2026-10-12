@@ -63,8 +63,7 @@ const command: Command = {
       return new EmbedBuilder()
         .setColor(Colors.primary)
         .setTitle('🏁 سباق الحيوانات')
-        .setDescription(`${phase}\n\n${lanes}`)
-        .setTimestamp();
+        .setDescription(`${phase}\n\n${lanes}`);
     };
 
     await interaction.editReply({ embeds: [render('استعدوا...') ] });
@@ -84,19 +83,13 @@ const command: Command = {
       await new Promise(r => setTimeout(r, 800));
     }
 
-    const final = new EmbedBuilder()
-      .setColor(Colors.success)
-      .setTitle('🏆 الفائز!')
-      .setDescription(
-        `${winner.animal} **<@${winner.id}>** وصل إلى الخط أولاً! 🎉\n\n` +
-        entrants
-          .filter(e => e !== winner)
-          .map(e => `${e.animal} <@${e.id}> — ${Math.min(e.pos, TRACK)}/${TRACK}`)
-          .join('\n')
-      )
-      .setTimestamp();
+    const final =
+      `🏆 ${winner.animal} **<@${winner.id}>** وصل إلى الخط أولاً! 🎉 • ` +
+      entrants
+        .map(e => `${e.animal} <@${e.id}> — ${Math.min(e.pos, TRACK)}/${TRACK}`)
+        .join(' • ');
 
-    await interaction.editReply({ embeds: [final] });
+    await interaction.editReply({ content: final });
   },
 };
 

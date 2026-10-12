@@ -2,10 +2,9 @@
 // Liberty City Bot - Choose Command
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
-import { Colors } from '../../utils/embeds';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -38,14 +37,7 @@ const command: Command = {
 
     const picked = options[Math.floor(Math.random() * options.length)];
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎲 اختياري لك')
-      .setColor(Colors.primary)
-      .setDescription(`أختار: **${picked}** ✨\n\n*من بين ${options.length} خيارات*`)
-      .setFooter({ text: `طلبها ${interaction.user.username}` })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ content: `🎲 أختار: **${picked}** ✨ — من بين ${options.length} خيارات` });
   },
 };
 

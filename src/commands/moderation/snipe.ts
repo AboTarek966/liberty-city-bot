@@ -7,12 +7,10 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
-  EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { getGuildSettings } from '../../models';
 import { getSnipedMessage, getSnipeCount } from '../../utils/snipeCache';
-import { Colors } from '../../utils/embeds';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -65,44 +63,14 @@ const command: Command = {
 
     const minutesAgo = Math.max(1, Math.round((Date.now() - entry.deletedAt) / 60000));
 
-    const embed = new EmbedBuilder()
-      .setTitle(index === 0 ? '🕵️ آخر رسالة محذوفة' : `🕵️ رسالة محذوفة #${index + 1}`)
-      .setColor(Colors.error || 0xed4245)
-      .setAuthor({
-        name: entry.authorTag,
-        ...(entry.authorAvatar ? { iconURL: entry.authorAvatar } : {}),
-      })
-      .setDescription(
-        (entry.content || '*(بدون نص — انظر المرفقات أدناه)*').substring(0, 1900)
-      )
-      .addFields(
-        {
-          name: '📅 نُشرت',
-          value: `<t:${Math.floor(entry.postedAt / 1000)}:R>`,
-          inline: true,
-        },
-        {
-          name: '🗑️ حُذفت',
-          value: `منذ ${minutesAgo} دقيقة`,
-          inline: true,
-        }
-      )
-      .setFooter({
-        text: `Liberty City Snipe • ${entry.channelId} • ${getSnipeCount(interaction.guildId, interaction.channelId)} محفوظة`,
-      })
-      .setTimestamp();
+    const raw = (entry.content || '*(بدون نص)*').replace(/\s+/g, ' ').trim();
+    const short = raw.length > 150 ? `${raw.substring(0, 150)}…` : raw;
 
-    if (entry.attachments.length > 0) {
-      embed.addFields({
-        name: `📎 المرفقات (${entry.attachments.length})`,
-        value: entry.attachments.map((a, i) => `[${a.name}](${a.url})`).join('\n').substring(0, 1000),
-      });
-    }
-    if (entry.pinned) {
-      embed.addFields({ name: '📌', value: 'كانت رسالة مثبتة', inline: true });
-    }
+    let content = `${index === 0 ? '🕵️ آخر رسالة محذوفة' : `🕵️ رسالة محذوفة #${index + 1}`} — ${entry.authorTag} (قبل ${minutesAgo} دقيقة): ${short}`;
+    if (entry.attachments.length > 0) content += ` 📎 ${entry.attachments.length} مرفق`;
+    if (entry.pinned) content += ' 📌 كانت مثبتة';
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ content, ephemeral: true });
   },
 };
 

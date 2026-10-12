@@ -1,1 +1,1 @@
-{"version":3,"file":"rate.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/rate.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA0Cd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"rate.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/rate.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAGxD,QAAA,MAAM,OAAO,EAAE,OAmCd,CAAC;AAEF,eAAe,OAAO,CAAC"}

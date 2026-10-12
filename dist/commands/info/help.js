@@ -44,29 +44,23 @@ async function showHelpMenu(interaction, client) {
     };
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('📚 أوامر Liberty City')
-        .setDescription(`مرحباً **${interaction.user.username}**! 👋\n\n` +
-        `أنا بوت **Liberty City** الشامل، إليك قائمة الأوامر المتاحة:\n\n` +
-        `> استخدم \`/help <أمر>\` للحصول على معلومات تفصيلية عن أمر معين\n` +
-        `> جميع الأوامر هي Slash Commands (تبدأ بـ \`/\`)`)
         .setColor(embeds_1.Colors.primary)
-        .setThumbnail(interaction.client.user?.displayAvatarURL() || '')
-        .setFooter({ text: 'Liberty City Bot | جميع الحقوق محفوظة' })
-        .setTimestamp();
-    // Add category fields
+        .setThumbnail(interaction.client.user?.displayAvatarURL() || '');
+    // قائمة مختصرة بالتصنيفات والأوامر
+    const lines = [];
     for (const category of categories) {
         const info = categoryInfo[category] || { name: category, emoji: '📂' };
         const catCommands = client.commandHandler.getCommandsByCategory(category);
         if (catCommands.length > 0) {
-            embed.addFields({
-                name: `${info.emoji} ${info.name} [${catCommands.length}]`,
-                value: catCommands
-                    .slice(0, 15)
-                    .map(cmd => `\`/${cmd.data.name}\``)
-                    .join('، ') + (catCommands.length > 15 ? `... و ${catCommands.length - 15} أمر آخر` : ''),
-                inline: false,
-            });
+            const names = catCommands
+                .slice(0, 12)
+                .map(cmd => `\`/${cmd.data.name}\``)
+                .join('، ') + (catCommands.length > 12 ? ` … +${catCommands.length - 12}` : '');
+            lines.push(`${info.emoji} **${info.name}** [${catCommands.length}]: ${names}`);
         }
     }
+    embed.setDescription((`**${interaction.user.username}** 👋 — استخدم \`/help <أمر>\` للتفاصيل عن أمر معين\n\n` +
+        lines.join('\n')).substring(0, 4000));
     // Create buttons for navigation
     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
         .setCustomId('help_moderation')
@@ -125,37 +119,23 @@ async function showCommandInfo(interaction, client, commandName) {
     }
     const data = command.data;
     const options = data.options || [];
-    const embed = new discord_js_1.EmbedBuilder()
-        .setTitle(`📋 معلومات الأمر: /${data.name}`)
-        .setDescription(data.description)
-        .setColor(embeds_1.Colors.primary)
-        .addFields({ name: '📂 التصنيف', value: command.category || 'غير مصنف', inline: true }, { name: '⏱️ الكولداون', value: command.cooldown ? `${command.cooldown} ثانية` : 'بدون', inline: true }, {
-        name: '🔐 الصلاحيات المطلوبة',
-        value: command.permissions && command.permissions.length > 0
+    const parts = [
+        `📋 **/${data.name}** — ${data.description}`,
+        `📂 ${command.category || 'غير مصنف'} • ⏱️ ${command.cooldown ? `${command.cooldown} ثانية` : 'بدون كولداون'}`,
+        `🔐 ${command.permissions && command.permissions.length > 0
             ? command.permissions.map(p => `\`${p}\``).join(', ')
-            : 'لا توجد صلاحيات مطلوبة',
-        inline: false,
-    })
-        .setFooter({ text: 'Liberty City Bot' })
-        .setTimestamp();
-    // Add options info
+            : 'لا توجد صلاحيات مطلوبة'}`,
+    ];
+    // معلومات الوسائط
     if (options.length > 0) {
-        const optionsList = options
-            .map((opt) => {
-            const required = opt.required ? '(مطلوب)' : '(اختياري)';
-            return `\`/${data.name} ${opt.name}\` - ${opt.description} ${required}`;
-        })
-            .join('\n');
-        embed.addFields({ name: '📝 الوسائط', value: optionsList, inline: false });
+        parts.push(`📝 ${options
+            .map((opt) => `\`/${data.name} ${opt.name}\` ${opt.required ? '(مطلوب)' : '(اختياري)'}`)
+            .join('، ')}`);
     }
-    // Add usage example
-    embed.addFields({
-        name: '💡 مثال على الاستخدام',
-        value: `\`/${data.name}${options.length > 0 ? ' ' + options.map((o) => `<${o.name}>`).join(' ') : ''}\``,
-        inline: false,
-    });
+    // مثال على الاستخدام
+    parts.push(`💡 \`/${data.name}${options.length > 0 ? ' ' + options.map((o) => `<${o.name}>`).join(' ') : ''}\``);
     await interaction.reply({
-        embeds: [embed],
+        content: parts.join(' • '),
         ephemeral: true,
     });
 }

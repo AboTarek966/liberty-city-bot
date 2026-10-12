@@ -311,6 +311,7 @@ export async function executeAIModeration(
   // 7) التنفيذ
   try {
     let embed: any;
+    let msg: string | null = null; // ✅ رد نصي سطر واحد بدل الإيمبد الكبير
 
     switch (hit.action) {
       case 'ban': {
@@ -321,6 +322,7 @@ export async function executeAIModeration(
           reason,
         });
         embed = result.embed;
+        msg = result.simpleMsg;
         break;
       }
       case 'kick': {
@@ -333,6 +335,7 @@ export async function executeAIModeration(
           reason,
         });
         embed = result.embed;
+        msg = result.simpleMsg;
         break;
       }
       case 'timeout': {
@@ -348,6 +351,7 @@ export async function executeAIModeration(
           duration: `${durationMs}ms`,
         });
         embed = result.embed;
+        msg = result.simpleMsg;
         break;
       }
       case 'untimeout': {
@@ -360,6 +364,7 @@ export async function executeAIModeration(
           reason,
         });
         embed = result.embed;
+        msg = result.simpleMsg;
         break;
       }
       case 'warn': {
@@ -371,6 +376,7 @@ export async function executeAIModeration(
           reason,
         });
         embed = result.embed;
+        msg = result.simpleMsg;
         break;
       }
       // ========== أوامر إدارة السيرفر الجديدة ==========
@@ -394,6 +400,7 @@ export async function executeAIModeration(
             { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
           )
           .setTimestamp();
+        msg = `✅ تم إنشاء الرول **${newRole.name}**`;
         break;
       }
       case 'role_delete': {
@@ -415,6 +422,7 @@ export async function executeAIModeration(
             { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
           )
           .setTimestamp();
+        msg = `🗑️ تم حذف الرول **${role.name}**`;
         break;
       }
       case 'role_add': {
@@ -445,6 +453,7 @@ export async function executeAIModeration(
             { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
           )
           .setTimestamp();
+        msg = `➕ ${member} ← ${role}`;
         break;
       }
       case 'role_remove': {
@@ -475,6 +484,7 @@ export async function executeAIModeration(
             { name: '🛡️ المنفذ', value: `${moderator.user.tag}`, inline: true },
           )
           .setTimestamp();
+        msg = `➖ ${member} ← ${role} (تمت الإزالة)`;
         break;
       }
       case 'promote': {
@@ -510,6 +520,7 @@ export async function executeAIModeration(
             { name: '🛡️ المنفذ', value: `${message.author.tag}`, inline: true },
           )
           .setTimestamp();
+        msg = `⬆️ ${member} ← ${newRole}`;
         break;
       }
       case 'jail': {
@@ -579,6 +590,7 @@ export async function executeAIModeration(
             { name: '🛡️ المنفذ', value: `${message.author.tag}`, inline: true },
           )
           .setTimestamp();
+        msg = `🔒 ${member} تم سجنه في ${jailChannel}`;
         break;
       }
       case 'lockdown': {
@@ -597,6 +609,7 @@ export async function executeAIModeration(
             .setTitle('🔒 تم تفعيل وضع الطوارئ')
             .setColor(Colors.error)
             .setDescription('تم قفل جميع القنوات — لا يستطيع الأعضاء إرسال رسائل أو دخول الغرف الصوتية');
+          msg = '🔒 تم تفعيل وضع الطوارئ — كل القنوات مقفلة';
         } else {
           const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
           for (const channel of channels.values()) {
@@ -610,15 +623,13 @@ export async function executeAIModeration(
             .setTitle('🔓 تم إلغاء وضع الطوارئ')
             .setColor(Colors.success)
             .setDescription('تم فتح جميع القنوات — عاد الأعضاء للكتابة والدخول');
+          msg = '🔓 تم إلغاء وضع الطوارئ — القنوات مفتوحة';
         }
         break;
       }
     }
 
-    await respond(message, {
-      content: `✅ **تم تنفيذ أمر الـ ${hit.label} بنجاح** — ${target.user}`,
-      embeds: [embed],
-    });
+    await respond(message, msg || `✅ **تم تنفيذ أمر الـ ${hit.label} بنجاح** — ${target.user}`);
 
     logger.info(
       `✅ AI-Moderation executed: ${hit.action} on ${target.user.id} by ${message.author.id}`

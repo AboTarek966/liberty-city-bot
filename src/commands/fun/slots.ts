@@ -3,10 +3,9 @@
 // رهان من الرصيد — ثلاث نفسية = فوز ×5
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ColorResolvable } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { UserProfile } from '../../models';
-import { Colors } from '../../utils/embeds';
 import { formatNumber } from '../../utils/helpers';
 
 const SYMBOLS = ['🍒', '🍋', '💎', '🔔', '⭐', '7️⃣'];
@@ -42,38 +41,26 @@ const command: Command = {
     const a = spin(), b = spin(), c = spin();
 
     let title: string;
-    let color: ColorResolvable;
     let payout = 0;
 
     if (a === b && b === c) {
       payout = amount * 5;
       title = '💎💎💎 جاكبوت! ثلاث نفسية — ربحت ×5!';
-      color = Colors.success;
     } else if (a === b || b === c || a === c) {
       payout = amount * 2;
       title = '🎉 زوجان! ربحت ×2';
-      color = Colors.success;
     } else {
       title = '💀 حظ أوفر هذه المرة';
-      color = Colors.error;
     }
 
     profile.balance += payout;
     await profile.save();
 
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(color)
-          .setTitle('🎰 ماكينة الحظ')
-          .setDescription(
-            `> │ ${a} │ ${b} │ ${c} │\n\n` +
-            `${title}\n\n` +
-            `**الرهان:** \`${formatNumber(amount)}\` — **الربح:** \`${formatNumber(payout)}\`\n` +
-            `**رصيدك:** \`${formatNumber(profile.balance)}\``
-          )
-          .setTimestamp(),
-      ],
+      content:
+        `🎰 │ ${a} │ ${b} │ ${c} │ — ${title} • ` +
+        `الرهان: \`${formatNumber(amount)}\` • الربح: \`${formatNumber(payout)}\` • ` +
+        `رصيدك: \`${formatNumber(profile.balance)}\``,
     });
   },
 };

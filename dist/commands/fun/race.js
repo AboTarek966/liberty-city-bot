@@ -54,8 +54,7 @@ const command = {
             return new discord_js_1.EmbedBuilder()
                 .setColor(embeds_1.Colors.primary)
                 .setTitle('🏁 سباق الحيوانات')
-                .setDescription(`${phase}\n\n${lanes}`)
-                .setTimestamp();
+                .setDescription(`${phase}\n\n${lanes}`);
         };
         await interaction.editReply({ embeds: [render('استعدوا...')] });
         await new Promise(r => setTimeout(r, 1200));
@@ -72,16 +71,11 @@ const command = {
             await interaction.editReply({ embeds: [render('...')] }).catch(() => { });
             await new Promise(r => setTimeout(r, 800));
         }
-        const final = new discord_js_1.EmbedBuilder()
-            .setColor(embeds_1.Colors.success)
-            .setTitle('🏆 الفائز!')
-            .setDescription(`${winner.animal} **<@${winner.id}>** وصل إلى الخط أولاً! 🎉\n\n` +
+        const final = `🏆 ${winner.animal} **<@${winner.id}>** وصل إلى الخط أولاً! 🎉 • ` +
             entrants
-                .filter(e => e !== winner)
                 .map(e => `${e.animal} <@${e.id}> — ${Math.min(e.pos, TRACK)}/${TRACK}`)
-                .join('\n'))
-            .setTimestamp();
-        await interaction.editReply({ embeds: [final] });
+                .join(' • ');
+        await interaction.editReply({ content: final });
     },
 };
 function shuffleIds(arr) {

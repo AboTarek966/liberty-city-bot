@@ -27,55 +27,25 @@ const command: Command = {
     const target = interaction.options.getUser('user') || interaction.user;
     const member = interaction.guild?.members.cache.get(target.id);
 
-    const embed = new EmbedBuilder()
-      .setTitle(`👤 معلومات: ${target.tag}`)
-      .setColor(Colors.primary)
-      .setThumbnail(target.displayAvatarURL({ size: 512 }))
-      .addFields(
-        {
-          name: '🆔 المعرف',
-          value: `\`${target.id}\``,
-          inline: true,
-        },
-        {
-          name: '🤖 هل هو بوت؟',
-          value: target.bot ? 'نعم 🤖' : 'لا 👤',
-          inline: true,
-        },
-        {
-          name: '📅 إنشاء الحساب',
-          value: `<t:${Math.floor(target.createdTimestamp / 1000)}:R>`,
-          inline: true,
-        },
-      )
-      .setFooter({ text: 'Liberty City Bot' })
-      .setTimestamp();
+    const lines: string[] = [
+      `${target.bot ? '🤖' : '👤'} **${target.tag}** — \`${target.id}\``,
+      `📅 إنشاء الحساب: <t:${Math.floor(target.createdTimestamp / 1000)}:R>`,
+    ];
 
     if (member) {
-      embed.addFields(
-        {
-          name: '📥 انضم للسيرفر',
-          value: member.joinedTimestamp
+      lines.push(
+        `📥 انضم: ${
+          member.joinedTimestamp
             ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`
-            : 'غير معروف',
-          inline: true,
-        },
-        {
-          name: '🎭 أعلى رتبة',
-          value: member.roles.highest.id !== interaction.guildId
+            : 'غير معروف'
+        }`
+      );
+      lines.push(
+        `🎭 أعلى رتبة: ${
+          member.roles.highest.id !== interaction.guildId
             ? `${member.roles.highest}`
-            : 'لا يوجد',
-          inline: true,
-        },
-        {
-          name: `🎭 الأدوار [${member.roles.cache.size - 1}]`,
-          value: member.roles.cache
-            .filter(r => r.id !== interaction.guildId)
-            .map(r => r.toString())
-            .slice(0, 10)
-            .join(' ') || 'لا يوجد',
-          inline: false,
-        },
+            : 'لا يوجد'
+        } • أدوار [${member.roles.cache.size - 1}]`
       );
 
       // Add permissions summary
@@ -87,13 +57,15 @@ const command: Command = {
       if (member.permissions.has('ManageMessages')) keyPerms.push('💬 إدارة رسائل');
 
       if (keyPerms.length > 0) {
-        embed.addFields({
-          name: '🔑 صلاحيات رئيسية',
-          value: keyPerms.join(', '),
-          inline: false,
-        });
+        lines.push(`🔑 ${keyPerms.join(' • ')}`);
       }
     }
+
+    const embed = new EmbedBuilder()
+      .setTitle(`👤 معلومات: ${target.tag}`)
+      .setColor(Colors.primary)
+      .setThumbnail(target.displayAvatarURL({ size: 512 }))
+      .setDescription(lines.join('\n'));
 
     await interaction.reply({ embeds: [embed] });
   },

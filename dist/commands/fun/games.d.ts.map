@@ -1,1 +1,1 @@
-{"version":3,"file":"games.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/games.ts"],"names":[],"mappings":"AAYA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAGxD,eAAO,MAAM,UAAU;;;;GActB,CAAC;AAEF,QAAA,MAAM,OAAO,EAAE,OAoCd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"games.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/games.ts"],"names":[],"mappings":"AAYA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAGxD,eAAO,MAAM,UAAU;;;;GActB,CAAC;AAEF,QAAA,MAAM,OAAO,EAAE,OAkCd,CAAC;AAEF,eAAe,OAAO,CAAC"}

@@ -1,1 +1,1 @@
-{"version":3,"file":"balance.d.ts","sourceRoot":"","sources":["../../../src/commands/economy/balance.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAKxD,QAAA,MAAM,OAAO,EAAE,OAoCd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"balance.d.ts","sourceRoot":"","sources":["../../../src/commands/economy/balance.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA0Bd,CAAC;AAEF,eAAe,OAAO,CAAC"}

@@ -84,26 +84,19 @@ export function buildPollEmbed(poll: any, authorName?: string): {
 } {
   const totalVotes = poll.options.reduce((sum: number, o: any) => sum + o.votes.length, 0);
 
-  const embed = new EmbedBuilder()
-    .setTitle(`📊 ${poll.question}`)
-    .setColor(Colors.primary)
-    .addFields(
-      poll.options.map((o: any, i: number) => {
+  const tally =
+    poll.options
+      .map((o: any, i: number) => {
         const count = o.votes.length;
         const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-        const filled = Math.round(pct / 10);
-        const bar = '🟦'.repeat(filled) + '⬜'.repeat(10 - filled);
-        return {
-          name: `${i + 1}️⃣ ${o.text}`.substring(0, 256),
-          value: `${bar} **${pct}%** — ${count} صوت`,
-          inline: false,
-        };
+        return `${i + 1}️⃣ ${o.text} — **${pct}%** (${count} صوت)`;
       })
-    )
-    .setFooter({
-      text: `صوّت بالأزرار بالأسفل${authorName ? ` • صنع بواسطة ${authorName}` : ''} • يمكنك تغيير صوتك`,
-    })
-    .setTimestamp();
+      .join('\n') || 'لا أصوات بعد';
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📊 ${poll.question}`.substring(0, 256))
+    .setColor(Colors.primary)
+    .setDescription(tally);
 
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   let current = new ActionRowBuilder<ButtonBuilder>();

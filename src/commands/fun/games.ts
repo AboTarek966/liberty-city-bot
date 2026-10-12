@@ -44,9 +44,7 @@ const command: Command = {
       .setDescription(
         `**اختر لعبة من القائمة بالأسفل** — توصلك طريقة اللعب فوراً\n\n` +
         GAMES_LIST.map(g => `${g.label}`).join('  •  ')
-      )
-      .setFooter({ text: 'بعض الألعاب تستخدم رصيدك — اجمعه بـ /daily والنشر' })
-      .setTimestamp();
+      );
 
     const select = new StringSelectMenuBuilder()
       .setCustomId('games_menu')

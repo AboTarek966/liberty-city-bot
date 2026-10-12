@@ -62,33 +62,31 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Li
 
   const embed = new EmbedBuilder()
     .setTitle('📚 أوامر Liberty City')
-    .setDescription(
-      `مرحباً **${interaction.user.username}**! 👋\n\n` +
-      `أنا بوت **Liberty City** الشامل، إليك قائمة الأوامر المتاحة:\n\n` +
-      `> استخدم \`/help <أمر>\` للحصول على معلومات تفصيلية عن أمر معين\n` +
-      `> جميع الأوامر هي Slash Commands (تبدأ بـ \`/\`)`
-    )
     .setColor(Colors.primary)
-    .setThumbnail(interaction.client.user?.displayAvatarURL() || '')
-    .setFooter({ text: 'Liberty City Bot | جميع الحقوق محفوظة' })
-    .setTimestamp();
+    .setThumbnail(interaction.client.user?.displayAvatarURL() || '');
 
-  // Add category fields
+  // قائمة مختصرة بالتصنيفات والأوامر
+  const lines: string[] = [];
   for (const category of categories) {
     const info = categoryInfo[category] || { name: category, emoji: '📂' };
     const catCommands = client.commandHandler.getCommandsByCategory(category);
 
     if (catCommands.length > 0) {
-      embed.addFields({
-        name: `${info.emoji} ${info.name} [${catCommands.length}]`,
-        value: catCommands
-          .slice(0, 15)
+      const names =
+        catCommands
+          .slice(0, 12)
           .map(cmd => `\`/${cmd.data.name}\``)
-          .join('، ') + (catCommands.length > 15 ? `... و ${catCommands.length - 15} أمر آخر` : ''),
-        inline: false,
-      });
+          .join('، ') + (catCommands.length > 12 ? ` … +${catCommands.length - 12}` : '');
+      lines.push(`${info.emoji} **${info.name}** [${catCommands.length}]: ${names}`);
     }
   }
+
+  embed.setDescription(
+    (
+      `**${interaction.user.username}** 👋 — استخدم \`/help <أمر>\` للتفاصيل عن أمر معين\n\n` +
+      lines.join('\n')
+    ).substring(0, 4000)
+  );
 
   // Create buttons for navigation
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -169,45 +167,30 @@ async function showCommandInfo(
   const data = command.data;
   const options = data.options || [];
 
-  const embed = new EmbedBuilder()
-    .setTitle(`📋 معلومات الأمر: /${data.name}`)
-    .setDescription(data.description)
-    .setColor(Colors.primary)
-    .addFields(
-      { name: '📂 التصنيف', value: command.category || 'غير مصنف', inline: true },
-      { name: '⏱️ الكولداون', value: command.cooldown ? `${command.cooldown} ثانية` : 'بدون', inline: true },
-      {
-        name: '🔐 الصلاحيات المطلوبة',
-        value: command.permissions && command.permissions.length > 0
-          ? command.permissions.map(p => `\`${p}\``).join(', ')
-          : 'لا توجد صلاحيات مطلوبة',
-        inline: false,
-      },
-    )
-    .setFooter({ text: 'Liberty City Bot' })
-    .setTimestamp();
+  const parts = [
+    `📋 **/${data.name}** — ${data.description}`,
+    `📂 ${command.category || 'غير مصنف'} • ⏱️ ${command.cooldown ? `${command.cooldown} ثانية` : 'بدون كولداون'}`,
+    `🔐 ${command.permissions && command.permissions.length > 0
+      ? command.permissions.map(p => `\`${p}\``).join(', ')
+      : 'لا توجد صلاحيات مطلوبة'}`,
+  ];
 
-  // Add options info
+  // معلومات الوسائط
   if (options.length > 0) {
-    const optionsList = options
-      .map((opt: any) => {
-        const required = opt.required ? '(مطلوب)' : '(اختياري)';
-        return `\`/${data.name} ${opt.name}\` - ${opt.description} ${required}`;
-      })
-      .join('\n');
-
-    embed.addFields({ name: '📝 الوسائط', value: optionsList, inline: false });
+    parts.push(
+      `📝 ${options
+        .map((opt: any) => `\`/${data.name} ${opt.name}\` ${opt.required ? '(مطلوب)' : '(اختياري)'}`)
+        .join('، ')}`
+    );
   }
 
-  // Add usage example
-  embed.addFields({
-    name: '💡 مثال على الاستخدام',
-    value: `\`/${data.name}${options.length > 0 ? ' ' + options.map((o: any) => `<${o.name}>`).join(' ') : ''}\``,
-    inline: false,
-  });
+  // مثال على الاستخدام
+  parts.push(
+    `💡 \`/${data.name}${options.length > 0 ? ' ' + options.map((o: any) => `<${o.name}>`).join(' ') : ''}\``
+  );
 
   await interaction.reply({
-    embeds: [embed],
+    content: parts.join(' • '),
     ephemeral: true,
   });
 }

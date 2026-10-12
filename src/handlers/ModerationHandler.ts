@@ -63,7 +63,7 @@ export class ModerationHandler {
   // --------------------------------------------
   // Ban
   // --------------------------------------------
-  async ban(options: ModerationOptions): Promise<{ case: any; embed: any }> {
+  async ban(options: ModerationOptions): Promise<{ case: any; embed: any; simpleMsg: string }> {
     const { guild, moderator, target, reason, proof } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -114,13 +114,17 @@ export class ModerationHandler {
     void this.logAction(guild, embed);
 
     logger.info(`Banned ${target.id} from ${guild.id} by ${moderator.id}`);
-    return { case: null, embed };
+    return {
+      case: null,
+      embed,
+      simpleMsg: `🔨 **${target instanceof GuildMember ? target.user.tag : target.tag}** تم حظره | ${reason}`,
+    };
   }
 
   // --------------------------------------------
   // Kick
   // --------------------------------------------
-  async kick(options: ModerationOptions): Promise<{ case: any; embed: any }> {
+  async kick(options: ModerationOptions): Promise<{ case: any; embed: any; simpleMsg: string }> {
     const { guild, moderator, target, reason } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -169,13 +173,17 @@ export class ModerationHandler {
     void this.logAction(guild, embed);
 
     logger.info(`Kicked ${target.id} from ${guild.id} by ${moderator.id}`);
-    return { case: null, embed };
+    return {
+      case: null,
+      embed,
+      simpleMsg: `👢 **${target instanceof GuildMember ? target.user.tag : target.tag}** تم طرده | ${reason}`,
+    };
   }
 
   // --------------------------------------------
   // Timeout
   // --------------------------------------------
-  async timeout(options: ModerationOptions): Promise<{ case: any; embed: any }> {
+  async timeout(options: ModerationOptions): Promise<{ case: any; embed: any; simpleMsg: string }> {
     const { guild, moderator, target, reason, duration } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -233,13 +241,17 @@ export class ModerationHandler {
     void this.logAction(guild, embed);
 
     logger.info(`Timed out ${target.id} in ${guild.id} by ${moderator.id}`);
-    return { case: null, embed };
+    return {
+      case: null,
+      embed,
+      simpleMsg: `⏱️ **${target instanceof GuildMember ? target.user.tag : target.tag}** كتم حتى ${formatDuration(durationMs)} | ${reason}`,
+    };
   }
 
   // --------------------------------------------
   // Remove Timeout
   // --------------------------------------------
-  async removeTimeout(options: ModerationOptions): Promise<{ case: any; embed: any }> {
+  async removeTimeout(options: ModerationOptions): Promise<{ case: any; embed: any; simpleMsg: string }> {
     const { guild, moderator, target, reason } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -288,13 +300,17 @@ export class ModerationHandler {
     void this.logAction(guild, embed);
 
     logger.info(`Removed timeout for ${target.id} in ${guild.id} by ${moderator.id}`);
-    return { case: null, embed };
+    return {
+      case: null,
+      embed,
+      simpleMsg: `🔓 **${target instanceof GuildMember ? target.user.tag : target.tag}** تم فك الكتم عنه | ${reason}`,
+    };
   }
 
   // --------------------------------------------
   // Warn
   // --------------------------------------------
-  async warn(options: ModerationOptions): Promise<{ case: any; embed: any; warningCount: number }> {
+  async warn(options: ModerationOptions): Promise<{ case: any; embed: any; warningCount: number; simpleMsg: string }> {
     const { guild, moderator, target, reason } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -349,13 +365,18 @@ export class ModerationHandler {
     void this.checkWarningThreshold(guild, target.id, warningCount + 1);
 
     logger.info(`Warned ${target.id} in ${guild.id} by ${moderator.id}`);
-    return { case: null, embed, warningCount: warningCount + 1 };
+    return {
+      case: null,
+      embed,
+      warningCount: warningCount + 1,
+      simpleMsg: `⚠️ **${target instanceof GuildMember ? target.user.tag : target.tag}** تم تحذيره (${warningCount + 1} تحذير) | ${reason}`,
+    };
   }
 
   // --------------------------------------------
   // Unwarn (إزالة تحذير)
   // --------------------------------------------
-  async unwarn(options: ModerationOptions): Promise<{ case: any; embed: any; warningCount: number }> {
+  async unwarn(options: ModerationOptions): Promise<{ case: any; embed: any; warningCount: number; simpleMsg: string }> {
     const { guild, moderator, target, reason } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -405,7 +426,12 @@ export class ModerationHandler {
     void this.logAction(guild, embed);
 
     logger.info(`Unwarned ${target.id} in ${guild.id} by ${moderator.id} (remaining: ${remaining})`);
-    return { case: null, embed, warningCount: remaining };
+    return {
+      case: null,
+      embed,
+      warningCount: remaining,
+      simpleMsg: `✅ **${target instanceof GuildMember ? target.user.tag : target.tag}** تم إزالة تحذير (المتبقي: ${remaining}) | ${reason}`,
+    };
   }
 
   // --------------------------------------------

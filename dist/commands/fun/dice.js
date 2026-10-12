@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('dice')
@@ -28,13 +27,10 @@ const command = {
             rolls.push(Math.floor(Math.random() * sides) + 1);
         }
         const total = rolls.reduce((a, b) => a + b, 0);
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('🎲 رمية النرد')
-            .setColor(embeds_1.Colors.primary)
-            .addFields({ name: 'الرميات', value: rolls.map(r => `\`${r}\``).join(' • '), inline: true }, { name: 'الأوجه', value: `\`${sides}\``, inline: true }, ...(count > 1 ? [{ name: 'المجموع', value: `\`${total}\``, inline: true }] : []))
-            .setFooter({ text: `رمتها ${interaction.user.username}` })
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({
+            content: `🎲 رمية النرد: ${rolls.map(r => `\`${r}\``).join(' • ')} • الأوجه: \`${sides}\`` +
+                (count > 1 ? ` • المجموع: \`${total}\`` : ''),
+        });
     },
 };
 exports.default = command;

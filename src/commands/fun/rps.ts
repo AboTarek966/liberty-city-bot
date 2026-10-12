@@ -2,9 +2,8 @@
 // Liberty City Bot - Rock Paper Scissors (حجر ورقة مقص)
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ColorResolvable } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { Colors } from '../../utils/embeds';
 
 const CHOICES: Record<string, { name: string; emoji: string; beats: string }> = {
   حجر: { name: 'حجر', emoji: '🪨', beats: 'مقص' },
@@ -37,30 +36,18 @@ const command: Command = {
     const bot = keys[Math.floor(Math.random() * keys.length)];
 
     let title: string;
-    let color: ColorResolvable;
     if (player === bot) {
       title = '🤝 تعادل!';
-      color = Colors.warning;
     } else if (CHOICES[player].beats === bot) {
       title = '🎉 فزت!';
-      color = Colors.success;
     } else {
       title = '💀 البوت فاز!';
-      color = Colors.error;
     }
 
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(color)
-          .setTitle(title)
-          .setDescription(
-            `**أنت:** ${CHOICES[player].emoji} ${CHOICES[player].name}\n` +
-            `**البوت:** ${CHOICES[bot].emoji} ${CHOICES[bot].name}\n\n` +
-            `_جولة جديدة؟ اكتب الأمر مرة أخرى!_`
-          )
-          .setTimestamp(),
-      ],
+      content:
+        `${title} • أنت: ${CHOICES[player].emoji} ${CHOICES[player].name} • ` +
+        `البوت: ${CHOICES[bot].emoji} ${CHOICES[bot].name}`,
     });
   },
 };

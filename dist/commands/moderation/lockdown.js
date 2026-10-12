@@ -45,6 +45,11 @@ const command = {
         const result = await (0, lockdown_1.setLockdown)(interaction.guild, state);
         settings.protection.lockdown = state;
         await settings.save();
+        const content = state
+            ? `🔒 تم قفل السيرفر — لا أحد يكتب في القنوات (${result.textChannels} نصية • ${result.voiceChannels} صوتية) | 📝 ${reason}`
+            : `🔓 تم فتح السيرفر — الكتابة والدخول مفتوحان (${result.textChannels} نصية • ${result.voiceChannels} صوتية)`;
+        await interaction.editReply({ content });
+        // إنشاء الإمب الخاص بقناة السجلات
         const embed = new discord_js_1.EmbedBuilder()
             .setTitle(state ? '🔒 تم تفعيل وضع الطوارئ' : '🔓 تم إلغاء وضع الطوارئ')
             .setColor(state ? 0xe74c3c : 0x2ecc71)
@@ -63,7 +68,6 @@ const command = {
         })
             .setFooter({ text: 'Liberty City Security' })
             .setTimestamp();
-        await interaction.editReply({ embeds: [embed] });
         // تسجيل في قناة السجلات
         const logChannelId = settings.logging?.channelId;
         if (logChannelId) {

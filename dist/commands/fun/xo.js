@@ -27,10 +27,9 @@ const command = {
         const embed = new discord_js_1.EmbedBuilder()
             .setColor(embeds_1.Colors.primary)
             .setTitle('❌⭕ تحدي XO!')
-            .setDescription(`${interaction.user} يتحدى ${opponent}!\n\n` +
+            .setDescription(`${interaction.user} يتحدى ${opponent}! • ` +
             `${interaction.user} = **X** (يبدأ أولاً) | ${opponent} = **O**\n` +
-            `الأزرار الفارغة قابلة للضغط — اللعبة تنتهي خلال 3 دقائق`)
-            .setTimestamp();
+            `الأزرار الفارغة قابلة للضغط — اللعبة تنتهي خلال 3 دقائق`);
         await interaction.reply({
             embeds: [embed],
             components: (0, xoGame_1.renderXoBoard)(game),

@@ -47,13 +47,7 @@ const command = {
         }
         // إزالة نصوص مكسورة سابقة
         const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('🎱 كرة السحر')
-            .setColor(0x1A1A2E)
-            .addFields({ name: '❓ سؤالك', value: question.substring(0, 300), inline: false }, { name: '🔮 الإجابة', value: answer, inline: false })
-            .setFooter({ text: `سأله ${interaction.user.username}` })
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ content: `🎱 سؤالك: ${question.substring(0, 300)} — 🔮 ${answer}` });
     },
 };
 exports.default = command;

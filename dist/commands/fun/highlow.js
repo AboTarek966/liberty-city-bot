@@ -6,7 +6,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
-const embeds_1 = require("../../utils/embeds");
 const helpers_1 = require("../../utils/helpers");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -44,16 +43,11 @@ const command = {
             profile.balance += amount * 2;
         }
         await profile.save();
+        const result = won ? '🎉 ربحت!' : mine === botCard ? '🤝 تعادل (نفس الرقم)' : '💀 خسرت';
         await interaction.reply({
-            embeds: [
-                new discord_js_1.EmbedBuilder()
-                    .setColor(won ? embeds_1.Colors.success : mine === botCard ? embeds_1.Colors.warning : embeds_1.Colors.error)
-                    .setTitle(won ? '🎉 ربحت!' : mine === botCard ? '🤝 تعادل (نفس الرقم)' : '💀 خسرت')
-                    .setDescription(`> **بطاقتك:** \`${mine}\`\n> **بطاقة البوت:** \`${botCard}\`\n\n` +
-                    `**الرهان:** \`${(0, helpers_1.formatNumber)(amount)}\` — **الربح:** \`${(0, helpers_1.formatNumber)(won ? amount * 2 : 0)}\`\n` +
-                    `**رصيدك:** \`${(0, helpers_1.formatNumber)(profile.balance)}\``)
-                    .setTimestamp(),
-            ],
+            content: `${result} • بطاقتك: \`${mine}\` • بطاقة البوت: \`${botCard}\` • ` +
+                `الرهان: \`${(0, helpers_1.formatNumber)(amount)}\` • الربح: \`${(0, helpers_1.formatNumber)(won ? amount * 2 : 0)}\` • ` +
+                `رصيدك: \`${(0, helpers_1.formatNumber)(profile.balance)}\``,
         });
     },
 };

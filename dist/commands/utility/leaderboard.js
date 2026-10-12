@@ -30,25 +30,17 @@ function periodLabel(period) {
 function limitNumber(limit) {
     return limit === 'all' ? 100 : parseInt(limit, 10);
 }
-function progressBar(value, max) {
-    if (max <= 0)
-        return '░░░░░░░░░░';
-    const filled = Math.max(0, Math.min(10, Math.round((value / max) * 10)));
-    return '█'.repeat(filled) + '░'.repeat(10 - filled);
-}
 function buildRankingLines(results, type) {
     if (results.length === 0)
         return ['📭 لا توجد بيانات بعد في هذه الفترة'];
-    const max = type === 'messages' ? results[0].messages : results[0].voiceMinutes;
     const lines = [];
     for (let i = 0; i < results.length; i++) {
         const r = results[i];
         const value = type === 'messages'
             ? `**${r.messages}** رسالة`
             : `**${formatMinutes(r.voiceMinutes)}**`;
-        const bar = progressBar(type === 'messages' ? r.messages : r.voiceMinutes, max);
         const medal = medals[i] || `**${i + 1}.**`;
-        lines.push(`${medal} <@${r.userId}> — ${value}\n\`${bar}\``);
+        lines.push(`${medal} <@${r.userId}> — ${value}`);
     }
     return lines;
 }
@@ -56,10 +48,7 @@ async function buildLeaderboardEmbed(client, guildId, type, period, limit) {
     const ln = limitNumber(limit);
     const resultsMsg = await client.activityTracker.getLeaderboard(guildId, period, 'messages', type === 'voiceMinutes' ? 1 : ln);
     const resultsVoice = await client.activityTracker.getLeaderboard(guildId, period, 'voiceMinutes', type === 'messages' ? 1 : ln);
-    const embed = new discord_js_1.EmbedBuilder()
-        .setColor(embeds_1.Colors.warning)
-        .setFooter({ text: 'Liberty City • يتم تحديث النشاط تلقائياً' })
-        .setTimestamp();
+    const embed = new discord_js_1.EmbedBuilder().setColor(embeds_1.Colors.warning);
     if (type === 'all') {
         embed.setTitle(`🏆 لوحة المتصدرين — ${periodLabel(period)}`);
         const topMsg = resultsMsg.slice(0, limitNumber(limit));

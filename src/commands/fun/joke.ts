@@ -2,10 +2,9 @@
 // Liberty City Bot - Joke Command
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
-import { Colors } from '../../utils/embeds';
 
 const JOKES = [
   'لماذا لا يحب الحاسوب الرياضيات؟\nلأنه يخاف من المتغيرات! 😄',
@@ -35,14 +34,7 @@ const command: Command = {
   async execute(interaction: ChatInputCommandInteraction) {
     const joke = JOKES[Math.floor(Math.random() * JOKES.length)];
 
-    const embed = new EmbedBuilder()
-      .setTitle('😂 نكتة اليوم')
-      .setColor(Colors.warning)
-      .setDescription(joke)
-      .setFooter({ text: `طلبها ${interaction.user.username} — اكتب /joke لمزيد!` })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ content: `😂 ${joke.replace(/\n/g, ' ')}` });
   },
 };
 

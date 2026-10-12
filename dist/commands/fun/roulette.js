@@ -5,7 +5,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('roulette')
@@ -36,28 +35,20 @@ const command = {
             await interaction.editReply({ content: '❌يحتاج الروليت شخصين على الأقل' });
             return;
         }
-        const lines = players.map(p => `> 🔘 <@${p}>`).join('\n');
-        const start = new discord_js_1.EmbedBuilder()
-            .setColor(embeds_1.Colors.warning)
-            .setTitle('🔫 لعبة الروليت!')
-            .setDescription(`**المشاركون:**\n${lines}\n\nالبارودة تدور...`)
-            .setTimestamp();
-        await interaction.editReply({ embeds: [start] });
+        const playersLine = players.map(p => `🔘 <@${p}>`).join(' • ');
+        await interaction.editReply({ content: `🔫 لعبة الروليت! • المشاركون: ${playersLine} • البارودة تدور...` });
         await new Promise(r => setTimeout(r, 1500));
         await interaction.editReply({
-            embeds: [start.setFields({ name: '🔊', value: 'جرررررخ...' })],
+            content: `🔫 اللعبة تدور... 🔊 جرررررخ...`,
         }).catch(() => { });
         await new Promise(r => setTimeout(r, 1500));
         const victimId = players[Math.floor(Math.random() * players.length)];
         const survivors = players.filter(p => p !== victimId);
-        const result = new discord_js_1.EmbedBuilder()
-            .setColor(embeds_1.Colors.error)
-            .setTitle('💥 البارودة أصابت!')
-            .setDescription(`> 💀 **الضحية:** <@${victimId}>\n\n` +
-            `**الناجون:**\n${survivors.map(s => `> ✅ <@${s}>`).join('\n')}\n\n` +
-            `_جرّب حظك مرة أخرى!_`)
-            .setTimestamp();
-        await interaction.editReply({ embeds: [result] });
+        await interaction.editReply({
+            content: `💥 البارودة أصابت! 💀 الضحية: <@${victimId}> • ` +
+                `الناجون: ${survivors.map(s => `✅ <@${s}>`).join(' • ') || 'لا أحد'} • ` +
+                `_جرّب حظك مرة أخرى!_`,
+        });
     },
 };
 // خلط عشوائي مبسّط
