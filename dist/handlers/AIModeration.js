@@ -246,9 +246,25 @@ async function executeAIModeration(message, client, question) {
         return true;
     }
     // 4) التحقق من صلاحيات المستخدم (إلزامي!)
-    if (!message.member.permissions.has(hit.permission)) {
+    // 🔓 أوامر الرولات (إعطاء/سحب/ترقية) = فحص تسلسل هرمي فقط:
+    //    المالك أو الأدمن أو رتبتك أعلى من رتبة الهدف — بدون ManageRoles
+    const hierarchyActions = ['role_add', 'role_remove', 'promote'];
+    let allowed;
+    if (hierarchyActions.includes(hit.action)) {
+        const targetMember = target.member || (await message.guild.members.fetch(target.user.id).catch(() => null));
+        const isOwner = message.guild.ownerId === message.author.id;
+        const isAdmin = message.member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+        allowed =
+            isOwner ||
+                isAdmin ||
+                (!!targetMember && message.member.roles.highest.position > targetMember.roles.highest.position);
+    }
+    else {
+        allowed = message.member.permissions.has(hit.permission);
+    }
+    if (!allowed) {
         logger.info(`⛔ Denied: ${message.author.tag} lacks permission for ${hit.action}`);
-        await respond(message, `❌ **لا تملك صلاحية** ${hit.label} — هذا الطلب يحتاج صلاحيات إدارية.`);
+        await respond(message, `❌ **لا تملك صلاحية** ${hit.label} — رتبتك ليست أعلى من رتبة الهدف.`);
         return true;
     }
     // 5) لا عقوبة على النفس

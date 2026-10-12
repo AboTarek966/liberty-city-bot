@@ -3,10 +3,7 @@
 // اختيار رول من قائمة عند استخدام اختصار roleadd بدون تحديد رول
 // ============================================
 
-import {
-  RoleSelectMenuInteraction,
-  PermissionFlagsBits,
-} from 'discord.js';
+import { RoleSelectMenuInteraction } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { LibertyClient } from '../../LibertyClient';
 
@@ -20,11 +17,8 @@ const handler: SelectMenuHandler = {
     await roleSelect.deferReply({ ephemeral: true });
 
     try {
+      // بدون فحص ManageRoles — الفحص يكون حسب التسلسل الهرمي فقط داخل addRoles
       const byMember = await roleSelect.guild.members.fetch(roleSelect.user.id);
-      if (!byMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        await roleSelect.editReply({ content: '❌ تحتاج صلاحية إدارة الرولات' });
-        return;
-      }
 
       // استخراج معرف العضو من customId (alias_roleadd:<userId>)
       const parts = roleSelect.customId.split(':');
