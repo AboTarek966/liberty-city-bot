@@ -952,23 +952,29 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
   const botId = client.user?.id;
   if (!botId) return;
 
+  const isDM = !message.guild;
+
   // Check if bot was mentioned
   const isMention = message.mentions.has(client.user!);
 
-  // بدون منشن وبدون رد → لا شيء يفعل (بدون أي طلب API)
-  if (!isMention && !message.reference?.messageId) return;
-
-  // Check if reply to bot's message (الذاكرة المؤقتة أولاً — بدون طلب API إن أمكن)
+  // في DMs: يرد على أي رسالة مباشرة (بدون حاجة لمنشن/رد)
+  // في السيرفرات: يشترط منشن أو رد على البوت
   let repliedToBot = false;
-  if (!isMention && message.reference?.messageId) {
-    try {
-      const cached = message.channel.messages.cache.get(message.reference.messageId);
-      const refMessage = cached || (await message.channel.messages.fetch(message.reference.messageId));
-      repliedToBot = refMessage.author.id === botId;
-    } catch {}
-  }
 
-  if (!isMention && !repliedToBot) return;
+  if (!isDM) {
+    if (!isMention && !message.reference?.messageId) return;
+
+    // Check if reply to bot's message (الذاكرة المؤقتة أولاً — بدون طلب API إن أمكن)
+    if (!isMention && message.reference?.messageId) {
+      try {
+        const cached = message.channel.messages.cache.get(message.reference.messageId);
+        const refMessage = cached || (await message.channel.messages.fetch(message.reference.messageId));
+        repliedToBot = refMessage.author.id === botId;
+      } catch {}
+    }
+
+    if (!isMention && !repliedToBot) return;
+  }
 
   // Extract question (remove bot mention)
   const question = message.content
@@ -996,7 +1002,6 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
   }
 
   // التعامل مع DMs — لا يوجد guild أو member
-  const isDM = !message.guild;
   const memberRoles = message.member?.roles.cache.map(r => r.id) || [];
   const guildId = message.guild?.id;
 
