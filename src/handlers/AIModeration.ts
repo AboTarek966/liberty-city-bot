@@ -65,6 +65,12 @@ const ACTIONS: ActionDef[] = [
     permission: PermissionFlagsBits.ModerateMembers,
     label: 'تحذير تسلسلي (1/2/3)',
   },
+  {
+    action: 'sequential_warn',
+    patterns: /^(?:ت|تح|تحذ)\s*[123١٢٣]\b/i,
+    permission: PermissionFlagsBits.ModerateMembers,
+    label: 'اختصار تحذير تسلسلي (ت 1/2/3)',
+  },
   // ========== أوامر إدارة السيرفر الجديدة ==========
   {
     action: 'role_create',

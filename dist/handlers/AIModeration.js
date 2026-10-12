@@ -85,6 +85,12 @@ const ACTIONS = [
         permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
         label: 'تحذير تسلسلي (1/2/3)',
     },
+    {
+        action: 'sequential_warn',
+        patterns: /^(?:ت|تح|تحذ)\s*[123١٢٣]\b/i,
+        permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
+        label: 'اختصار تحذير تسلسلي (ت 1/2/3)',
+    },
     // ========== أوامر إدارة السيرفر الجديدة ==========
     {
         action: 'role_create',
