@@ -468,14 +468,12 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
                 .setFooter({ text: 'Liberty City Tickets' })
                 .setTimestamp();
             await respond(message, { embeds: [embed] });
-            await message.delete().catch(() => { });
             return;
         }
         // ticket_top
         const stats = settings.tickets.claimStats;
         if (!stats || stats.size === 0) {
             await respond(message, '📊 لا توجد إحصائيات استلام بعد.');
-            await message.delete().catch(() => { });
             return;
         }
         const sorted = [...stats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -491,7 +489,6 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
             .setFooter({ text: 'Liberty City Tickets' })
             .setTimestamp();
         await respond(message, { embeds: [embed] });
-        await message.delete().catch(() => { });
         return;
     }
     const command = client.commandHandler.getCommand(commandName);
@@ -522,8 +519,7 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
         logger.error(`Alias execution failed for "${commandName}": ${error.message}`);
         await respond(message, `❌ حدث خطأ: ${error.message}`);
     }
-    // Delete the command message for cleanliness
-    await message.delete().catch(() => { });
+    // ✅ لا نحذف رسالة المستخدم — تبقى ظاهرة مع رد البوت
 }
 // --------------------------------------------
 // Message-based command executors (by command name)

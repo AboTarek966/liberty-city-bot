@@ -518,7 +518,6 @@ export async function executeAliasCommand(
         .setFooter({ text: 'Liberty City Tickets' })
         .setTimestamp();
       await respond(message, { embeds: [embed] });
-      await message.delete().catch(() => {});
       return;
     }
 
@@ -526,7 +525,6 @@ export async function executeAliasCommand(
     const stats = settings.tickets.claimStats;
     if (!stats || stats.size === 0) {
       await respond(message, '📊 لا توجد إحصائيات استلام بعد.');
-      await message.delete().catch(() => {});
       return;
     }
     const sorted = [...stats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -542,7 +540,6 @@ export async function executeAliasCommand(
       .setFooter({ text: 'Liberty City Tickets' })
       .setTimestamp();
     await respond(message, { embeds: [embed] });
-    await message.delete().catch(() => {});
     return;
   }
 
@@ -577,8 +574,7 @@ export async function executeAliasCommand(
     await respond(message, `❌ حدث خطأ: ${error.message}`);
   }
 
-  // Delete the command message for cleanliness
-  await message.delete().catch(() => {});
+  // ✅ لا نحذف رسالة المستخدم — تبقى ظاهرة مع رد البوت
 }
 
 // --------------------------------------------
