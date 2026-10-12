@@ -7,6 +7,7 @@ import {
   Guild,
   GuildMember,
   User,
+  Role,
   TextChannel,
   ChannelType,
   PermissionFlagsBits,
@@ -602,6 +603,112 @@ export class ModerationHandler {
       case: moderationCase,
       embed,
       simpleMsg: `✅ **تم إضافة رول ${role} للعضو ${target} من قبل ${moderator}**`,
+    };
+  }
+
+  // --------------------------------------------
+  // Add Roles (إضافة أكثر من رول في مرة واحدة)
+  // --------------------------------------------
+  async addRoles(options: {
+    guild: Guild;
+    moderator: GuildMember;
+    target: GuildMember;
+    reason: string;
+    roleIds: string[];
+  }): Promise<{
+    case: any;
+    embed: any;
+    simpleMsg: string;
+    added: string[];
+    skipped: string[];
+  }> {
+    const { guild, moderator, target, reason, roleIds } = options;
+
+    if (!this.canModerate(moderator, target)) {
+      throw new Error('لا يمكنك إضافة رول لهذا العضو');
+    }
+    if (!roleIds.length) {
+      throw new Error('لم يتم تحديد أي رول');
+    }
+
+    const isOwner = moderator.id === guild.ownerId;
+    const toAdd: string[] = [];
+    const skipped: string[] = [];
+
+    for (const roleId of roleIds) {
+      const role = guild.roles.cache.get(roleId);
+      if (!role) {
+        skipped.push('رول غير موجود');
+        continue;
+      }
+      if (target.roles.cache.has(role.id)) {
+        skipped.push(`${role.name} (مملوك بالفعل)`);
+        continue;
+      }
+      if (role.managed) {
+        skipped.push(`${role.name} (مُدار)`);
+        continue;
+      }
+      if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
+        skipped.push(`${role.name} (أعلى من رتبتك)`);
+        continue;
+      }
+      if (guild.members.me!.roles.highest.comparePositionTo(role) <= 0) {
+        skipped.push(`${role.name} (أعلى من رتبة البوت)`);
+        continue;
+      }
+      toAdd.push(role.id);
+    }
+
+    if (!toAdd.length) {
+      if (skipped.length && skipped.every(s => s.includes('مملوك بالفعل'))) {
+        throw new Error('العضو يملك هذه الرولات بالفعل');
+      }
+      throw new Error(
+        `لا يمكن إعطاء أي رول:\n${skipped.slice(0, 6).map(s => `• ${s}`).join('\n')}`,
+      );
+    }
+
+    await target.roles.add(toAdd, `${reason} | بواسطة ${moderator.user.tag}`);
+
+    const caseId = await getNextCaseId(guild.id);
+    const moderationCase = await ModerationCase.create({
+      guildId: guild.id,
+      caseId,
+      type: 'role_add',
+      moderatorId: moderator.id,
+      targetId: target.id,
+      reason,
+      active: false,
+    });
+
+    const addedRoles = toAdd.map(id => guild.roles.cache.get(id)).filter(Boolean) as Role[];
+    const embed = moderationEmbed({
+      type: 'role_add',
+      moderator: moderator.user,
+      target,
+      reason,
+      caseId,
+      extraFields: [
+        {
+          name: addedRoles.length > 1 ? 'الرولات' : 'الرول',
+          value: addedRoles.map(r => `${r}`).join(', '),
+          inline: false,
+        },
+        ...(skipped.length
+          ? [{ name: 'تم تخطيها', value: skipped.slice(0, 10).join('\n'), inline: false }]
+          : []),
+      ],
+    });
+    await this.logAction(guild, embed);
+
+    logger.info(`Added ${toAdd.length} role(s) to ${target.id} by ${moderator.id}`);
+    return {
+      case: moderationCase,
+      embed,
+      simpleMsg: `✅ **تم إضافة ${toAdd.length} رول للعضو ${target} من قبل ${moderator}**`,
+      added: toAdd,
+      skipped,
     };
   }
 

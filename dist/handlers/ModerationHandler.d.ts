@@ -57,6 +57,19 @@ export declare class ModerationHandler {
         embed: any;
         simpleMsg: string;
     }>;
+    addRoles(options: {
+        guild: Guild;
+        moderator: GuildMember;
+        target: GuildMember;
+        reason: string;
+        roleIds: string[];
+    }): Promise<{
+        case: any;
+        embed: any;
+        simpleMsg: string;
+        added: string[];
+        skipped: string[];
+    }>;
     removeRole(options: {
         guild: Guild;
         moderator: GuildMember;

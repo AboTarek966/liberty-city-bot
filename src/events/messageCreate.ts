@@ -472,38 +472,49 @@ async function runAliasCommand(
 
     case 'roleadd': {
       const userId = parseUserId(args[0]);
-      const roleId = args[1]?.replace(/[<@&>]/g, '');
-      if (!userId) return usage('<@المستخدم> [@رول — أو اختر من القائمة]');
+      if (!userId) return usage('<@المستخدم> [@رول1 @رول2 ... — أو اختر من القائمة]');
 
       const target = await guild.members.fetch(userId).catch(() => null);
       if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
 
-      // إذا لم يُحدد رول → أرسل قائمة اختيار الرولات
-      if (!roleId) {
+      // ✅ جمع كل الرولات من نفس الرسالة (mentions أو IDs) بدلا من تكرار الأمر
+      const roleIds: string[] = [];
+      let reasonStart = 1;
+      for (let i = 1; i < args.length; i++) {
+        const raw = args[i];
+        const isMention = /^<@&\d+>$/.test(raw);
+        const isId = /^\d{17,20}$/.test(raw);
+        if (!isMention && !isId) break;
+        const id = raw.replace(/[<@&>]/g, '');
+        if (!guild.roles.cache.has(id)) break;
+        if (!roleIds.includes(id)) roleIds.push(id);
+        reasonStart = i + 1;
+      }
+
+      // إذا لم يُحدد رول → أرسل قائمة اختيار الرولات (متعددة)
+      if (roleIds.length === 0) {
         const { RoleSelectMenuBuilder, ActionRowBuilder } = await import('discord.js') as any;
         const select = new RoleSelectMenuBuilder()
           .setCustomId(`alias_roleadd:${target.id}`)
-          .setPlaceholder(`➕ اختر الرول الذي تريد إضافته لـ ${target.user.username}`)
+          .setPlaceholder(`➕ اختر الرولات التي تريد إضافتها لـ ${target.user.username} (يمكن أكثر من واحدة)`)
           .setMinValues(1)
-          .setMaxValues(1);
+          .setMaxValues(10);
         const row = new ActionRowBuilder().addComponents(select);
         await respond(message, {
-          content: `➕ **اختر الرول** الذي تريد إضافته لـ ${target}:`,
+          content: `➕ **اختر الرولات** التي تريد إضافتها لـ ${target} (يمكنك اختيار أكثر من رول في نفس القائمة):`,
           components: [row],
         } as any);
         return;
       }
 
-      const role = guild.roles.cache.get(roleId);
-      if (!role) return respond(message, '❌ الرول غير موجود');
-      const reason = args.slice(2).join(' ') || 'إضافة رول';
+      const reason = args.slice(reasonStart).join(' ') || 'إضافة رول';
       try {
-        const result = await client.moderationHandler.addRole({
+        const result = await client.moderationHandler.addRoles({
           guild,
           moderator: member,
           target,
           reason,
-          roleId,
+          roleIds,
         });
         return respond(message, { embeds: [result.embed] });
       } catch (e: any) {

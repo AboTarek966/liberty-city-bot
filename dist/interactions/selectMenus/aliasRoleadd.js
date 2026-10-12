@@ -31,35 +31,18 @@ const handler = {
                 await roleSelect.editReply({ content: '❌ العضو غير موجود في السيرفر' });
                 return;
             }
-            const roleId = roleSelect.values[0];
-            const role = roleSelect.guild.roles.cache.get(roleId);
-            if (!role) {
-                await roleSelect.editReply({ content: '❌ الرول غير موجود' });
+            // ✅ كل الرولات المختارة (يمكن أكثر من واحدة)
+            const roleIds = [...roleSelect.values];
+            if (roleIds.length === 0) {
+                await roleSelect.editReply({ content: '❌ لم تختر أي رول' });
                 return;
             }
-            // فحص الصلاحيات
-            if (role.managed) {
-                await roleSelect.editReply({ content: '❌ لا يمكن إضافة رول مُدار (Managed)' });
-                return;
-            }
-            if (role.position >= byMember.roles.highest.position) {
-                await roleSelect.editReply({ content: '❌ الرول أعلى من رتبتك' });
-                return;
-            }
-            if (role.position >= (roleSelect.guild.members.me?.roles.highest.position ?? 0)) {
-                await roleSelect.editReply({ content: '❌ الرول أعلى من رتبة البوت' });
-                return;
-            }
-            if (target.roles.cache.has(roleId)) {
-                await roleSelect.editReply({ content: `❌ ${target} يملك الرول \`${role.name}\` بالفعل` });
-                return;
-            }
-            const result = await client.moderationHandler.addRole({
+            const result = await client.moderationHandler.addRoles({
                 guild: roleSelect.guild,
                 moderator: byMember,
                 target,
                 reason: 'إضافة رول عبر قائمة الاختيار',
-                roleId,
+                roleIds,
             });
             await roleSelect.editReply({ embeds: [result.embed] });
         }

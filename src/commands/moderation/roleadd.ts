@@ -30,8 +30,20 @@ const command: Command = {
     .addRoleOption(o =>
       o
         .setName('role')
-        .setDescription('الرول المراد إضافته (اتركه فارغاً لفتح لوحة الاختيار)')
+        .setDescription('الرول الأول (اتركه فارغاً لفتح لوحة الاختيار)')
         .setRequired(false)
+    )
+    .addRoleOption(o =>
+      o.setName('role2').setDescription('رول إضافي 2').setRequired(false)
+    )
+    .addRoleOption(o =>
+      o.setName('role3').setDescription('رول إضافي 3').setRequired(false)
+    )
+    .addRoleOption(o =>
+      o.setName('role4').setDescription('رول إضافي 4').setRequired(false)
+    )
+    .addRoleOption(o =>
+      o.setName('role5').setDescription('رول إضافي 5').setRequired(false)
     )
     .addStringOption(o =>
       o.setName('reason').setDescription('السبب').setRequired(false)
@@ -44,8 +56,13 @@ const command: Command = {
     const client = interaction.client as LibertyClient;
     const guild = interaction.guild!;
     const member = interaction.options.getMember('user') as GuildMember;
-    const roleOption = interaction.options.getRole('role') as Role | null;
     const reason = interaction.options.getString('reason') || 'إضافة رول';
+
+    // ✅ كل الرولات المحددة في نفس الأمر (role حتى role5)
+    const requestedRoles = (['role', 'role2', 'role3', 'role4', 'role5'] as const)
+      .map(n => interaction.options.getRole(n))
+      .filter((r): r is Role => r !== null);
+    const uniqueRoles = [...new Map(requestedRoles.map(r => [r.id, r])).values()];
 
     if (!member) {
       await interaction.reply({ content: '❌ لم يتم العثور على العضو', ephemeral: true });
@@ -61,9 +78,9 @@ const command: Command = {
     const executorMember = interaction.member as GuildMember;
 
     // --------------------------------------------
-    // لوحة اختيار الرولات (لم يتم تحديد رول)
+    // لوحة اختيار الرولات (لم يتم تحديد أي رول)
     // --------------------------------------------
-    if (!roleOption) {
+    if (uniqueRoles.length === 0) {
       const grantable = getGrantableRoles(guild, executorMember);
       if (grantable.length === 0) {
         await interaction.reply({
@@ -79,35 +96,69 @@ const command: Command = {
       return;
     }
 
-    const role = roleOption;
-
-    if (member.roles.cache.has(role.id)) {
-      await interaction.reply({ content: `❌ العضو يملك رول ${role} بالفعل`, ephemeral: true });
-      return;
-    }
-
+    // --------------------------------------------
+    // فحص كل الرولات المحددة
+    // --------------------------------------------
     const isOwner = interaction.user.id === guild.ownerId;
-    if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0) {
-      await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من الرول المضاف', ephemeral: true });
-      return;
+    const grantable: Role[] = [];
+    const execBlocked: Role[] = [];
+    const botBlocked: Role[] = [];
+    const alreadyOwned: Role[] = [];
+
+    for (const role of uniqueRoles) {
+      if (member.roles.cache.has(role.id)) {
+        alreadyOwned.push(role);
+        continue;
+      }
+      if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0) {
+        execBlocked.push(role);
+        continue;
+      }
+      if (guild.members.me!.roles.highest.comparePositionTo(role) <= 0) {
+        botBlocked.push(role);
+        continue;
+      }
+      grantable.push(role);
     }
 
-    if (guild.members.me!.roles.highest.comparePositionTo(role) <= 0) {
-      await interaction.reply({ content: '❌ رتبة البوت يجب أن تكون أعلى من الرول المضاف', ephemeral: true });
+    if (grantable.length === 0) {
+      let msg = `❌ العضو يملك هذه الرولات بالفعل (${alreadyOwned.length})`;
+      if (execBlocked.length) msg = '❌ رتبتك يجب أن تكون أعلى من الرول المضاف';
+      else if (botBlocked.length) msg = '❌ رتبة البوت يجب أن تكون أعلى من الرول المضاف';
+      await interaction.reply({ content: msg, ephemeral: true });
       return;
     }
 
     try {
-      await member.roles.add(role, `${reason} | بواسطة ${interaction.user.tag}`);
+      await member.roles.add(
+        grantable.map(r => r.id),
+        `${reason} | بواسطة ${interaction.user.tag}`,
+      );
+
+      const rolesText = grantable.map(r => `${r}`).join(', ');
+      const skippedText = [
+        ...execBlocked.map(r => `${r} (أعلى من رتبتك)`),
+        ...botBlocked.map(r => `${r} (أعلى من رتبة البوت)`),
+        ...alreadyOwned.map(r => `${r} (مملوك بالفعل)`),
+      ]
+        .slice(0, 10)
+        .join('\n');
 
       const embed = new EmbedBuilder()
-        .setTitle('➕ تم إضافة الرول')
+        .setTitle(grantable.length > 1 ? '➕ تم إضافة الرولات' : '➕ تم إضافة الرول')
         .setColor(Colors.success)
         .addFields(
           { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-          { name: '🎭 الرول', value: `${role}`, inline: true },
+          {
+            name: grantable.length > 1 ? '🎭 الرولات' : '🎭 الرول',
+            value: rolesText,
+            inline: false,
+          },
           { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
           { name: '📝 السبب', value: reason, inline: false },
+          ...(skippedText
+            ? [{ name: '⚠️ تم تخطيها', value: skippedText, inline: false }]
+            : []),
         )
         .setTimestamp()
         .setFooter({ text: `Liberty City | ${guild.name}` });
@@ -122,13 +173,16 @@ const command: Command = {
           const logChannel = guild.channels.cache.get(settings.logging.channelId);
           if (logChannel && logChannel.isTextBased()) {
             const logEmbed = new EmbedBuilder()
-              .setTitle('➕ إضافة رول')
+              .setTitle(grantable.length > 1 ? '➕ إضافة رولات' : '➕ إضافة رول')
               .setColor(Colors.success)
               .addFields(
                 { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-                { name: '🎭 الرول', value: `${role}`, inline: true },
+                { name: '🎭 الرولات', value: rolesText, inline: false },
                 { name: '🛡️ المنفذ', value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: true },
                 { name: '📝 السبب', value: reason, inline: false },
+                ...(skippedText
+                  ? [{ name: '⚠️ تم تخطيها', value: skippedText, inline: false }]
+                  : []),
               )
               .setTimestamp();
             await (logChannel as any).send({ embeds: [logEmbed] }).catch(() => {});

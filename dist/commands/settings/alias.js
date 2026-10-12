@@ -164,7 +164,7 @@ async function handleAdd(interaction, client) {
         backup: `\`${shortcut} create\``,
         rolemenu: `\`${shortcut} create\``,
         autorole: `\`${shortcut} @رول\``,
-        roleadd: `${shortcut} @عضو @رول [السبب]`,
+        roleadd: `${shortcut} @عضو @رول1 [@رول2 ...] [السبب]`,
         roleremove: `${shortcut} @عضو @رول [السبب]`
     };
     const example = usageExamples[cleanCommand] || `\`${shortcut}\``;
