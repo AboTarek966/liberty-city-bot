@@ -184,20 +184,19 @@ const command = {
             catch (e) {
                 // تجاهل
             }
-            // جدولة الإفراج التلقائي إن وُجدت مدة
-            if (duration) {
-                const ms = parseDuration(duration);
-                if (ms) {
-                    setTimeout(async () => {
-                        try {
-                            await unjailUser(guild, member.id, jailRole, currentRoles, 'انتهت مدة السجن');
-                        }
-                        catch (e) {
-                            logger.error('Auto unjail failed:', e);
-                        }
-                    }, ms);
-                }
-            }
+            // جدولة الإفراج التلقائي إن وُجدت مدة — معطل بناءً على الطلب (إفراج يدوي فقط)
+            // if (duration) {
+            //   const ms = parseDuration(duration);
+            //   if (ms) {
+            //     setTimeout(async () => {
+            //       try {
+            //         await unjailUser(guild, member.id, jailRole, currentRoles, 'انتهت مدة السجن');
+            //       } catch (e) {
+            //         logger.error('Auto unjail failed:', e);
+            //       }
+            //     }, ms);
+            //   }
+            // }
             // الرد
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle('🔒 تم سجن العضو')
