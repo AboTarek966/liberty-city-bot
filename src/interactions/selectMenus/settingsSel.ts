@@ -248,6 +248,8 @@ const handler: SelectMenuHandler = {
         (settings.logging as any).channelId = values[0] || null;
         break;
       case 'jail:channel':
+        // دفاعياً: ممكن تكون وثيقة السيرفر القديمة بدون كائن jail
+        if (!settings.jail) (settings as any).jail = {};
         (settings.jail as any).channelId = values[0] || null;
         break;
       case 'logging:split': {
@@ -427,7 +429,9 @@ const handler: SelectMenuHandler = {
       client.loggingHandler?.invalidateCache?.(guildId);
     }
 
-    const panel = await buildPanel(section, interaction.guild, interaction.user.id);
+    // 🧠 قسم السجن يُعرض ضمن لوحة الحماية → أعد بناء لوحة الحماية (لا الرئيسية)
+    const panelSection: SettingsCategory = (section as string) === 'jail' ? 'protection' : section;
+    const panel = await buildPanel(panelSection, interaction.guild, interaction.user.id);
     await interaction.editReply({
       embeds: panel.embeds,
       components: panel.components as any,

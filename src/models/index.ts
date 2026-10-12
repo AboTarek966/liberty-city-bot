@@ -751,6 +751,12 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     message: { type: String, default: '{user} غادر السيرفر. أصبح عدد الأعضاء {count} 😢' },
     embedColor: { type: String, default: '#FF3366' },
   },
+
+  jail: {
+    enabled: { type: Boolean, default: false },
+    channelId: { type: String }, // روم السجن
+    jailRoleId: { type: String }, // رول السجن
+  },
   
   automod: {
     enabled: { type: Boolean, default: true },

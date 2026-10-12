@@ -337,7 +337,12 @@ function buildProtection(guild, s) {
         .setPlaceholder('🔒 اختر روم السجن (الذي يبقى العضو المسجون قادراً على رؤيته)')
         .setChannelTypes(discord_js_1.ChannelType.GuildText)
         .setMinValues(0)
-        .setMaxValues(1));
+        .setMaxValues(1)
+        // ✅ عرض القناة المحفوظة حالياً كاختيار افتراضي (وإن حُذفت القناة تتجاهل)
+        .setDefaultChannels(s.jail?.channelId &&
+        guild.channels.cache.get(s.jail.channelId)?.type === discord_js_1.ChannelType.GuildText
+        ? [s.jail.channelId]
+        : []));
     return { embeds: [embed], components: [row1, row2, row3, row4, jailChannelSelect] };
 }
 // --------------------------------------------

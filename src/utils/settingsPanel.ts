@@ -441,6 +441,13 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       .setChannelTypes(ChannelType.GuildText)
       .setMinValues(0)
       .setMaxValues(1)
+      // ✅ عرض القناة المحفوظة حالياً كاختيار افتراضي (وإن حُذفت القناة تتجاهل)
+      .setDefaultChannels(
+        s.jail?.channelId &&
+          guild.channels.cache.get(s.jail.channelId)?.type === ChannelType.GuildText
+          ? [s.jail.channelId]
+          : []
+      )
   );
 
   return { embeds: [embed], components: [row1, row2, row3, row4, jailChannelSelect] };

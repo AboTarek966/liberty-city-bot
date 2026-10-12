@@ -206,6 +206,9 @@ const handler = {
                 settings.logging.channelId = values[0] || null;
                 break;
             case 'jail:channel':
+                // دفاعياً: ممكن تكون وثيقة السيرفر القديمة بدون كائن jail
+                if (!settings.jail)
+                    settings.jail = {};
                 settings.jail.channelId = values[0] || null;
                 break;
             case 'logging:split': {
@@ -385,7 +388,9 @@ const handler = {
             const client = interaction.client;
             client.loggingHandler?.invalidateCache?.(guildId);
         }
-        const panel = await (0, settingsPanel_1.buildPanel)(section, interaction.guild, interaction.user.id);
+        // 🧠 قسم السجن يُعرض ضمن لوحة الحماية → أعد بناء لوحة الحماية (لا الرئيسية)
+        const panelSection = section === 'jail' ? 'protection' : section;
+        const panel = await (0, settingsPanel_1.buildPanel)(panelSection, interaction.guild, interaction.user.id);
         await interaction.editReply({
             embeds: panel.embeds,
             components: panel.components,
