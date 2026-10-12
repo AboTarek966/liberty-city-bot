@@ -140,9 +140,13 @@ const command: Command = {
         .filter(r => r.id !== guild.id) // استبعاد @everyone
         .map(r => r.id);
 
-      // إزالة الرولات الحالية
-      if (currentRoles.length > 0) {
-        await member.roles.remove(currentRoles, `سجن: ${reason}`);
+      // إزالة الرولات الحالية — واحدة تلو الأخرى (متينة ضد فشل رول واحد)
+      for (const roleId of currentRoles) {
+        try {
+          await member.roles.remove(roleId, `سجن: ${reason}`);
+        } catch (e) {
+          logger.warn(`Failed to remove role ${roleId} from ${member.id}:`, e);
+        }
       }
 
       // إضافة رول السجن
@@ -274,9 +278,11 @@ const command: Command = {
         }).catch(() => {});
       } catch {}
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Jail command failed:', error);
-      await interaction.editReply({ content: '❌ حدث خطأ أثناء تنفيذ الأمر' });
+      await interaction.editReply({
+        content: `❌ حدث خطأ أثناء سجن العضو:\n\`\`\`${error?.message || error}\`\`\``,
+      }).catch(() => {});
     }
   },
 };
