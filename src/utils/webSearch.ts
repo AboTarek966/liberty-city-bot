@@ -106,6 +106,26 @@ export function formatSearchResults(results: SearchResult[]): string {
   ).join('\n\n');
 }
 
+/**
+ * تنسيق نتائج البحث للسياق الغني (للتضمين في البرومبت)
+ */
+export function formatSearchResultsForContext(results: SearchResult[]): string {
+  if (results.length === 0) return 'لم يتم العثور على نتائج حديثة.';
+  return results.map((r, i) => 
+    `[${i + 1}] **${r.title}** (${r.url})\n   ${r.snippet ? r.snippet.slice(0, 400) : 'لا يوجد ملخص'}`
+  ).join('\n\n');
+}
+
+/**
+ * تنسيق مختصر للرد المباشر للمستخدم
+ */
+export function formatSearchResultsBrief(results: SearchResult[]): string {
+  if (results.length === 0) return '🔍 لم أجد نتائج ذات صلة.';
+  return results.slice(0, 3).map((r, i) => 
+    `${i + 1}. **${r.title}** — ${r.snippet ? r.snippet.slice(0, 200) + '...' : 'بدون ملخص'}\n   🔗 ${r.url}`
+  ).join('\n\n');
+}
+
 export async function searchTrend(query: string): Promise<string> {
   const r = await webSearch(`${query} ترند 2024 2025`, 3);
   return formatSearchResults(r);
@@ -116,6 +136,51 @@ export async function searchNews(query: string): Promise<string> {
   return formatSearchResults(r);
 }
 
+/**
+ * بحث أكاديمي/علمي
+ */
+export async function searchAcademic(query: string): Promise<string> {
+  const r = await webSearch(`${query} site:scholar.google.com OR site:arxiv.org OR site:researchgate.net`, 3);
+  return formatSearchResults(r);
+}
+
+/**
+ * بحث تقني/برمجي
+ */
+export async function searchTechnical(query: string): Promise<string> {
+  const r = await webSearch(`${query} site:stackoverflow.com OR site:github.com OR site:dev.to OR site:medium.com`, 3);
+  return formatSearchResults(r);
+}
+
+/**
+ * بحث عام محسّن مع محاولات متعددة
+ */
+export async function webSearchEnhanced(query: string, maxResults = 5): Promise<SearchResult[]> {
+  // محاولة 1: استعلام محسّن
+  let results = await webSearch(query, maxResults);
+  
+  // إذا كانت النتائج قليلة، جرب استعلامات بديلة
+  if (results.length < 3) {
+    const alternativeQueries = [
+      `${query} شرح`,
+      `${query} ما هو`,
+      `${query} كيف`,
+      `${query} 2024 2025`,
+    ];
+    
+    for (const altQuery of alternativeQueries) {
+      const more = await webSearch(altQuery, maxResults - results.length);
+      for (const r of more) {
+        if (!results.some(existing => existing.url === r.url)) {
+          results.push(r);
+        }
+      }
+      if (results.length >= maxResults) break;
+    }
+  }
+  
+  return results.slice(0, maxResults);
+}
 
 /**
  * البحث عن فيديو يوتيوب
@@ -147,4 +212,15 @@ async function searchYouTubeAPI(query: string, maxResults: number, apiKey: strin
   }));
 }
 
-export default { webSearch, formatSearchResults, searchTrend, searchNews };
+export default { 
+  webSearch, 
+  webSearchEnhanced,
+  formatSearchResults, 
+  formatSearchResultsForContext,
+  formatSearchResultsBrief,
+  searchTrend, 
+  searchNews,
+  searchAcademic,
+  searchTechnical,
+  searchYouTube
+};

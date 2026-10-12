@@ -6,8 +6,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.webSearch = webSearch;
 exports.formatSearchResults = formatSearchResults;
+exports.formatSearchResultsForContext = formatSearchResultsForContext;
+exports.formatSearchResultsBrief = formatSearchResultsBrief;
 exports.searchTrend = searchTrend;
 exports.searchNews = searchNews;
+exports.searchAcademic = searchAcademic;
+exports.searchTechnical = searchTechnical;
+exports.webSearchEnhanced = webSearchEnhanced;
 exports.searchYouTube = searchYouTube;
 const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('WebSearch');
@@ -102,6 +107,22 @@ function formatSearchResults(results) {
         return 'لم يتم العثور على نتائج حديثة.';
     return results.map((r, i) => `${i + 1}. **${r.title}**\n   🔗 ${r.url}\n   ${r.snippet ? `📝 ${r.snippet}` : ''}`).join('\n\n');
 }
+/**
+ * تنسيق نتائج البحث للسياق الغني (للتضمين في البرومبت)
+ */
+function formatSearchResultsForContext(results) {
+    if (results.length === 0)
+        return 'لم يتم العثور على نتائج حديثة.';
+    return results.map((r, i) => `[${i + 1}] **${r.title}** (${r.url})\n   ${r.snippet ? r.snippet.slice(0, 400) : 'لا يوجد ملخص'}`).join('\n\n');
+}
+/**
+ * تنسيق مختصر للرد المباشر للمستخدم
+ */
+function formatSearchResultsBrief(results) {
+    if (results.length === 0)
+        return '🔍 لم أجد نتائج ذات صلة.';
+    return results.slice(0, 3).map((r, i) => `${i + 1}. **${r.title}** — ${r.snippet ? r.snippet.slice(0, 200) + '...' : 'بدون ملخص'}\n   🔗 ${r.url}`).join('\n\n');
+}
 async function searchTrend(query) {
     const r = await webSearch(`${query} ترند 2024 2025`, 3);
     return formatSearchResults(r);
@@ -109,6 +130,47 @@ async function searchTrend(query) {
 async function searchNews(query) {
     const r = await webSearch(`${query} أخبار`, 3);
     return formatSearchResults(r);
+}
+/**
+ * بحث أكاديمي/علمي
+ */
+async function searchAcademic(query) {
+    const r = await webSearch(`${query} site:scholar.google.com OR site:arxiv.org OR site:researchgate.net`, 3);
+    return formatSearchResults(r);
+}
+/**
+ * بحث تقني/برمجي
+ */
+async function searchTechnical(query) {
+    const r = await webSearch(`${query} site:stackoverflow.com OR site:github.com OR site:dev.to OR site:medium.com`, 3);
+    return formatSearchResults(r);
+}
+/**
+ * بحث عام محسّن مع محاولات متعددة
+ */
+async function webSearchEnhanced(query, maxResults = 5) {
+    // محاولة 1: استعلام محسّن
+    let results = await webSearch(query, maxResults);
+    // إذا كانت النتائج قليلة، جرب استعلامات بديلة
+    if (results.length < 3) {
+        const alternativeQueries = [
+            `${query} شرح`,
+            `${query} ما هو`,
+            `${query} كيف`,
+            `${query} 2024 2025`,
+        ];
+        for (const altQuery of alternativeQueries) {
+            const more = await webSearch(altQuery, maxResults - results.length);
+            for (const r of more) {
+                if (!results.some(existing => existing.url === r.url)) {
+                    results.push(r);
+                }
+            }
+            if (results.length >= maxResults)
+                break;
+        }
+    }
+    return results.slice(0, maxResults);
 }
 /**
  * البحث عن فيديو يوتيوب
@@ -140,5 +202,16 @@ async function searchYouTubeAPI(query, maxResults, apiKey) {
         snippet: item.snippet.description?.slice(0, 300) || '',
     }));
 }
-exports.default = { webSearch, formatSearchResults, searchTrend, searchNews };
+exports.default = {
+    webSearch,
+    webSearchEnhanced,
+    formatSearchResults,
+    formatSearchResultsForContext,
+    formatSearchResultsBrief,
+    searchTrend,
+    searchNews,
+    searchAcademic,
+    searchTechnical,
+    searchYouTube
+};
 //# sourceMappingURL=webSearch.js.map
