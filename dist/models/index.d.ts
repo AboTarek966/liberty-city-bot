@@ -349,6 +349,8 @@ export interface ITicket extends Document {
     panelId?: string;
     status: 'open' | 'claimed' | 'waiting' | 'closed' | 'deleted';
     claimedBy?: string;
+    /** سجل الإداريين الذين استلموا هذه التذكرة (لعدم احتساب نقاط مكررة) */
+    claimHistory?: string[];
     priority: 'low' | 'medium' | 'high' | 'urgent';
     subject?: string;
     fields: ITicketFieldResponse[];

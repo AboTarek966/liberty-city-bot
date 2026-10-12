@@ -424,6 +424,8 @@ const TicketSchema = new mongoose_1.Schema({
     closeReason: { type: String },
     locked: { type: Boolean, default: false },
     lockGrantedUsers: [{ type: String }],
+    /** سجل الإداريين الذين استلموا هذه التذكرة — لعدم احتساب نقاط مكررة */
+    claimHistory: [{ type: String }],
     lockSnapshots: [TicketLockSnapshotSchema],
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

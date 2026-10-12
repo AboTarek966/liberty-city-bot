@@ -404,6 +404,8 @@ export interface ITicket extends Document {
   panelId?: string;
   status: 'open' | 'claimed' | 'waiting' | 'closed' | 'deleted';
   claimedBy?: string;
+  /** سجل الإداريين الذين استلموا هذه التذكرة (لعدم احتساب نقاط مكررة) */
+  claimHistory?: string[];
   priority: 'low' | 'medium' | 'high' | 'urgent';
   subject?: string;
   fields: ITicketFieldResponse[];
@@ -926,6 +928,8 @@ const TicketSchema = new Schema<ITicket>({
   closeReason: { type: String },
   locked: { type: Boolean, default: false },
   lockGrantedUsers: [{ type: String }],
+  /** سجل الإداريين الذين استلموا هذه التذكرة — لعدم احتساب نقاط مكررة */
+  claimHistory: [{ type: String }],
   lockSnapshots: [TicketLockSnapshotSchema],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

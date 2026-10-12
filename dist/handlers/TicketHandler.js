@@ -449,19 +449,30 @@ class TicketHandler {
         }
         ticket.status = 'claimed';
         ticket.claimedBy = claimedBy.id;
-        // 📊 تحديث إحصائيات الاستلام لهذا الإداري
-        const currentCount = settings.tickets.claimStats?.get(claimedBy.id) || 0;
-        settings.tickets.claimStats.set(claimedBy.id, currentCount + 1);
+        // 📊 تحديث إحصائيات الاستلام — فقط إذا كان إدارياً جديداً لم يستلم هذه التذكرة من قبل
+        const claimHistory = ticket.claimHistory || [];
+        const isNewClaimer = !claimHistory.includes(claimedBy.id);
+        let currentCount = 0;
+        if (isNewClaimer) {
+            currentCount = settings.tickets.claimStats?.get(claimedBy.id) || 0;
+            settings.tickets.claimStats.set(claimedBy.id, currentCount + 1);
+            claimHistory.push(claimedBy.id);
+            ticket.claimHistory = claimHistory;
+        }
+        else {
+            // إداري سبق واستلم هذه التذكرة — لا نحتسب نقاطاً، نعرض العدد الحالي
+            currentCount = settings.tickets.claimStats?.get(claimedBy.id) || 0;
+        }
         await Promise.all([ticket.save(), settings.save()]);
         this.activeTickets.set(channelId, ticket);
         const channel = claimedBy.guild.channels.cache.get(channelId);
-        logger.info(`Claimed ticket by ${claimedBy.user.tag}`);
+        logger.info(`Claimed ticket by ${claimedBy.user.tag} (newClaimer: ${isNewClaimer})`);
         // 🔒 القفل + رسالة القناة + الأزرار + السجل → تعمل بعد الرد حتى لا يتأخر البوت
-        void this.finalizeClaim(claimedBy.guild, ticket, channel, claimedBy, settings, currentCount);
+        void this.finalizeClaim(claimedBy.guild, ticket, channel, claimedBy, settings, currentCount, isNewClaimer);
         return ticket;
     }
     /** الأعمال الثقيلة بعد الاستلام — تعمل في الخلفية حتى يظهر الرد فوراً */
-    async finalizeClaim(guild, ticket, channel, claimedBy, settings, currentCount) {
+    async finalizeClaim(guild, ticket, channel, claimedBy, settings, currentCount, isNewClaimer) {
         try {
             const jobs = [];
             if (channel) {
@@ -478,7 +489,9 @@ class TicketHandler {
                     description: `تم استلام التذكرة بواسطة ${claimedBy}\n\n` +
                         `🔒 **تم قفل التذكرة:** الكتابة للمستلم + الأدمن فقط — بقية فريق الدعم للقراءة فقط.\n` +
                         `📌 لمنح إداري معيّن صلاحية الكتابة اختر **➕ إضافة عضو أو إداري** من قائمة الخيارات.\n\n` +
-                        `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``,
+                        (isNewClaimer
+                            ? `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``
+                            : `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount}\` (لا تُحتسب نقطة — سبق واستلمت هذه التذكرة)`),
                     color: embeds_1.Colors.success,
                     footer: { text: 'Liberty City Tickets' },
                 });
