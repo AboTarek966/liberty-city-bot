@@ -1,1 +1,1 @@
-{"version":3,"file":"ticketDelete.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/ticketDelete.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAIlE,QAAA,MAAM,OAAO,EAAE,aAgCd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"ticketDelete.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/ticketDelete.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAIlE,QAAA,MAAM,OAAO,EAAE,aAyCd,CAAC;AAEF,eAAe,OAAO,CAAC"}

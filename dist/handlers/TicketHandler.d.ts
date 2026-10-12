@@ -59,6 +59,9 @@ export declare class TicketHandler {
     unclaimTicket(channelId: string, unclaimedBy: GuildMember): Promise<ITicket>;
     /** الأعمال الثقيلة بعد إلغاء الاستلام — تعمل في الخلفية حتى يظهر الرد فوراً */
     private finalizeUnclaim;
+    reopenTicket(channelId: string, reopenedBy: GuildMember): Promise<ITicket>;
+    /** الأعمال الثقيلة بعد إعادة الفتح — تعمل في الخلفية */
+    private finalizeReopen;
     private applyClaimLock;
     private releaseClaimLock;
     callAdmin(channelId: string, calledBy: GuildMember): Promise<void>;

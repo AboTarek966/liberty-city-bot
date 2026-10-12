@@ -288,24 +288,28 @@ class TicketHandler {
         const transcript = await this.generateTranscript(channel);
         ticket.status = 'closed';
         ticket.closedBy = closedBy.id;
-        ticket.closeReason = reason;
+        ticket.closeReason = reason || 'غير محدد';
         ticket.transcript = transcript;
         ticket.closedAt = new Date();
         await ticket.save();
         this.activeTickets.delete(channelId);
+        // إيمبد الإغلاق + أزرار "إعادة الفتح" و "حذف"
         const closingEmbed = (0, embeds_1.createEmbed)({
             title: '🔒 تم إغلاق التذكرة',
-            description: `تم إغلاق التذكرة بواسطة ${closedBy}\n\n` +
-                `السبب: ${reason || 'غير محدد'}\n\n` +
-                `سيتم حذف القناة خلال 10 ثوانٍ...`,
+            description: `تم إغلاق التذكرة بواسطة ${closedBy}\n` +
+                `السبب: ${reason || 'غير محدد'}`,
             color: embeds_1.Colors.error,
             footer: { text: 'Liberty City Tickets' },
         });
-        await channel.send({ embeds: [closingEmbed] });
+        const actionRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+            .setCustomId(`ticket_reopen:${ticket._id}`)
+            .setLabel('🔓 إعادة الفتح')
+            .setStyle(discord_js_1.ButtonStyle.Success), new discord_js_1.ButtonBuilder()
+            .setCustomId(`ticket_delete:${ticket._id}`)
+            .setLabel('🗑️ حذف نهائي')
+            .setStyle(discord_js_1.ButtonStyle.Danger));
+        await channel.send({ embeds: [closingEmbed], components: [actionRow] });
         await this.saveTranscript(guild, ticket, transcript);
-        setTimeout(async () => {
-            await channel.delete('Liberty City - Ticket closed').catch(() => { });
-        }, 10000);
         await this.logTicketEvent(guild, 'close', ticket, closedBy.user, reason);
         // ⭐ استبيان الرضا — رسالة خاصة لصاحب التذكرة بعد الإغلاق
         try {
@@ -541,6 +545,63 @@ class TicketHandler {
         }
         catch (err) {
             logger.warn('finalizeUnclaim failed:', err);
+        }
+    }
+    // --------------------------------------------
+    // Reopen Ticket (إعادة فتح تذكرة مغلقة)
+    // --------------------------------------------
+    async reopenTicket(channelId, reopenedBy) {
+        const guild = reopenedBy.guild;
+        const ticket = await models_1.Ticket.findOne({ channelId });
+        if (!ticket)
+            throw new Error('لم يتم العثور على التذكرة');
+        if (ticket.status !== 'closed')
+            throw new Error('التذكرة غير مغلقة');
+        const canManage = reopenedBy.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels);
+        if (!canManage) {
+            throw new Error('تحتاج صلاحية إدارة القنوات لإعادة فتح التذكرة');
+        }
+        ticket.status = 'open';
+        ticket.claimedBy = undefined;
+        ticket.closedBy = undefined;
+        ticket.closeReason = undefined;
+        ticket.closedAt = undefined;
+        await ticket.save();
+        this.activeTickets.set(channelId, ticket);
+        const channel = guild.channels.cache.get(channelId);
+        logger.info(`Reopened ticket by ${reopenedBy.user.tag}`);
+        // الأعمال في الخلفية
+        void this.finalizeReopen(guild, ticket, channel, reopenedBy);
+        return ticket;
+    }
+    /** الأعمال الثقيلة بعد إعادة الفتح — تعمل في الخلفية */
+    async finalizeReopen(guild, ticket, channel, reopenedBy) {
+        try {
+            const jobs = [];
+            if (channel) {
+                // إزالة رسالة الإغلاق القديمة (الرسالة الأخيرة في القناة)
+                try {
+                    const messages = await channel.messages.fetch({ limit: 5 });
+                    const closingMsg = messages.find(m => m.embeds[0]?.title === '🔒 تم إغلاق التذكرة');
+                    if (closingMsg)
+                        await closingMsg.delete().catch(() => { });
+                }
+                catch { }
+                const reopenEmbed = (0, embeds_1.createEmbed)({
+                    title: '🔓 تم إعادة فتح التذكرة',
+                    description: `تم إعادة فتح التذكرة بواسطة ${reopenedBy}\n\n` +
+                        `يمكن لفريق الدعم استلامها والمتابعة.`,
+                    color: embeds_1.Colors.success,
+                    footer: { text: 'Liberty City Tickets' },
+                });
+                jobs.push(channel.send({ embeds: [reopenEmbed] }));
+                jobs.push(this.updateTicketButtons(channel, false));
+            }
+            jobs.push(this.logTicketEvent(guild, 'close', ticket, reopenedBy.user, 'إعادة فتح'));
+            await Promise.allSettled(jobs);
+        }
+        catch (err) {
+            logger.warn('finalizeReopen failed:', err);
         }
     }
     // --------------------------------------------

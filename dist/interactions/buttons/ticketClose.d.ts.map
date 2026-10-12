@@ -1,1 +1,1 @@
-{"version":3,"file":"ticketClose.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/ticketClose.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAIlE,QAAA,MAAM,OAAO,EAAE,aAqCd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"ticketClose.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/ticketClose.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAIlE,QAAA,MAAM,OAAO,EAAE,aAgDd,CAAC;AAEF,eAAe,OAAO,CAAC"}

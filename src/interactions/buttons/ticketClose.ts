@@ -2,7 +2,7 @@
 // Liberty City Bot - Ticket Close Button
 // ============================================
 
-import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
+import { ButtonInteraction, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { Ticket } from '../../models';
@@ -13,34 +13,45 @@ const handler: ButtonHandler = {
     const client = interaction.client as LibertyClient;
     if (!interaction.guild) return;
 
-    await interaction.deferReply({ ephemeral: true });
-
     try {
       const ticket = await Ticket.findOne({ channelId: interaction.channelId });
       if (!ticket) {
-        await interaction.editReply({ content: '❌ لم يتم العثور على تذكرة في هذه القناة' });
+        await interaction.reply({ content: '❌ لم يتم العثور على تذكرة في هذه القناة', ephemeral: true });
         return;
       }
 
-      const member = await interaction.guild.members.fetch(interaction.user.id);
+      // التحقق من الصلاحيات
+      const member = interaction.guild.members.cache.get(interaction.user.id) ??
+        await interaction.guild.members.fetch(interaction.user.id);
       const isOwner = ticket.userId === interaction.user.id;
       const canManage = member.permissions.has(PermissionFlagsBits.ManageChannels);
 
       if (!isOwner && !canManage) {
-        await interaction.editReply({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة' });
+        await interaction.reply({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة', ephemeral: true });
         return;
       }
 
-      await client.ticketHandler.closeTicket(
-        interaction.channelId,
-        member,
-        isOwner ? 'أُغلقت بواسطة صاحب التذكرة' : 'أُغلقت بواسطة المشرف'
-      );
+      // إظهار Modal لكتابة السبب
+      const modal = new ModalBuilder()
+        .setCustomId(`ticket_close_modal:${ticket._id}`)
+        .setTitle('🔒 إغلاق التذكرة');
 
-      await interaction.editReply({ content: '🔒 تم إغلاق التذكرة بنجاح' });
+      const reasonInput = new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel('سبب الإغلاق (اختياري)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('اكتب سبب الإغلاق هنا...')
+        .setRequired(false)
+        .setMaxLength(500);
+
+      const row = new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
     } catch (error: any) {
-      await interaction.editReply({
-        content: `❌ ${error.message || 'حدث خطأ أثناء إغلاق التذكرة'}`,
+      await interaction.reply({
+        content: `❌ ${error.message || 'حدث خطأ'}`,
+        ephemeral: true,
       });
     }
   },
