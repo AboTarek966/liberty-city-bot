@@ -732,6 +732,13 @@ const botName = this.client.user?.username || 'Liberty City';
     };
   }
 
+  /** موديلات Groq بالترتيب: المُهيّأ أولاً ثم بدائل معروفة بالحساب */
+  private groqModelCandidates(): string[] {
+    const primary = config.ai.groq.model || 'openai/gpt-oss-120b';
+    const backups = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+    return [primary, ...backups.filter((m) => m !== primary)];
+  }
+
   private async generateGroq(
     message: string,
     systemPrompt: string,
@@ -739,32 +746,44 @@ const botName = this.client.user?.username || 'Liberty City';
     history: HistoryMessage[] = [],
     stream?: AIStreamHandlers
   ): Promise<AIResponse> {
-    const model = config.ai.groq.model;
     const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : config.ai.groq.temperature;
     const maxTokens = Math.min(aiConfig.maxTokens || 500, config.ai.groq.maxTokens);
     const messages = this.buildMessages(systemPrompt, history, message);
 
-    // 📡 بث مباشر — أول كلمات تظهر فوراً (رد يبدو أسرع)
-    if (stream?.onFirstChunk) {
-      return await this.streamGroq(model, messages, temperature, maxTokens, stream);
+    let lastError: any = null;
+
+    for (const model of this.groqModelCandidates()) {
+      try {
+        // 📡 بث مباشر — أول كلمات تظهر فوراً (رد يبدو أسرع)
+        if (stream?.onFirstChunk) {
+          return await this.streamGroq(model, messages, temperature, maxTokens, stream);
+        }
+
+        const completion = await this.groq.chat.completions.create({
+          model,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+        });
+
+        const content = completion.choices[0]?.message?.content?.trim();
+        if (!content) throw new Error('Empty response from Groq');
+
+        return {
+          content,
+          tokensUsed: completion.usage?.total_tokens || 0,
+          model: 'groq-' + model,
+          fallback: false,
+        };
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.status ?? error?.response?.status ?? 0);
+        // مشكلة في الموديل نفسه (غير موجود / ممنوع / حصة) → جرّب الموديل التالي
+        if (status !== 400 && status !== 404 && status !== 429) break;
+      }
     }
 
-    const completion = await this.groq.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    });
-
-    const content = completion.choices[0]?.message?.content?.trim();
-    if (!content) throw new Error('Empty response from Groq');
-
-    return {
-      content,
-      tokensUsed: completion.usage?.total_tokens || 0,
-      model: 'groq-' + model,
-      fallback: false,
-    };
+    throw lastError || new Error('Groq request failed');
   }
 
   /** بث رد Groq مباشرة أثناء التوليد */

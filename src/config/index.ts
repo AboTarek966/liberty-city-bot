@@ -99,7 +99,7 @@ export const config = {
     },
     groq: {
       apiKey: process.env.GROQ_API_KEY || '',
-      model: getEnv('GROQ_MODEL', 'llama-3.1-8b-instant'),
+      model: getEnv('GROQ_MODEL', 'openai/gpt-oss-120b'),
       maxTokens: getEnvNumber('GROQ_MAX_TOKENS', 800),
       temperature: parseFloat(getEnv('GROQ_TEMPERATURE', '0.7')),
     },

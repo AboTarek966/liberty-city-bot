@@ -60,6 +60,8 @@ export declare class AIHandler {
     private resolveProviderOrder;
     private buildSystemPrompt;
     private generateOpenAI;
+    /** موديلات Groq بالترتيب: المُهيّأ أولاً ثم بدائل معروفة بالحساب */
+    private groqModelCandidates;
     private generateGroq;
     /** بث رد Groq مباشرة أثناء التوليد */
     private streamGroq;
