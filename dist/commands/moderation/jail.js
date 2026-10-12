@@ -134,22 +134,15 @@ const command = {
                 await interaction.editReply({ content: '❌ رتبة البوت يجب أن تكون أعلى من رول السجن' });
                 return;
             }
-            // 🔒 إزالة جميع رولات العضو (عدا @everyone) وإعطاء رول السجن فقط
+            // 🔒 استبدال جميع رولات العضو برول السجن فقط (استدعاء API واحد)
             // هذا ضروري لأن Discord يُعطي أولوية للـ ALLOW من أي رول آخر
+            // نحفظ الرولات الحالية أولاً لاستعادتها لاحقاً عند إلغاء السجن
             const currentRoles = member.roles.cache
                 .filter(r => r.id !== guild.id) // استبعاد @everyone
                 .map(r => r.id);
-            // إزالة الرولات الحالية — واحدة تلو الأخرى (متينة ضد فشل رول واحد)
-            for (const roleId of currentRoles) {
-                try {
-                    await member.roles.remove(roleId, `سجن: ${reason}`);
-                }
-                catch (e) {
-                    logger.warn(`Failed to remove role ${roleId} from ${member.id}:`, e);
-                }
-            }
-            // إضافة رول السجن
-            await member.roles.add(jailRole, reason);
+            // roles.set() يستبدل كل الرولات دفعة واحدة — أسرع وأأمن من إزالتها واحداً واحداً
+            // (يتجنب أخطاء "Unknown Role" من رولات محذوفة في الكاش)
+            await member.roles.set([jailRole], `سجن: ${reason}`);
             // تخزين بيانات السجن في قاعدة البيانات
             const { JailData } = await Promise.resolve().then(() => __importStar(require('../../models')));
             await JailData.findOneAndUpdate({ guildId: guild.id, userId: member.id }, {
