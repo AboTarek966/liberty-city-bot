@@ -45,8 +45,9 @@ const CommandAliasSchema = new mongoose_1.Schema({
     options: { type: mongoose_1.Schema.Types.Mixed, default: {} },
     createdBy: { type: String, required: true },
 }, { timestamps: true });
-// Compound index for guild + alias uniqueness
-CommandAliasSchema.index({ guildId: 1, alias: 1 }, { unique: true });
+// الفهرس غير الفريد — نفس الاختصار يمكن أن يرتبط بأكثر من أمر (نظام التبديل/Toggle)
+// مثال: `ت` → warn و `ت` → unwarn — البوت يحدد أيهما ينفّذ حسب حالة العضو
+CommandAliasSchema.index({ guildId: 1, alias: 1 });
 exports.CommandAlias = mongoose_1.default.model('CommandAlias', CommandAliasSchema);
 exports.default = exports.CommandAlias;
 //# sourceMappingURL=CommandAlias.js.map

@@ -57,12 +57,18 @@ const handler: ButtonHandler = {
     await interaction.deferUpdate();
 
     const category = (interaction.customId.split(':')[1] || 'home') as SettingsCategory;
-    const panel = await buildPanel(category, interaction.guild, interaction.user.id);
-
-    await interaction.editReply({
-      embeds: panel.embeds,
-      components: panel.components as any,
-    });
+    // 🛡️ حماية: أي خطأ في بناء اللوحة يظهر رسالة بدل صمت تام
+    try {
+      const panel = await buildPanel(category, interaction.guild, interaction.user.id);
+      await interaction.editReply({
+        embeds: panel.embeds,
+        components: panel.components as any,
+      });
+    } catch (error: any) {
+      await interaction
+        .editReply({ content: `❌ فشل فتح القسم \`${category}\` — ${error.message}` })
+        .catch(() => {});
+    }
   },
 };
 

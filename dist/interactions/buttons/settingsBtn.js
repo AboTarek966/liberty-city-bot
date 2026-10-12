@@ -637,6 +637,12 @@ const handler = {
                 await interaction.editReply({ embeds: sPanel.embeds, components: sPanel.components });
                 return;
             }
+            case 'general:warnroles': {
+                // 🎭 لوحة فرعية: رولات التحذير (للأعضاء + للإداريين)
+                const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
+                return;
+            }
             case 'commands:clear': {
                 settings.customCommands = [];
                 await settings.save();

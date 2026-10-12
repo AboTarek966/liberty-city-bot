@@ -15,7 +15,7 @@ import {
   RoleSelectMenuBuilder,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
@@ -751,6 +751,12 @@ const handler: ButtonHandler = {
         // لوحة فرعية: متجر السيرفر
         const sPanel = buildShop(interaction.guild!, settings);
         await interaction.editReply({ embeds: sPanel.embeds, components: sPanel.components as any });
+        return;
+      }
+      case 'general:warnroles': {
+        // 🎭 لوحة فرعية: رولات التحذير (للأعضاء + للإداريين)
+        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
         return;
       }
       case 'commands:clear': {

@@ -280,6 +280,14 @@ export interface IGuildSettings extends Document {
     items: IShopItem[];
   };
 
+  // 🎭 رولات التحذير — تُعرض كخيارات فقط عند تنفيذ /warn
+  warnRoles: {
+    /** رولات تحذير الأعضاء (تظهر عند تحذير عضو عادي) */
+    memberIds: string[];
+    /** رولات تحذير الإداريين (تظهر عند تحذير إداري) */
+    adminIds: string[];
+  };
+
   updatedAt: Date;
 }
 
@@ -828,6 +836,11 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     items: [ShopItemSchema],
   },
 
+  warnRoles: {
+    memberIds: [{ type: String }],
+    adminIds: [{ type: String }],
+  },
+
   updatedAt: { type: Date, default: Date.now },
 });
 
@@ -973,6 +986,25 @@ const MuteRoleSchema = new Schema<IMuteRole>({
 });
 
 // --------------------------------------------
+// AFK (وضع عدم الوجود) — يُلغى تلقائياً عند أول رسالة
+// --------------------------------------------
+export interface IUserAFK extends Document {
+  guildId: string;
+  userId: string;
+  reason: string;
+  since: Date;
+}
+
+const UserAFKSchema = new Schema<IUserAFK>({
+  guildId: { type: String, required: true },
+  userId: { type: String, required: true },
+  reason: { type: String, default: 'AFK' },
+  since: { type: Date, default: Date.now },
+});
+
+UserAFKSchema.index({ guildId: 1, userId: 1 }, { unique: true });
+
+// --------------------------------------------
 // Model Exports
 // --------------------------------------------
 export const GuildSettings = mongoose.model<IGuildSettings>('GuildSettings', GuildSettingsSchema);
@@ -983,6 +1015,7 @@ export const Ticket = mongoose.model<ITicket>('Ticket', TicketSchema);
 export const AISession = mongoose.model<IAISession>('AISession', AISessionSchema);
 export const UserProfile = mongoose.model<IUserProfile>('UserProfile', UserProfileSchema);
 export const MuteRole = mongoose.model<IMuteRole>('MuteRole', MuteRoleSchema);
+export const UserAFK = mongoose.model<IUserAFK>('UserAFK', UserAFKSchema);
 
 // Re-export new models
 export { CommandAlias } from './CommandAlias';

@@ -9,6 +9,8 @@ import {
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
+import { getGuildSettings } from '../../models';
+import { offerWarnRoles } from '../../utils/warnRoles';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -63,6 +65,32 @@ const command: Command = {
         value: `${result.warningCount}`,
         inline: true,
       });
+
+      // 🎭 رولات التحذير — إعطاء مباشرة أو لوحة اختيار (من الإعدادات)
+      const targetMember = await interaction.guild!.members.fetch(target.id).catch(() => null);
+      if (targetMember) {
+        const executor =
+          interaction.guild!.members.cache.get(interaction.user.id) ||
+          (await interaction.guild!.members.fetch(interaction.user.id).catch(() => null));
+        if (executor) {
+          const note = await offerWarnRoles({
+            settings: await getGuildSettings(interaction.guildId!),
+            guild: interaction.guild!,
+            executor,
+            target: targetMember,
+            reason,
+            reply: payload =>
+              interaction.followUp({
+                content: payload.content,
+                components: payload.components as any,
+                ephemeral: true,
+              }),
+          });
+          if (note) {
+            embed.addFields({ name: '🎭 رول التحذير', value: note, inline: false });
+          }
+        }
+      }
 
       await interaction.editReply({
         embeds: [embed],

@@ -73,10 +73,11 @@ export class ActivityTracker {
   constructor(client: Client) {
     this.client = client;
 
-    // Flush voice time every minute
+    // Flush stats every 30 seconds (voice time + batched message counts)
     this.flushTimer = setInterval(() => {
       this.flushVoiceTime().catch(err => logger.error('Flush voice time error:', err));
-    }, 60_000);
+      this.flushMessages().catch(err => logger.error('Flush message stats error:', err));
+    }, 30_000);
 
     // Listen for voice state changes
     client.on('voiceStateUpdate', (oldState, newState) => {
@@ -87,34 +88,55 @@ export class ActivityTracker {
   }
 
   // --------------------------------------------
-  // Track a message
+  // Track a message (📦 عدّاد في الذاكرة — يُكتب دفعة واحدة كل 30 ثانية)
+  // كان يُنفّذ 4 عمليات كتابة في قاعدة البيانات لكل رسالة!
   // --------------------------------------------
+  private pendingMessages = new Map<string, number>();
+
   async trackMessage(guildId: string, userId: string): Promise<void> {
     try {
       const now = new Date();
-      const day = getDayKey(now);
-      const week = getWeekKey(now);
-      const month = getMonthKey(now);
+      const keys = [
+        ['day', getDayKey(now)],
+        ['week', getWeekKey(now)],
+        ['month', getMonthKey(now)],
+        ['total', 'all'],
+      ] as const;
 
-      const ops = [
-        this.inc(guildId, userId, 'day', day, 1),
-        this.inc(guildId, userId, 'week', week, 1),
-        this.inc(guildId, userId, 'month', month, 1),
-        this.inc(guildId, userId, 'total', 'all', 1),
-      ];
-
-      await Promise.all(ops);
+      for (const [period, date] of keys) {
+        const k = `${guildId}:${userId}:${period}:${date}`;
+        this.pendingMessages.set(k, (this.pendingMessages.get(k) || 0) + 1);
+      }
     } catch (error) {
       logger.error('Error tracking message:', error);
     }
   }
 
-  private inc(guildId: string, userId: string, period: string, date: string, messages: number) {
-    return ActivityStats.updateOne(
-      { guildId, userId, period, date },
-      { $inc: { messages }, $set: { updatedAt: new Date() } },
-      { upsert: true }
-    ).exec();
+  // كتابة العدّادات المجمّعة إلى قاعدة البيانات (دفعة واحدة)
+  private async flushMessages(): Promise<void> {
+    if (this.pendingMessages.size === 0) return;
+    const entries = [...this.pendingMessages.entries()];
+    this.pendingMessages.clear();
+
+    try {
+      const ops = entries.map(([key, count]) => {
+        const [guildId, userId, period, date] = key.split(':');
+        return {
+          updateOne: {
+            filter: { guildId, userId, period, date },
+            update: { $inc: { messages: count }, $set: { updatedAt: new Date() } },
+            upsert: true,
+          },
+        };
+      });
+      await ActivityStats.bulkWrite(ops, { ordered: false });
+    } catch (error) {
+      logger.error('Error flushing message stats:', error);
+      // إعادة العدّادات المفقودة حتى لا تضيع
+      for (const [key, count] of entries) {
+        this.pendingMessages.set(key, (this.pendingMessages.get(key) || 0) + count);
+      }
+    }
   }
 
   // --------------------------------------------
@@ -278,6 +300,8 @@ export class ActivityTracker {
   // Cleanup
   // --------------------------------------------
   cleanup(): void {
+    // كتابة العدّادات المجمّعة قبل الإيقاف (حتى لا تضيع)
+    this.flushMessages().catch(() => {});
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
       this.flushTimer = null;

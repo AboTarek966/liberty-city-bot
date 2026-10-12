@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
+const aliasCache_1 = require("../../utils/aliasCache");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('alias')
@@ -39,7 +40,7 @@ const command = {
         .setName('extra')
         .setDescription('📦 أوامر إضافية (إعدادات وحماية ورولات)')
         .setRequired(false)
-        .addChoices({ name: '⚙️ إعدادات السيرفر', value: 'settings' }, { name: '🛡️ أنظمة الحماية', value: 'protection' }, { name: '🕵️ استرجاع رسالة محذوفة (سنايب)', value: 'snipe' }, { name: '💾 نسخة احتياطية', value: 'backup' }, { name: '⌨️ إدارة الاختصارات نفسها', value: 'alias' }, { name: '🎭 قائمة رولات (روليميو)', value: 'rolemenu' }, { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' }, { name: '➕ إضافة رول لعضو', value: 'roleadd' }, { name: '➖ إزالة رول من عضو', value: 'roleremove' }, { name: '🔓 إلغاء تايم أوت', value: 'untimeout' }, { name: '🔓 إلغاء حظر', value: 'unban' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 وضع الطوارئ', value: 'lockdown' }, { name: '🔒 سجن', value: 'jail' }, { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' }, { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' })))
+        .addChoices({ name: '⚙️ إعدادات السيرفر', value: 'settings' }, { name: '🛡️ أنظمة الحماية', value: 'protection' }, { name: '🕵️ استرجاع رسالة محذوفة (سنايب)', value: 'snipe' }, { name: '💾 نسخة احتياطية', value: 'backup' }, { name: '⌨️ إدارة الاختصارات نفسها', value: 'alias' }, { name: '🎭 قائمة رولات (روليميو)', value: 'rolemenu' }, { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' }, { name: '➕ إضافة رول لعضو', value: 'roleadd' }, { name: '➖ إزالة رول من عضو', value: 'roleremove' }, { name: '🔓 إلغاء تايم أوت', value: 'untimeout' }, { name: '🔓 إلغاء حظر', value: 'unban' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 وضع الطوارئ', value: 'lockdown' }, { name: '🔒 سجن', value: 'jail' }, { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' }, { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' }, { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' })))
         .addSubcommand(sub => sub
         .setName('remove')
         .setDescription('حذف اختصار')
@@ -99,20 +100,27 @@ async function handleAdd(interaction, client) {
         });
         return;
     }
-    // Check if shortcut already exists
-    const existing = await models_1.CommandAlias.findOne({
+    // ⚡ السماح بنفس الاختصار لأكثر من أمر (نظام التبديل/Toggle)
+    // مثال: `ت` → تحذير و `ت` → إزالة تحذير — البوت يحدد أيهما ينفّذ حسب الحالة
+    const existingSame = await models_1.CommandAlias.findOne({
         guildId: interaction.guildId,
         alias: shortcut,
+        command: cleanCommand,
     });
-    if (existing) {
+    if (existingSame) {
         await interaction.reply({
-            content: `❌ الاختصار \`${shortcut}\` مستخدم بالفعل للأمر \`/${existing.command}\``,
+            content: `❌ الاختصار \`${shortcut}\` مرتبط بالفعل بالأمر \`/${cleanCommand}\``,
             ephemeral: true,
         });
         return;
     }
+    const existingOther = await models_1.CommandAlias.findOne({
+        guildId: interaction.guildId,
+        alias: shortcut,
+        command: { $ne: cleanCommand },
+    });
     // Check if shortcut conflicts with a built-in command name
-    if (client.commandHandler.getCommand(shortcut)) {
+    if (!existingOther && client.commandHandler.getCommand(shortcut)) {
         await interaction.reply({
             content: `❌ الاختصار \`${shortcut}\` يتعارض مع أمر موجود. اختر اختصاراً آخر`,
             ephemeral: true,
@@ -125,6 +133,8 @@ async function handleAdd(interaction, client) {
         command: cleanCommand,
         createdBy: interaction.user.id,
     });
+    // تحديث الذاكرة المؤقتة فوراً (سرعة فورية بدون انتظار انتهاء صلاحيتها)
+    (0, aliasCache_1.invalidateAliasCache)(interaction.guildId);
     // مثال استخدام جاهز حسب نوع العقوبة/الأمر
     const usageExamples = {
         ban: `\`${shortcut} @عضو [السبب]\``,
@@ -161,6 +171,7 @@ async function handleAdd(interaction, client) {
         ticket_top: `\`${shortcut}\``,
         settings: `\`${shortcut}\` (يفتح لوحة الإعدادات)`,
         protection: `\`${shortcut}\` (يفتح أنظمة الحماية)`,
+        afk: `\`${shortcut} [السبب]\` — أو \`${shortcut}\` مرة أخرى للإلغاء`,
         backup: `\`${shortcut} create\``,
         rolemenu: `\`${shortcut} create\``,
         autorole: `\`${shortcut} @رول\``,
@@ -172,28 +183,34 @@ async function handleAdd(interaction, client) {
         .setTitle('✅ تمت إضافة الاختصار')
         .setColor(embeds_1.Colors.success)
         .addFields({ name: 'الاختصار', value: `\`${shortcut}\``, inline: true }, { name: 'الأمر', value: `/${cleanCommand}`, inline: true }, { name: '🔎 جرّبه الآن في الشات', value: example, inline: false })
-        .setDescription(`اكتب \`${shortcut}\` في الشات لتنفيذ \`/${cleanCommand}\``)
+        .setDescription(`اكتب \`${shortcut}\` في الشات لتنفيذ \`/${cleanCommand}\`` +
+        (existingOther
+            ? `\n\n🔁 **الاختصار مرتبط أيضاً بـ \`/${existingOther.command}\`** — ` +
+                `سيُطبَّق **تبديل تلقائي** حسب حالة الهدف (مثال: عضو عنده تحذير ⇐ يشيله، ما عنده ⇐ يضيفه)`
+            : ''))
         .setFooter({ text: 'Liberty City Aliases' });
     await interaction.reply({ embeds: [embed] });
 }
 // --------------------------------------------
-// Remove Alias
+// Remove Alias (يحذف كل الأوامر المرتبطة بهذا الاختصار)
 // --------------------------------------------
 async function handleRemove(interaction) {
     const shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
-    const deleted = await models_1.CommandAlias.findOneAndDelete({
+    const result = await models_1.CommandAlias.deleteMany({
         guildId: interaction.guildId,
         alias: shortcut,
     });
-    if (!deleted) {
+    if (!result.deletedCount) {
         await interaction.reply({
             content: `❌ الاختصار \`${shortcut}\` غير موجود`,
             ephemeral: true,
         });
         return;
     }
+    (0, aliasCache_1.invalidateAliasCache)(interaction.guildId);
     await interaction.reply({
-        content: `✅ تم حذف الاختصار \`${shortcut}\``,
+        content: `✅ تم حذف الاختصار \`${shortcut}\`` +
+            (result.deletedCount > 1 ? ` (كل أوامره: **${result.deletedCount}**)` : ''),
         ephemeral: true,
     });
 }
@@ -250,21 +267,30 @@ async function handleList(interaction) {
         autorole: '➕ رول تلقائي',
         roleadd: '➕ إضافة رول',
         roleremove: '➖ إزالة رول',
+        afk: '💤 AFK',
     };
-    const lines = aliases.slice(0, 30).map((a) => {
-        const label = LABELS[a.command];
-        return label
-            ? `\`${a.alias}\` → ${label} \`/${a.command}\``
-            : `\`${a.alias}\` → \`/${a.command}\``;
+    // تجميع الاختصارات المكررة (نظام التبديل 🔁)
+    const grouped = new Map();
+    for (const a of aliases) {
+        const list = grouped.get(a.alias) || [];
+        list.push(a.command);
+        grouped.set(a.alias, list);
+    }
+    const lines = [...grouped.entries()].slice(0, 30).map(([alias, cmds]) => {
+        const names = cmds
+            .map(c => (LABELS[c] ? `${LABELS[c]} \`/${c}\`` : `\`/${c}\``))
+            .join(' • ');
+        return `\`${alias}\`${cmds.length > 1 ? ' 🔁' : ''} → ${names}`;
     });
     const embed = new discord_js_1.EmbedBuilder()
-        .setTitle(`⌨️ اختصارات الأوامر [${aliases.length}]`)
-        .setDescription(lines.join('\n'))
+        .setTitle(`⌨️ اختصارات الأوامر [${grouped.size}]`)
+        .setDescription(lines.join('\n') +
+        (grouped.size < aliases.length ? `\n\n🔁 = نفس الاختصار مرتبط بأكثر من أمر (تبديل تلقائي حسب الحالة)` : ''))
         .setColor(embeds_1.Colors.primary)
         .setFooter({ text: 'Liberty City Aliases' })
         .setTimestamp();
-    if (aliases.length > 30) {
-        embed.setFooter({ text: `Liberty City Aliases | عرض 30 من ${aliases.length}` });
+    if (grouped.size > 30) {
+        embed.setFooter({ text: `Liberty City Aliases | عرض 30 من ${grouped.size}` });
     }
     await interaction.reply({ embeds: [embed] });
 }

@@ -45,6 +45,7 @@ exports.getSettingsPassword = getSettingsPassword;
 exports.canManageSettings = canManageSettings;
 exports.buildPanel = buildPanel;
 exports.buildVerificationPanel = buildVerificationPanel;
+exports.buildWarnRolesPanel = buildWarnRolesPanel;
 exports.getActivePanel = getActivePanel;
 exports.buildCommands = buildCommands;
 exports.buildShop = buildShop;
@@ -249,7 +250,7 @@ function buildHome(guild, userId, s) {
         .setTimestamp();
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:general', 'عام', discord_js_1.ButtonStyle.Primary, '🌐'), btn('settings_cat:protection', 'الحماية', discord_js_1.ButtonStyle.Success, '🛡️'), btn('settings_cat:tickets', 'التذاكر', discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_cat:ai', 'الذكاء', discord_js_1.ButtonStyle.Danger, '🤖'), btn('settings_cat:welcome', 'الترحيب', discord_js_1.ButtonStyle.Success, '👋'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:leave', 'المغادرة', discord_js_1.ButtonStyle.Danger, '📤'), btn('settings_cat:logging', 'السجلات', discord_js_1.ButtonStyle.Primary, '📋'), btn('settings_cat:levels', 'المستويات', discord_js_1.ButtonStyle.Secondary, '📈'), btn('settings_cat:automod', 'الأوتو مود', discord_js_1.ButtonStyle.Danger, '🔇'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Secondary, '🔄'));
-    const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'));
+    const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
     return { embeds: [embed], components: [row1, row2, row3] };
 }
 // --------------------------------------------
@@ -297,7 +298,7 @@ function buildProtection(guild, s) {
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiMention', 'منشنز', '📣', p.antiMention.enabled), toggleBtn('protection', 'antiCaps', 'كابس', '🔠', p.antiCaps.enabled), toggleBtn('protection', 'antiEmoji', 'إيموجي', '😀', p.antiEmoji.enabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled));
-    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled), toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled), toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'));
     // Row 5: Jail channel selection
     const jailChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:jail:channel')
@@ -341,6 +342,46 @@ function buildVerificationPanel(guild, s) {
         .setMaxValues(1));
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('verification', 'enabled', 'التوثيق', '⚡', !!v.enabled), btn('settings_btn:verification:msg', 'تعديل الرسالة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:verification:send', 'إرسال الرسالة', discord_js_1.ButtonStyle.Success, '📤'), btn('settings_cat:protection', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
     return { embeds: [embed], components: [roleSelect, channelSelect, row1] };
+}
+// --------------------------------------------
+// 🎭 رولات التحذير — لوحة فرعية (قائمتان: الأعضاء فوق، الإداريين تحت)
+// --------------------------------------------
+function buildWarnRolesPanel(guild, s) {
+    const w = s.warnRoles || { memberIds: [], adminIds: [] };
+    const toLines = (ids) => {
+        const roles = (ids || [])
+            .map((id) => guild.roles.cache.get(id))
+            .filter(Boolean);
+        if (!roles.length)
+            return '> 🔴 **لم تُحدد بعد**';
+        return roles.map(r => `> • <@&${r.id}>`).join('\n');
+    };
+    const memberIds = w.memberIds || [];
+    const adminIds = w.adminIds || [];
+    const embed = new discord_js_1.EmbedBuilder()
+        .setTitle('🎭 رولات التحذير')
+        .setDescription(`اختر الرولات التي تُستخدم كرولات تحذير — عند تنفيذ \`/warn\` يعرض البوت **قائمة اختيار** من هذه الرولات فقط (بنظام لوحة الرولات) لتضيفها للعضو المحذَّر\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👮‍♂️ **رولات تحذير الأعضاء (${memberIds.length}):**\n${toLines(memberIds)}\n\n` +
+        `🛡️ **رولات تحذير الإداريين (${adminIds.length}):**\n${toLines(adminIds)}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 *يُحدد النوع تلقائياً حسب صلاحيات العضو المُحذَّر (إداري ⇐ قائمة الإداريين، عضو ⇐ قائمة الأعضاء)*\n` +
+        `🗑️ *اترك القائمة فارغة (0 قيم) لمسحها*`)
+        .setColor(memberIds.length || adminIds.length ? 0x2ecc71 : 0xe74c3c)
+        .setFooter({ text: `${guild.name} • Liberty City Settings` })
+        .setTimestamp();
+    const memberSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:warnroles:members')
+        .setPlaceholder('👮‍♂️ اختر رولات تحذير الأعضاء (يمكن أكثر من واحدة)')
+        .setMinValues(0)
+        .setMaxValues(10));
+    const adminSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:warnroles:admins')
+        .setPlaceholder('🛡️ اختر رولات تحذير الإداريين (يمكن أكثر من واحدة)')
+        .setMinValues(0)
+        .setMaxValues(10));
+    const backRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'));
+    return { embeds: [embed], components: [memberSelect, adminSelect, backRow] };
 }
 // --------------------------------------------
 // Tickets

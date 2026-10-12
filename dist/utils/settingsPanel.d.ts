@@ -31,6 +31,7 @@ export declare const TITLES: Record<SettingsCategory, string>;
 export declare const CATEGORY_COLORS: Record<SettingsCategory, number>;
 export declare function buildPanel(category: SettingsCategory, guild: Guild, userId: string): Promise<BuiltPanel>;
 export declare function buildVerificationPanel(guild: Guild, s: any): BuiltPanel;
+export declare function buildWarnRolesPanel(guild: Guild, s: any): BuiltPanel;
 export declare function getActivePanel(settings: any): any;
 export declare function buildCommands(guild: Guild, s: any): BuiltPanel;
 export declare function buildShop(guild: Guild, s: any): BuiltPanel;

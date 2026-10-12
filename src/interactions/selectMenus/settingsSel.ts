@@ -19,7 +19,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, canManageSettings, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 
@@ -377,6 +377,36 @@ const handler: SelectMenuHandler = {
         const sPanel = buildShop(interaction.guild!, settings);
         await interaction.editReply({ embeds: sPanel.embeds, components: sPanel.components as any });
         await interaction.followUp({ content: `🗑️ تم حذف **${item?.name || 'العنصر'}** من المتجر`, ephemeral: true });
+        return;
+      }
+      case 'warnroles:members': {
+        // 👮‍♂️ رولات تحذير الأعضاء
+        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [] };
+        settings.warnRoles.memberIds = [...values];
+        await settings.save();
+        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+        await interaction.followUp({
+          content: values.length
+            ? `✅ رولات تحذير الأعضاء: ${values.map((v: string) => `<@&${v}>`).join(' , ')}`
+            : '🗑️ تم مسح رولات تحذير الأعضاء',
+          ephemeral: true,
+        });
+        return;
+      }
+      case 'warnroles:admins': {
+        // 🛡️ رولات تحذير الإداريين
+        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [] };
+        settings.warnRoles.adminIds = [...values];
+        await settings.save();
+        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+        await interaction.followUp({
+          content: values.length
+            ? `✅ رولات تحذير الإداريين: ${values.map((v: string) => `<@&${v}>`).join(' , ')}`
+            : '🗑️ تم مسح رولات تحذير الإداريين',
+          ephemeral: true,
+        });
         return;
       }
       default:

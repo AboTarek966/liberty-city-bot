@@ -22,8 +22,9 @@ const CommandAliasSchema = new Schema<ICommandAlias>({
   createdBy: { type: String, required: true },
 }, { timestamps: true });
 
-// Compound index for guild + alias uniqueness
-CommandAliasSchema.index({ guildId: 1, alias: 1 }, { unique: true });
+// الفهرس غير الفريد — نفس الاختصار يمكن أن يرتبط بأكثر من أمر (نظام التبديل/Toggle)
+// مثال: `ت` → warn و `ت` → unwarn — البوت يحدد أيهما ينفّذ حسب حالة العضو
+CommandAliasSchema.index({ guildId: 1, alias: 1 });
 
 export const CommandAlias = mongoose.model<ICommandAlias>('CommandAlias', CommandAliasSchema);
 export default CommandAlias;

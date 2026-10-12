@@ -23,8 +23,9 @@ export declare class ActivityTracker {
     private voiceJoins;
     private flushTimer;
     constructor(client: Client);
+    private pendingMessages;
     trackMessage(guildId: string, userId: string): Promise<void>;
-    private inc;
+    private flushMessages;
     private handleVoiceState;
     private addVoiceJoin;
     private addVoiceTime;

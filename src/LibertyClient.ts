@@ -125,6 +125,16 @@ export class LibertyClient extends Client {
     try {
       await mongoose.connect(config.database.uri);
       logger.info('📦 Connected to MongoDB');
+
+      // 🔄 مزامنة فهرس الاختصارات — فك الفهرس الفريد القديم ليسمح
+      // باستخدام نفس الاختصار لأكثر من أمر (نظام التبديل/Toggle)
+      try {
+        const { CommandAlias } = await import('./models');
+        await CommandAlias.collection.dropIndex('guildId_1_alias_1').catch(() => {});
+        await CommandAlias.createIndexes().catch(() => {});
+      } catch (e: any) {
+        logger.warn(`Alias index sync skipped: ${e.message}`);
+      }
     } catch (error) {
       logger.error('❌ Failed to connect to MongoDB:', error);
       throw error;

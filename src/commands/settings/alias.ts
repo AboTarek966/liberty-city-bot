@@ -13,6 +13,7 @@ import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { Colors } from '../../utils/embeds';
 import { CommandAlias } from '../../models';
+import { invalidateAliasCache } from '../../utils/aliasCache';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -90,7 +91,8 @@ const command: Command = {
               { name: '🚨 وضع الطوارئ', value: 'lockdown' },
               { name: '🔒 سجن', value: 'jail' },
               { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' },
-              { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' }
+              { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' },
+              { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' }
             )
         )
     )
@@ -165,22 +167,30 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     return;
   }
 
-  // Check if shortcut already exists
-  const existing = await CommandAlias.findOne({
+  // ⚡ السماح بنفس الاختصار لأكثر من أمر (نظام التبديل/Toggle)
+  // مثال: `ت` → تحذير و `ت` → إزالة تحذير — البوت يحدد أيهما ينفّذ حسب الحالة
+  const existingSame = await CommandAlias.findOne({
     guildId: interaction.guildId!,
     alias: shortcut,
+    command: cleanCommand,
   });
 
-  if (existing) {
+  if (existingSame) {
     await interaction.reply({
-      content: `❌ الاختصار \`${shortcut}\` مستخدم بالفعل للأمر \`/${existing.command}\``,
+      content: `❌ الاختصار \`${shortcut}\` مرتبط بالفعل بالأمر \`/${cleanCommand}\``,
       ephemeral: true,
     });
     return;
   }
 
+  const existingOther = await CommandAlias.findOne({
+    guildId: interaction.guildId!,
+    alias: shortcut,
+    command: { $ne: cleanCommand },
+  });
+
   // Check if shortcut conflicts with a built-in command name
-  if (client.commandHandler.getCommand(shortcut)) {
+  if (!existingOther && client.commandHandler.getCommand(shortcut)) {
     await interaction.reply({
       content: `❌ الاختصار \`${shortcut}\` يتعارض مع أمر موجود. اختر اختصاراً آخر`,
       ephemeral: true,
@@ -194,6 +204,9 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     command: cleanCommand,
     createdBy: interaction.user.id,
   });
+
+  // تحديث الذاكرة المؤقتة فوراً (سرعة فورية بدون انتظار انتهاء صلاحيتها)
+  invalidateAliasCache(interaction.guildId!);
 
   // مثال استخدام جاهز حسب نوع العقوبة/الأمر
   const usageExamples: Record<string, string> = {
@@ -231,6 +244,7 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     ticket_top: `\`${shortcut}\``,
     settings: `\`${shortcut}\` (يفتح لوحة الإعدادات)`,
     protection: `\`${shortcut}\` (يفتح أنظمة الحماية)`,
+    afk: `\`${shortcut} [السبب]\` — أو \`${shortcut}\` مرة أخرى للإلغاء`,
     backup: `\`${shortcut} create\``,
     rolemenu: `\`${shortcut} create\``,
     autorole: `\`${shortcut} @رول\``,
@@ -247,24 +261,30 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
       { name: 'الأمر', value: `/${cleanCommand}`, inline: true },
       { name: '🔎 جرّبه الآن في الشات', value: example, inline: false },
     )
-    .setDescription(`اكتب \`${shortcut}\` في الشات لتنفيذ \`/${cleanCommand}\``)
+    .setDescription(
+      `اكتب \`${shortcut}\` في الشات لتنفيذ \`/${cleanCommand}\`` +
+      (existingOther
+        ? `\n\n🔁 **الاختصار مرتبط أيضاً بـ \`/${existingOther.command}\`** — ` +
+          `سيُطبَّق **تبديل تلقائي** حسب حالة الهدف (مثال: عضو عنده تحذير ⇐ يشيله، ما عنده ⇐ يضيفه)`
+        : '')
+    )
     .setFooter({ text: 'Liberty City Aliases' });
 
   await interaction.reply({ embeds: [embed] });
 }
 
 // --------------------------------------------
-// Remove Alias
+// Remove Alias (يحذف كل الأوامر المرتبطة بهذا الاختصار)
 // --------------------------------------------
 async function handleRemove(interaction: ChatInputCommandInteraction): Promise<void> {
   const shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
 
-  const deleted = await CommandAlias.findOneAndDelete({
+  const result = await CommandAlias.deleteMany({
     guildId: interaction.guildId!,
     alias: shortcut,
   });
 
-  if (!deleted) {
+  if (!result.deletedCount) {
     await interaction.reply({
       content: `❌ الاختصار \`${shortcut}\` غير موجود`,
       ephemeral: true,
@@ -272,8 +292,12 @@ async function handleRemove(interaction: ChatInputCommandInteraction): Promise<v
     return;
   }
 
+  invalidateAliasCache(interaction.guildId!);
+
   await interaction.reply({
-    content: `✅ تم حذف الاختصار \`${shortcut}\``,
+    content:
+      `✅ تم حذف الاختصار \`${shortcut}\`` +
+      (result.deletedCount > 1 ? ` (كل أوامره: **${result.deletedCount}**)` : ''),
     ephemeral: true,
   });
 }
@@ -333,24 +357,36 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     autorole: '➕ رول تلقائي',
     roleadd: '➕ إضافة رول',
     roleremove: '➖ إزالة رول',
+    afk: '💤 AFK',
   };
 
-  const lines = aliases.slice(0, 30).map((a: any) => {
-    const label = LABELS[a.command];
-    return label
-      ? `\`${a.alias}\` → ${label} \`/${a.command}\``
-      : `\`${a.alias}\` → \`/${a.command}\``;
+  // تجميع الاختصارات المكررة (نظام التبديل 🔁)
+  const grouped = new Map<string, string[]>();
+  for (const a of aliases) {
+    const list = grouped.get(a.alias) || [];
+    list.push(a.command);
+    grouped.set(a.alias, list);
+  }
+
+  const lines = [...grouped.entries()].slice(0, 30).map(([alias, cmds]) => {
+    const names = cmds
+      .map(c => (LABELS[c] ? `${LABELS[c]} \`/${c}\`` : `\`/${c}\``))
+      .join(' • ');
+    return `\`${alias}\`${cmds.length > 1 ? ' 🔁' : ''} → ${names}`;
   });
 
   const embed = new EmbedBuilder()
-    .setTitle(`⌨️ اختصارات الأوامر [${aliases.length}]`)
-    .setDescription(lines.join('\n'))
+    .setTitle(`⌨️ اختصارات الأوامر [${grouped.size}]`)
+    .setDescription(
+      lines.join('\n') +
+      (grouped.size < aliases.length ? `\n\n🔁 = نفس الاختصار مرتبط بأكثر من أمر (تبديل تلقائي حسب الحالة)` : '')
+    )
     .setColor(Colors.primary)
     .setFooter({ text: 'Liberty City Aliases' })
     .setTimestamp();
 
-  if (aliases.length > 30) {
-    embed.setFooter({ text: `Liberty City Aliases | عرض 30 من ${aliases.length}` });
+  if (grouped.size > 30) {
+    embed.setFooter({ text: `Liberty City Aliases | عرض 30 من ${grouped.size}` });
   }
 
   await interaction.reply({ embeds: [embed] });

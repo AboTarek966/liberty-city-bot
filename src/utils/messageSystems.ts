@@ -44,11 +44,41 @@ export async function handleCustomCommand(message: Message): Promise<boolean> {
 // --------------------------------------------
 // تحديث آخر نشاط في تذكرة مفتوحة (نظام الإغلاق التلقائي عند الخمول)
 // يعيد ضبط علامة التحذير عند عودة النشاط
+// ⚡ مع ذاكرة مؤقتة: القنوات العادية تُفحص مرة كل دقيقة فقط
+// (بدل استعلام + كتابة في قاعدة البيانات مع كل رسالة!)
 // --------------------------------------------
+const ticketChannelCache = new Map<string, { active: boolean; ts: number }>();
+const TICKET_NEG_TTL = 60_000; // قناة عادية → فحص كل دقيقة
+const TICKET_POS_TTL = 300_000; // قناة تذكرة → فحص كل 5 دقائق
+
 export async function touchTicketActivity(message: Message): Promise<void> {
   if (!message.guild) return;
+  const channelId = message.channel.id;
+  const now = Date.now();
+  const hit = ticketChannelCache.get(channelId);
+  let active: boolean;
+
+  if (hit && now - hit.ts < (hit.active ? TICKET_POS_TTL : TICKET_NEG_TTL)) {
+    active = hit.active;
+  } else {
+    try {
+      const doc = await Ticket.findOne({
+        channelId,
+        status: { $in: ['open', 'claimed', 'waiting'] },
+      })
+        .select('_id')
+        .lean();
+      active = !!doc;
+    } catch {
+      active = false;
+    }
+    ticketChannelCache.set(channelId, { active, ts: now });
+  }
+
+  if (!active) return;
+
   await Ticket.updateOne(
-    { channelId: message.channel.id, status: { $in: ['open', 'claimed', 'waiting'] } },
+    { channelId, status: { $in: ['open', 'claimed', 'waiting'] } },
     { $set: { lastActivityAt: new Date(), idleWarned: false } }
   ).exec();
 }

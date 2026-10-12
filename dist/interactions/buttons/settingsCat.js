@@ -43,11 +43,19 @@ const handler = {
         }
         await interaction.deferUpdate();
         const category = (interaction.customId.split(':')[1] || 'home');
-        const panel = await (0, settingsPanel_1.buildPanel)(category, interaction.guild, interaction.user.id);
-        await interaction.editReply({
-            embeds: panel.embeds,
-            components: panel.components,
-        });
+        // 🛡️ حماية: أي خطأ في بناء اللوحة يظهر رسالة بدل صمت تام
+        try {
+            const panel = await (0, settingsPanel_1.buildPanel)(category, interaction.guild, interaction.user.id);
+            await interaction.editReply({
+                embeds: panel.embeds,
+                components: panel.components,
+            });
+        }
+        catch (error) {
+            await interaction
+                .editReply({ content: `❌ فشل فتح القسم \`${category}\` — ${error.message}` })
+                .catch(() => { });
+        }
     },
 };
 exports.default = handler;

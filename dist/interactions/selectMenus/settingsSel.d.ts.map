@@ -1,1 +1,1 @@
-{"version":3,"file":"settingsSel.d.ts","sourceRoot":"","sources":["../../../src/interactions/selectMenus/settingsSel.ts"],"names":[],"mappings":"AAoBA,OAAO,EAAE,iBAAiB,EAAE,MAAM,mCAAmC,CAAC;AAWtE,QAAA,MAAM,OAAO,EAAE,iBAgXd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"settingsSel.d.ts","sourceRoot":"","sources":["../../../src/interactions/selectMenus/settingsSel.ts"],"names":[],"mappings":"AAoBA,OAAO,EAAE,iBAAiB,EAAE,MAAM,mCAAmC,CAAC;AAWtE,QAAA,MAAM,OAAO,EAAE,iBA8Yd,CAAC;AAEF,eAAe,OAAO,CAAC"}

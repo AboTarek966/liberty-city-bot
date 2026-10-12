@@ -292,6 +292,7 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:commands', 'أوامر مخصصة', ButtonStyle.Primary, '📝'),
     btn('settings_btn:general:shop', '🛍️ المتجر', ButtonStyle.Success, '🛍️'),
+    btn('settings_btn:general:warnroles', '🎭 رولات التحذير', ButtonStyle.Secondary, '🎭'),
   );
 
   return { embeds: [embed], components: [row1, row2, row3] };
@@ -388,7 +389,6 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       !!p.lockdown
     ),
     btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
-    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
   // Row 5: Jail channel selection
@@ -454,6 +454,60 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
   );
 
   return { embeds: [embed], components: [roleSelect, channelSelect, row1] };
+}
+
+// --------------------------------------------
+// 🎭 رولات التحذير — لوحة فرعية (قائمتان: الأعضاء فوق، الإداريين تحت)
+// --------------------------------------------
+export function buildWarnRolesPanel(guild: Guild, s: any): BuiltPanel {
+  const w = s.warnRoles || { memberIds: [], adminIds: [] };
+  const toLines = (ids: string[]) => {
+    const roles = (ids || [])
+      .map((id: string) => guild.roles.cache.get(id))
+      .filter(Boolean);
+    if (!roles.length) return '> 🔴 **لم تُحدد بعد**';
+    return roles.map(r => `> • <@&${r!.id}>`).join('\n');
+  };
+  const memberIds: string[] = w.memberIds || [];
+  const adminIds: string[] = w.adminIds || [];
+
+  const embed = new EmbedBuilder()
+    .setTitle('🎭 رولات التحذير')
+    .setDescription(
+      `اختر الرولات التي تُستخدم كرولات تحذير — عند تنفيذ \`/warn\` يعرض البوت **قائمة اختيار** من هذه الرولات فقط (بنظام لوحة الرولات) لتضيفها للعضو المحذَّر\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👮‍♂️ **رولات تحذير الأعضاء (${memberIds.length}):**\n${toLines(memberIds)}\n\n` +
+      `🛡️ **رولات تحذير الإداريين (${adminIds.length}):**\n${toLines(adminIds)}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 *يُحدد النوع تلقائياً حسب صلاحيات العضو المُحذَّر (إداري ⇐ قائمة الإداريين، عضو ⇐ قائمة الأعضاء)*\n` +
+      `🗑️ *اترك القائمة فارغة (0 قيم) لمسحها*`
+    )
+    .setColor(memberIds.length || adminIds.length ? 0x2ecc71 : 0xe74c3c)
+    .setFooter({ text: `${guild.name} • Liberty City Settings` })
+    .setTimestamp();
+
+  const memberSelect = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('settings_sel:warnroles:members')
+      .setPlaceholder('👮‍♂️ اختر رولات تحذير الأعضاء (يمكن أكثر من واحدة)')
+      .setMinValues(0)
+      .setMaxValues(10)
+  );
+
+  const adminSelect = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('settings_sel:warnroles:admins')
+      .setPlaceholder('🛡️ اختر رولات تحذير الإداريين (يمكن أكثر من واحدة)')
+      .setMinValues(0)
+      .setMaxValues(10)
+  );
+
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_cat:home', 'القائمة الرئيسية', ButtonStyle.Secondary, '🏠'),
+    btn('settings_back', '🔄 تحديث', ButtonStyle.Primary, '🔄'),
+  );
+
+  return { embeds: [embed], components: [memberSelect, adminSelect, backRow] };
 }
 
 // --------------------------------------------

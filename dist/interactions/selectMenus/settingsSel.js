@@ -338,6 +338,38 @@ const handler = {
                 await interaction.followUp({ content: `🗑️ تم حذف **${item?.name || 'العنصر'}** من المتجر`, ephemeral: true });
                 return;
             }
+            case 'warnroles:members': {
+                // 👮‍♂️ رولات تحذير الأعضاء
+                if (!settings.warnRoles)
+                    settings.warnRoles = { memberIds: [], adminIds: [] };
+                settings.warnRoles.memberIds = [...values];
+                await settings.save();
+                const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
+                await interaction.followUp({
+                    content: values.length
+                        ? `✅ رولات تحذير الأعضاء: ${values.map((v) => `<@&${v}>`).join(' , ')}`
+                        : '🗑️ تم مسح رولات تحذير الأعضاء',
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'warnroles:admins': {
+                // 🛡️ رولات تحذير الإداريين
+                if (!settings.warnRoles)
+                    settings.warnRoles = { memberIds: [], adminIds: [] };
+                settings.warnRoles.adminIds = [...values];
+                await settings.save();
+                const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
+                await interaction.followUp({
+                    content: values.length
+                        ? `✅ رولات تحذير الإداريين: ${values.map((v) => `<@&${v}>`).join(' , ')}`
+                        : '🗑️ تم مسح رولات تحذير الإداريين',
+                    ephemeral: true,
+                });
+                return;
+            }
             default:
                 await interaction.editReply({ content: '❌ خيار غير معروف' });
                 return;

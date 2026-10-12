@@ -36,12 +36,17 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.handleAliasPickSelect = handleAliasPickSelect;
+exports.executeAliasCommand = executeAliasCommand;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const AIModeration_1 = require("../handlers/AIModeration");
 const aliasRunner_1 = require("../utils/aliasRunner");
+const aliasCache_1 = require("../utils/aliasCache");
+const afk_1 = require("../utils/afk");
+const warnRoles_1 = require("../utils/warnRoles");
 const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
 const pendingUploads_1 = require("../utils/pendingUploads");
@@ -110,6 +115,13 @@ const event = {
         catch (error) {
             logger.error('Error in scam filter:', error);
         }
+        // 💤 نظام AFK (إلغاء تلقائي عند الرسالة + إخبار المنشنزين بالسبب)
+        try {
+            await handleAfkActivity(message);
+        }
+        catch (error) {
+            logger.error('Error in AFK system:', error);
+        }
         // Activity tracking (messages)
         try {
             await client.activityTracker.trackMessage(message.guild.id, message.author.id);
@@ -133,9 +145,9 @@ const event = {
         catch (error) {
             logger.error('Error in custom command:', error);
         }
-        // رصيد عشوائي أثناء التحدث (25% = +5 عملات)
+        // رصيد عشوائي أثناء التحدث (25% = +5 عملات) — بدون انتظار حتى لا يبطئ الرد
         try {
-            await (0, messageSystems_1.earnCreditsRandom)(message);
+            void (0, messageSystems_1.earnCreditsRandom)(message).catch(() => { });
         }
         catch {
             /* لا يعطّل باقي الأنظمة */
@@ -176,10 +188,10 @@ async function handleAliasCommand(message, client) {
         const args = message.content.slice(prefix.length).trim().split(/\s+/);
         const shortcut = args[0]?.toLowerCase();
         if (shortcut) {
-            const alias = await models_1.CommandAlias.findOne({ guildId: message.guild.id, alias: shortcut });
-            if (alias) {
-                logger.info(`⌨️ Alias matched (prefix): "${shortcut}" → "${alias.command}" | by ${message.author.tag}`);
-                await executeAliasCommand(message, client, alias.command, args.slice(1), shortcut);
+            const matched = await (0, aliasCache_1.getAliasesForShortcut)(message.guild.id, shortcut);
+            if (matched.length > 0) {
+                logger.info(`⌨️ Alias matched (prefix): "${shortcut}" → ${matched.map(a => a.command).join(', ')} | by ${message.author.tag}`);
+                await runMatchedAliases(message, client, matched, args.slice(1), shortcut);
                 return true;
             }
         }
@@ -188,14 +200,179 @@ async function handleAliasCommand(message, client) {
     const parts = message.content.trim().split(/\s+/);
     const potentialAlias = parts[0]?.toLowerCase();
     if (potentialAlias && potentialAlias.length <= 15) {
-        const alias = await models_1.CommandAlias.findOne({ guildId: message.guild.id, alias: potentialAlias });
-        if (alias) {
-            logger.info(`⌨️ Alias matched: "${potentialAlias}" → "${alias.command}" | by ${message.author.tag}`);
-            await executeAliasCommand(message, client, alias.command, parts.slice(1), potentialAlias);
+        const matched = await (0, aliasCache_1.getAliasesForShortcut)(message.guild.id, potentialAlias);
+        if (matched.length > 0) {
+            logger.info(`⌨️ Alias matched: "${potentialAlias}" → ${matched.map(a => a.command).join(', ')} | by ${message.author.tag}`);
+            await runMatchedAliases(message, client, matched, parts.slice(1), potentialAlias);
             return true;
         }
     }
     return false;
+}
+// --------------------------------------------
+// تنفيذ الاختصار — واحد أو أكثر (نظام التبديل/Toggle)
+// نفس الكلمة قد ترتبط بأكثر من أمر مثل: `ت` → تحذير و `ت` → إزالة تحذير
+// --------------------------------------------
+async function runMatchedAliases(message, client, matches, args, shortcut) {
+    if (matches.length === 1) {
+        await executeAliasCommand(message, client, matches[0].command, args, shortcut);
+        return;
+    }
+    // أكثر من أمر → نحدد أيهما ينفّذ حسب حالة الهدف (تبديل تلقائي)
+    const resolved = await resolveToggle(message, matches, args);
+    if (resolved) {
+        await executeAliasCommand(message, client, resolved, args, shortcut);
+        return;
+    }
+    // لا يوجد زوج تبديل معروف → قائمة اختيار يدوية
+    await showAliasPickMenu(message, client, matches, args, shortcut);
+}
+// أزواج التبديل: إذا كان الاختصار مرتبط بالأمر وعكسه، نحدد أيهما ينفّذ حسب الحالة
+const TOGGLE_PAIRS = [
+    ['warn', 'unwarn'],
+    ['ban', 'unban'],
+    ['timeout', 'untimeout'],
+    ['mute', 'unmute'],
+    ['roleadd', 'roleremove'],
+];
+async function resolveToggle(message, matches, args) {
+    const commands = matches.map(a => a.command);
+    const has = (c) => commands.includes(c);
+    const pick = (c) => matches.find(a => a.command === c).command;
+    const guild = message.guild;
+    const userId = parseUserId(args[0]);
+    for (const [addCmd, removeCmd] of TOGGLE_PAIRS) {
+        if (!(has(addCmd) && has(removeCmd)))
+            continue;
+        // تحذير ⇐ العضو عنده تحذيرات؟
+        if (addCmd === 'warn') {
+            const count = userId
+                ? await models_1.Warning.countDocuments({ guildId: guild.id, userId }).catch(() => 0)
+                : 0;
+            return pick(count > 0 ? removeCmd : addCmd);
+        }
+        const member = userId ? await guild.members.fetch(userId).catch(() => null) : null;
+        // حظر ⇐ العضو موجود في السيرفر؟ (موجود ⇐ حظر، محذوف ⇐ إلغاء حظر)
+        if (addCmd === 'ban') {
+            return pick(member ? addCmd : removeCmd);
+        }
+        // تايم أوت ⇐ مكتوم حالياً؟
+        if (addCmd === 'timeout') {
+            return pick(member?.isCommunicationDisabled() ? removeCmd : addCmd);
+        }
+        // كتم ⇐ يملك رول الكتم؟
+        if (addCmd === 'mute') {
+            const muteRole = await models_1.MuteRole.findOne({ guildId: guild.id }).catch(() => null);
+            const muted = !!(member && muteRole && member.roles.cache.has(muteRole.roleId));
+            return pick(muted ? removeCmd : addCmd);
+        }
+        // رولات ⇐ الرول محدد والعضو يملكه؟
+        if (addCmd === 'roleadd') {
+            const roleId = args[1]?.replace(/[<@&>]/g, '');
+            const role = /^\d{17,20}$/.test(roleId || '') ? guild.roles.cache.get(roleId) : null;
+            if (role && member)
+                return pick(member.roles.cache.has(role.id) ? removeCmd : addCmd);
+            return pick(addCmd); // بدون رول محدد → لوحة الاختيار (إضافة)
+        }
+    }
+    return null;
+}
+// --------------------------------------------
+// قائمة اختيار يدوية (عند ارتباط الكلمة بأكثر من أمر غير متكامل)
+// --------------------------------------------
+const ALIAS_PICK_TTL = 10 * 60 * 1000;
+const aliasPickStates = new Map();
+const ALIAS_LABELS = {
+    ban: '🔨 حظر', kick: '👢 طرد', timeout: '⏱️ تايم أوت', warn: '⚠️ تحذير',
+    unwarn: '✅ إزالة تحذير', mute: '🔇 كتم', unmute: '🔊 فك الكتم',
+    untimeout: '🔓 إلغاء تايم أوت', unban: '🔓 إلغاء حظر', purge: '🗑️ مسح',
+    roleadd: '➕ إضافة رول', roleremove: '➖ إزالة رول', promote: '⬆️ ترقية',
+    jail: '🔒 سجن', lockdown: '🚨 وضع الطوارئ', settings: '⚙️ إعدادات',
+    afk: '💤 AFK', snipe: '🕵️ سنايب', ping: '🏓 بينج',
+};
+function cleanupAliasPick() {
+    const now = Date.now();
+    for (const [k, v] of aliasPickStates) {
+        if (now - v.createdAt > ALIAS_PICK_TTL)
+            aliasPickStates.delete(k);
+    }
+}
+async function showAliasPickMenu(message, client, matches, args, shortcut) {
+    cleanupAliasPick();
+    const sid = message.id;
+    aliasPickStates.set(sid, {
+        matches, args, shortcut,
+        userId: message.author.id,
+        message, client,
+        createdAt: Date.now(),
+    });
+    const options = matches.slice(0, 25).map(a => ({
+        label: (ALIAS_LABELS[a.command] || `/${a.command}`).substring(0, 100),
+        value: a.command,
+    }));
+    const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()
+        .setCustomId(`alias_pick:${sid}`)
+        .setPlaceholder(`🔁 "${shortcut}" مرتبط بأكثر من أمر — اختر ما تريد تنفيذه`)
+        .setMinValues(1)
+        .setMaxValues(1)
+        .setOptions(options));
+    await respond(message, {
+        content: `🔁 الاختصار \`${shortcut}\` مرتبط بأكثر من أمر — اختر الإجراء المطلوب:`,
+        components: [row],
+    });
+}
+// يُستدعى من معالج القائمة (interactions/selectMenus/aliasPick.ts)
+async function handleAliasPickSelect(interaction, sid) {
+    cleanupAliasPick();
+    const state = aliasPickStates.get(sid);
+    if (!state) {
+        await interaction
+            .reply({ content: '❌ انتهت صلاحية القائمة — اكتب الاختصار من جديد', ephemeral: true })
+            .catch(() => { });
+        return false;
+    }
+    if (state.userId !== interaction.user.id) {
+        await interaction
+            .reply({ content: '❌ هذه القائمة مخصصة لمن كتب الاختصار فقط', ephemeral: true })
+            .catch(() => { });
+        return false;
+    }
+    aliasPickStates.delete(sid);
+    const commandName = interaction.values[0];
+    await interaction
+        .update({ content: `✅ يتم التنفيذ: \`${commandName}\`…`, components: [] })
+        .catch(() => { });
+    await executeAliasCommand(state.message, state.client, commandName, state.args, state.shortcut);
+    return true;
+}
+// --------------------------------------------
+// 💤 نظام AFK — إلغاء تلقائي + إخبار المنشنزين
+// --------------------------------------------
+async function handleAfkActivity(message) {
+    const guild = message.guild;
+    const authorId = message.author.id;
+    const parts = [];
+    // 1) صاحب الرسالة كان AFK → إلغاء الحالة + رسالة عودة
+    const mine = await (0, afk_1.getAFK)(guild.id, authorId);
+    if (mine) {
+        await (0, afk_1.removeAFK)(guild.id, authorId);
+        parts.push(`👋 **مرحباً بعودتك <@${authorId}>!** تم إلغاء وضع AFK ` +
+            `(كنت غائباً لمدة ${(0, helpers_1.formatDuration)(Date.now() - mine.since, { compact: true })})`);
+    }
+    // 2) منشن أعضاء في وضع AFK → إخبار صاحب الرسالة بسبب غيابهم
+    const mentioned = [...message.mentions.users.values()]
+        .filter(u => !u.bot && u.id !== authorId)
+        .slice(0, 5);
+    for (const user of mentioned) {
+        const afk = await (0, afk_1.getAFK)(guild.id, user.id);
+        if (afk) {
+            parts.push(`💤 <@${user.id}> في وضع AFK — **${afk.reason}** ` +
+                `(منذ ${(0, helpers_1.formatDuration)(Date.now() - afk.since, { compact: true })})`);
+        }
+    }
+    if (parts.length) {
+        await message.reply({ content: parts.join('\n') }).catch(() => { });
+    }
 }
 // --------------------------------------------
 // Send a response, with fallback if replying fails
@@ -386,8 +563,8 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
             if (!userId)
                 return usage('<@المستخدم> [السبب]');
             const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
-            const target = (await guild.members.fetch(userId).catch(() => null)) ||
-                (await client.users.fetch(userId).catch(() => null));
+            const targetMember = await guild.members.fetch(userId).catch(() => null);
+            const target = targetMember || (await client.users.fetch(userId).catch(() => null));
             if (!target)
                 return respond(message, '❌ لم يتم العثور على المستخدم');
             const result = await client.moderationHandler.warn({
@@ -396,6 +573,22 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                 target,
                 reason,
             });
+            // 🎭 رولات التحذير — إعطاء مباشر أو لوحة اختيار (من الإعدادات)
+            let warnRoleNote = null;
+            if (targetMember) {
+                const settings = await (0, models_1.getGuildSettings)(guild.id);
+                warnRoleNote = await (0, warnRoles_1.offerWarnRoles)({
+                    settings,
+                    guild,
+                    executor: member,
+                    target: targetMember,
+                    reason,
+                    reply: payload => respond(message, payload),
+                });
+            }
+            if (warnRoleNote) {
+                result.embed.addFields({ name: '🎭 رول التحذير', value: warnRoleNote, inline: false });
+            }
             return respond(message, { embeds: [result.embed] });
         }
         case 'mute': {
@@ -647,11 +840,15 @@ async function handleAIResponse(message, client) {
         return;
     // Check if bot was mentioned
     const isMention = message.mentions.has(client.user);
-    // Check if reply to bot's message
+    // بدون منشن وبدون رد → لا شيء يفعل (بدون أي طلب API)
+    if (!isMention && !message.reference?.messageId)
+        return;
+    // Check if reply to bot's message (الذاكرة المؤقتة أولاً — بدون طلب API إن أمكن)
     let repliedToBot = false;
-    if (message.reference?.messageId) {
+    if (!isMention && message.reference?.messageId) {
         try {
-            const refMessage = await message.channel.messages.fetch(message.reference.messageId);
+            const cached = message.channel.messages.cache.get(message.reference.messageId);
+            const refMessage = cached || (await message.channel.messages.fetch(message.reference.messageId));
             repliedToBot = refMessage.author.id === botId;
         }
         catch { }

@@ -239,6 +239,12 @@ export interface IGuildSettings extends Document {
         enabled: boolean;
         items: IShopItem[];
     };
+    warnRoles: {
+        /** رولات تحذير الأعضاء (تظهر عند تحذير عضو عادي) */
+        memberIds: string[];
+        /** رولات تحذير الإداريين (تظهر عند تحذير إداري) */
+        adminIds: string[];
+    };
     updatedAt: Date;
 }
 export interface ITicketPanel {
@@ -442,6 +448,12 @@ export interface ILoggerSettings extends Document {
     ignoredChannels: string[];
     ignoredRoles: string[];
 }
+export interface IUserAFK extends Document {
+    guildId: string;
+    userId: string;
+    reason: string;
+    since: Date;
+}
 export declare const GuildSettings: mongoose.Model<IGuildSettings, {}, {}, {}, mongoose.Document<unknown, {}, IGuildSettings, {}, {}> & IGuildSettings & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
@@ -478,6 +490,11 @@ export declare const UserProfile: mongoose.Model<IUserProfile, {}, {}, {}, mongo
     __v: number;
 }, any>;
 export declare const MuteRole: mongoose.Model<IMuteRole, {}, {}, {}, mongoose.Document<unknown, {}, IMuteRole, {}, {}> & IMuteRole & Required<{
+    _id: mongoose.Types.ObjectId;
+}> & {
+    __v: number;
+}, any>;
+export declare const UserAFK: mongoose.Model<IUserAFK, {}, {}, {}, mongoose.Document<unknown, {}, IUserAFK, {}, {}> & IUserAFK & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
     __v: number;

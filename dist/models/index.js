@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -344,6 +344,10 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         enabled: { type: Boolean, default: true },
         items: [ShopItemSchema],
     },
+    warnRoles: {
+        memberIds: [{ type: String }],
+        adminIds: [{ type: String }],
+    },
     updatedAt: { type: Date, default: Date.now },
 });
 // Moderation Case Schema
@@ -473,6 +477,13 @@ const MuteRoleSchema = new mongoose_1.Schema({
     roleId: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
 });
+const UserAFKSchema = new mongoose_1.Schema({
+    guildId: { type: String, required: true },
+    userId: { type: String, required: true },
+    reason: { type: String, default: 'AFK' },
+    since: { type: Date, default: Date.now },
+});
+UserAFKSchema.index({ guildId: 1, userId: 1 }, { unique: true });
 // --------------------------------------------
 // Model Exports
 // --------------------------------------------
@@ -484,6 +495,7 @@ exports.Ticket = mongoose_1.default.model('Ticket', TicketSchema);
 exports.AISession = mongoose_1.default.model('AISession', AISessionSchema);
 exports.UserProfile = mongoose_1.default.model('UserProfile', UserProfileSchema);
 exports.MuteRole = mongoose_1.default.model('MuteRole', MuteRoleSchema);
+exports.UserAFK = mongoose_1.default.model('UserAFK', UserAFKSchema);
 // Re-export new models
 var CommandAlias_2 = require("./CommandAlias");
 Object.defineProperty(exports, "CommandAlias", { enumerable: true, get: function () { return CommandAlias_2.CommandAlias; } });
