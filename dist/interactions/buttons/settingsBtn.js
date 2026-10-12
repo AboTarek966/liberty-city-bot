@@ -10,7 +10,9 @@ const guildMemberAdd_1 = require("../../events/guildMemberAdd");
 const guildMemberRemove_1 = require("../../events/guildMemberRemove");
 const pendingUploads_1 = require("../../utils/pendingUploads");
 const welcomeCard_1 = require("../../utils/welcomeCard");
+const helpers_1 = require("../../utils/helpers");
 const clampNum = (v, min, max) => Math.min(max, Math.max(min, v));
+const logger = (0, helpers_1.createLogger)('SettingsBtn');
 const handler = {
     id: 'settings_btn',
     async execute(interaction) {
@@ -645,8 +647,14 @@ const handler = {
             }
             case 'general:warnroles': {
                 // 🎭 لوحة فرعية: رولات التحذير (للأعضاء + للإداريين)
-                const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, settings);
-                await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
+                try {
+                    const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, settings);
+                    await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
+                }
+                catch (error) {
+                    logger.error('buildWarnRolesPanel failed:', error);
+                    await interaction.editReply({ content: `❌ فشل تحميل لوحة رولات التحذير: ${error.message}` }).catch(() => { });
+                }
                 return;
             }
             case 'commands:clear': {

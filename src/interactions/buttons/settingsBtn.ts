@@ -22,9 +22,12 @@ import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
 import { setPendingImageUpload } from '../../utils/pendingUploads';
 import { CARD_DEFAULTS } from '../../utils/welcomeCard';
+import { createLogger } from '../../utils/helpers';
 
 const clampNum = (v: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, v));
+
+const logger = createLogger('SettingsBtn');
 
 const handler: ButtonHandler = {
   id: 'settings_btn',
@@ -761,8 +764,13 @@ const handler: ButtonHandler = {
       }
       case 'general:warnroles': {
         // 🎭 لوحة فرعية: رولات التحذير (للأعضاء + للإداريين)
-        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
-        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+        try {
+          const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+          await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+        } catch (error: any) {
+          logger.error('buildWarnRolesPanel failed:', error);
+          await interaction.editReply({ content: `❌ فشل تحميل لوحة رولات التحذير: ${error.message}` }).catch(() => {});
+        }
         return;
       }
       case 'commands:clear': {
