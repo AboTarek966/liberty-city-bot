@@ -145,7 +145,8 @@ class AIHandler {
             if (userRoles.some(r => aiConfig.ignoredRoles?.includes(r)))
                 return null;
             // Check if should respond (command usage, mention or reply to bot)
-            const shouldRespond = fromCommand || isMention || repliedToBot || (guildId && await this.shouldAutoReply(guildId, channelId, message));
+            // في DMs: يرد على أي رسالة مباشرة (بدون حاجة لمنشن/رد)
+            const shouldRespond = fromCommand || isMention || repliedToBot || !guildId || (guildId && await this.shouldAutoReply(guildId, channelId, message));
             if (!shouldRespond)
                 return null;
             // Check sensitive keywords (الإداريين يتجاوزون الفلتر - فالذكاء الاصطناعي لا يملك أي أسرار حقيقية)
