@@ -120,6 +120,15 @@ const command: Command = {
         return;
       }
 
+      // التحقق من أن البوت يملك ManageChannels في روم السجن (لازم لتعديل الصلاحيات)
+      if (!botPermsInJail?.has(PermissionFlagsBits.ManageChannels)) {
+        await interaction.editReply({
+          content: '❌ البوت لا يملك صلاحية **Manage Channels** في روم السجن.\n\n' +
+            '**الحل:** اذهب إلى إعدادات السيرفر → الرتب → رول البوت → فعّل "Manage Channels" (إدارة القنوات) ثم أعد المحاولة.',
+        });
+        return;
+      }
+
       // إنشاء/جلب رول "السجن"
       let jailRole = guild.roles.cache.find(r => r.name === '🔒 جايـل' || r.name === 'Jail');
       if (!jailRole) {
