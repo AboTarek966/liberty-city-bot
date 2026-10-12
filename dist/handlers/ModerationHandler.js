@@ -267,8 +267,6 @@ class ModerationHandler {
             color: embeds_1.Colors.warning,
         });
         void this.logAction(guild, embed);
-        // Check if should auto-mute/ban at threshold
-        void this.checkWarningThreshold(guild, target.id, warningCount + 1);
         logger.info(`Warned ${target.id} in ${guild.id} by ${moderator.id}`);
         return {
             case: null,
@@ -327,33 +325,6 @@ class ModerationHandler {
             warningCount: remaining,
             simpleMsg: `✅ **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم إزالة تحذير (المتبقي: ${remaining}) | ${reason}`,
         };
-    }
-    // --------------------------------------------
-    // Check Warning Threshold
-    // --------------------------------------------
-    async checkWarningThreshold(guild, userId, warningCount) {
-        // Default thresholds: 5 warnings = kick, 10 warnings = ban
-        const kickThreshold = 5;
-        const banThreshold = 10;
-        try {
-            const member = guild.members.cache.get(userId);
-            if (!member)
-                return;
-            if (warningCount >= banThreshold) {
-                await guild.members.ban(userId, {
-                    reason: `Auto-ban: Reached ${banThreshold} warnings`,
-                    deleteMessageSeconds: 0,
-                });
-                logger.info(`Auto-banned ${userId} for reaching ${banThreshold} warnings`);
-            }
-            else if (warningCount >= kickThreshold) {
-                await member.kick(`Auto-kick: Reached ${kickThreshold} warnings`);
-                logger.info(`Auto-kicked ${userId} for reaching ${kickThreshold} warnings`);
-            }
-        }
-        catch (error) {
-            logger.error('Failed to check warning threshold:', error);
-        }
     }
     // --------------------------------------------
     // Mute (Role-based)

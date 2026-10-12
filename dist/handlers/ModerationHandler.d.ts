@@ -43,7 +43,6 @@ export declare class ModerationHandler {
         warningCount: number;
         simpleMsg: string;
     }>;
-    private checkWarningThreshold;
     mute(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
