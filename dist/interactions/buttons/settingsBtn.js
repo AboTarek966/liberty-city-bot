@@ -1,0 +1,659 @@
+"use strict";
+// ============================================
+// Settings Panel - Action Buttons (لغة، بادئة، XP، مودالات...)
+// ============================================
+Object.defineProperty(exports, "__esModule", { value: true });
+const discord_js_1 = require("discord.js");
+const settingsPanel_1 = require("../../utils/settingsPanel");
+const models_1 = require("../../models");
+const guildMemberAdd_1 = require("../../events/guildMemberAdd");
+const guildMemberRemove_1 = require("../../events/guildMemberRemove");
+const pendingUploads_1 = require("../../utils/pendingUploads");
+const welcomeCard_1 = require("../../utils/welcomeCard");
+const clampNum = (v, min, max) => Math.min(max, Math.max(min, v));
+const handler = {
+    id: 'settings_btn',
+    async execute(interaction) {
+        if (!interaction.guild) {
+            await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
+            return;
+        }
+        if (!(0, settingsPanel_1.canManageSettings)(interaction)) {
+            await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+            return;
+        }
+        const parts = interaction.customId.split(':');
+        const section = parts[1];
+        const action = parts[2];
+        const guildId = interaction.guild.id;
+        const key = `${section}:${action}`;
+        // الإجراءات التي ترد فوراً (مودال أو رد مباشر) — لا يمكن deferUpdate قبلها
+        const immediateKeys = new Set([
+            'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
+            'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
+            'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
+            'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
+            'commands:add', 'welcome:cardnum', 'shop:add',
+        ]);
+        // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
+        if (!immediateKeys.has(key)) {
+            await interaction.deferUpdate();
+        }
+        const settings = await (0, models_1.getGuildSettings)(guildId);
+        // ---------- مودالات (تفتح مودال = رد فوري) ----------
+        const openModal = async (title, placeholder, style, max, value = '', required = true) => {
+            const input = new discord_js_1.TextInputBuilder()
+                .setCustomId('value')
+                .setLabel(title.substring(0, 45))
+                .setStyle(style)
+                .setPlaceholder(placeholder)
+                .setMaxLength(max)
+                .setRequired(required);
+            if (value)
+                input.setValue(value.substring(0, max));
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId(`settings_modal:${section}:${action}`)
+                .setTitle(title.substring(0, 45))
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(input));
+            await interaction.showModal(modal);
+        };
+        // مودال خاص: محتوى لوحة التذاكر (عنوان + وصف معاً)
+        if (`${section}:${action}` === 'tickets:panel') {
+            const panel = (0, settingsPanel_1.getActivePanel)(settings);
+            if (!panel) {
+                await interaction.reply({
+                    content: '⚠️ أنشئ اللوحة أولاً: اختر **قناة لوحة التذاكر** من قائمة القنوات في هذه اللوحة',
+                    ephemeral: true,
+                });
+                return;
+            }
+            const titleInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('title')
+                .setLabel('عنوان اللوحة')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(256)
+                .setRequired(true)
+                .setValue((panel.name || '').substring(0, 256));
+            const descInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('description')
+                .setLabel('محتوى اللوحة')
+                .setStyle(discord_js_1.TextInputStyle.Paragraph)
+                .setMaxLength(2000)
+                .setRequired(true)
+                .setValue((panel.description || '').substring(0, 2000));
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:tickets:panel')
+                .setTitle('تعديل محتوى لوحة التذاكر')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(titleInput), new discord_js_1.ActionRowBuilder().addComponents(descInput));
+            await interaction.showModal(modal);
+            return;
+        }
+        // مودال خاص: رسالة التوثيق (عنوان + نص + نص الزر)
+        if (`${section}:${action}` === 'verification:msg') {
+            const v = settings.verification || {};
+            const titleInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('title')
+                .setLabel('عنوان رسالة التوثيق')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(256)
+                .setRequired(true)
+                .setValue((v.title || '✅ توثيق العضوية').substring(0, 256));
+            const descInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('description')
+                .setLabel('نص الرسالة')
+                .setStyle(discord_js_1.TextInputStyle.Paragraph)
+                .setMaxLength(1000)
+                .setRequired(true)
+                .setValue((v.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو').substring(0, 1000));
+            const labelInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('label')
+                .setLabel('نص الزر')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(80)
+                .setRequired(true)
+                .setValue((v.buttonLabel || 'توثيق').substring(0, 80));
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:verification:msg')
+                .setTitle('رسالة التوثيق')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(titleInput), new discord_js_1.ActionRowBuilder().addComponents(descInput), new discord_js_1.ActionRowBuilder().addComponents(labelInput));
+            await interaction.showModal(modal);
+            return;
+        }
+        // مودال خاص: رسالة الترقية (عنوان + نص + لون معاً)
+        if (`${section}:${action}` === 'levels:msg') {
+            const lv = settings.leveling;
+            const titleInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('title')
+                .setLabel('عنوان رسالة الترقية')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(256)
+                .setRequired(true)
+                .setValue((lv.levelUpTitle || '🎉 ترقية جديدة!').substring(0, 256));
+            const msgInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('message')
+                .setLabel('نص الرسالة (يدعم المتغيرات)')
+                .setStyle(discord_js_1.TextInputStyle.Paragraph)
+                .setMaxLength(1500)
+                .setRequired(true)
+                .setValue((lv.levelUpMessage || 'تهانينا {user}! لقد وصلت للمستوى {level} 🎉').substring(0, 1500));
+            const colorInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('color')
+                .setLabel('اللون (HEX) — اختياري')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(7)
+                .setRequired(false)
+                .setValue((lv.levelUpColor || '#e67e22').substring(0, 7));
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:levels:msg')
+                .setTitle('رسالة الترقية')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(titleInput), new discord_js_1.ActionRowBuilder().addComponents(msgInput), new discord_js_1.ActionRowBuilder().addComponents(colorInput));
+            await interaction.showModal(modal);
+            return;
+        }
+        // الإجراءات التي تفتح مودال → ترجع فوراً (showModal هو الرد)
+        const modalActions = [
+            'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
+            'automod:words', 'ai:personality',
+            'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
+            'tickets:autotext', 'tickets:pimg', 'tickets:types',
+        ];
+        if (modalActions.includes(`${section}:${action}`)) {
+            switch (`${section}:${action}`) {
+                case 'general:prefix':
+                    return openModal('تغيير بادئة الأوامر', 'مثال: lc! أو ! أو ?', discord_js_1.TextInputStyle.Short, 5);
+                case 'general:tz':
+                    return openModal('المنطقة الزمنية', 'مثال: Asia/Riyadh أو Europe/London', discord_js_1.TextInputStyle.Short, 50);
+                case 'welcome:msg':
+                    return openModal('رسالة الترحيب', '{user} {server} {count}', discord_js_1.TextInputStyle.Paragraph, 1000);
+                case 'leave:msg':
+                    return openModal('رسالة المغادرة', '{user} {server} {count}', discord_js_1.TextInputStyle.Paragraph, 1000);
+                case 'automod:words':
+                    return openModal('الكلمات المحظورة', 'اكتب كل كلمة في سطر جديد:\nكلمة1\nكلمة2\nكلمة3', discord_js_1.TextInputStyle.Paragraph, 1000);
+                case 'ai:personality': {
+                    const aiConfig = await models_1.AIConfig.findOne({ guildId }).catch(() => null);
+                    return openModal('شخصية الذكاء الاصطناعي', 'مثال: أنت مساعد ودود يحب الفكاهة...', discord_js_1.TextInputStyle.Paragraph, 1000, aiConfig?.customPersonality || '');
+                }
+                case 'welcome:title':
+                    return openModal('عنوان رسالة الترحيب', 'مثال: مرحباً بك في السيرفر!', discord_js_1.TextInputStyle.Short, 256, settings.welcome.embedTitle || '');
+                case 'welcome:color':
+                    return openModal('لون الإمبد (HEX)', 'مثال: #5865F2', discord_js_1.TextInputStyle.Short, 7, settings.welcome.embedColor || '#00D4FF');
+                case 'welcome:imgurl':
+                    return openModal('رابط صورة الترحيب', 'https://... — اتركه فارغاً لحذف الصورة', discord_js_1.TextInputStyle.Short, 500, settings.welcome.imageBackground || '', false);
+                case 'welcome:cardurl':
+                    return openModal('رابط خلفية البطاقة', 'https://... — اتركه فارغاً للخلفية الافتراضية', discord_js_1.TextInputStyle.Short, 500, settings.welcome.card?.backgroundUrl || '', false);
+                case 'tickets:autotext':
+                    return openModal('الرسالة التلقائية داخل التذكرة', '{user} {ticket} {server}', discord_js_1.TextInputStyle.Paragraph, 1500, settings.tickets.autoMessage || '');
+                case 'tickets:types': {
+                    if (!(0, settingsPanel_1.getActivePanel)(settings)) {
+                        await interaction.reply({
+                            content: '⚠️ أنشئ اللوحة أولاً من زر **🎨 نقل اللوحة**',
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+                    const opts = (0, settingsPanel_1.getActivePanel)(settings).options || [];
+                    const prefill = opts
+                        .map((o) => `${o.emoji ? o.emoji + ' ' : ''}${o.label}${o.description ? ' | ' + o.description : ''}`)
+                        .join('\n');
+                    return openModal('أنواع التذاكر (نوع واحد في كل سطر)', '🔧 دعم فني | مساعدة تقنية\n💰 طلب شراكة | طلبات الشراكة\n⚠️ إبلاغ | الإبلاغ عن مشكلة', discord_js_1.TextInputStyle.Paragraph, 1800, prefill);
+                }
+                case 'tickets:pimg':
+                    if (!(0, settingsPanel_1.getActivePanel)(settings)) {
+                        await interaction.reply({
+                            content: '⚠️ أنشئ اللوحة أولاً من زر **🎨 نقل اللوحة**',
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+                    return openModal('رابط صورة اللوحة', 'https://... — اتركه فارغاً لحذف الصورة', discord_js_1.TextInputStyle.Short, 500, (0, settingsPanel_1.getActivePanel)(settings).image || '', false);
+            }
+        }
+        // ---------- إجراءات ترد فوراً (مودال أو رسالة + قائمة اختيار) ----------
+        // ⚠️ يجب أن تتم قبل deferUpdate — لا يمكن فتح مودال أو رد بعد التأكيد
+        if (`${section}:${action}` === 'commands:add') {
+            // مودال بحقلين: اسم الأمر + الرد
+            const nameInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('name')
+                .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(50)
+                .setRequired(true);
+            const contentInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('content')
+                .setLabel('رد البوت (حتى 1900 حرف) — {user} {server}')
+                .setStyle(discord_js_1.TextInputStyle.Paragraph)
+                .setMaxLength(1900)
+                .setRequired(true);
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:commands:add')
+                .setTitle('➕ إضافة أمر مخصص')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(nameInput), new discord_js_1.ActionRowBuilder().addComponents(contentInput));
+            await interaction.showModal(modal);
+            return;
+        }
+        if (`${section}:${action}` === 'shop:add') {
+            // الخطوة الأولى: اختيار رول العنصر — ثم يفتح مودال الاسم والسعر
+            const roleSelect = new discord_js_1.RoleSelectMenuBuilder()
+                .setCustomId('settings_sel:shop:role')
+                .setPlaceholder('🛍️ اختر الرول الذي يحصل عليه المشتري')
+                .setMinValues(1)
+                .setMaxValues(1);
+            await interaction.reply({
+                content: '🛍️ اختر **الرول** الذي سيحصل عليه المشتري عند شراء هذا العنصر:',
+                components: [new discord_js_1.ActionRowBuilder().addComponents(roleSelect)],
+                ephemeral: true,
+            });
+            return;
+        }
+        if (`${section}:${action}` === 'welcome:cardnum') {
+            // 🔢 إدخال أرقام مباشرة للعنصر الحالي (أسهل من الحركة بالأسهم للأرقام الكبيرة)
+            const el = (0, settingsPanel_1.getCardEditor)(interaction.user.id).element;
+            const pos = (0, settingsPanel_1.getCardElementValues)(settings.welcome.card, el);
+            const xInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('x')
+                .setLabel('المسافة من اليسار X (0-800)')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(4)
+                .setValue(String(pos.x))
+                .setRequired(true);
+            const yInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('y')
+                .setLabel('المسافة من الأعلى Y (0-300)')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(4)
+                .setValue(String(pos.y))
+                .setRequired(true);
+            const sizeInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('size')
+                .setLabel('الحجم بالبكسل')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(4)
+                .setValue(String(pos.size))
+                .setRequired(true);
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId(`settings_modal:welcome:cardpos:${el}`)
+                .setTitle('🔢 إدخال مباشر')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(xInput), new discord_js_1.ActionRowBuilder().addComponents(yInput), new discord_js_1.ActionRowBuilder().addComponents(sizeInput));
+            if (el !== 'avatar') {
+                const cur = el === 'name' ? settings.welcome.card?.nameColor : settings.welcome.card?.countColor;
+                const colorInput = new discord_js_1.TextInputBuilder()
+                    .setCustomId('color')
+                    .setLabel('اللون HEX (اختياري)')
+                    .setStyle(discord_js_1.TextInputStyle.Short)
+                    .setMaxLength(7)
+                    .setValue(cur || '')
+                    .setRequired(false);
+                modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(colorInput));
+            }
+            await interaction.showModal(modal);
+            return;
+        }
+        // ---------- إجراءات تحدث اللوحة (تم تأكيدها deferUpdate في الأعلى) ----------
+        switch (`${section}:${action}`) {
+            case 'general:lang': {
+                settings.language = settings.language === 'ar' ? 'en' : 'ar';
+                await settings.save();
+                break;
+            }
+            case 'welcome:dm': {
+                settings.welcome.dmEnabled = !settings.welcome.dmEnabled;
+                await settings.save();
+                break;
+            }
+            case 'welcome:img': {
+                settings.welcome.imageEnabled = !settings.welcome.imageEnabled;
+                await settings.save();
+                break;
+            }
+            case 'logging:split': {
+                // 🔀 لوحة فرعية: توجيه كل نوع سجلات لروم مخصص
+                const splitPanel = (0, settingsPanel_1.buildLoggingSplitPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: splitPanel.embeds, components: splitPanel.components });
+                return;
+            }
+            case 'welcome:card': {
+                // 🎴 محرر بطاقة الترحيب — معاينة حية مع كل ضغطة
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'welcome:cardup': {
+                // رفع مباشر: أول رسالة مرفقة خلال 60 ثانية = خلفية البطاقة
+                (0, pendingUploads_1.setPendingImageUpload)(interaction.user.id, interaction.guildId, interaction.channelId, 'welcomeCard');
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                await interaction.followUp({
+                    content: '📤 **ارفع صورة خلفية البطاقة الآن** — أرسل أي صورة في هذه القناة خلال 60 ثانية وستصبح الخلفية تلقائياً',
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'welcome:cardprev': {
+                // (زر قديم) — المعاينة الآن حية دائماً في اللوحة
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'welcome:cardmv': {
+                // 🔀 تحريك العنصر المحدد (المعاينة تتحدث فوراً)
+                const st = (0, settingsPanel_1.getCardEditor)(interaction.user.id);
+                const card = settings.welcome.card || (settings.welcome.card = { enabled: true });
+                const dir = parts[3];
+                const cur = (0, settingsPanel_1.getCardElementValues)(card, st.element);
+                let { x, y } = cur;
+                if (dir === 'l')
+                    x -= st.step;
+                else if (dir === 'r')
+                    x += st.step;
+                else if (dir === 'u')
+                    y -= st.step;
+                else if (dir === 'd')
+                    y += st.step;
+                x = clampNum(Math.round(x), 0, 800);
+                y = clampNum(Math.round(y), 0, 300);
+                if (st.element === 'avatar') {
+                    card.avatarX = x;
+                    card.avatarY = y;
+                }
+                else if (st.element === 'name') {
+                    card.nameX = x;
+                    card.nameY = y;
+                }
+                else {
+                    card.countX = x;
+                    card.countY = y;
+                }
+                await settings.save();
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'welcome:cardsz': {
+                // 📏 تكبير/تصغير العنصر المحدد
+                const st = (0, settingsPanel_1.getCardEditor)(interaction.user.id);
+                const card = settings.welcome.card || (settings.welcome.card = { enabled: true });
+                const cur = (0, settingsPanel_1.getCardElementValues)(card, st.element);
+                const delta = parts[3] === 'in' ? st.step : -st.step;
+                const min = st.element === 'avatar' ? 40 : 8;
+                const size = clampNum(Math.round(cur.size + delta), min, 300);
+                if (st.element === 'avatar')
+                    card.avatarSize = size;
+                else if (st.element === 'name')
+                    card.nameSize = size;
+                else
+                    card.countSize = size;
+                await settings.save();
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'welcome:cardsel': {
+                // 🔄 تبديل العنصر: صورة ← اسم ← رقم
+                const st = (0, settingsPanel_1.getCardEditor)(interaction.user.id);
+                st.element = (0, settingsPanel_1.nextCardElement)(st.element);
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'welcome:cardstep': {
+                // ⚡ تغيير خطوة الحركة: 5 ← 10 ← 25 ← 50
+                const st = (0, settingsPanel_1.getCardEditor)(interaction.user.id);
+                st.step = (0, settingsPanel_1.nextCardStep)(st.step);
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'welcome:cardreset': {
+                // ✨ تخطيط تلقائي — العودة للقيم الجاهزة المرتبة
+                const card = settings.welcome.card || (settings.welcome.card = {});
+                Object.assign(card, {
+                    avatarX: welcomeCard_1.CARD_DEFAULTS.avatarX,
+                    avatarY: welcomeCard_1.CARD_DEFAULTS.avatarY,
+                    avatarSize: welcomeCard_1.CARD_DEFAULTS.avatarSize,
+                    nameX: welcomeCard_1.CARD_DEFAULTS.nameX,
+                    nameY: welcomeCard_1.CARD_DEFAULTS.nameY,
+                    nameSize: welcomeCard_1.CARD_DEFAULTS.nameSize,
+                    nameColor: welcomeCard_1.CARD_DEFAULTS.nameColor,
+                    countX: welcomeCard_1.CARD_DEFAULTS.countX,
+                    countY: welcomeCard_1.CARD_DEFAULTS.countY,
+                    countSize: welcomeCard_1.CARD_DEFAULTS.countSize,
+                    countColor: welcomeCard_1.CARD_DEFAULTS.countColor,
+                });
+                await settings.save();
+                await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
+                return;
+            }
+            case 'tickets:auto': {
+                settings.tickets.autoMessageEnabled = !settings.tickets.autoMessageEnabled;
+                await settings.save();
+                break;
+            }
+            case 'tickets:move': {
+                // لوحة فرعية: إنشاء/نقل لوحة التذاكر
+                const movePanel = (0, settingsPanel_1.buildTicketMovePanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: movePanel.embeds, components: movePanel.components });
+                return;
+            }
+            case 'tickets:advanced': {
+                // لوحة فرعية: صورة اللوحة + رولات الإدارة العليا
+                const advPanel = (0, settingsPanel_1.buildTicketAdvancedPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: advPanel.embeds, components: advPanel.components });
+                return;
+            }
+            case 'tickets:pupimg': {
+                // رفع مباشر: أول رسالة مرفقة من المستخدم خلال 60 ثانية = صورة اللوحة
+                if (!(0, settingsPanel_1.getActivePanel)(settings)) {
+                    await interaction.followUp({
+                        content: '⚠️ أنشئ اللوحة أولاً من زر **نقل اللوحة** ثم ارفع الصورة',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                (0, pendingUploads_1.setPendingImageUpload)(interaction.user.id, interaction.guildId, interaction.channelId);
+                await interaction.followUp({
+                    content: '📤 **ارفع صورة اللوحة الآن** — أرسل أي صورة في هذه القناة خلال 60 ثانية وستصبح بانر اللوحة تلقائياً',
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'verification:open': {
+                const vPanel = (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: vPanel.embeds, components: vPanel.components });
+                return;
+            }
+            case 'verification:send': {
+                // إعادة عرض لوحة التوثيق أولاً
+                const vPanel = (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: vPanel.embeds, components: vPanel.components });
+                const v = settings.verification;
+                if (!v?.roleId || !v?.channelId) {
+                    await interaction.followUp({
+                        content: '⚠️ حدد **رول التوثيق** و**قناة الرسالة** أولاً من القوائم بالأعلى',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                const vChannel = interaction.guild.channels.cache.get(v.channelId);
+                if (!vChannel || vChannel.type !== discord_js_1.ChannelType.GuildText) {
+                    await interaction.followUp({ content: '❌ قناة التوثيق غير موجودة أو ليست نصية', ephemeral: true });
+                    return;
+                }
+                // فحص أن رتبة البوت أعلى من رول التوثيق
+                const vRole = interaction.guild.roles.cache.get(v.roleId);
+                const botMember = interaction.guild.members.me;
+                if (!vRole) {
+                    await interaction.followUp({ content: '❌ رول التوثيق لم يعد موجودة', ephemeral: true });
+                    return;
+                }
+                if (botMember && botMember.roles.highest.position <= vRole.position) {
+                    await interaction.followUp({
+                        content: '⚠️ **ارفع رتبة البوت أعلى من رول التوثيق** حتى يتمكن من إعطائه — لم يتم إرسال الرسالة',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                const guildIcon = interaction.guild.iconURL();
+                const sent = await vChannel
+                    .send({
+                    embeds: [
+                        {
+                            color: 0x5865f2,
+                            title: v.title || '✅ توثيق العضوية',
+                            description: v.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو',
+                            ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
+                            footer: { text: 'Liberty City Verification' },
+                        },
+                    ],
+                    components: [
+                        new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+                            .setCustomId('verify')
+                            .setLabel((v.buttonLabel || 'توثيق').substring(0, 80))
+                            .setStyle(discord_js_1.ButtonStyle.Success)
+                            .setEmoji(v.buttonEmoji || '✅')),
+                    ],
+                })
+                    .catch(() => null);
+                if (!sent) {
+                    await interaction.followUp({
+                        content: `❌ فشل الإرسال إلى ${vChannel} — تحقق من صلاحية **إرسال الرسائل** للبوت`,
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                await interaction.followUp({
+                    content: `✅ تم إرسال رسالة التوثيق إلى ${vChannel}`,
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'welcome:test': {
+                // معاينة حقيقية بنفس كود حدث الانضمام (force تتجاهل حالة التفعيل)
+                const result = await (0, guildMemberAdd_1.handleWelcome)(interaction.member, { force: true });
+                const panel = await (0, settingsPanel_1.buildPanel)('welcome', interaction.guild, interaction.user.id);
+                await interaction.editReply({ embeds: panel.embeds, components: panel.components });
+                const note = result === 'sent'
+                    ? `✅ تمت المعاينة${settings.welcome.dmEnabled ? ' + رسالة خاصة 📩' : ''}${settings.welcome.enabled ? '' : ' ⚠️ *النظام معطّل حالياً*'}`
+                    : result === 'no-channel'
+                        ? '⚠️ لم تحدد قناة الترحيب بعد — اخترها من القائمة بالأسفل'
+                        : result === 'bad-channel'
+                            ? '❌ قناة الترحيب غير موجودة أو ليست نصية'
+                            : '❌ فشل الإرسال — تحقق من صلاحية **إرسال الرسائل** للبوت في القناة';
+                await interaction.followUp({ content: note, ephemeral: true });
+                return;
+            }
+            case 'leave:test': {
+                const result = await (0, guildMemberRemove_1.handleLeave)(interaction.member, { force: true });
+                const panel = await (0, settingsPanel_1.buildPanel)('leave', interaction.guild, interaction.user.id);
+                await interaction.editReply({ embeds: panel.embeds, components: panel.components });
+                const note = result === 'sent'
+                    ? `✅ تمت معاينة رسالة المغادرة${settings.leave.enabled ? '' : ' ⚠️ *النظام معطّل حالياً*'}`
+                    : result === 'no-channel'
+                        ? '⚠️ لم تحدد قناة المغادرة بعد — اخترها من القائمة بالأسفل'
+                        : result === 'bad-channel'
+                            ? '❌ قناة المغادرة غير موجودة أو ليست نصية'
+                            : '❌ فشل الإرسال — تحقق من صلاحية **إرسال الرسائل** للبوت في القناة';
+                await interaction.followUp({ content: note, ephemeral: true });
+                return;
+            }
+            case 'ai:inc':
+            case 'ai:dec': {
+                let aiConfig = await models_1.AIConfig.findOne({ guildId });
+                if (!aiConfig)
+                    aiConfig = await models_1.AIConfig.create({ guildId });
+                const delta = action === 'inc' ? 1 : -1;
+                aiConfig.cooldown = Math.min(60, Math.max(1, (aiConfig.cooldown || 3) + delta));
+                await aiConfig.save();
+                break;
+            }
+            case 'levels:inc':
+            case 'levels:dec': {
+                const delta = action === 'inc' ? 5 : -5;
+                settings.leveling.xpPerMessage = Math.min(500, Math.max(1, settings.leveling.xpPerMessage + delta));
+                await settings.save();
+                break;
+            }
+            case 'levels:mult_inc':
+            case 'levels:mult_dec': {
+                const delta = action === 'mult_inc' ? 0.5 : -0.5;
+                settings.leveling.xpGainMultiplier = Math.min(10, Math.max(0.5, (settings.leveling.xpGainMultiplier || 1) + delta));
+                await settings.save();
+                break;
+            }
+            case 'levels:voice_inc':
+            case 'levels:voice_dec': {
+                const delta = action === 'levels:voice_inc' ? 5 : -5;
+                settings.leveling.voiceXpPerMinute = Math.min(500, Math.max(1, (settings.leveling.voiceXpPerMinute || 10) + delta));
+                await settings.save();
+                break;
+            }
+            case 'levels:cooldown_inc':
+            case 'levels:cooldown_dec': {
+                const delta = action === 'levels:cooldown_inc' ? 10000 : -10000;
+                settings.leveling.xpCooldown = Math.min(300000, Math.max(5000, (settings.leveling.xpCooldown || 60000) + delta));
+                await settings.save();
+                break;
+            }
+            case 'levels:style': {
+                settings.leveling.levelUpStyle = settings.leveling.levelUpStyle === 'text' ? 'embed' : 'text';
+                await settings.save();
+                break;
+            }
+            case 'levels:test': {
+                // إرسال معاينة رسالة الترقية للقناة الحالية
+                const client = interaction.client;
+                await client.levelingHandler
+                    .sendLevelUpMessage(interaction.member, 99, interaction.channelId)
+                    .catch(() => { });
+                break;
+            }
+            case 'levels:rewards': {
+                const panel = (0, settingsPanel_1.buildLevelRewardsPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: panel.embeds, components: panel.components });
+                return;
+            }
+            case 'levels:ignore': {
+                const panel = (0, settingsPanel_1.buildLevelIgnorePanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: panel.embeds, components: panel.components });
+                return;
+            }
+            case 'levels:back': {
+                // يعود للوحة المستويات الرئيسية (عبر buildPanel أدناه)
+                break;
+            }
+            case 'levels:reward_remove': {
+                const lvl = Number(parts[3]);
+                const roleId = parts[4];
+                if (Array.isArray(settings.leveling.levelRewards)) {
+                    settings.leveling.levelRewards = settings.leveling.levelRewards.filter((r) => !(Number(r.level) === lvl && r.roleId === roleId));
+                    await settings.save();
+                }
+                const panel = (0, settingsPanel_1.buildLevelRewardsPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: panel.embeds, components: panel.components });
+                return;
+            }
+            case 'tickets:inc':
+            case 'tickets:dec': {
+                const delta = action === 'inc' ? 1 : -1;
+                settings.tickets.maxPerUser = Math.min(10, Math.max(1, settings.tickets.maxPerUser + delta));
+                await settings.save();
+                break;
+            }
+            case 'general:shop': {
+                // لوحة فرعية: متجر السيرفر
+                const sPanel = (0, settingsPanel_1.buildShop)(interaction.guild, settings);
+                await interaction.editReply({ embeds: sPanel.embeds, components: sPanel.components });
+                return;
+            }
+            case 'commands:clear': {
+                settings.customCommands = [];
+                await settings.save();
+                const cPanel = (0, settingsPanel_1.buildCommands)(interaction.guild, settings);
+                await interaction.editReply({ embeds: cPanel.embeds, components: cPanel.components });
+                return;
+            }
+            default:
+                await interaction.editReply({ content: '❌ إجراء غير معروف' });
+                return;
+        }
+        const panel = await (0, settingsPanel_1.buildPanel)(section, interaction.guild, interaction.user.id);
+        await interaction.editReply({
+            embeds: panel.embeds,
+            components: panel.components,
+        });
+    },
+};
+exports.default = handler;
+//# sourceMappingURL=settingsBtn.js.map

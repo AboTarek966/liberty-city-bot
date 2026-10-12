@@ -1,0 +1,105 @@
+"use strict";
+// ============================================
+// Liberty City Bot - Embed Builder Modals (ebm|)
+// ============================================
+Object.defineProperty(exports, "__esModule", { value: true });
+const embedBuilderState_1 = require("../../utils/embedBuilderState");
+const EXPIRED_MESSAGE = '⌛ انتهت صلاحية المعاينة، أعد تشغيل الأمر `/embed`';
+const HEX_COLOR_REGEX = /^#?[0-9a-fA-F]{6}$/;
+const URL_REGEX = /^https?:\/\/\S+$/i;
+const INLINE_TRUE_VALUES = ['yes', 'y', 'true', '1', 'on', 'نعم'];
+const handler = {
+    id: embedBuilderState_1.EB_MODAL_PREFIX,
+    async execute(interaction) {
+        await interaction.deferUpdate(); // ✅ منع انتهاء صلاحية التفاعل
+        const session = (0, embedBuilderState_1.getSession)(interaction.user.id);
+        if (!session) {
+            await interaction.editReply({ content: EXPIRED_MESSAGE, embeds: [], components: [] });
+            return;
+        }
+        const data = session.data;
+        const action = interaction.customId.split('|')[1] || '';
+        switch (action) {
+            // 📝 العنوان
+            case 'title': {
+                const title = interaction.fields.getTextInputValue('title').trim().slice(0, 256);
+                if (!title) {
+                    await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '❌ العنوان لا يمكن أن يكون فارغاً'));
+                    return;
+                }
+                data.title = title;
+                (0, embedBuilderState_1.touchSession)(interaction.user.id);
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '✅ تم تحديث العنوان'));
+                return;
+            }
+            // 📄 الوصف (فارغاً = مسح الوصف)
+            case 'description': {
+                const description = interaction.fields.getTextInputValue('description').trim().slice(0, 4000);
+                data.description = description || undefined;
+                (0, embedBuilderState_1.touchSession)(interaction.user.id);
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, description ? '✅ تم تحديث الوصف' : '🗑️ تم مسح الوصف'));
+                return;
+            }
+            // 🖼️ الصورة الرئيسية
+            case 'image': {
+                const url = interaction.fields.getTextInputValue('image').trim();
+                if (!URL_REGEX.test(url)) {
+                    await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '❌ رابط الصورة غير صالح — يجب أن يبدأ بـ http'));
+                    return;
+                }
+                data.image = url;
+                (0, embedBuilderState_1.touchSession)(interaction.user.id);
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '✅ تم تحديث الصورة'));
+                return;
+            }
+            // 🔍 الصورة المصغّرة
+            case 'thumbnail': {
+                const url = interaction.fields.getTextInputValue('thumbnail').trim();
+                if (!URL_REGEX.test(url)) {
+                    await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '❌ رابط الصورة المصغّرة غير صالح — يجب أن يبدأ بـ http'));
+                    return;
+                }
+                data.thumbnail = url;
+                (0, embedBuilderState_1.touchSession)(interaction.user.id);
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '✅ تم تحديث الصورة المصغّرة'));
+                return;
+            }
+            // 🔢 لون مخصص HEX
+            case 'color': {
+                const raw = interaction.fields.getTextInputValue('hex').trim();
+                if (!HEX_COLOR_REGEX.test(raw)) {
+                    await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '❌ لون غير صالح — استخدم صيغة مثل #5865F2'));
+                    return;
+                }
+                data.color = (0, embedBuilderState_1.parseHexColor)(raw) ?? data.color;
+                (0, embedBuilderState_1.touchSession)(interaction.user.id);
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '✅ تم تغيير اللون'));
+                return;
+            }
+            // ➕ إضافة حقل جديد (حد أقصى 25)
+            case 'field': {
+                if (data.fields.length >= embedBuilderState_1.EB_MAX_FIELDS) {
+                    await interaction.editReply((0, embedBuilderState_1.renderMain)(data, `❌ الحد الأقصى ${embedBuilderState_1.EB_MAX_FIELDS} حقل`));
+                    return;
+                }
+                const name = interaction.fields.getTextInputValue('name').trim().slice(0, 256);
+                const value = interaction.fields.getTextInputValue('value').trim().slice(0, 1024);
+                if (!name || !value) {
+                    await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '❌ اسم الحقل وقيمته مطلوبان'));
+                    return;
+                }
+                const inlineRaw = interaction.fields.getTextInputValue('inline').trim().toLowerCase();
+                const inline = INLINE_TRUE_VALUES.includes(inlineRaw);
+                data.fields.push({ name, value, inline });
+                (0, embedBuilderState_1.touchSession)(interaction.user.id);
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, `✅ تم إضافة الحقل (${data.fields.length}/${embedBuilderState_1.EB_MAX_FIELDS})`));
+                return;
+            }
+            default:
+                await interaction.editReply((0, embedBuilderState_1.renderMain)(data, '❌ نوع نموذج غير معروف'));
+                return;
+        }
+    },
+};
+exports.default = handler;
+//# sourceMappingURL=embedBuilder.js.map

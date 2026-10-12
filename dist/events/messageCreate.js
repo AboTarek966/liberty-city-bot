@@ -1,0 +1,755 @@
+"use strict";
+// ============================================
+// Liberty City Bot - Message Create Event
+// ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const discord_js_1 = require("discord.js");
+const helpers_1 = require("../utils/helpers");
+const models_1 = require("../models");
+const embeds_1 = require("../utils/embeds");
+const AIModeration_1 = require("../handlers/AIModeration");
+const aliasRunner_1 = require("../utils/aliasRunner");
+const scamFilter_1 = require("../utils/scamFilter");
+const messageSystems_1 = require("../utils/messageSystems");
+const pendingUploads_1 = require("../utils/pendingUploads");
+const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
+const event = {
+    name: 'messageCreate',
+    async execute(message) {
+        const client = message.client;
+        // Ignore bots and webhooks
+        if (message.author.bot)
+            return;
+        if (message.webhookId)
+            return;
+        // Ignore DMs
+        if (!message.guild)
+            return;
+        if (message.channel.type === discord_js_1.ChannelType.DM)
+            return;
+        // 📤 رفع مباشر لصورة لوحة التذاكر (استجابة فورية — قبل أي فحوصات)
+        if ((0, pendingUploads_1.hasPendingImageUpload)(message.author.id) && message.attachments.size > 0) {
+            try {
+                const upload = (0, pendingUploads_1.consumePendingImageUpload)(message.author.id);
+                if (upload && upload.guildId === message.guild.id) {
+                    const attachment = message.attachments.first();
+                    if (attachment && /\.(png|jpe?g|gif|webp)$/i.test(attachment.name || attachment.url)) {
+                        const settings = await (0, models_1.getGuildSettings)(message.guild.id);
+                        // 🎴 خلفية بطاقة الترحيب
+                        if (upload.kind === 'welcomeCard') {
+                            settings.set('welcome.card.backgroundUrl', attachment.url);
+                            await settings.save();
+                            await message
+                                .reply('✅ تم ضبط الصورة كخلفية لبطاقة الترحيب — افتح الإعدادات ← الترحيب ← 🎴 للتعديل والمعاينة')
+                                .catch(() => { });
+                            return;
+                        }
+                        // 🎫 صورة لوحة التذاكر
+                        const panels = settings.tickets.panels;
+                        const panel = panels[panels.length - 1];
+                        if (panel) {
+                            panel.image = attachment.url;
+                            await settings.save();
+                            await client.ticketHandler.updatePanelMessage(message.guild, panel).catch(() => { });
+                            await message.reply('✅ تم ضبط الصورة كبانر للوحة التذاكر وتم تحديثها فوراً').catch(() => { });
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (error) {
+                logger.error('Error in pending image upload:', error);
+            }
+        }
+        // Protection checks (anti-spam, anti-link, etc.)
+        try {
+            await client.protectionHandler.checkMessage(message);
+        }
+        catch (error) {
+            logger.error('Error in protection check:', error);
+        }
+        // فلتر الروابط الاحتيالية (صيد النيترو والمشاريع المزيفة)
+        try {
+            const blocked = await (0, scamFilter_1.handleScamFilter)(message, client);
+            if (blocked)
+                return; // رسالة احتيالية — لا تُعالَج بقية الأنظمة
+        }
+        catch (error) {
+            logger.error('Error in scam filter:', error);
+        }
+        // Activity tracking (messages)
+        try {
+            await client.activityTracker.trackMessage(message.guild.id, message.author.id);
+        }
+        catch (error) {
+            logger.error('Error tracking activity:', error);
+        }
+        // تحديث آخر نشاط في التذاكر المفتوحة (للإغلاق التلقائي عند الخمول)
+        try {
+            await (0, messageSystems_1.touchTicketActivity)(message);
+        }
+        catch (error) {
+            logger.error('Error touching ticket activity:', error);
+        }
+        // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)
+        try {
+            const customHandled = await (0, messageSystems_1.handleCustomCommand)(message);
+            if (customHandled)
+                return;
+        }
+        catch (error) {
+            logger.error('Error in custom command:', error);
+        }
+        // رصيد عشوائي أثناء التحدث (25% = +5 عملات)
+        try {
+            await (0, messageSystems_1.earnCreditsRandom)(message);
+        }
+        catch {
+            /* لا يعطّل باقي الأنظمة */
+        }
+        // Alias / prefix commands
+        try {
+            const handled = await handleAliasCommand(message, client);
+            if (handled)
+                return;
+        }
+        catch (error) {
+            logger.error('Error handling alias command:', error);
+        }
+        // AI auto-reply (mention or reply to bot)
+        try {
+            await handleAIResponse(message, client);
+        }
+        catch (error) {
+            logger.error('Error in AI response:', error);
+        }
+        // Leveling system (add XP via centralized handler)
+        try {
+            await client.levelingHandler.addMessageXp(message.member, message.channel.id);
+        }
+        catch (error) {
+            logger.error('Error in leveling:', error);
+        }
+    },
+};
+// --------------------------------------------
+// Alias / Prefix Command Handler
+// --------------------------------------------
+async function handleAliasCommand(message, client) {
+    const settings = await (0, models_1.getGuildSettings)(message.guild.id);
+    const prefix = settings.prefix || 'lc!';
+    // Check prefix command (e.g., "lc!تايم @user")
+    if (message.content.startsWith(prefix)) {
+        const args = message.content.slice(prefix.length).trim().split(/\s+/);
+        const shortcut = args[0]?.toLowerCase();
+        if (shortcut) {
+            const alias = await models_1.CommandAlias.findOne({ guildId: message.guild.id, alias: shortcut });
+            if (alias) {
+                logger.info(`⌨️ Alias matched (prefix): "${shortcut}" → "${alias.command}" | by ${message.author.tag}`);
+                await executeAliasCommand(message, client, alias.command, args.slice(1), shortcut);
+                return true;
+            }
+        }
+    }
+    // Check standalone shortcut (e.g., user types just "تايم @user")
+    const parts = message.content.trim().split(/\s+/);
+    const potentialAlias = parts[0]?.toLowerCase();
+    if (potentialAlias && potentialAlias.length <= 15) {
+        const alias = await models_1.CommandAlias.findOne({ guildId: message.guild.id, alias: potentialAlias });
+        if (alias) {
+            logger.info(`⌨️ Alias matched: "${potentialAlias}" → "${alias.command}" | by ${message.author.tag}`);
+            await executeAliasCommand(message, client, alias.command, parts.slice(1), potentialAlias);
+            return true;
+        }
+    }
+    return false;
+}
+// --------------------------------------------
+// Send a response, with fallback if replying fails
+// (e.g., original message already deleted by protection)
+// --------------------------------------------
+async function respond(message, payload) {
+    const body = typeof payload === 'string' ? { content: payload } : payload;
+    try {
+        await message.reply(body);
+        return;
+    }
+    catch (error) {
+        logger.warn(`Alias reply failed (${error.message}) — falling back to channel.send`);
+    }
+    try {
+        if (message.channel.isTextBased() && 'send' in message.channel) {
+            const fallback = typeof payload === 'string'
+                ? { content: `<@${message.author.id}> ${payload}` }
+                : payload;
+            await message.channel.send(fallback);
+        }
+    }
+    catch (error) {
+        logger.error(`Alias fallback send also failed: ${error.message}`);
+    }
+}
+// Extract a user ID from a mention (<@id>, <@!id>) or a raw ID token
+function parseUserId(token) {
+    if (!token)
+        return null;
+    const mention = token.match(/^<@!?(\d{17,20})>$/);
+    if (mention)
+        return mention[1];
+    if (/^\d{17,20}$/.test(token))
+        return token;
+    return null;
+}
+// --------------------------------------------
+// Execute an alias target command from a message
+// --------------------------------------------
+async function executeAliasCommand(message, client, commandName, args, shortcut) {
+    // 🎫 أوامر تذاكر مخصصة (لا تحتاج أمر سلاش منفصل)
+    if (commandName === 'ticket_mystats' || commandName === 'ticket_top') {
+        const member = message.member;
+        if (!member)
+            return;
+        if (!member.permissions.has(discord_js_1.PermissionFlagsBits.SendMessages)) {
+            await respond(message, '❌ ليس لديك الصلاحيات الكافية');
+            return;
+        }
+        const settings = await (0, models_1.getGuildSettings)(message.guild.id);
+        if (commandName === 'ticket_mystats') {
+            const count = settings.tickets.claimStats?.get(message.author.id) || 0;
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle('📊 إحصائياتك في التذاكر')
+                .setColor(embeds_1.Colors.primary)
+                .setDescription(`👤 ${message.author}\n\n` +
+                `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
+                `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`)
+                .setFooter({ text: 'Liberty City Tickets' })
+                .setTimestamp();
+            await respond(message, { embeds: [embed] });
+            await message.delete().catch(() => { });
+            return;
+        }
+        // ticket_top
+        const stats = settings.tickets.claimStats;
+        if (!stats || stats.size === 0) {
+            await respond(message, '📊 لا توجد إحصائيات استلام بعد.');
+            await message.delete().catch(() => { });
+            return;
+        }
+        const sorted = [...stats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const medals = ['🥇', '🥈', '🥉'];
+        const lines = sorted.map(([userId, count], i) => {
+            const medal = medals[i] || `\`${i + 1}.\``;
+            return `${medal} <@${userId}> — **${count}** تذكرة`;
+        });
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle('🏆 أعلى 10 إداريين في استلام التذاكر')
+            .setColor(embeds_1.Colors.primary)
+            .setDescription(lines.join('\n'))
+            .setFooter({ text: 'Liberty City Tickets' })
+            .setTimestamp();
+        await respond(message, { embeds: [embed] });
+        await message.delete().catch(() => { });
+        return;
+    }
+    const command = client.commandHandler.getCommand(commandName);
+    if (!command) {
+        logger.warn(`Alias target command not found: "${commandName}"`);
+        await respond(message, `❌ الأمر \`${commandName}\` غير موجود في البوت`);
+        return;
+    }
+    const member = message.member;
+    if (!member) {
+        logger.warn(`Alias: message.member is null for ${message.author.tag}`);
+        return;
+    }
+    // Permission check (same permissions as the slash command)
+    if (command.permissions && command.permissions.length > 0) {
+        const hasPermission = command.permissions.every(p => member.permissions.has(p));
+        if (!hasPermission) {
+            logger.info(`Alias denied: ${message.author.tag} lacks permissions for "${commandName}"`);
+            await respond(message, '❌ ليس لديك الصلاحيات الكافية لاستخدام هذا الأمر');
+            return;
+        }
+    }
+    try {
+        await runAliasCommand(message, client, commandName, args, shortcut, member);
+        logger.info(`✅ Alias executed: "${shortcut}" → "${commandName}" | by ${message.author.tag}`);
+    }
+    catch (error) {
+        logger.error(`Alias execution failed for "${commandName}": ${error.message}`);
+        await respond(message, `❌ حدث خطأ: ${error.message}`);
+    }
+    // Delete the command message for cleanliness
+    await message.delete().catch(() => { });
+}
+// --------------------------------------------
+// Message-based command executors (by command name)
+// --------------------------------------------
+async function runAliasCommand(message, client, commandName, args, shortcut, member) {
+    const guild = message.guild;
+    const usage = (syntax) => respond(message, `📋 **الاستخدام:** \`${shortcut} ${syntax}\``);
+    switch (commandName) {
+        // ---------- MODERATION ----------
+        case 'ban': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم> [السبب]');
+            const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
+            if (userId === message.author.id)
+                return respond(message, '❌ لا يمكنك حظر نفسك');
+            const target = await client.users.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ لم يتم العثور على المستخدم');
+            const result = await client.moderationHandler.ban({
+                guild,
+                moderator: member,
+                target,
+                reason,
+            });
+            return respond(message, { embeds: [result.embed] });
+        }
+        case 'kick': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم> [السبب]');
+            const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
+            if (userId === message.author.id)
+                return respond(message, '❌ لا يمكنك طرد نفسك');
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            const result = await client.moderationHandler.kick({
+                guild,
+                moderator: member,
+                target,
+                reason,
+            });
+            return respond(message, { embeds: [result.embed] });
+        }
+        case 'timeout': {
+            const userId = parseUserId(args[0]);
+            const duration = args[1];
+            if (!userId || !duration)
+                return usage('<@المستخدم> <المدة> [السبب] • مثال: 10m, 1h, 1d');
+            const reason = args.slice(2).join(' ') || 'لم يتم تحديد سبب';
+            if (userId === message.author.id)
+                return respond(message, '❌ لا يمكنك كتم نفسك');
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            if (!target.moderatable)
+                return respond(message, '❌ لا أستطيع كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
+            const result = await client.moderationHandler.timeout({
+                guild,
+                moderator: member,
+                target,
+                reason,
+                duration,
+            });
+            return respond(message, { embeds: [result.embed] });
+        }
+        case 'warn': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم> [السبب]');
+            const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
+            const target = (await guild.members.fetch(userId).catch(() => null)) ||
+                (await client.users.fetch(userId).catch(() => null));
+            if (!target)
+                return respond(message, '❌ لم يتم العثور على المستخدم');
+            const result = await client.moderationHandler.warn({
+                guild,
+                moderator: member,
+                target,
+                reason,
+            });
+            return respond(message, { embeds: [result.embed] });
+        }
+        case 'mute': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم> [السبب]');
+            const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            const result = await client.moderationHandler.mute({
+                guild,
+                moderator: member,
+                target,
+                reason,
+            });
+            return respond(message, { embeds: [result.embed] });
+        }
+        case 'unmute': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم> [السبب]');
+            const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            const result = await client.moderationHandler.unmute({
+                guild,
+                moderator: member,
+                target,
+                reason,
+            });
+            return respond(message, { embeds: [result.embed] });
+        }
+        case 'untimeout': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم>');
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            if (!target.moderatable)
+                return respond(message, '❌ لا أستطيع إلغاء كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
+            if (!target.isCommunicationDisabled())
+                return respond(message, 'ℹ️ هذا العضو غير مكتوم أصلاً');
+            await target.timeout(null, `إلغاء تايم أوت بواسطة ${member.user.tag}`).catch(() => {
+                return respond(message, '❌ فشل إلغاء التايم أوت — تحقق من صلاحيات البوت');
+            });
+            return respond(message, `✅ **تم إلغاء تايم أوت** <@${userId}>`);
+        }
+        case 'unban': {
+            const userId = parseUserId(args[0]);
+            if (!userId)
+                return usage('<@المستخدم / ID>');
+            const reason = args.slice(1).join(' ') || 'إلغاء حظر';
+            try {
+                await guild.members.unban(userId, reason).catch(() => {
+                    return respond(message, '❌ فشل إلغاء الحظر — المستخدم غير محظور أو صلاحيات البوت');
+                });
+                return respond(message, `✅ **تم إلغاء الحظر** عن \`${userId}\``);
+            }
+            catch {
+                return respond(message, '❌ فشل إلغاء الحظر');
+            }
+        }
+        case 'roleadd': {
+            const userId = parseUserId(args[0]);
+            const roleId = args[1]?.replace(/[<@&>]/g, '');
+            if (!userId)
+                return usage('<@المستخدم> [@رول — أو اختر من القائمة]');
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            // إذا لم يُحدد رول → أرسل قائمة اختيار الرولات
+            if (!roleId) {
+                const { RoleSelectMenuBuilder, ActionRowBuilder } = await Promise.resolve().then(() => __importStar(require('discord.js')));
+                const select = new RoleSelectMenuBuilder()
+                    .setCustomId(`alias_roleadd:${target.id}`)
+                    .setPlaceholder(`➕ اختر الرول الذي تريد إضافته لـ ${target.user.username}`)
+                    .setMinValues(1)
+                    .setMaxValues(1);
+                const row = new ActionRowBuilder().addComponents(select);
+                await respond(message, {
+                    content: `➕ **اختر الرول** الذي تريد إضافته لـ ${target}:`,
+                    components: [row],
+                });
+                return;
+            }
+            const role = guild.roles.cache.get(roleId);
+            if (!role)
+                return respond(message, '❌ الرول غير موجود');
+            const reason = args.slice(2).join(' ') || 'إضافة رول';
+            try {
+                const result = await client.moderationHandler.addRole({
+                    guild,
+                    moderator: member,
+                    target,
+                    reason,
+                    roleId,
+                });
+                return respond(message, { embeds: [result.embed] });
+            }
+            catch (e) {
+                return respond(message, `❌ ${e.message}`);
+            }
+        }
+        case 'roleremove': {
+            const userId = parseUserId(args[0]);
+            const roleId = args[1]?.replace(/[<@&>]/g, '');
+            if (!userId || !roleId)
+                return usage('<@المستخدم> <@الرول / ID>');
+            const reason = args.slice(2).join(' ') || 'إزالة رول';
+            const target = await guild.members.fetch(userId).catch(() => null);
+            if (!target)
+                return respond(message, '❌ العضو غير موجود في السيرفر');
+            const role = guild.roles.cache.get(roleId);
+            if (!role)
+                return respond(message, '❌ الرول غير موجود');
+            try {
+                const result = await client.moderationHandler.removeRole({
+                    guild,
+                    moderator: member,
+                    target,
+                    reason,
+                    roleId,
+                });
+                return respond(message, { embeds: [result.embed] });
+            }
+            catch (e) {
+                return respond(message, `❌ ${e.message}`);
+            }
+        }
+        // ---------- UTILITY ----------
+        case 'purge': {
+            const amount = parseInt(args[0], 10);
+            if (!amount || amount < 1 || amount > 100)
+                return usage('<1-100> • مثال: 50');
+            if (!('bulkDelete' in message.channel))
+                return respond(message, '❌ لا يمكن الحذف في هذا النوع من القنوات');
+            const deleted = await message.channel.bulkDelete(amount, true);
+            if (message.channel.isTextBased() && 'send' in message.channel) {
+                await message.channel
+                    .send(`🗑️ **تم حذف ${deleted.size} رسالة بنجاح**`)
+                    .then(m => setTimeout(() => m.delete().catch(() => { }), 5000))
+                    .catch(() => { });
+            }
+            return;
+        }
+        case 'ping': {
+            if (!message.channel.isTextBased() || !('send' in message.channel))
+                return;
+            const start = Date.now();
+            const msg = await message.channel.send('🏓 جاري القياس...');
+            const latency = Date.now() - start;
+            await msg
+                .edit(`🏓 **Pong!**\n• سرعة الرد: **${latency}ms**\n• WebSocket: **${client.ws.ping}ms**`)
+                .catch(() => { });
+            return;
+        }
+        case 'say': {
+            const text = args.join(' ').trim();
+            if (!text)
+                return usage('<النص المراد إرساله>');
+            if (!message.channel.isTextBased() || !('send' in message.channel))
+                return;
+            await message.delete().catch(() => { });
+            await message.channel.send(text.substring(0, 2000)).catch((e) => {
+                logger.error(`Alias "say" failed: ${e.message}`);
+            });
+            return;
+        }
+        case 'avatar': {
+            const userId = parseUserId(args[0]) || message.author.id;
+            const user = await client.users.fetch(userId).catch(() => null);
+            if (!user)
+                return respond(message, '❌ لم يتم العثور على المستخدم');
+            const embed = new discord_js_1.EmbedBuilder()
+                .setColor(embeds_1.Colors.primary)
+                .setTitle(`🖼️ صورة ${user.tag}`)
+                .setImage(user.displayAvatarURL({ size: 512 }))
+                .setFooter({ text: `ID: ${user.id}` })
+                .setTimestamp();
+            return respond(message, { embeds: [embed] });
+        }
+        case 'userinfo': {
+            const userId = parseUserId(args[0]) || message.author.id;
+            const gm = await guild.members.fetch(userId).catch(() => null);
+            const user = gm?.user || (await client.users.fetch(userId).catch(() => null));
+            if (!user)
+                return respond(message, '❌ لم يتم العثور على المستخدم');
+            const created = Math.floor(user.createdTimestamp / 1000);
+            const fields = [
+                { name: '👤 الحساب', value: `\`${user.tag}\` • <@${user.id}>`, inline: false },
+                { name: '🆔 المعرّف', value: `\`${user.id}\``, inline: true },
+                { name: '📅 تاريخ الإنشاء', value: `<t:${created}:R>`, inline: true },
+            ];
+            if (gm) {
+                const joined = Math.floor((gm.joinedTimestamp || Date.now()) / 1000);
+                fields.push({ name: '📥 انضم للسيرفر', value: `<t:${joined}:R>`, inline: true });
+                fields.push({
+                    name: '🎭 أعلى الرتب',
+                    value: gm.roles.cache
+                        .filter(r => r.id !== guild.id)
+                        .sort((a, b) => b.position - a.position)
+                        .first(5)
+                        .map(r => r.toString())
+                        .join(' , ') || 'بدون رتب',
+                    inline: false,
+                });
+            }
+            const embed = new discord_js_1.EmbedBuilder()
+                .setColor(embeds_1.Colors.info)
+                .setTitle(`ℹ️ معلومات ${user.tag}`)
+                .setThumbnail(user.displayAvatarURL({ size: 256 }))
+                .addFields(fields)
+                .setTimestamp();
+            return respond(message, { embeds: [embed] });
+        }
+        // ---------- Fallback: تنفيذ عام لأي أمر سلاش ----------
+        default: {
+            const executed = await (0, aliasRunner_1.executeCommandFromMessage)(message, client, commandName, args);
+            if (!executed) {
+                return respond(message, `⌨️ الاختصار **${shortcut}** ← \`/${commandName}\`\nهذا الأمر لا يُنفّذ من المحادثة — استخدم الأمر الكامل \`/${commandName}\` مباشرة.`);
+            }
+            return;
+        }
+    }
+}
+// --------------------------------------------
+// AI Auto-Reply (Mention / Reply)
+// --------------------------------------------
+async function handleAIResponse(message, client) {
+    if (!client.aiHandler)
+        return;
+    const botId = client.user?.id;
+    if (!botId)
+        return;
+    // Check if bot was mentioned
+    const isMention = message.mentions.has(client.user);
+    // Check if reply to bot's message
+    let repliedToBot = false;
+    if (message.reference?.messageId) {
+        try {
+            const refMessage = await message.channel.messages.fetch(message.reference.messageId);
+            repliedToBot = refMessage.author.id === botId;
+        }
+        catch { }
+    }
+    if (!isMention && !repliedToBot)
+        return;
+    // Extract question (remove bot mention)
+    const question = message.content
+        .replace(/<@!?\d+>/g, '')
+        .trim();
+    if (!question) {
+        await message.reply('👋 نعم؟ اكتب سؤالك وسأجيبك!').catch(() => { });
+        return;
+    }
+    // أوامر العقوبات باللغة الطبيعية (تنفيذ حتمي وسريع قبل الذكاء الاصطناعي)
+    try {
+        const executed = await (0, AIModeration_1.executeAIModeration)(message, client, question);
+        if (executed)
+            return;
+    }
+    catch (error) {
+        logger.error('Error in AI moderation:', error);
+    }
+    // Typing indicator
+    if ('sendTyping' in message.channel) {
+        await message.channel.sendTyping().catch(() => { });
+    }
+    const memberRoles = message.member?.roles.cache.map(r => r.id) || [];
+    // سياق المستخدم: هل هو إداري؟ (يحدد ما يمكن للـ AI إظهاره)
+    const memberPerms = message.member?.permissions;
+    const isPrivileged = !!memberPerms &&
+        (memberPerms.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+            memberPerms.has(discord_js_1.PermissionFlagsBits.ManageGuild));
+    const userContext = {
+        username: message.member?.displayName || message.author.username,
+        isPrivileged,
+        roleNames: message.member?.roles.cache
+            .filter(r => r.name !== '@everyone')
+            .map(r => r.name)
+            .slice(0, 20) || [],
+    };
+    // 📡 بث مباشر — أول كلمات من الذكاء الاصطناعي تظهر فوراً
+    let streamedMsg = null;
+    let lastEditAt = 0;
+    const preview = (text) => text.length > 1900 ? text.slice(0, 1900) + '\n…' : text;
+    // خيارات الرسالة للإيموجي والمنشنز بشكل صحيح
+    const msgOptions = (text) => ({
+        content: text,
+        allowedMentions: { parse: ['users', 'roles', 'everyone'] },
+    });
+    const stream = {
+        onFirstChunk: async (text) => {
+            streamedMsg = await message.reply(msgOptions(preview(text)));
+            lastEditAt = Date.now();
+        },
+        onUpdate: async (text) => {
+            if (!streamedMsg)
+                return;
+            const now = Date.now();
+            if (now - lastEditAt < 1000)
+                return;
+            lastEditAt = now;
+            await streamedMsg.edit(msgOptions(preview(text))).catch(() => { });
+        },
+    };
+    const response = await client.aiHandler.generateResponse(message.author.id, message.guild.id, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream });
+    if (response) {
+        const parts = splitAiText(response.content, 1900);
+        if (streamedMsg) {
+            // الرد الأول مُرسَل أثناء البث — نضبطه بالمحتوى النهائي ثم نُكمل البقية
+            await streamedMsg.edit(msgOptions(parts[0])).catch(() => { });
+            for (let i = 1; i < parts.length; i++) {
+                if (message.channel.isTextBased() && 'send' in message.channel) {
+                    await message.channel.send(msgOptions(parts[i])).catch(() => { });
+                }
+            }
+        }
+        else {
+            // بدون بث (رزيرف/فشل) — رد عادي مع تقسيم الردود الطويلة
+            await message.reply(msgOptions(parts[0])).catch(async () => {
+                if (message.channel.isTextBased() && 'send' in message.channel) {
+                    await message.channel.send(msgOptions(`<@${message.author.id}> ${parts[0]}`)).catch(() => { });
+                }
+            });
+            for (let i = 1; i < parts.length; i++) {
+                if (message.channel.isTextBased() && 'send' in message.channel) {
+                    await message.channel.send(msgOptions(parts[i])).catch(() => { });
+                }
+            }
+        }
+    }
+}
+// تقسيم نص الرد حسب حد ديسكورد (2000 حرف) عند أقرب سطر/مسافة
+function splitAiText(text, max) {
+    if (text.length <= max)
+        return [text];
+    const parts = [];
+    let rest = text;
+    while (rest.length > max) {
+        let cut = rest.lastIndexOf('\n', max);
+        if (cut < max * 0.5)
+            cut = rest.lastIndexOf(' ', max);
+        if (cut < max * 0.5)
+            cut = max;
+        parts.push(rest.slice(0, cut));
+        rest = rest.slice(cut).trimStart();
+    }
+    if (rest)
+        parts.push(rest);
+    return parts;
+}
+exports.default = event;
+//# sourceMappingURL=messageCreate.js.map
