@@ -378,7 +378,7 @@ class ModerationHandler {
         // Log
         await this.logAction(guild, embed);
         logger.info(`Muted ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed };
+        return { case: moderationCase, embed, simpleMsg: `🔇 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم كتمه${duration ? ` لمدة ${duration}` : ''} | ${reason}` };
     }
     // --------------------------------------------
     // Unmute
@@ -427,7 +427,7 @@ class ModerationHandler {
         // Log
         await this.logAction(guild, embed);
         logger.info(`Unmuted ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed };
+        return { case: moderationCase, embed, simpleMsg: `🔊 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم فك الكتم عنه | ${reason}` };
     }
     // --------------------------------------------
     // Add Role (إضافة رول)

@@ -1,1 +1,1 @@
-{"version":3,"file":"untimeout.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/untimeout.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OAmFd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"untimeout.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/untimeout.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OAwEd,CAAC;AAEF,eAAe,OAAO,CAAC"}

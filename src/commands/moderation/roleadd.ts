@@ -136,34 +136,12 @@ const command: Command = {
       );
 
       const rolesText = grantable.map(r => `${r}`).join(', ');
-      const skippedText = [
-        ...execBlocked.map(r => `${r} (أعلى من رتبتك)`),
-        ...botBlocked.map(r => `${r} (أعلى من رتبة البوت)`),
-        ...alreadyOwned.map(r => `${r} (مملوك بالفعل)`),
-      ]
-        .slice(0, 10)
-        .join('\n');
+      const skippedCount = execBlocked.length + botBlocked.length + alreadyOwned.length;
 
-      const embed = new EmbedBuilder()
-        .setTitle(grantable.length > 1 ? '➕ تم إضافة الرولات' : '➕ تم إضافة الرول')
-        .setColor(Colors.success)
-        .addFields(
-          { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-          {
-            name: grantable.length > 1 ? '🎭 الرولات' : '🎭 الرول',
-            value: rolesText,
-            inline: false,
-          },
-          { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-          { name: '📝 السبب', value: reason, inline: false },
-          ...(skippedText
-            ? [{ name: '⚠️ تم تخطيها', value: skippedText, inline: false }]
-            : []),
-        )
-        .setTimestamp()
-        .setFooter({ text: `Liberty City | ${guild.name}` });
-
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({
+        content: `➕ **${member}** ← ${rolesText}` +
+          (skippedCount ? ` (تخطي ${skippedCount})` : ''),
+      });
 
       // Log
       try {
@@ -172,6 +150,12 @@ const command: Command = {
         if (settings.logging?.enabled && settings.logging.channelId) {
           const logChannel = guild.channels.cache.get(settings.logging.channelId);
           if (logChannel && logChannel.isTextBased()) {
+            const skippedText = [
+              ...execBlocked.map(r => `${r} (أعلى من رتبتك)`),
+              ...botBlocked.map(r => `${r} (أعلى من رتبة البوت)`),
+              ...alreadyOwned.map(r => `${r} (مملوك بالفعل)`),
+            ].slice(0, 10).join('\n');
+
             const logEmbed = new EmbedBuilder()
               .setTitle(grantable.length > 1 ? '➕ إضافة رولات' : '➕ إضافة رول')
               .setColor(Colors.success)

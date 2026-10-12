@@ -4,7 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('purge')
@@ -54,14 +53,7 @@ const command = {
             return;
         }
         const deleted = await channel.bulkDelete(messagesToDelete, true);
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('🗑️ تم مسح الرسائل')
-            .setColor(embeds_1.Colors.success)
-            .setDescription(`تم مسح **${deleted.size}** رسالة` +
-            (targetUser ? ` من ${targetUser}` : ''))
-            .setFooter({ text: 'Liberty City Bot' })
-            .setTimestamp();
-        await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({ content: `🗑️ تم مسح **${deleted.size}** رسالة` + (targetUser ? ` من ${targetUser}` : '') });
     },
 };
 exports.default = command;

@@ -54,13 +54,7 @@ const command = {
         const reason = interaction.options.getString('reason') || 'إلغاء حظر';
         try {
             await guild.members.unban(user.id, `${reason} | بواسطة ${interaction.user.tag}`);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🔓 تم إلغاء الحظر')
-                .setColor(embeds_1.Colors.success)
-                .addFields({ name: '👤 العضو', value: `${user} (\`${user.id}\`)`, inline: true }, { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true }, { name: '📝 السبب', value: reason, inline: false })
-                .setTimestamp()
-                .setFooter({ text: `Liberty City | ${guild.name}` });
-            await interaction.reply({ embeds: [embed] });
+            await interaction.reply({ content: `🔓 **${user.tag}** تم إلغاء حظره | ${reason}` });
             // Log
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../../models')));

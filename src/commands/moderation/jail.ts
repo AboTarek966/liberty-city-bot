@@ -239,21 +239,8 @@ const command: Command = {
       //   }
       // }
 
-      // الرد
-      const embed = new EmbedBuilder()
-        .setTitle('🔒 تم سجن العضو')
-        .setColor(Colors.error)
-        .addFields(
-          { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-          { name: '🔒 روم السجن', value: `${targetJailChannel}`, inline: true },
-          { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-          { name: '📝 السبب', value: reason, inline: false },
-          { name: '⏱️ المدة', value: duration || 'دائم (يحتاج إفراج يدوي)', inline: true },
-        )
-        .setTimestamp()
-        .setFooter({ text: `Liberty City | ${guild.name}` });
-
-      await interaction.editReply({ embeds: [embed] });
+      // الرد — رسالة نصية بسيطة
+      await interaction.editReply({ content: `🔒 **${member}** تم سجنه في ${targetJailChannel} | ${reason}` });
 
       // تسجيل في السجلات
       try {

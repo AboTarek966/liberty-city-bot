@@ -36,18 +36,7 @@ const command: Command = {
     try {
       await guild.members.unban(user.id, `${reason} | بواسطة ${interaction.user.tag}`);
 
-      const embed = new EmbedBuilder()
-        .setTitle('🔓 تم إلغاء الحظر')
-        .setColor(Colors.success)
-        .addFields(
-          { name: '👤 العضو', value: `${user} (\`${user.id}\`)`, inline: true },
-          { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-          { name: '📝 السبب', value: reason, inline: false },
-        )
-        .setTimestamp()
-        .setFooter({ text: `Liberty City | ${guild.name}` });
-
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({ content: `🔓 **${user.tag}** تم إلغاء حظره | ${reason}` });
 
       // Log
       try {

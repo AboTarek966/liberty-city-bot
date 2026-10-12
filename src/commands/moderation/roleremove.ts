@@ -70,19 +70,7 @@ const command: Command = {
     try {
       await member.roles.remove(role, `${reason} | بواسطة ${interaction.user.tag}`);
 
-      const embed = new EmbedBuilder()
-        .setTitle('➖ تم إزالة الرول')
-        .setColor(Colors.warning)
-        .addFields(
-          { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-          { name: '🎭 الرول', value: `${role}`, inline: true },
-          { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-          { name: '📝 السبب', value: reason, inline: false },
-        )
-        .setTimestamp()
-        .setFooter({ text: `Liberty City | ${guild.name}` });
-
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({ content: `➖ **${member}** ← ${role} (تمت الإزالة)` });
 
       // Log
       try {

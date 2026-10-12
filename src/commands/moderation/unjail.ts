@@ -114,20 +114,8 @@ const command: Command = {
       // تنظيف بيانات السجن
       await JailData.findOneAndDelete({ guildId: guild.id, userId: member.id });
 
-      // الرد
-      const embed = new EmbedBuilder()
-        .setTitle('🔓 تم إلغاء سجن العضو')
-        .setColor(Colors.success)
-        .addFields(
-          { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-          { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-          { name: '📝 السبب', value: reason, inline: false },
-          { name: '🔄 رولات مستعادة', value: previousRoles.length > 0 ? previousRoles.map(r => `<@&${r}>`).join('، ') : 'لا توجد رولات سابقة', inline: false },
-        )
-        .setTimestamp()
-        .setFooter({ text: `Liberty City | ${guild.name}` });
-
-      await interaction.editReply({ embeds: [embed] });
+      // الرد — رسالة نصية بسيطة
+      await interaction.editReply({ content: `🔓 **${member}** تم إلغاء سجنه واستعادة ${previousRoles.length} رول | ${reason}` });
 
       // تسجيل في السجلات
       try {

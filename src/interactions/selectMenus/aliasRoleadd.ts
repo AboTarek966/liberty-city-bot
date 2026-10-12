@@ -56,7 +56,7 @@ const handler: SelectMenuHandler = {
         roleIds,
       });
 
-      await roleSelect.editReply({ embeds: [result.embed] });
+      await roleSelect.editReply({ content: result.simpleMsg });
     } catch (error: any) {
       await roleSelect.editReply({ content: `❌ حدث خطأ: ${error.message}` }).catch(() => {});
     }

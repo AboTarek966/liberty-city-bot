@@ -59,18 +59,7 @@ const command: Command = {
     try {
       await member.timeout(null, `${reason} | بواسطة ${interaction.user.tag}`);
 
-      const embed = new EmbedBuilder()
-        .setTitle('🔓 تم فك الكتم')
-        .setColor(Colors.success)
-        .addFields(
-          { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-          { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-          { name: '📝 السبب', value: reason, inline: false },
-        )
-        .setTimestamp()
-        .setFooter({ text: `Liberty City | ${guild.name}` });
-
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({ content: `🔓 **${member}** تم فك الكتم عنه | ${reason}` });
 
       // Log
       try {

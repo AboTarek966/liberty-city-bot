@@ -81,7 +81,7 @@ const command: Command = {
       });
 
       await interaction.editReply({
-        embeds: [result.embed],
+        content: `⏱️ **${target.tag}** تم كتمه لمدة ${duration} | ${reason}`,
       });
     } catch (error: any) {
       await interaction.editReply({

@@ -433,7 +433,7 @@ export class ModerationHandler {
   // --------------------------------------------
   // Mute (Role-based)
   // --------------------------------------------
-  async mute(options: ModerationOptions): Promise<{ case: any; embed: any }> {
+  async mute(options: ModerationOptions): Promise<{ case: any; embed: any; simpleMsg: string }> {
     const { guild, moderator, target, reason, duration } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -485,13 +485,13 @@ export class ModerationHandler {
     await this.logAction(guild, embed);
 
     logger.info(`Muted ${target.id} in ${guild.id} by ${moderator.id}`);
-    return { case: moderationCase, embed };
+    return { case: moderationCase, embed, simpleMsg: `🔇 **${target instanceof GuildMember ? target.user.tag : target.tag}** تم كتمه${duration ? ` لمدة ${duration}` : ''} | ${reason}` };
   }
 
   // --------------------------------------------
   // Unmute
   // --------------------------------------------
-  async unmute(options: ModerationOptions): Promise<{ case: any; embed: any }> {
+  async unmute(options: ModerationOptions): Promise<{ case: any; embed: any; simpleMsg: string }> {
     const { guild, moderator, target, reason } = options;
     const targetMember = target instanceof GuildMember ? target : guild.members.cache.get(target.id);
 
@@ -544,7 +544,7 @@ export class ModerationHandler {
     await this.logAction(guild, embed);
 
     logger.info(`Unmuted ${target.id} in ${guild.id} by ${moderator.id}`);
-    return { case: moderationCase, embed };
+    return { case: moderationCase, embed, simpleMsg: `🔊 **${target instanceof GuildMember ? target.user.tag : target.tag}** تم فك الكتم عنه | ${reason}` };
   }
 
   // --------------------------------------------

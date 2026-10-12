@@ -138,22 +138,10 @@ const command: Command = {
       return;
     }
 
-    // الرد
-    const embed = new EmbedBuilder()
-      .setTitle('⬆️ تم ترقية العضو')
-      .setColor(Colors.success)
-      .addFields(
-        { name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true },
-        { name: '🎭 الرول الجديد', value: `${newRole}`, inline: true },
-        { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true },
-        { name: '📝 السبب', value: reason, inline: false },
-      )
-      .setTimestamp()
-      .setFooter({ text: `Liberty City | ${guild.name}` });
+    // الرد — رسالة نصية بسيطة وسريعة
+    await interaction.reply({ content: `✅ **${member}** تمت ترقيته إلى ${newRole}` });
 
-    await interaction.reply({ embeds: [embed] });
-
-    // تسجيل في السجلات
+    // تسجيل في السجلات (خلفية — لا يؤخر الرد)
     try {
       const settings = await (await import('../../models')).getGuildSettings(guild.id);
       if (settings.logging?.enabled && settings.logging.channelId) {

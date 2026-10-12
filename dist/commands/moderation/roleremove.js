@@ -79,13 +79,7 @@ const command = {
         }
         try {
             await member.roles.remove(role, `${reason} | بواسطة ${interaction.user.tag}`);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('➖ تم إزالة الرول')
-                .setColor(embeds_1.Colors.warning)
-                .addFields({ name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true }, { name: '🎭 الرول', value: `${role}`, inline: true }, { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true }, { name: '📝 السبب', value: reason, inline: false })
-                .setTimestamp()
-                .setFooter({ text: `Liberty City | ${guild.name}` });
-            await interaction.reply({ embeds: [embed] });
+            await interaction.reply({ content: `➖ **${member}** ← ${role} (تمت الإزالة)` });
             // Log
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../../models')));

@@ -75,17 +75,7 @@ const command: Command = {
     }
     const deleted = await channel.bulkDelete(messagesToDelete, true);
 
-    const embed = new EmbedBuilder()
-      .setTitle('🗑️ تم مسح الرسائل')
-      .setColor(Colors.success)
-      .setDescription(
-        `تم مسح **${deleted.size}** رسالة` +
-        (targetUser ? ` من ${targetUser}` : '')
-      )
-      .setFooter({ text: 'Liberty City Bot' })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ content: `🗑️ تم مسح **${deleted.size}** رسالة` + (targetUser ? ` من ${targetUser}` : '') });
   },
 };
 

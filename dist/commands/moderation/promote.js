@@ -139,15 +139,9 @@ const command = {
             await interaction.reply({ content: '❌ فشل إضافة الرول — تحقق من صلاحيات البوت', ephemeral: true });
             return;
         }
-        // الرد
-        const embed = new discord_js_1.EmbedBuilder()
-            .setTitle('⬆️ تم ترقية العضو')
-            .setColor(embeds_1.Colors.success)
-            .addFields({ name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true }, { name: '🎭 الرول الجديد', value: `${newRole}`, inline: true }, { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true }, { name: '📝 السبب', value: reason, inline: false })
-            .setTimestamp()
-            .setFooter({ text: `Liberty City | ${guild.name}` });
-        await interaction.reply({ embeds: [embed] });
-        // تسجيل في السجلات
+        // الرد — رسالة نصية بسيطة وسريعة
+        await interaction.reply({ content: `✅ **${member}** تمت ترقيته إلى ${newRole}` });
+        // تسجيل في السجلات (خلفية — لا يؤخر الرد)
         try {
             const settings = await (await Promise.resolve().then(() => __importStar(require('../../models')))).getGuildSettings(guild.id);
             if (settings.logging?.enabled && settings.logging.channelId) {

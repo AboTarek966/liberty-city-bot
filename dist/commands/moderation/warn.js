@@ -42,11 +42,8 @@ const command = {
                 target,
                 reason,
             });
-            const embed = result.embed;
-            embed.addFields({
-                name: '📊 عدد التحذيرات',
-                value: `${result.warningCount}`,
-                inline: true,
+            await interaction.editReply({
+                content: `⚠️ **${target.tag}** تم تحذيره (${result.warningCount} تحذير) | ${reason}`,
             });
             // 🎭 رولات التحذير — إعطاء مباشرة أو لوحة اختيار (من الإعدادات)
             const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
@@ -54,7 +51,7 @@ const command = {
                 const executor = interaction.guild.members.cache.get(interaction.user.id) ||
                     (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
                 if (executor) {
-                    const note = await (0, warnRoles_1.offerWarnRoles)({
+                    await (0, warnRoles_1.offerWarnRoles)({
                         settings: await (0, models_1.getGuildSettings)(interaction.guildId),
                         guild: interaction.guild,
                         executor,
@@ -66,14 +63,8 @@ const command = {
                             ephemeral: true,
                         }),
                     });
-                    if (note) {
-                        embed.addFields({ name: '🎭 رول التحذير', value: note, inline: false });
-                    }
                 }
             }
-            await interaction.editReply({
-                embeds: [embed],
-            });
         }
         catch (error) {
             await interaction.editReply({

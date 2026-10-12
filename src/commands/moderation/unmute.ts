@@ -54,7 +54,7 @@ const command: Command = {
         reason,
       });
 
-      await interaction.editReply({ embeds: [result.embed] });
+      await interaction.editReply({ content: result.simpleMsg });
     } catch (error: any) {
       await interaction.editReply({ content: `❌ حدث خطأ: ${error.message}` });
     }

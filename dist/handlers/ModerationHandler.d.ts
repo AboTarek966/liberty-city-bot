@@ -41,10 +41,12 @@ export declare class ModerationHandler {
     mute(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
+        simpleMsg: string;
     }>;
     unmute(options: ModerationOptions): Promise<{
         case: any;
         embed: any;
+        simpleMsg: string;
     }>;
     addRole(options: {
         guild: Guild;

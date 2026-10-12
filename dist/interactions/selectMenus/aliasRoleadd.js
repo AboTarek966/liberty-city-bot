@@ -44,7 +44,7 @@ const handler = {
                 reason: 'إضافة رول عبر قائمة الاختيار',
                 roleIds,
             });
-            await roleSelect.editReply({ embeds: [result.embed] });
+            await roleSelect.editReply({ content: result.simpleMsg });
         }
         catch (error) {
             await roleSelect.editReply({ content: `❌ حدث خطأ: ${error.message}` }).catch(() => { });

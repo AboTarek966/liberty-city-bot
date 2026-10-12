@@ -61,7 +61,7 @@ const command = {
                 reason,
             });
             await interaction.editReply({
-                embeds: [result.embed],
+                content: `👢 **${target.tag}** تم طرده | ${reason}`,
             });
         }
         catch (error) {

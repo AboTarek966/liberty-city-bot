@@ -1,1 +1,1 @@
-{"version":3,"file":"unjail.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/unjail.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAQxD,QAAA,MAAM,OAAO,EAAE,OAwJd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"unjail.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/unjail.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAQxD,QAAA,MAAM,OAAO,EAAE,OA4Id,CAAC;AAEF,eAAe,OAAO,CAAC"}

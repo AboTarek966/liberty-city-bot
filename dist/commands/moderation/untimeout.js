@@ -72,13 +72,7 @@ const command = {
         }
         try {
             await member.timeout(null, `${reason} | بواسطة ${interaction.user.tag}`);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🔓 تم فك الكتم')
-                .setColor(embeds_1.Colors.success)
-                .addFields({ name: '👤 العضو', value: `${member} (\`${member.id}\`)`, inline: true }, { name: '🛡️ المنفذ', value: `${interaction.user}`, inline: true }, { name: '📝 السبب', value: reason, inline: false })
-                .setTimestamp()
-                .setFooter({ text: `Liberty City | ${guild.name}` });
-            await interaction.reply({ embeds: [embed] });
+            await interaction.reply({ content: `🔓 **${member}** تم فك الكتم عنه | ${reason}` });
             // Log
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../../models')));
