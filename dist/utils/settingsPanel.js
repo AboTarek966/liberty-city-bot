@@ -1043,7 +1043,8 @@ function buildAutoMod(guild, s) {
     const embed = categoryEmbed('automod', guild, `فلترة تلقائية للرسائل المسيئة والمحظورة والـ Zalgo\n\n` +
         `> ⚡ **الحالة:** ${on(a.enabled)} ${a.enabled ? 'مفعّل' : 'معطّل'}\n` +
         `> 🎯 **الإجراء عند المخالفة:** ${actionLabels[a.badWordsAction] || a.badWordsAction}\n` +
-        `> 😀 **مكافحة Zalgo:** ${on(a.zalgoEnabled)} ${a.zalgoEnabled ? 'مفعّل' : 'معطّل'}\n\n` +
+        `> 😀 **مكافحة Zalgo:** ${on(a.zalgoEnabled)} ${a.zalgoEnabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 👑 **من يتجاوز الكلمات المحظورة:** حاملو رتبة \`Administrator\` فقط\n\n` +
         `━━━━━ **الكلمات المحظورة (${a.badWords?.length || 0})** ━━━━━\n` +
         `${wordsPreview}`);
     const actionSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()

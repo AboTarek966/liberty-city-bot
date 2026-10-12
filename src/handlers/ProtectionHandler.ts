@@ -78,10 +78,12 @@ export class ProtectionHandler {
     // Skip if channel is ignored
     if (this.isIgnoredChannel(message.channel.id, settings)) return null;
 
-    const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    const hasAdministrator = message.member.permissions.has(PermissionFlagsBits.Administrator);
+    const isAdmin = hasAdministrator ||
                     message.member.permissions.has(PermissionFlagsBits.ManageMessages);
 
     // Check each protection type — الإدارين يتجاوزون الحماية العامة فقط
+    // requiresAdministrator: تجاوز الكلمات المحظورة (السب) لمن يملك Administrator فقط
     const checks = [
       { name: 'antiSpam', check: this.checkAntiSpam.bind(this), adminBypass: true },
       { name: 'antiLink', check: this.checkAntiLink.bind(this), adminBypass: true },
@@ -89,13 +91,13 @@ export class ProtectionHandler {
       { name: 'antiMention', check: this.checkAntiMention.bind(this), adminBypass: true },
       { name: 'antiCaps', check: this.checkAntiCaps.bind(this), adminBypass: true },
       { name: 'antiEmoji', check: this.checkAntiEmoji.bind(this), adminBypass: true },
-      { name: 'autoMod', check: this.checkAutoMod.bind(this), adminBypass: false }, // للكل
+      { name: 'autoMod', check: this.checkAutoMod.bind(this), adminBypass: true, requiresAdministrator: true },
       { name: 'zalgo', check: this.checkZalgo.bind(this), adminBypass: false }, // للكل
     ];
 
-    for (const { name, check, adminBypass } of checks) {
-      // ⚡ الإدارين يتجاوزون هذا الفحص؟
-      if (isAdmin && adminBypass) continue;
+    for (const { name, check, adminBypass, requiresAdministrator } of checks) {
+      // ⚡ يتجاوز هذا الفحص؟ (الأمراء فقط للسب، وبقية الإدارين لبقية الحمايات)
+      if (adminBypass && (requiresAdministrator ? hasAdministrator : isAdmin)) continue;
       
       const action = await check(message, settings);
       if (action) {
