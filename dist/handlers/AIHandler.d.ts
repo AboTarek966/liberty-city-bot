@@ -37,6 +37,12 @@ export declare class AIHandler {
      * Detects if an AI response is just (a near copy of) the user's question.
      */
     private isEchoResponse;
+    /**
+     * إزالة تكرار السؤال من بداية الرد.
+     * يحذف أي سطر في أول الرد يعيد صياغة سؤال المستخدم حرفياً أو تقريباً
+     * (مثل: "سؤالك: ..." / "أنت تسأل عن ..." / إعادة السؤال كاملاً كسطر أول).
+     */
+    private stripQuestionEcho;
     private checkCustomRules;
     private checkTrigger;
     private shouldAutoReply;
