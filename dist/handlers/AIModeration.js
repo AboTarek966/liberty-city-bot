@@ -79,6 +79,12 @@ const ACTIONS = [
         permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
         label: 'تحذير',
     },
+    {
+        action: 'sequential_warn',
+        patterns: /تحذير\s*[١٢٣123]/i,
+        permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
+        label: 'تحذير تسلسلي (1/2/3)',
+    },
     // ========== أوامر إدارة السيرفر الجديدة ==========
     {
         action: 'role_create',
@@ -359,6 +365,51 @@ async function executeAIModeration(message, client, question) {
                 });
                 embed = result.embed;
                 msg = result.simpleMsg;
+                break;
+            }
+            case 'sequential_warn': {
+                // استخراج الرقم من "تحذير 1" أو "تحذير 2" أو "تحذير 3"
+                const match = question.match(/تحذير\s*([١٢٣123])/i);
+                const level = match ? parseInt(match[1].replace('١', '1').replace('٢', '2').replace('٣', '3'), 10) : 1;
+                const targetMember = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+                if (!targetMember)
+                    throw new Error('العضو غير موجود في السيرفر');
+                // التحقق: النظام التسلسلي للإداريين فقط
+                const isAdminTarget = targetMember.id === guild.ownerId ||
+                    targetMember.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+                    targetMember.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild);
+                if (!isAdminTarget) {
+                    throw new Error('النظام التسلسلي للإداريين فقط — للأعضاء العاديين استخدم `/warn`');
+                }
+                // تطبيق الرول مباشرة حسب الرقم
+                const { applySequentialAdminWarnRoles } = await Promise.resolve().then(() => __importStar(require('../utils/warnRoles')));
+                const settings = await (0, models_1.getGuildSettings)(guild.id);
+                // نحسب عدد التحذيرات الحالي ونعدل السبب ليتضمن المستوى المطلوب
+                const currentCount = await (await Promise.resolve().then(() => __importStar(require('../models')))).Warning.countDocuments({ guildId: guild.id, userId: targetMember.id });
+                const targetCount = Math.max(currentCount, level - 1);
+                // نضيف تحذيرات وهمية للوصول للمستوى المطلوب (أو نستخدم دالة مباشرة)
+                // الحل الأبسط: نضيف التحذير في قاعدة البيانات ثم نطبق الرول
+                const { Warning } = await Promise.resolve().then(() => __importStar(require('../models')));
+                for (let i = currentCount; i < level; i++) {
+                    await Warning.create({
+                        guildId: guild.id,
+                        userId: targetMember.id,
+                        moderatorId: moderator.id,
+                        reason: `تحذير تسلسلي رقم ${i + 1} (يدوي)`,
+                        caseId: await (await Promise.resolve().then(() => __importStar(require('../models')))).getNextCaseId(guild.id),
+                    });
+                }
+                const result = await applySequentialAdminWarnRoles({
+                    settings,
+                    guild,
+                    executor: moderator,
+                    target: targetMember,
+                    reason: `تحذير تسلسلي رقم ${level} (يدوي)`,
+                });
+                if (!result) {
+                    throw new Error(`لا يوجد رول تحذير رقم ${level} مُعد — راجع /settings → 🎭 رولات التحذير`);
+                }
+                msg = `✅ ${result}`;
                 break;
             }
             // ========== أوامر إدارة السيرفر الجديدة ==========
