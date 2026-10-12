@@ -386,10 +386,11 @@ function buildVerificationPanel(guild, s) {
     return { embeds: [embed], components: [roleSelect, channelSelect, row1] };
 }
 // --------------------------------------------
-// 🎭 رولات التحذير — لوحة فرعية (قائمتان: الأعضاء فوق، الإداريين تحت)
+// 🎭 رولات التحذير — لوحة فرعية (قائمتان: الأعضاء فوق، الإداريين تحت + النظام التسلسلي للإداريين)
 // --------------------------------------------
 function buildWarnRolesPanel(guild, s) {
     const w = s.warnRoles || { memberIds: [], adminIds: [] };
+    const seq = w.adminSequential || { role1Id: '', role2Id: '', role3Id: '' };
     const toLines = (ids) => {
         const roles = (ids || [])
             .map((id) => guild.roles.cache.get(id))
@@ -398,18 +399,30 @@ function buildWarnRolesPanel(guild, s) {
             return '> 🔴 **لم تُحدد بعد**';
         return roles.map(r => `> • <@&${r.id}>`).join('\n');
     };
+    const toLine = (id) => {
+        if (!id)
+            return '> 🔴 **لم يُحدد بعد**';
+        const r = guild.roles.cache.get(id);
+        return r ? `> • <@&${r.id}>` : `> 🔴 **الرول غير موجود**`;
+    };
     const memberIds = w.memberIds || [];
     const adminIds = w.adminIds || [];
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('🎭 رولات التحذير')
-        .setDescription(`اختر الرولات التي تُستخدم كرولات تحذير — عند تنفيذ \`/warn\` يعرض البوت **قائمة اختيار** من هذه الرولات فقط (بنظام لوحة الرولات) لتضيفها للعضو المحذَّر\n\n` +
+        .setDescription(`اختر الرولات التي تُستخدم كرولات تحذير — عند تنفيذ \`/warn\`:\n` +
+        `• **نظام تسلسلي للإداريين** (جديد): تحذير 1 → رول 1، تحذير 2 → رول 2، تحذير 3 → رول 3 (تلقائي)\n` +
+        `• **نظام القائمة** (للأعضاء/إداريين بلا نظام تسلسلي): يعرض لوحة اختيار من هذه الرولات\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `👮‍♂️ **رولات تحذير الأعضاء (${memberIds.length}):**\n${toLines(memberIds)}\n\n` +
-        `🛡️ **رولات تحذير الإداريين (${adminIds.length}):**\n${toLines(adminIds)}\n` +
+        `🛡️ **رولات تحذير الإداريين — قائمة (${adminIds.length}):**\n${toLines(adminIds)}\n\n` +
+        `⚡ **النظام التسلسلي للإداريين (تلقائي حسب عدد التحذيرات):**\n` +
+        `1️⃣ **تحذير 1:** ${toLine(seq.role1Id)}\n` +
+        `2️⃣ **تحذير 2:** ${toLine(seq.role2Id)}\n` +
+        `3️⃣ **تحذير 3+:** ${toLine(seq.role3Id)}\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `💡 *يُحدد النوع تلقائياً حسب صلاحيات العضو المُحذَّر (إداري ⇐ قائمة الإداريين، عضو ⇐ قائمة الأعضاء)*\n` +
+        `💡 *يُحدد النوع تلقائياً حسب صلاحيات العضو المُحذَّر (إداري ⇐ النظام التسلسلي، عضو ⇐ قائمة الأعضاء)*\n` +
         `🗑️ *اترك القائمة فارغة (0 قيم) لمسحها*`)
-        .setColor(memberIds.length || adminIds.length ? 0x2ecc71 : 0xe74c3c)
+        .setColor((memberIds.length || adminIds.length || seq.role1Id || seq.role2Id || seq.role3Id) ? 0x2ecc71 : 0xe74c3c)
         .setFooter({ text: `${guild.name} • Liberty City Settings` })
         .setTimestamp();
     const memberSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
@@ -419,11 +432,26 @@ function buildWarnRolesPanel(guild, s) {
         .setMaxValues(10));
     const adminSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
         .setCustomId('settings_sel:warnroles:admins')
-        .setPlaceholder('🛡️ اختر رولات تحذير الإداريين (يمكن أكثر من واحدة)')
+        .setPlaceholder('🛡️ اختر رولات تحذير الإداريين — القائمة (يمكن أكثر من واحدة)')
         .setMinValues(0)
         .setMaxValues(10));
+    const seq1Select = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:warnroles:seq1')
+        .setPlaceholder('1️⃣ رول التحذير الأول (للتحذير الأول)')
+        .setMinValues(0)
+        .setMaxValues(1));
+    const seq2Select = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:warnroles:seq2')
+        .setPlaceholder('2️⃣ رول التحذير الثاني (للتحذير الثاني)')
+        .setMinValues(0)
+        .setMaxValues(1));
+    const seq3Select = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:warnroles:seq3')
+        .setPlaceholder('3️⃣ رول التحذير الثالث (للتحذير الثالث وما بعده)')
+        .setMinValues(0)
+        .setMaxValues(1));
     const backRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'));
-    return { embeds: [embed], components: [memberSelect, adminSelect, backRow] };
+    return { embeds: [embed], components: [memberSelect, adminSelect, seq1Select, seq2Select, seq3Select, backRow] };
 }
 // --------------------------------------------
 // Tickets

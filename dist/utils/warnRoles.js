@@ -7,10 +7,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isAdminTarget = isAdminTarget;
 exports.getWarnRolePool = getWarnRolePool;
+exports.getWarningCount = getWarningCount;
+exports.applySequentialAdminWarnRoles = applySequentialAdminWarnRoles;
 exports.offerWarnRoles = offerWarnRoles;
 const discord_js_1 = require("discord.js");
 const rolePicker_1 = require("./rolePicker");
 const helpers_1 = require("./helpers");
+const models_1 = require("../models");
 const logger = (0, helpers_1.createLogger)('WarnRoles');
 // هل الهدف إداري؟ (مالك السيرفر أو لديه صلاحية أدمن/إدارة)
 function isAdminTarget(target) {
@@ -26,14 +29,82 @@ function getWarnRolePool(settings, target) {
     return [...(isAdminTarget(target) ? w.adminIds || [] : w.memberIds || [])];
 }
 /**
+ * الحصول على عدد تحذيرات عضو في هذا السيرفر
+ */
+async function getWarningCount(guildId, userId) {
+    return await models_1.Warning.countDocuments({ guildId, userId });
+}
+/**
+ * تطبيق نظام التحذيرات التسلسلي للإداريين:
+ * - تحذير 1 → role1Id
+ * - تحذير 2 → role2Id
+ * - تحذير 3 → role3Id
+ * يعيد ملاحظة نصية بما تم، أو null لو ما فيش إعداد
+ */
+async function applySequentialAdminWarnRoles(opts) {
+    const { settings, guild, executor, target, reason } = opts;
+    // فقط للإداريين
+    if (!isAdminTarget(target))
+        return null;
+    const sequential = settings?.warnRoles?.adminSequential;
+    if (!sequential)
+        return null;
+    // حساب عدد التحذيرات الحالي (بما فيها التحذير الجديد)
+    const currentCount = await getWarningCount(guild.id, target.id);
+    // تحديد الرول المناسب
+    let roleId;
+    let roleNumber;
+    if (currentCount === 1) {
+        roleId = sequential.role1Id;
+        roleNumber = 1;
+    }
+    else if (currentCount === 2) {
+        roleId = sequential.role2Id;
+        roleNumber = 2;
+    }
+    else if (currentCount >= 3) {
+        roleId = sequential.role3Id;
+        roleNumber = 3;
+    }
+    else {
+        return null; // لا يوجد رول لهذا العدد
+    }
+    if (!roleId)
+        return null;
+    try {
+        const botTop = guild.members.me?.roles.highest.position ?? 0;
+        const role = guild.roles.cache.get(roleId);
+        if (!role || role.id === guild.id || role.managed || role.position >= botTop) {
+            logger.warn(`Sequential warn role ${roleId} not usable (hierarchy/managed)`);
+            return null;
+        }
+        // إذا كان العضو يملك الرول بالفعل، لا نعيد إعطاؤه
+        if (target.roles.cache.has(roleId)) {
+            return `🎭 العضو يملك بالفعل رول التحذير رقم ${roleNumber}: <@&${roleId}>`;
+        }
+        await target.roles.add(role, `تحذير إداري تسلسلي #${currentCount}: ${reason}`);
+        logger.info(`Sequential admin warn role applied: ${role.name} (warning #${currentCount}) → ${target.id} (by ${executor.id})`);
+        return `🎭 تم إعطاء رول التحذير رقم ${roleNumber}: <@&${roleId}>`;
+    }
+    catch (error) {
+        logger.warn(`applySequentialAdminWarnRoles failed: ${error.message}`);
+        return null;
+    }
+}
+/**
  * يُطبّق رولات التحذير بعد التحذير:
- * - رول واحد فقط → يُعطى مباشرة ويُرجع ملاحظة
- * - أكثر من رول → يعرض لوحة اختيار (من رولات التحذير فقط)
+ * - للإداريين: نظام تسلسلي تلقائي (1→role1, 2→role2, 3→role3)
+ * - للأعضاء: رول واحد فقط → يُعطى مباشرة، أو لوحة اختيار
  * - لا توجد رولات قابلة → يُرجع null
  */
 async function offerWarnRoles(opts) {
     const { settings, guild, executor, target, reason, reply } = opts;
     try {
+        // أولاً: جرب النظام التسلسلي للإداريين (تلقائي، بدون لوحة)
+        const sequentialNote = await applySequentialAdminWarnRoles({ settings, guild, executor, target, reason });
+        if (sequentialNote)
+            return sequentialNote;
+        // ثانياً: النظام القديم (pool من رولات التحذير)
         const pool = getWarnRolePool(settings, target);
         if (pool.length === 0)
             return null;

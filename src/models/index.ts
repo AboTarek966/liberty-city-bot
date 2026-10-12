@@ -284,8 +284,17 @@ export interface IGuildSettings extends Document {
   warnRoles: {
     /** رولات تحذير الأعضاء (تظهر عند تحذير عضو عادي) */
     memberIds: string[];
-    /** رولات تحذير الإداريين (تظهر عند تحذير إداري) */
+    /** رولات تحذير الإداريين (تظهر عند تحذير إداري) — للتوافق القديم */
     adminIds: string[];
+    /** نظام التحذيرات التسلسلي للإداريين (جديد) */
+    adminSequential?: {
+      /** رول التحذير الأول */
+      role1Id?: string;
+      /** رول التحذير الثاني */
+      role2Id?: string;
+      /** رول التحذير الثالث */
+      role3Id?: string;
+    };
   };
 
   updatedAt: Date;
