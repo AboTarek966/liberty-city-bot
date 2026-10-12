@@ -99,21 +99,19 @@ const event = {
                 logger.error('Error in pending image upload:', error);
             }
         }
-        // Protection checks (anti-spam, anti-link, etc.)
+        // Protection checks + فلتر الاحتيال بالتوازي (كلاهما فحوصات أمان تسبق كل شيء)
         try {
-            await client.protectionHandler.checkMessage(message);
-        }
-        catch (error) {
-            logger.error('Error in protection check:', error);
-        }
-        // فلتر الروابط الاحتيالية (صيد النيترو والمشاريع المزيفة)
-        try {
-            const blocked = await (0, scamFilter_1.handleScamFilter)(message, client);
+            const results = await Promise.allSettled([
+                client.protectionHandler.checkMessage(message),
+                (0, scamFilter_1.handleScamFilter)(message, client),
+            ]);
+            const scamResult = results[1];
+            const blocked = scamResult.status === 'fulfilled' ? scamResult.value : false;
             if (blocked)
                 return; // رسالة احتيالية — لا تُعالَج بقية الأنظمة
         }
         catch (error) {
-            logger.error('Error in scam filter:', error);
+            logger.error('Error in safety checks:', error);
         }
         // 💤 نظام AFK (إلغاء تلقائي عند الرسالة + إخبار المنشنزين بالسبب)
         try {
@@ -122,19 +120,28 @@ const event = {
         catch (error) {
             logger.error('Error in AFK system:', error);
         }
-        // Activity tracking (messages)
+        // Activity tracking (messages) — يعمل في الخلفية حتى لا يبطئ أمر المستخدم
         try {
-            await client.activityTracker.trackMessage(message.guild.id, message.author.id);
+            void client.activityTracker.trackMessage(message.guild.id, message.author.id).catch(() => { });
         }
         catch (error) {
             logger.error('Error tracking activity:', error);
         }
-        // تحديث آخر نشاط في التذاكر المفتوحة (للإغلاق التلقائي عند الخمول)
+        // تحديث آخر نشاط في التذاكر المفتوحة (للإغلاق التلقائي عند الخمول) — في الخلفية
         try {
-            await (0, messageSystems_1.touchTicketActivity)(message);
+            void (0, messageSystems_1.touchTicketActivity)(message).catch(() => { });
         }
         catch (error) {
             logger.error('Error touching ticket activity:', error);
+        }
+        // Alias / prefix commands — يُنفَّذ مبكراً حتى يرد البوت بسرعة
+        try {
+            const handled = await handleAliasCommand(message, client);
+            if (handled)
+                return;
+        }
+        catch (error) {
+            logger.error('Error handling alias command:', error);
         }
         // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)
         try {
@@ -152,15 +159,6 @@ const event = {
         catch {
             /* لا يعطّل باقي الأنظمة */
         }
-        // Alias / prefix commands
-        try {
-            const handled = await handleAliasCommand(message, client);
-            if (handled)
-                return;
-        }
-        catch (error) {
-            logger.error('Error handling alias command:', error);
-        }
         // AI auto-reply (mention or reply to bot)
         try {
             await handleAIResponse(message, client);
@@ -168,9 +166,9 @@ const event = {
         catch (error) {
             logger.error('Error in AI response:', error);
         }
-        // Leveling system (add XP via centralized handler)
+        // Leveling system (add XP via centralized handler) — في الخلفية
         try {
-            await client.levelingHandler.addMessageXp(message.member, message.channel.id);
+            void client.levelingHandler.addMessageXp(message.member, message.channel.id).catch(() => { });
         }
         catch (error) {
             logger.error('Error in leveling:', error);

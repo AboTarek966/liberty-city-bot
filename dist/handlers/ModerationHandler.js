@@ -28,29 +28,14 @@ class ModerationHandler {
         if (targetMember && !this.canModerate(moderator, targetMember)) {
             throw new Error('لا يمكنك حظر هذا العضو');
         }
+        // ⚡ رقم الكيس يُجلب بالتوازي مع عملية الحظر لتقليل زمن الرد
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         // Ban the user
         await guild.members.ban(target.id, {
             reason,
             deleteMessageSeconds: 0,
         });
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'ban',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            proof,
-            active: true,
-        });
-        // Send DM to user
-        await this.sendDM(target, {
-            title: '🔨 تم حظرك',
-            description: `تم حظرك من **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.error,
-        });
+        const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'ban',
@@ -60,10 +45,25 @@ class ModerationHandler {
             caseId,
             proof,
         });
-        // Log to mod logs
-        await this.logAction(guild, embed);
+        // ⚡ كل ما لا يؤثر على الرد يعمل في الخلفية (الكيس، رسالة خاصة، سجل الإشراف)
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'ban',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            proof,
+            active: true,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '🔨 تم حظرك',
+            description: `تم حظرك من **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.error,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Banned ${target.id} from ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed };
+        return { case: null, embed };
     }
     // --------------------------------------------
     // Kick
@@ -77,25 +77,11 @@ class ModerationHandler {
         if (!this.canModerate(moderator, targetMember)) {
             throw new Error('لا يمكنك طرد هذا العضو');
         }
+        // ⚡ رقم الكيس بالتوازي مع عملية الطرد
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         // Kick the member
         await targetMember.kick(reason);
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'kick',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: true,
-        });
-        // Send DM
-        await this.sendDM(target, {
-            title: '👢 تم طردك',
-            description: `تم طردك من **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.error,
-        });
+        const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'kick',
@@ -104,10 +90,24 @@ class ModerationHandler {
             reason,
             caseId,
         });
-        // Log
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'kick',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: true,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '👢 تم طردك',
+            description: `تم طردك من **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.error,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Kicked ${target.id} from ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed };
+        return { case: null, embed };
     }
     // --------------------------------------------
     // Timeout
@@ -126,27 +126,11 @@ class ModerationHandler {
         if (!durationMs || durationMs <= 0 || durationMs > 28 * 24 * 60 * 60 * 1000) {
             throw new Error('مدة غير صالحة (الحد الأقصى 28 يوم)');
         }
+        // ⚡ رقم الكيس بالتوازي مع عملية الكتم
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         // Timeout the member
         await targetMember.timeout(durationMs, reason);
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'timeout',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            duration: durationMs,
-            expiresAt: new Date(Date.now() + durationMs),
-            active: true,
-        });
-        // Send DM
-        await this.sendDM(target, {
-            title: '⏱️ تم كتمك',
-            description: `تم كتمك في **${guild.name}**\n\n**المدة:** ${(0, helpers_1.formatDuration)(durationMs)}\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.warning,
-        });
+        const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'timeout',
@@ -156,10 +140,26 @@ class ModerationHandler {
             caseId,
             duration: (0, helpers_1.formatDuration)(durationMs),
         });
-        // Log
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'timeout',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            duration: durationMs,
+            expiresAt: new Date(Date.now() + durationMs),
+            active: true,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '⏱️ تم كتمك',
+            description: `تم كتمك في **${guild.name}**\n\n**المدة:** ${(0, helpers_1.formatDuration)(durationMs)}\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.warning,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Timed out ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed };
+        return { case: null, embed };
     }
     // --------------------------------------------
     // Remove Timeout
@@ -173,25 +173,11 @@ class ModerationHandler {
         if (!this.canModerate(moderator, targetMember)) {
             throw new Error('لا يمكنك إلغاء كتم هذا العضو');
         }
+        // ⚡ رقم الكيس بالتوازي مع إلغاء الكتم
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         // Remove timeout
         await targetMember.timeout(null, reason);
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'untimeout',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: false,
-        });
-        // Send DM
-        await this.sendDM(target, {
-            title: '▶️ تم إلغاء كتمك',
-            description: `تم إلغاء كتمك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.success,
-        });
+        const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'untimeout',
@@ -200,10 +186,24 @@ class ModerationHandler {
             reason,
             caseId,
         });
-        // Log
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'untimeout',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: false,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '▶️ تم إلغاء كتمك',
+            description: `تم إلغاء كتمك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.success,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Removed timeout for ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed };
+        return { case: null, embed };
     }
     // --------------------------------------------
     // Warn
@@ -214,35 +214,18 @@ class ModerationHandler {
         if (!this.canModerate(moderator, targetMember || target)) {
             throw new Error('لا يمكنك تحذير هذا العضو');
         }
-        // Get warning count
-        const warningCount = await models_1.Warning.countDocuments({
-            guildId: guild.id,
-            userId: target.id,
-        });
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'warn',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: true,
-        });
-        // Create warning record
+        // ⚡ عدّ التحذيرات + رقم الكيس بالتوازي (استعلامان في وقت واحد بدل متتاليين)
+        const [warningCount, caseId] = await Promise.all([
+            models_1.Warning.countDocuments({ guildId: guild.id, userId: target.id }),
+            (0, models_1.getNextCaseId)(guild.id),
+        ]);
+        // سجل التحذير (ضروري لعملية unwarn) — يبقى متزامناً
         await models_1.Warning.create({
             guildId: guild.id,
             userId: target.id,
             moderatorId: moderator.id,
             reason,
             caseId,
-        });
-        // Send DM
-        await this.sendDM(target, {
-            title: '⚠️ تحذير',
-            description: `تم تحذيرك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**عدد التحذيرات:** ${warningCount + 1}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.warning,
         });
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
@@ -252,12 +235,26 @@ class ModerationHandler {
             reason,
             caseId,
         });
-        // Log
-        await this.logAction(guild, embed);
+        // ⚡ كل ما لا يؤثر على الرد يعمل في الخلفية
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'warn',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: true,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '⚠️ تحذير',
+            description: `تم تحذيرك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**عدد التحذيرات:** ${warningCount + 1}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.warning,
+        });
+        void this.logAction(guild, embed);
         // Check if should auto-mute/ban at threshold
-        await this.checkWarningThreshold(guild, target.id, warningCount + 1);
+        void this.checkWarningThreshold(guild, target.id, warningCount + 1);
         logger.info(`Warned ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed, warningCount: warningCount + 1 };
+        return { case: null, embed, warningCount: warningCount + 1 };
     }
     // --------------------------------------------
     // Unwarn (إزالة تحذير)
@@ -265,35 +262,20 @@ class ModerationHandler {
     async unwarn(options) {
         const { guild, moderator, target, reason } = options;
         const targetMember = target instanceof discord_js_1.GuildMember ? target : guild.members.cache.get(target.id);
-        const warningCount = await models_1.Warning.countDocuments({
-            guildId: guild.id,
-            userId: target.id,
-        });
+        // ⚡ العدّ + آخر تحذير + رقم الكيس كلها بالتوازي
+        const [warningCount, latest, caseId] = await Promise.all([
+            models_1.Warning.countDocuments({ guildId: guild.id, userId: target.id }),
+            models_1.Warning.findOne({ guildId: guild.id, userId: target.id }).sort({ createdAt: -1 }),
+            (0, models_1.getNextCaseId)(guild.id),
+        ]);
         if (warningCount === 0) {
             throw new Error('هذا العضو ليس لديه أي تحذيرات');
         }
         // إزالة أحدث تحذير
-        const latest = await models_1.Warning.findOne({ guildId: guild.id, userId: target.id })
-            .sort({ createdAt: -1 });
         if (latest) {
             await models_1.Warning.findByIdAndDelete(latest._id);
         }
         const remaining = Math.max(0, warningCount - 1);
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'unwarn',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: false,
-        });
-        await this.sendDM(target, {
-            title: '✅ إزالة تحذير',
-            description: `تم إزالة أحد تحذيراتك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**التحذيرات المتبقية:** ${remaining}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.success,
-        });
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'unwarn',
             moderator: moderator.user,
@@ -301,9 +283,24 @@ class ModerationHandler {
             reason,
             caseId,
         });
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'unwarn',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: false,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '✅ إزالة تحذير',
+            description: `تم إزالة أحد تحذيراتك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**التحذيرات المتبقية:** ${remaining}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.success,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Unwarned ${target.id} in ${guild.id} by ${moderator.id} (remaining: ${remaining})`);
-        return { case: moderationCase, embed, warningCount: remaining };
+        return { case: null, embed, warningCount: remaining };
     }
     // --------------------------------------------
     // Check Warning Threshold
@@ -344,28 +341,13 @@ class ModerationHandler {
         if (!this.canModerate(moderator, targetMember)) {
             throw new Error('لا يمكنك كتم هذا العضو');
         }
+        // ⚡ رقم الكيس بالتوازي مع إضافة رول الكتم
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         // Get or create mute role
         let muteRole = await this.getMuteRole(guild);
         // Add mute role
         await targetMember.roles.add(muteRole, reason);
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'mute',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            duration: duration ? (0, helpers_1.parseDuration)(duration) || undefined : undefined,
-            active: true,
-        });
-        // Send DM
-        await this.sendDM(target, {
-            title: '🔇 تم كتمك',
-            description: `تم كتمك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.warning,
-        });
+        const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'mute',
@@ -375,10 +357,25 @@ class ModerationHandler {
             caseId,
             duration,
         });
-        // Log
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'mute',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            duration: duration ? (0, helpers_1.parseDuration)(duration) || undefined : undefined,
+            active: true,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '🔇 تم كتمك',
+            description: `تم كتمك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.warning,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Muted ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed, simpleMsg: `🔇 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم كتمه${duration ? ` لمدة ${duration}` : ''} | ${reason}` };
+        return { case: null, embed, simpleMsg: `🔇 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم كتمه${duration ? ` لمدة ${duration}` : ''} | ${reason}` };
     }
     // --------------------------------------------
     // Unmute
@@ -392,6 +389,8 @@ class ModerationHandler {
         if (!this.canModerate(moderator, targetMember)) {
             throw new Error('لا يمكنك إلغاء كتم هذا العضو');
         }
+        // ⚡ رقم الكيس بالتوازي مع إزالة رول الكتم
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         // Get mute role
         const muteRole = await this.getMuteRole(guild);
         if (!muteRole) {
@@ -399,23 +398,7 @@ class ModerationHandler {
         }
         // Remove mute role
         await targetMember.roles.remove(muteRole, reason);
-        // Create case
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'unmute',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: false,
-        });
-        // Send DM
-        await this.sendDM(target, {
-            title: '🔊 تم إلغاء كتمك',
-            description: `تم إلغاء كتمك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
-            color: embeds_1.Colors.success,
-        });
+        const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'unmute',
@@ -424,10 +407,24 @@ class ModerationHandler {
             reason,
             caseId,
         });
-        // Log
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'unmute',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: false,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.sendDM(target, {
+            title: '🔊 تم إلغاء كتمك',
+            description: `تم إلغاء كتمك في **${guild.name}**\n\n**السبب:** ${reason}\n\n**المشرف:** ${moderator.user.tag}`,
+            color: embeds_1.Colors.success,
+        });
+        void this.logAction(guild, embed);
         logger.info(`Unmuted ${target.id} in ${guild.id} by ${moderator.id}`);
-        return { case: moderationCase, embed, simpleMsg: `🔊 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم فك الكتم عنه | ${reason}` };
+        return { case: null, embed, simpleMsg: `🔊 **${target instanceof discord_js_1.GuildMember ? target.user.tag : target.tag}** تم فك الكتم عنه | ${reason}` };
     }
     // --------------------------------------------
     // Add Role (إضافة رول)
@@ -450,17 +447,10 @@ class ModerationHandler {
         if (guild.members.me.roles.highest.comparePositionTo(role) <= 0) {
             throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المضاف');
         }
+        // ⚡ رقم الكيس بالتوازي مع إضافة الرول
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         await target.roles.add(role, `${reason} | بواسطة ${moderator.user.tag}`);
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'role_add',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: false,
-        });
+        const caseId = await caseIdPromise;
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'role_add',
             moderator: moderator.user,
@@ -469,10 +459,20 @@ class ModerationHandler {
             caseId,
             extraFields: [{ name: 'الرول', value: `${role}`, inline: true }],
         });
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'role_add',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: false,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.logAction(guild, embed);
         logger.info(`Added role ${roleId} to ${target.id} by ${moderator.id}`);
         return {
-            case: moderationCase,
+            case: null,
             embed,
             simpleMsg: `✅ **تم إضافة رول ${role} للعضو ${target} من قبل ${moderator}**`,
         };
@@ -521,17 +521,10 @@ class ModerationHandler {
             }
             throw new Error(`لا يمكن إعطاء أي رول:\n${skipped.slice(0, 6).map(s => `• ${s}`).join('\n')}`);
         }
+        // ⚡ رقم الكيس بالتوازي مع إضافة الرولات
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         await target.roles.add(toAdd, `${reason} | بواسطة ${moderator.user.tag}`);
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'role_add',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: false,
-        });
+        const caseId = await caseIdPromise;
         const addedRoles = toAdd.map(id => guild.roles.cache.get(id)).filter(Boolean);
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'role_add',
@@ -550,10 +543,20 @@ class ModerationHandler {
                     : []),
             ],
         });
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'role_add',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: false,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.logAction(guild, embed);
         logger.info(`Added ${toAdd.length} role(s) to ${target.id} by ${moderator.id}`);
         return {
-            case: moderationCase,
+            case: null,
             embed,
             simpleMsg: `✅ **تم إضافة ${toAdd.length} رول للعضو ${target} من قبل ${moderator}**`,
             added: toAdd,
@@ -581,17 +584,10 @@ class ModerationHandler {
         if (guild.members.me.roles.highest.comparePositionTo(role) <= 0) {
             throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد إزالتها');
         }
+        // ⚡ رقم الكيس بالتوازي مع إزالة الرول
+        const caseIdPromise = (0, models_1.getNextCaseId)(guild.id);
         await target.roles.remove(role, `${reason} | بواسطة ${moderator.user.tag}`);
-        const caseId = await (0, models_1.getNextCaseId)(guild.id);
-        const moderationCase = await models_1.ModerationCase.create({
-            guildId: guild.id,
-            caseId,
-            type: 'role_remove',
-            moderatorId: moderator.id,
-            targetId: target.id,
-            reason,
-            active: false,
-        });
+        const caseId = await caseIdPromise;
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'role_remove',
             moderator: moderator.user,
@@ -600,10 +596,20 @@ class ModerationHandler {
             caseId,
             extraFields: [{ name: 'الرول', value: `${role}`, inline: true }],
         });
-        await this.logAction(guild, embed);
+        // ⚡ في الخلفية — لا يؤخر الرد
+        void models_1.ModerationCase.create({
+            guildId: guild.id,
+            caseId,
+            type: 'role_remove',
+            moderatorId: moderator.id,
+            targetId: target.id,
+            reason,
+            active: false,
+        }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+        void this.logAction(guild, embed);
         logger.info(`Removed role ${roleId} from ${target.id} by ${moderator.id}`);
         return {
-            case: moderationCase,
+            case: null,
             embed,
             simpleMsg: `✅ **تم إزالة رول ${role} من العضو ${target} من قبل ${moderator}**`,
         };
