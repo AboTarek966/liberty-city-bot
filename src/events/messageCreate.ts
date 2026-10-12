@@ -380,6 +380,27 @@ export async function handleAliasPickSelect(
 // --------------------------------------------
 // 💤 نظام AFK — إلغاء تلقائي + إخبار المنشنزين
 // --------------------------------------------
+
+// هل هذه الرسالة نفسها ستُنفّذ أمر AFK عبر اختصار؟
+// (في هذه الحالة نترك الأمر يُدير التبديل بنفسه بدل إلغاء مزدوج)
+async function messageTriggersAfkCommand(message: Message, guildId: string): Promise<boolean> {
+  try {
+    const raw = message.content.trim();
+    if (!raw) return false;
+    const settings = await getGuildSettings(guildId);
+    const prefix = settings.prefix || 'lc!';
+    let first = raw.split(/\s+/)[0]?.toLowerCase() || '';
+    if (first.startsWith(prefix.toLowerCase())) {
+      first = first.slice(prefix.length).split(/\s+/)[0] || '';
+    }
+    if (!first || first.length > 15) return false;
+    const aliases = await getAliasesForShortcut(guildId, first);
+    return aliases.some(a => a.command === 'afk');
+  } catch {
+    return false;
+  }
+}
+
 async function handleAfkActivity(message: Message): Promise<void> {
   const guild = message.guild!;
   const authorId = message.author.id;
@@ -387,7 +408,7 @@ async function handleAfkActivity(message: Message): Promise<void> {
 
   // 1) صاحب الرسالة كان AFK → إلغاء الحالة + رسالة عودة
   const mine = await getAFK(guild.id, authorId);
-  if (mine) {
+  if (mine && !(await messageTriggersAfkCommand(message, guild.id))) {
     await removeAFK(guild.id, authorId);
     parts.push(
       `👋 **مرحباً بعودتك <@${authorId}>!** تم إلغاء وضع AFK ` +

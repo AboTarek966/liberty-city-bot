@@ -348,13 +348,35 @@ async function handleAliasPickSelect(interaction, sid) {
 // --------------------------------------------
 // 💤 نظام AFK — إلغاء تلقائي + إخبار المنشنزين
 // --------------------------------------------
+// هل هذه الرسالة نفسها ستُنفّذ أمر AFK عبر اختصار؟
+// (في هذه الحالة نترك الأمر يُدير التبديل بنفسه بدل إلغاء مزدوج)
+async function messageTriggersAfkCommand(message, guildId) {
+    try {
+        const raw = message.content.trim();
+        if (!raw)
+            return false;
+        const settings = await (0, models_1.getGuildSettings)(guildId);
+        const prefix = settings.prefix || 'lc!';
+        let first = raw.split(/\s+/)[0]?.toLowerCase() || '';
+        if (first.startsWith(prefix.toLowerCase())) {
+            first = first.slice(prefix.length).split(/\s+/)[0] || '';
+        }
+        if (!first || first.length > 15)
+            return false;
+        const aliases = await (0, aliasCache_1.getAliasesForShortcut)(guildId, first);
+        return aliases.some(a => a.command === 'afk');
+    }
+    catch {
+        return false;
+    }
+}
 async function handleAfkActivity(message) {
     const guild = message.guild;
     const authorId = message.author.id;
     const parts = [];
     // 1) صاحب الرسالة كان AFK → إلغاء الحالة + رسالة عودة
     const mine = await (0, afk_1.getAFK)(guild.id, authorId);
-    if (mine) {
+    if (mine && !(await messageTriggersAfkCommand(message, guild.id))) {
         await (0, afk_1.removeAFK)(guild.id, authorId);
         parts.push(`👋 **مرحباً بعودتك <@${authorId}>!** تم إلغاء وضع AFK ` +
             `(كنت غائباً لمدة ${(0, helpers_1.formatDuration)(Date.now() - mine.since, { compact: true })})`);

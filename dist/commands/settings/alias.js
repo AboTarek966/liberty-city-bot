@@ -119,14 +119,10 @@ async function handleAdd(interaction, client) {
         alias: shortcut,
         command: { $ne: cleanCommand },
     });
-    // Check if shortcut conflicts with a built-in command name
-    if (!existingOther && client.commandHandler.getCommand(shortcut)) {
-        await interaction.reply({
-            content: `❌ الاختصار \`${shortcut}\` يتعارض مع أمر موجود. اختر اختصاراً آخر`,
-            ephemeral: true,
-        });
-        return;
-    }
+    // ⚡ السماح باختصار يطابق اسم أمر مدمج (مثل `afk` أو `ping`):
+    // لا يوجد تعارض تقني — الأوامر المدمجة تعمل عبر الشرائح فقط،
+    // والشات لا ينفذ إلا الاختصارات. (كان يُرفض سابقاً بدون سبب حقيقي)
+    const isBuiltinName = !!client.commandHandler.getCommand(shortcut);
     await models_1.CommandAlias.create({
         guildId: interaction.guildId,
         alias: shortcut,
@@ -187,6 +183,12 @@ async function handleAdd(interaction, client) {
         (existingOther
             ? `\n\n🔁 **الاختصار مرتبط أيضاً بـ \`/${existingOther.command}\`** — ` +
                 `سيُطبَّق **تبديل تلقائي** حسب حالة الهدف (مثال: عضو عنده تحذير ⇐ يشيله، ما عنده ⇐ يضيفه)`
+            : '') +
+        (isBuiltinName
+            ? shortcut === cleanCommand
+                ? `\n\n✅ **يعمل الآن مباشرة في الشات:** \`${example}\``
+                : `\n\nℹ️ **ملاحظة:** \`${shortcut}\` هو أيضاً اسم أمر سلاش — لا مشكلة، ` +
+                    `لأن الشات يستخدم الاختصارات فقط والأوامر تعمل عبر الشرائح`
             : ''))
         .setFooter({ text: 'Liberty City Aliases' });
     await interaction.reply({ embeds: [embed] });
