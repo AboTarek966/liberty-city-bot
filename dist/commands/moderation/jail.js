@@ -131,14 +131,17 @@ const command = {
                 await interaction.editReply({ content: '❌ رتبة البوت يجب أن تكون أعلى من رول السجن' });
                 return;
             }
-            // إضافة رول السجن للعضو
-            if (!member.roles.cache.has(jailRole.id)) {
-                await member.roles.add(jailRole, reason);
-            }
-            // حفظ الرولات الحالية للعضو (للإفراج لاحقاً)
+            // 🔒 إزالة جميع رولات العضو (عدا @everyone) وإعطاء رول السجن فقط
+            // هذا ضروري لأن Discord يُعطي أولوية للـ ALLOW من أي رول آخر
             const currentRoles = member.roles.cache
-                .filter(r => r.id !== guild.id && r.id !== jailRole.id)
+                .filter(r => r.id !== guild.id) // استبعاد @everyone
                 .map(r => r.id);
+            // إزالة الرولات الحالية
+            if (currentRoles.length > 0) {
+                await member.roles.remove(currentRoles, `سجن: ${reason}`);
+            }
+            // إضافة رول السجن
+            await member.roles.add(jailRole, reason);
             // تخزين بيانات السجن في قاعدة البيانات
             const { JailData } = await Promise.resolve().then(() => __importStar(require('../../models')));
             await JailData.findOneAndUpdate({ guildId: guild.id, userId: member.id }, {

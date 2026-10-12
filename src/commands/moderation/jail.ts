@@ -134,15 +134,19 @@ const command: Command = {
         return;
       }
 
-      // إضافة رول السجن للعضو
-      if (!member.roles.cache.has(jailRole.id)) {
-        await member.roles.add(jailRole, reason);
+      // 🔒 إزالة جميع رولات العضو (عدا @everyone) وإعطاء رول السجن فقط
+      // هذا ضروري لأن Discord يُعطي أولوية للـ ALLOW من أي رول آخر
+      const currentRoles = member.roles.cache
+        .filter(r => r.id !== guild.id) // استبعاد @everyone
+        .map(r => r.id);
+
+      // إزالة الرولات الحالية
+      if (currentRoles.length > 0) {
+        await member.roles.remove(currentRoles, `سجن: ${reason}`);
       }
 
-      // حفظ الرولات الحالية للعضو (للإفراج لاحقاً)
-      const currentRoles = member.roles.cache
-        .filter(r => r.id !== guild.id && r.id !== jailRole.id)
-        .map(r => r.id);
+      // إضافة رول السجن
+      await member.roles.add(jailRole, reason);
       
       // تخزين بيانات السجن في قاعدة البيانات
       const { JailData } = await import('../../models');
