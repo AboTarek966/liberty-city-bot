@@ -67,7 +67,7 @@ const ACTIONS: ActionDef[] = [
   },
   {
     action: 'sequential_warn',
-    patterns: /^(?:ت|تح|تحذ)\s*[123١٢٣]\b/i,
+    patterns: /(?:^|\s)(?:ت|تح|تحذ)\s*[123١٢٣]\b/i,
     permission: PermissionFlagsBits.ModerateMembers,
     label: 'اختصار تحذير تسلسلي (ت 1/2/3)',
   },
@@ -392,8 +392,11 @@ export async function executeAIModeration(
         break;
       }
       case 'sequential_warn': {
-        // استخراج الرقم من "تحذير 1" أو "تحذير 2" أو "تحذير 3"
-        const match = question.match(/تحذير\s*([١٢٣123])/i);
+        // استخراج الرقم من "تحذير 1" أو "ت 1" أو "تح 2" أو "تحذ 3" إلخ
+        let match = question.match(/تحذير\s*([١٢٣123])/i);
+        if (!match) {
+          match = question.match(/(?:ت|تح|تحذ)\s*([١٢٣123])\b/i);
+        }
         const level = match ? parseInt(match[1].replace('١', '1').replace('٢', '2').replace('٣', '3'), 10) : 1;
         
         const targetMember = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
