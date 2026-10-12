@@ -108,21 +108,25 @@ export function canManageSettings(
 export type SettingsAccess = 'ok' | 'noperm' | 'needpassword';
 
 export function checkSettingsAccess(interaction: any): SettingsAccess {
-  const perms = (interaction.member as any)?.permissions;
-  const isOwner =
-    !!interaction.guild && interaction.user.id === interaction.guild.ownerId;
+  const member = interaction.member;
+  const perms = member?.permissions;
+  const guild = interaction.guild;
+  const isOwner = !!guild && interaction.user.id === guild.ownerId;
 
   let hasAdminPerms = isOwner;
   if (!hasAdminPerms) {
     try {
       if (perms && typeof perms.has === 'function') {
+        // PermissionsBitField طبيعي
         hasAdminPerms =
           perms.has(PermissionFlagsBits.ManageGuild) ||
           perms.has(PermissionFlagsBits.Administrator);
-      } else if (typeof perms === 'string' || Array.isArray(perms) || typeof perms === 'bigint') {
-        // member لم يُحلّل (دفعة تفاعل خام) — نحلل الصلاحيات يدوياً
-        const bitfield = new PermissionsBitField(perms as any);
-        hasAdminPerms = bitfield.has(PermissionFlagsBits.ManageGuild) || bitfield.has(PermissionFlagsBits.Administrator);
+      } else if (perms != null) {
+        // تفاعل خام — perms قد تكون string/bigint/number
+        const bitfield = new PermissionsBitField(BigInt(perms));
+        hasAdminPerms =
+          bitfield.has(PermissionFlagsBits.ManageGuild) ||
+          bitfield.has(PermissionFlagsBits.Administrator);
       }
     } catch {
       hasAdminPerms = false;

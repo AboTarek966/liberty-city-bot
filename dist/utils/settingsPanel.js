@@ -113,20 +113,25 @@ function canManageSettings(interaction) {
     return checkSettingsAccess(interaction) === 'ok';
 }
 function checkSettingsAccess(interaction) {
-    const perms = interaction.member?.permissions;
-    const isOwner = !!interaction.guild && interaction.user.id === interaction.guild.ownerId;
+    const member = interaction.member;
+    const perms = member?.permissions;
+    const guild = interaction.guild;
+    const isOwner = !!guild && interaction.user.id === guild.ownerId;
     let hasAdminPerms = isOwner;
     if (!hasAdminPerms) {
         try {
             if (perms && typeof perms.has === 'function') {
+                // PermissionsBitField طبيعي
                 hasAdminPerms =
                     perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
                         perms.has(discord_js_1.PermissionFlagsBits.Administrator);
             }
-            else if (typeof perms === 'string' || Array.isArray(perms) || typeof perms === 'bigint') {
-                // member لم يُحلّل (دفعة تفاعل خام) — نحلل الصلاحيات يدوياً
-                const bitfield = new discord_js_1.PermissionsBitField(perms);
-                hasAdminPerms = bitfield.has(discord_js_1.PermissionFlagsBits.ManageGuild) || bitfield.has(discord_js_1.PermissionFlagsBits.Administrator);
+            else if (perms != null) {
+                // تفاعل خام — perms قد تكون string/bigint/number
+                const bitfield = new discord_js_1.PermissionsBitField(BigInt(perms));
+                hasAdminPerms =
+                    bitfield.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+                        bitfield.has(discord_js_1.PermissionFlagsBits.Administrator);
             }
         }
         catch {
