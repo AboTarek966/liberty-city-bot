@@ -17,10 +17,9 @@ const command = {
         .setRequired(false)
         .setMinValue(1)
         .setMaxValue(5))
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageMessages)
         .setDMPermission(false),
     cooldown: 3,
-    permissions: [discord_js_1.PermissionFlagsBits.ManageMessages],
+    permissions: [],
     async execute(interaction) {
         if (!interaction.guildId || !interaction.channelId) {
             await interaction.reply({ content: '❌ هذا الأمر يعمل في السيرفر فقط', ephemeral: true });

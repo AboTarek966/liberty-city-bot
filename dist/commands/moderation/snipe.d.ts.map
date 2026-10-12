@@ -1,1 +1,1 @@
-{"version":3,"file":"snipe.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/snipe.ts"],"names":[],"mappings":"AAUA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA4Dd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"snipe.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/snipe.ts"],"names":[],"mappings":"AAUA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA2Dd,CAAC;AAEF,eAAe,OAAO,CAAC"}

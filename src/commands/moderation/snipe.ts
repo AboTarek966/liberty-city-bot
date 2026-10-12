@@ -24,11 +24,10 @@ const command: Command = {
         .setMinValue(1)
         .setMaxValue(5)
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .setDMPermission(false),
 
   cooldown: 3,
-  permissions: [PermissionFlagsBits.ManageMessages],
+  permissions: [],
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guildId || !interaction.channelId) {
