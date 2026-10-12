@@ -155,9 +155,12 @@ const command = {
                 duration: duration ? parseDuration(duration) : null,
                 jailChannelId: targetJailChannel.id,
             }, { upsert: true, new: true });
-            // إعداد الصلاحيات: منع رؤية جميع القنوات إلا روم السجن
-            const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
-            for (const channel of channels.values()) {
+            // 🔒 إعداد الصلاحيات: منع رؤية جميع القنوات (نصية + صوتية + كاتيجوريز) إلا روم السجن
+            // الاستراتيجية: تعديل الكاتيجوريز أولاً (ينتقل للأبناء)، ثم القنوات التي لها overwrites خاصة
+            const allChannels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice || c.type === discord_js_1.ChannelType.GuildCategory);
+            let failedChannels = [];
+            let successCount = 0;
+            for (const channel of allChannels.values()) {
                 if (channel.id === targetJailChannel.id)
                     continue;
                 try {
@@ -166,12 +169,14 @@ const command = {
                         SendMessages: false,
                         Connect: false,
                     }, { reason: `سجن ${member.user.tag}` });
+                    successCount++;
                 }
                 catch (e) {
-                    // تجاهل الأخطاء في القنوات الفردية
+                    failedChannels.push(`${channel.name} (${channel.id})`);
+                    logger.warn(`Failed to set jail overwrite for ${channel.name}:`, e);
                 }
             }
-            // السماح بالرؤية في روم السجن
+            // السماح بالرؤية في روم السجن (مع صلاحيات كاملة للكتابة)
             try {
                 await targetJailChannel.permissionOverwrites.edit(jailRole, {
                     ViewChannel: true,
@@ -179,11 +184,21 @@ const command = {
                     ReadMessageHistory: true,
                     AttachFiles: true,
                     EmbedLinks: true,
+                    UseExternalEmojis: true,
+                    AddReactions: true,
                 }, { reason: `سجن ${member.user.tag}` });
             }
             catch (e) {
-                // تجاهل
+                logger.error('Failed to set jail channel permissions:', e);
+                await interaction.editReply({ content: '❌ فشل إعداد صلاحيات روم السجن — تأكد أن رتبة البوت أعلى من رول السجن ولديه ManageChannels' });
+                return;
             }
+            // تسجيل القنوات التي فشلت (للتشخيص)
+            if (failedChannels.length > 0) {
+                logger.warn(`Jail: failed to set overwrites on ${failedChannels.length} channels:`, failedChannels.slice(0, 10));
+                // لا نفشل الأمر بالكامل — بعض القنوات قد تكون مقفلة أو البوت بلا صلاحية فيها
+            }
+            logger.info(`Jail: applied overwrites to ${successCount} channels, failed: ${failedChannels.length}`);
             // جدولة الإفراج التلقائي إن وُجدت مدة — معطل بناءً على الطلب (إفراج يدوي فقط)
             // if (duration) {
             //   const ms = parseDuration(duration);
