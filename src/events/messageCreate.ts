@@ -38,12 +38,10 @@ const event: Event = {
     if (message.author.bot) return;
     if (message.webhookId) return;
 
-    // Ignore DMs
-    if (!message.guild) return;
-    if (message.channel.type === ChannelType.DM) return;
+    const isDM = !message.guild;
 
-    // 📤 رفع مباشر لصورة لوحة التذاكر (استجابة فورية — قبل أي فحوصات)
-    if (hasPendingImageUpload(message.author.id) && message.attachments.size > 0) {
+    // 📤 رفع مباشر لصورة لوحة التذاكر (سيرفرات فقط)
+    if (!isDM && hasPendingImageUpload(message.author.id) && message.attachments.size > 0) {
       try {
         const upload = consumePendingImageUpload(message.author.id);
         if (upload && upload.guildId === message.guild.id) {
@@ -78,76 +76,89 @@ const event: Event = {
       }
     }
 
-    // Protection checks + فلتر الاحتيال بالتوازي (كلاهما فحوصات أمان تسبق كل شيء)
-    try {
-      const results = await Promise.allSettled([
-        client.protectionHandler.checkMessage(message),
-        handleScamFilter(message, client),
-      ]);
-      const scamResult = results[1];
-      const blocked =
-        scamResult.status === 'fulfilled' ? scamResult.value : false;
-      if (blocked) return; // رسالة احتيالية — لا تُعالَج بقية الأنظمة
-    } catch (error) {
-      logger.error('Error in safety checks:', error);
-    }
+    // ======== سيرفرات فقط: الحماية، AFK، Aliases، أوامر مخصصة، اقتصاد، AI، Leveling ========
+    if (!isDM) {
+      // Protection checks + فلتر الاحتيال بالتوازي (كلاهما فحوصات أمان تسبق كل شيء)
+      try {
+        const results = await Promise.allSettled([
+          client.protectionHandler.checkMessage(message),
+          handleScamFilter(message, client),
+        ]);
+        const scamResult = results[1];
+        const blocked =
+          scamResult.status === 'fulfilled' ? scamResult.value : false;
+        if (blocked) return; // رسالة احتيالية — لا تُعالَج بقية الأنظمة
+      } catch (error) {
+        logger.error('Error in safety checks:', error);
+      }
 
-    // 💤 نظام AFK (إلغاء تلقائي عند الرسالة + إخبار المنشنزين بالسبب)
-    try {
-      await handleAfkActivity(message);
-    } catch (error) {
-      logger.error('Error in AFK system:', error);
-    }
+      // 💤 نظام AFK (إلغاء تلقائي عند الرسالة + إخبار المنشنزين بالسبب)
+      try {
+        await handleAfkActivity(message);
+      } catch (error) {
+        logger.error('Error in AFK system:', error);
+      }
 
-    // Activity tracking (messages) — يعمل في الخلفية حتى لا يبطئ أمر المستخدم
-    try {
-      void client.activityTracker.trackMessage(message.guild.id, message.author.id).catch(() => {});
-    } catch (error) {
-      logger.error('Error tracking activity:', error);
-    }
+      // Activity tracking (messages) — يعمل في الخلفية حتى لا يبطئ أمر المستخدم
+      try {
+        void client.activityTracker.trackMessage(message.guild.id, message.author.id).catch(() => {});
+      } catch (error) {
+        logger.error('Error tracking activity:', error);
+      }
 
-    // تحديث آخر نشاط في التذاكر المفتوحة (للإغلاق التلقائي عند الخمول) — في الخلفية
-    try {
-      void touchTicketActivity(message).catch(() => {});
-    } catch (error) {
-      logger.error('Error touching ticket activity:', error);
-    }
+      // تحديث آخر نشاط في التذاكر المفتوحة (للإغلاق التلقائي عند الخمول) — في الخلفية
+      try {
+        void touchTicketActivity(message).catch(() => {});
+      } catch (error) {
+        logger.error('Error touching ticket activity:', error);
+      }
 
-    // Alias / prefix commands — يُنفَّذ مبكراً حتى يرد البوت بسرعة
-    try {
-      const handled = await handleAliasCommand(message, client);
-      if (handled) return;
-    } catch (error) {
-      logger.error('Error handling alias command:', error);
-    }
+      // Alias / prefix commands — يُنفَّذ مبكراً حتى يرد البوت بسرعة
+      try {
+        const handled = await handleAliasCommand(message, client);
+        if (handled) return;
+      } catch (error) {
+        logger.error('Error handling alias command:', error);
+      }
 
-    // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)
-    try {
-      const customHandled = await handleCustomCommand(message);
-      if (customHandled) return;
-    } catch (error) {
-      logger.error('Error in custom command:', error);
-    }
+      // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)
+      try {
+        const customHandled = await handleCustomCommand(message);
+        if (customHandled) return;
+      } catch (error) {
+        logger.error('Error in custom command:', error);
+      }
 
-    // رصيد عشوائي أثناء التحدث (25% = +5 عملات) — بدون انتظار حتى لا يبطئ الرد
-    try {
-      void earnCreditsRandom(message).catch(() => {});
-    } catch {
-      /* لا يعطّل باقي الأنظمة */
-    }
+      // رصيد عشوائي أثناء التحدث (25% = +5 عملات) — بدون انتظار حتى لا يبطئ الرد
+      try {
+        void earnCreditsRandom(message).catch(() => {});
+      } catch {
+        /* لا يعطّل باقي الأنظمة */
+      }
 
-    // AI auto-reply (mention or reply to bot)
-    try {
-      await handleAIResponse(message, client);
-    } catch (error) {
-      logger.error('Error in AI response:', error);
-    }
+      // AI auto-reply (mention or reply to bot) — يعمل في السيرفرات
+      try {
+        await handleAIResponse(message, client);
+      } catch (error) {
+        logger.error('Error in AI response:', error);
+      }
 
-    // Leveling system (add XP via centralized handler) — في الخلفية
-    try {
-      void client.levelingHandler.addMessageXp(message.member!, message.channel.id).catch(() => {});
-    } catch (error) {
-      logger.error('Error in leveling:', error);
+      // Leveling system (add XP via centralized handler) — في الخلفية
+      try {
+        void client.levelingHandler.addMessageXp(message.member!, message.channel.id).catch(() => {});
+      } catch (error) {
+        logger.error('Error in leveling:', error);
+      }
+    } // end if (!isDM)
+
+    // ======== DMs: AI response only ========
+    else {
+      // AI auto-reply في الخاص — يرد على أي رسالة مباشرة
+      try {
+        await handleAIResponse(message, client);
+      } catch (error) {
+        logger.error('Error in AI response (DM):', error);
+      }
     }
   },
 };
