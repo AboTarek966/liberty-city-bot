@@ -58,7 +58,10 @@ const command = {
     async execute(interaction) {
         const client = interaction.client;
         const guild = interaction.guild;
-        const member = interaction.options.getMember('user');
+        // ⚠️ getMember قد يُرجع كائن خام (APIInteractionGuildMember) بدون roles.cache
+        // لذلك نجلب العضو من السيرفر مباشرة لضمان كائن GuildMember كامل
+        const targetUser = interaction.options.getUser('user', true);
+        const member = await guild.members.fetch(targetUser.id).catch(() => null);
         const jailChannel = interaction.options.getChannel('jail_channel');
         const reason = interaction.options.getString('reason') || 'سجن عبر الأمر';
         const duration = interaction.options.getString('duration');

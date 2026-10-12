@@ -53,7 +53,9 @@ const command = {
     async execute(interaction) {
         const client = interaction.client;
         const guild = interaction.guild;
-        const member = interaction.options.getMember('user');
+        // ⚠️ getMember قد يُرجع كائن خام — نجلب العضو من السيرفر مباشرة
+        const targetUser = interaction.options.getUser('user', true);
+        const member = await guild.members.fetch(targetUser.id).catch(() => null);
         const reason = interaction.options.getString('reason') || 'إلغاء سجن يدوي';
         if (!member) {
             await interaction.reply({ content: '❌ لم يتم العثور على العضو', ephemeral: true });

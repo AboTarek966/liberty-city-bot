@@ -35,7 +35,9 @@ const command: Command = {
   async execute(interaction: ChatInputCommandInteraction) {
     const client = interaction.client as LibertyClient;
     const guild = interaction.guild!;
-    const member = interaction.options.getMember('user') as GuildMember;
+    // ⚠️ getMember قد يُرجع كائن خام — نجلب العضو من السيرفر مباشرة
+    const targetUser = interaction.options.getUser('user', true);
+    const member = await guild.members.fetch(targetUser.id).catch(() => null);
     const reason = interaction.options.getString('reason') || 'إلغاء سجن يدوي';
 
     if (!member) {
