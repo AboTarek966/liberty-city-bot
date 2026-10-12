@@ -43,7 +43,7 @@ const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('roleadd')
         .setDescription('إضافة رول لعضو')
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageRoles)
+        // 🔓 بدون صلاحية مطلوبة — أي إداري يمكنه إعطاء رولات أقل من رتبته (فحص الهرمية)
         .addUserOption(o => o.setName('user').setDescription('العضو المراد إضافة الرول له').setRequired(true))
         .addRoleOption(o => o
         .setName('role')
@@ -55,7 +55,7 @@ const command = {
         .addRoleOption(o => o.setName('role5').setDescription('رول إضافي 5').setRequired(false))
         .addStringOption(o => o.setName('reason').setDescription('السبب').setRequired(false)),
     cooldown: 5,
-    permissions: [discord_js_1.PermissionFlagsBits.ManageRoles],
+    // 🔓 بدون صلاحية مطلوبة — فحص الهرمية فقط
     async execute(interaction) {
         const client = interaction.client;
         const guild = interaction.guild;

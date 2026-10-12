@@ -42,12 +42,12 @@ const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('roleremove')
         .setDescription('إزالة رول من عضو')
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageRoles)
+        // 🔓 بدون صلاحية مطلوبة — أي إداري يمكنه إزالة رولات أقل من رتبته (فحص الهرمية)
         .addUserOption(o => o.setName('user').setDescription('العضو المراد إزالة الرول منه').setRequired(true))
         .addRoleOption(o => o.setName('role').setDescription('الرول المراد إزالته').setRequired(true))
         .addStringOption(o => o.setName('reason').setDescription('السبب').setRequired(false)),
     cooldown: 5,
-    permissions: [discord_js_1.PermissionFlagsBits.ManageRoles],
+    // 🔓 بدون صلاحية مطلوبة — فحص الهرمية فقط
     async execute(interaction) {
         const client = interaction.client;
         const guild = interaction.guild;

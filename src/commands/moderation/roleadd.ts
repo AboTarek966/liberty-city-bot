@@ -23,7 +23,7 @@ const command: Command = {
   data: new SlashCommandBuilder()
     .setName('roleadd')
     .setDescription('إضافة رول لعضو')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    // 🔓 بدون صلاحية مطلوبة — أي إداري يمكنه إعطاء رولات أقل من رتبته (فحص الهرمية)
     .addUserOption(o =>
       o.setName('user').setDescription('العضو المراد إضافة الرول له').setRequired(true)
     )
@@ -50,7 +50,7 @@ const command: Command = {
     ),
 
   cooldown: 5,
-  permissions: [PermissionFlagsBits.ManageRoles],
+  // 🔓 بدون صلاحية مطلوبة — فحص الهرمية فقط
 
   async execute(interaction: ChatInputCommandInteraction) {
     const client = interaction.client as LibertyClient;

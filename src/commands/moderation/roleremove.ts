@@ -18,7 +18,7 @@ const command: Command = {
   data: new SlashCommandBuilder()
     .setName('roleremove')
     .setDescription('إزالة رول من عضو')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    // 🔓 بدون صلاحية مطلوبة — أي إداري يمكنه إزالة رولات أقل من رتبته (فحص الهرمية)
     .addUserOption(o =>
       o.setName('user').setDescription('العضو المراد إزالة الرول منه').setRequired(true)
     )
@@ -30,7 +30,7 @@ const command: Command = {
     ),
 
   cooldown: 5,
-  permissions: [PermissionFlagsBits.ManageRoles],
+  // 🔓 بدون صلاحية مطلوبة — فحص الهرمية فقط
 
   async execute(interaction: ChatInputCommandInteraction) {
     const client = interaction.client as LibertyClient;
