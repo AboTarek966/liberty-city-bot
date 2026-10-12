@@ -225,6 +225,7 @@ const TOGGLE_PAIRS: Array<[string, string]> = [
   ['timeout', 'untimeout'],
   ['mute', 'unmute'],
   ['roleadd', 'roleremove'],
+  ['jail', 'unjail'],
 ];
 
 async function resolveToggle(
@@ -275,6 +276,17 @@ async function resolveToggle(
       if (role && member) return pick(member.roles.cache.has(role.id) ? removeCmd : addCmd);
       return pick(addCmd); // بدون رول محدد → لوحة الاختيار (إضافة)
     }
+
+    // سجن ⇐ العضو مسجون حالياً؟ (مسجون ⇐ إلغاء السجن، حر ⇐ سجن)
+    if (addCmd === 'jail') {
+      if (!member) return pick(addCmd);
+      let jailed = false;
+      try {
+        const { JailData } = await import('../models');
+        jailed = !!(await JailData.findOne({ guildId: guild.id, userId: member.id }));
+      } catch { /* تجاهل */ }
+      return pick(jailed ? removeCmd : addCmd);
+    }
   }
 
   return null;
@@ -302,7 +314,7 @@ const ALIAS_LABELS: Record<string, string> = {
   unwarn: '✅ إزالة تحذير', mute: '🔇 كتم', unmute: '🔊 فك الكتم',
   untimeout: '🔓 إلغاء تايم أوت', unban: '🔓 إلغاء حظر', purge: '🗑️ مسح',
   roleadd: '➕ إضافة رول', roleremove: '➖ إزالة رول', promote: '⬆️ ترقية',
-  jail: '🔒 سجن', lockdown: '🚨 وضع الطوارئ', settings: '⚙️ إعدادات',
+  jail: '🔒 سجن', unjail: '🔓 إلغاء سجن', lockdown: '🚨 وضع الطوارئ', settings: '⚙️ إعدادات',
   afk: '💤 AFK', snipe: '🕵️ سنايب', ping: '🏓 بينج',
 };
 

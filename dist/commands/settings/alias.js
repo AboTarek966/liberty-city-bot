@@ -40,7 +40,7 @@ const command = {
         .setName('extra')
         .setDescription('📦 أوامر إضافية (إعدادات وحماية ورولات)')
         .setRequired(false)
-        .addChoices({ name: '⚙️ إعدادات السيرفر', value: 'settings' }, { name: '🛡️ أنظمة الحماية', value: 'protection' }, { name: '🕵️ استرجاع رسالة محذوفة (سنايب)', value: 'snipe' }, { name: '💾 نسخة احتياطية', value: 'backup' }, { name: '⌨️ إدارة الاختصارات نفسها', value: 'alias' }, { name: '🎭 قائمة رولات (روليميو)', value: 'rolemenu' }, { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' }, { name: '➕ إضافة رول لعضو', value: 'roleadd' }, { name: '➖ إزالة رول من عضو', value: 'roleremove' }, { name: '🔓 إلغاء تايم أوت', value: 'untimeout' }, { name: '🔓 إلغاء حظر', value: 'unban' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 وضع الطوارئ', value: 'lockdown' }, { name: '🔒 سجن', value: 'jail' }, { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' }, { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' }, { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' })))
+        .addChoices({ name: '⚙️ إعدادات السيرفر', value: 'settings' }, { name: '🛡️ أنظمة الحماية', value: 'protection' }, { name: '🕵️ استرجاع رسالة محذوفة (سنايب)', value: 'snipe' }, { name: '💾 نسخة احتياطية', value: 'backup' }, { name: '⌨️ إدارة الاختصارات نفسها', value: 'alias' }, { name: '🎭 قائمة رولات (روليميو)', value: 'rolemenu' }, { name: '➕ رول تلقائي للأعضاء الجدد', value: 'autorole' }, { name: '➕ إضافة رول لعضو', value: 'roleadd' }, { name: '➖ إزالة رول من عضو', value: 'roleremove' }, { name: '🔓 إلغاء تايم أوت', value: 'untimeout' }, { name: '🔓 إلغاء حظر', value: 'unban' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 وضع الطوارئ', value: 'lockdown' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إلغاء سجن (إفراج)', value: 'unjail' }, { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' }, { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' }, { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' })))
         .addSubcommand(sub => sub
         .setName('remove')
         .setDescription('حذف اختصار')
@@ -172,7 +172,9 @@ async function handleAdd(interaction, client) {
         rolemenu: `\`${shortcut} create\``,
         autorole: `\`${shortcut} @رول\``,
         roleadd: `${shortcut} @عضو @رول1 [@رول2 ...] [السبب]`,
-        roleremove: `${shortcut} @عضو @رول [السبب]`
+        roleremove: `${shortcut} @عضو @رول [السبب]`,
+        jail: `\`${shortcut} @عضو [السبب]\``,
+        unjail: `\`${shortcut} @عضو [السبب]\``
     };
     const example = usageExamples[cleanCommand] || `\`${shortcut}\``;
     const embed = new discord_js_1.EmbedBuilder()
@@ -270,6 +272,8 @@ async function handleList(interaction) {
         roleadd: '➕ إضافة رول',
         roleremove: '➖ إزالة رول',
         afk: '💤 AFK',
+        jail: '🔒 سجن',
+        unjail: '🔓 إلغاء سجن',
     };
     // تجميع الاختصارات المكررة (نظام التبديل 🔁)
     const grouped = new Map();

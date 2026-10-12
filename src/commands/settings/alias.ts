@@ -90,6 +90,7 @@ const command: Command = {
               { name: '⬆️ ترقية', value: 'promote' },
               { name: '🚨 وضع الطوارئ', value: 'lockdown' },
               { name: '🔒 سجن', value: 'jail' },
+              { name: '🔓 إلغاء سجن (إفراج)', value: 'unjail' },
               { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' },
               { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' },
               { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' }
@@ -245,7 +246,9 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     rolemenu: `\`${shortcut} create\``,
     autorole: `\`${shortcut} @رول\``,
     roleadd: `${shortcut} @عضو @رول1 [@رول2 ...] [السبب]`,
-    roleremove: `${shortcut} @عضو @رول [السبب]`
+    roleremove: `${shortcut} @عضو @رول [السبب]`,
+    jail: `\`${shortcut} @عضو [السبب]\``,
+    unjail: `\`${shortcut} @عضو [السبب]\``
   };
   const example = usageExamples[cleanCommand] || `\`${shortcut}\``;
 
@@ -360,6 +363,8 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     roleadd: '➕ إضافة رول',
     roleremove: '➖ إزالة رول',
     afk: '💤 AFK',
+    jail: '🔒 سجن',
+    unjail: '🔓 إلغاء سجن',
   };
 
   // تجميع الاختصارات المكررة (نظام التبديل 🔁)
