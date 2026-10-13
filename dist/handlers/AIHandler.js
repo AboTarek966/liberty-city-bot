@@ -220,14 +220,16 @@ class AIHandler {
                     fallback: true,
                 };
             }
+            // ذاكرة المحادثة — تُحمَّل قبل كل شيء حتى تبقى المحادثة متصلة
+            const history = await this.loadHistory(userId, guildId);
             // Check custom response rules
+            // ⚠️ كانت تتجاوز الذاكرة نهائياً → البوت "ينسى" ما قاله للتو. نُسجّلها الآن.
             const customResponse = await this.checkCustomRules(guildId, message, userRoles, aiConfig);
             if (customResponse) {
                 this.cooldowns.set(cooldownKey, now);
+                await this.saveHistory(userId, guildId || 'dm', message, customResponse.content);
                 return customResponse;
             }
-            // ذاكرة المحادثة — الرسائل السابقة تُمرَّر للنموذج لفهم الاستفسارات المتتابعة
-            const history = await this.loadHistory(userId, guildId);
             // 🖼️ تحليل الوسائط: صور (رؤية) · رسائل صوتية (تفريغ) · فيديو (إطارات + صوت) · ملفات نصية
             let media;
             if (attachments && attachments.length > 0) {
