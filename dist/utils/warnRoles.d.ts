@@ -6,10 +6,10 @@ export declare function getWarnRolePool(settings: any, target: GuildMember): str
  */
 export declare function getWarningCount(guildId: string, userId: string): Promise<number>;
 /**
- * تطبيق نظام التحذيرات التسلسلي للإداريين:
- * - تحذير 1 → role1Id
- * - تحذير 2 → role2Id
- * - تحذير 3 → role3Id
+ * تطبيق رولات التحذير بعد التحذير (تراكمي):
+ * - 1 تحذير → رول 1
+ * - 2 تحذير → رول 1 + رول 2
+ * - 3+ → رول 1 + رول 2 + رول 3
  * يعيد ملاحظة نصية بما تم، أو null لو ما فيش إعداد
  */
 export declare function applySequentialAdminWarnRoles(opts: {
@@ -24,12 +24,7 @@ export declare function applySequentialAdminWarnRoles(opts: {
     diag?: Record<string, any>;
 }): Promise<string | null>;
 /**
- * 🔄 مزامنة رولات التحذير التسلسلي بعد الإزالة (unwarn):
- * يحسب عدد التحذيرات المتبقي ويضبط الرول accordingly:
- * - 0 تحذيرات → يزيل كل رولات التحذير
- * - 1 → role1Id فقط
- * - 2 → role2Id فقط
- * - 3+ → role3Id فقط
+ * 🔄 مزامنة رولات التحذير بعد الإزالة (unwarn) — نظام تراكمي
  * يعيد ملاحظة بما تم، أو null لو ما فيش تغيير/إعداد
  */
 export declare function syncSequentialAdminWarnRoles(opts: {

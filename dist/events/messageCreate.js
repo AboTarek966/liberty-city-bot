@@ -46,7 +46,6 @@ const AIModeration_1 = require("../handlers/AIModeration");
 const aliasRunner_1 = require("../utils/aliasRunner");
 const aliasCache_1 = require("../utils/aliasCache");
 const afk_1 = require("../utils/afk");
-const warnRoles_1 = require("../utils/warnRoles");
 const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
 const pendingUploads_1 = require("../utils/pendingUploads");
@@ -635,43 +634,21 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
             return respond(message, result.simpleMsg);
         }
         case 'unwarn': {
-            // 🔢 "شيل 2 @admin" ← رقم مستوى التحذير | "شيل @member" ← إزالة عادية
-            let level = 0;
+            // 🔢 "شيل 2 @admin" ← الرقم مجرد تمييز لمسار الإداريين (يُتجاهل)
+            //    "شيل @member" ← إزالة عادية
+            //    في الحالتين: يُشال تحذير واحد فقط + مزامنة الرولات التراكمية
             let rest = args;
-            const lvl = args[0]?.match(/^([١-٩1-9])$/);
-            if (lvl) {
-                level = parseInt(lvl[1].replace('١', '1').replace('٢', '2').replace('٣', '3')
-                    .replace('٤', '4').replace('٥', '5').replace('٦', '6')
-                    .replace('٧', '7').replace('٨', '8').replace('٩', '9'), 10);
+            if (args[0]?.match(/^([١-٩1-9])$/))
                 rest = args.slice(1);
-            }
             // نبحث عن المنشن (نتجاهل الكلمات الزائدة قبله مثل "تحذير")
             const mentionIdx = rest.findIndex(t => parseUserId(t));
-            if (mentionIdx === -1) {
-                return usage(level ? '<1|2|3> <@المستخدم> [السبب]' : '<@المستخدم> [السبب]');
-            }
+            if (mentionIdx === -1)
+                return usage('<@المستخدم> [السبب]');
             const userId = parseUserId(rest[mentionIdx]);
             const reason = rest.slice(mentionIdx + 1).join(' ') || 'إزالة تحذير';
             const targetMember = await guild.members.fetch(userId).catch(() => null);
             if (!targetMember)
                 return respond(message, '❌ لم يتم العثور على المستخدم');
-            // 🔢 فيه رقم → إنزال لمستوى محدد + مزامنة رولات التحذير
-            if (level > 0) {
-                try {
-                    const note = await (0, warnRoles_1.removeWarnToLevel)({
-                        guild,
-                        moderator: member,
-                        target: targetMember,
-                        level,
-                        reason,
-                    });
-                    return respond(message, note);
-                }
-                catch (e) {
-                    return respond(message, `❌ ${e.message}`);
-                }
-            }
-            // ✅ بدون رقم → إزالة تحذير عادية (آخر تحذير + مزامنة الرول تلقائياً)
             try {
                 const result = await client.moderationHandler.unwarn({
                     guild,

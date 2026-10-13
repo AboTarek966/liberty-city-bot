@@ -57,10 +57,93 @@ export async function getWarningCount(guildId: string, userId: string): Promise<
 }
 
 /**
- * تطبيق نظام التحذيرات التسلسلي للإداريين:
- * - تحذير 1 → role1Id
- * - تحذير 2 → role2Id  
- * - تحذير 3 → role3Id
+ * 🎭 مزامنة رولات التحذير (نظام تراكمي):
+ * - 0 تحذيرات → بدون رول
+ * - 1 → رول 1
+ * - 2 → رول 1 + رول 2
+ * - 3+ → رول 1 + رول 2 + رول 3
+ * الأعضاء العاديون لا يحصلون على أي رول
+ * يعيد ملاحظة بما تم، أو null لو ما فيش تغيير/إعداد
+ */
+async function cumulativeSync(opts: {
+  guild: Guild;
+  target: GuildMember;
+  settings: any;
+  reason: string;
+  diag?: Record<string, any>;
+}): Promise<{ note: string | null; count: number; wanted: number; configured: boolean }> {
+  const { guild, target, settings, reason, diag } = opts;
+  const set = (k: string, v: any) => { if (diag) diag[k] = v; };
+
+  const seq = settings?.warnRoles?.adminSequential;
+  if (!seq) {
+    set('fail', 'no_sequential_config');
+    return { note: null, count: 0, wanted: 0, configured: false };
+  }
+
+  const count = await getWarningCount(guild.id, target.id);
+  set('warnCount', count);
+
+  const configured = !!(seq.role1Id || seq.role2Id || seq.role3Id);
+  const isAdmin = isAdminTarget(target);
+  set('isAdmin', isAdmin);
+
+  // 🔺 تراكمي: الرولات المطلوبة = كل المستويات ≤ عدد التحذيرات (بحد أقصى 3)
+  const level = Math.min(count, 3);
+  const wantedIds: string[] = [];
+  if (isAdmin && level >= 1 && seq.role1Id) wantedIds.push(seq.role1Id);
+  if (isAdmin && level >= 2 && seq.role2Id) wantedIds.push(seq.role2Id);
+  if (isAdmin && level >= 3 && seq.role3Id) wantedIds.push(seq.role3Id);
+  set('wantedIds', wantedIds);
+
+  const allIds = [seq.role1Id, seq.role2Id, seq.role3Id].filter(Boolean) as string[];
+  const wanted = new Set(wantedIds);
+  const botTop = guild.members.me?.roles.highest.position ?? 0;
+  const notes: string[] = [];
+
+  // ① إزالة رولات التحذير الزائدة (غير المطلوبة)
+  for (const id of allIds) {
+    if (wanted.has(id) || !target.roles.cache.has(id)) continue;
+    const role = guild.roles.cache.get(id);
+    if (!role) continue;
+    try {
+      await target.roles.remove(role, `مزامنة رولات التحذير (${count} تحذير): ${reason}`);
+      notes.push(`تم إزالة ${role.name}`);
+    } catch (e: any) {
+      set('fail', `remove_${id}: ${e.message}`);
+      logger.warn(`sync remove role failed: ${e.message}`);
+    }
+  }
+
+  // ② إعطاء الرولات الناقصة
+  for (const id of wantedIds) {
+    if (target.roles.cache.has(id)) continue;
+    const role = guild.roles.cache.get(id);
+    if (!role) { set(`missing_${id}`, 'not_in_cache'); continue; }
+    if (role.managed) { set(`missing_${id}`, 'managed'); continue; }
+    if (role.position >= botTop) { set(`missing_${id}`, `hierarchy(${role.position}>=${botTop})`); continue; }
+    try {
+      await target.roles.add(role, `تحذير إداري (${count} تحذير): ${reason}`);
+      notes.push(`تم إعطاء ${role.name}`);
+    } catch (e: any) {
+      set(`missing_${id}`, e.message);
+      logger.warn(`sync add role failed: ${e.message}`);
+    }
+  }
+
+  return {
+    note: notes.length ? notes.join('، ') : null,
+    count,
+    wanted: wantedIds.length,
+    configured,
+  };
+}
+
+/**
+ * تطبيق رولات التحذير بعد التحذير (تراكمي):
+ * - 1 تحذير → رول 1
+ * - 2 تحذير → رول 1 + رول 2
+ * - 3+ → رول 1 + رول 2 + رول 3
  * يعيد ملاحظة نصية بما تم، أو null لو ما فيش إعداد
  */
 export async function applySequentialAdminWarnRoles(opts: {
@@ -77,10 +160,8 @@ export async function applySequentialAdminWarnRoles(opts: {
   const { settings, guild, executor, target, reason, forceFreshSettings, diag } = opts;
   const set = (k: string, v: any) => { if (diag) diag[k] = v; };
 
-  // فقط للإداريين
   if (!isAdminTarget(target)) { set('fail', 'not_admin_target'); return null; }
 
-  // إذا طُلب بيانات طازجة، أبطل الكاش وجيب إعدادات جديدة
   let effectiveSettings = settings;
   if (forceFreshSettings) {
     const { invalidateGuildSettings, getGuildSettings } = await import('../models');
@@ -88,56 +169,20 @@ export async function applySequentialAdminWarnRoles(opts: {
     effectiveSettings = await getGuildSettings(guild.id);
   }
 
-  const sequential = effectiveSettings?.warnRoles?.adminSequential;
-  if (!sequential) { set('fail', 'no_sequential_config'); return null; }
-
-  // حساب عدد التحذيرات الحالي (بما فيها التحذير الجديد)
-  const currentCount = await getWarningCount(guild.id, target.id);
-  set('warnCount', currentCount);
-
-  // تحديد الرول المناسب
-  let roleId: string | undefined;
-  let roleNumber: number;
-
-  if (currentCount === 1) {
-    roleId = sequential.role1Id;
-    roleNumber = 1;
-  } else if (currentCount === 2) {
-    roleId = sequential.role2Id;
-    roleNumber = 2;
-  } else if (currentCount >= 3) {
-    roleId = sequential.role3Id;
-    roleNumber = 3;
-  } else {
-    set('fail', `count_zero(${currentCount})`);
-    return null; // لا يوجد رول لهذا العدد
-  }
-
-  set('roleId', roleId);
-  set('roleNumber', roleNumber);
-  if (!roleId) { set('fail', 'role_id_empty'); return null; }
-
   try {
-    const botTop = guild.members.me?.roles.highest.position ?? 0;
-    const role = guild.roles.cache.get(roleId);
-    set('botTop', botTop);
-    set('roleFound', !!role);
-    if (role) set('rolePos', role.position);
+    const r = await cumulativeSync({
+      guild, target, settings: effectiveSettings, reason, diag,
+    });
+    set('botTop', guild.members.me?.roles.highest.position ?? 0);
 
-    if (!role || role.id === guild.id || role.managed || role.position >= botTop) {
-      set('fail', !role ? 'role_not_in_cache' : role.managed ? 'role_managed' : role.position >= botTop ? 'hierarchy_too_high' : 'role_is_everyone');
-      logger.warn(`Sequential warn role ${roleId} not usable (hierarchy/managed)`);
-      return null;
+    if (!r.configured) { set('fail', 'no_roles_configured'); return null; }
+    if (r.count === 0) { set('fail', 'count_zero'); return null; }
+    if (!r.note) {
+      // كل الرولات موجودة أصلاً
+      return `🎭 العضو يملك بالفعل رولات التحذير (${r.count} تحذير)`;
     }
-
-    // إذا كان العضو يملك الرول بالفعل، لا نعيد إعطاؤه
-    if (target.roles.cache.has(roleId)) {
-      return `🎭 العضو يملك بالفعل رول التحذير رقم ${roleNumber}: <@&${roleId}>`;
-    }
-
-    await target.roles.add(role, `تحذير إداري تسلسلي #${currentCount}: ${reason}`);
-    logger.info(`Sequential admin warn role applied: ${role.name} (warning #${currentCount}) → ${target.id} (by ${executor.id})`);
-    return `🎭 تم إعطاء رول التحذير رقم ${roleNumber}: <@&${roleId}>`;
+    logger.info(`Sequential admin warn roles (${r.count}) → ${target.id} (by ${executor.id}): ${r.note}`);
+    return `🎭 ${r.note} (${r.count} تحذير)`;
   } catch (error: any) {
     set('fail', `exception: ${error.message}`);
     logger.warn(`applySequentialAdminWarnRoles failed: ${error.message}`);
@@ -146,12 +191,7 @@ export async function applySequentialAdminWarnRoles(opts: {
 }
 
 /**
- * 🔄 مزامنة رولات التحذير التسلسلي بعد الإزالة (unwarn):
- * يحسب عدد التحذيرات المتبقي ويضبط الرول accordingly:
- * - 0 تحذيرات → يزيل كل رولات التحذير
- * - 1 → role1Id فقط
- * - 2 → role2Id فقط
- * - 3+ → role3Id فقط
+ * 🔄 مزامنة رولات التحذير بعد الإزالة (unwarn) — نظام تراكمي
  * يعيد ملاحظة بما تم، أو null لو ما فيش تغيير/إعداد
  */
 export async function syncSequentialAdminWarnRoles(opts: {
@@ -160,53 +200,15 @@ export async function syncSequentialAdminWarnRoles(opts: {
   settings: any;
 }): Promise<string | null> {
   const { guild, target, settings } = opts;
-
-  if (!isAdminTarget(target)) return null;
-
-  const seq = settings?.warnRoles?.adminSequential;
-  if (!seq) return null;
-
-  const count = await getWarningCount(guild.id, target.id);
-
-  // الرول المطلوب حسب العدد الحالي بعد الإزالة
-  const wantedId: string | undefined =
-    count === 0 ? undefined
-    : count === 1 ? seq.role1Id
-    : count === 2 ? seq.role2Id
-    : seq.role3Id;
-
-  const allIds = [seq.role1Id, seq.role2Id, seq.role3Id].filter(Boolean) as string[];
-  const botTop = guild.members.me?.roles.highest.position ?? 0;
-  const notes: string[] = [];
-
-  // ① إزالة كل رولات التحذير اللي مش مطلوبة للعدد الحالي
-  for (const id of allIds) {
-    if (id === wantedId) continue;
-    if (!target.roles.cache.has(id)) continue;
-    const role = guild.roles.cache.get(id);
-    if (!role) continue;
-    try {
-      await target.roles.remove(role, `مزامنة رولات التحذير بعد إزالة تحذير (المتبقي: ${count})`);
-      notes.push(`تم إزالة ${role.name}`);
-    } catch (e: any) {
-      logger.warn(`sync remove role failed: ${e.message}`);
-    }
+  try {
+    const r = await cumulativeSync({
+      guild, target, settings, reason: 'مزامنة بعد إزالة تحذير',
+    });
+    return r.note;
+  } catch (e: any) {
+    logger.warn(`syncSequentialAdminWarnRoles failed: ${e.message}`);
+    return null;
   }
-
-  // ② إعطاء الرول المناسب للعدد الجديد (لو مختلف)
-  if (wantedId && !target.roles.cache.has(wantedId)) {
-    const role = guild.roles.cache.get(wantedId);
-    if (role && !role.managed && role.position < botTop) {
-      try {
-        await target.roles.add(role, `مزامنة رولات التحذير بعد إزالة تحذير (المتبقي: ${count})`);
-        notes.push(`تم إعطاء ${role.name}`);
-      } catch (e: any) {
-        logger.warn(`sync add role failed: ${e.message}`);
-      }
-    }
-  }
-
-  return notes.length ? notes.join('، ') : null;
 }
 
 /**
