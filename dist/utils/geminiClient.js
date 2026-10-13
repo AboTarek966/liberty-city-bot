@@ -67,6 +67,10 @@ function buildBody(opts) {
         generationConfig: {
             temperature: opts.temperature,
             maxOutputTokens: Math.max(64, opts.maxTokens),
+            // ⚡ إيقاف "التفكير الممتد" — يسرق توكنز الإجابة فينتج نصاً مقطوعاً،
+            //   ويضيف ثوانٍ لا يحتاجها البوت (ردود المحادثة والرؤية لا تحتاج استدلالاً عميقاً).
+            //   مُختبر: الردود تكتمل وتنزل من ~25ث إلى ~4ث.
+            thinkingConfig: { thinkingBudget: 0 },
         },
         safetySettings: [
             'HARM_CATEGORY_HARASSMENT',
