@@ -1006,6 +1006,12 @@ async function handleAIResponse(message, client) {
     });
     const stream = {
         onFirstChunk: async (text) => {
+            // إن كان هناك رسالة بديلة مُرسلة مسبقاً (مؤشر "جارٍ التحليل") نُحرّرها بدل إرسال رسالة جديدة
+            if (streamedMsg) {
+                lastEditAt = Date.now();
+                await streamedMsg.edit(msgOptions(preview(text))).catch(() => { });
+                return;
+            }
             streamedMsg = await message.reply(msgOptions(preview(text)));
             lastEditAt = Date.now();
         },
@@ -1019,6 +1025,14 @@ async function handleAIResponse(message, client) {
             await streamedMsg.edit(msgOptions(preview(text))).catch(() => { });
         },
     };
+    // ⏳ الوسائط (صور/فيديو/رسائل صوتية) تحتاج ثوانٍ للتحليل — نُجيب فوراً حتى لا يظن المستخدم أن البوت عطِل.
+    //   ستُستبدل هذه الرسالة تلقائياً بالرد النهائي.
+    if (attachments.length > 0) {
+        try {
+            await stream.onFirstChunk('👀 بحلّل المرفق…');
+        }
+        catch { }
+    }
     const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM, attachments });
     if (response) {
         const parts = splitAiText(response.content, 1900);
@@ -1044,6 +1058,10 @@ async function handleAIResponse(message, client) {
                 }
             }
         }
+    }
+    else if (streamedMsg) {
+        // لا يوجد رد (محجوب/معطّل) — نحذف مؤشر "جارٍ التحليل" حتى لا يبقى عالقاً
+        await streamedMsg.delete().catch(() => { });
     }
 }
 // تقسيم نص الرد حسب حد ديسكورد (2000 حرف) عند أقرب سطر/مسافة
