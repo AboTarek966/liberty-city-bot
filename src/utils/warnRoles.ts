@@ -21,14 +21,26 @@ interface WarnRolesConfig {
   };
 }
 
-// هل الهدف إداري؟ (مالك السيرفر أو لديه صلاحية أدمن/إدارة)
+// هل الهدف إداري؟ (مالك السيرفر أو لديه أي صلاحية إدارة)
+// ⚠️ معرّف موحّد مع AIModeration — أي صلاحية إدارية تُعتبر "إداري"
+const ADMIN_PERMS = [
+  PermissionFlagsBits.Administrator,
+  PermissionFlagsBits.ManageGuild,
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.ManageRoles,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.KickMembers,
+  PermissionFlagsBits.BanMembers,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.ManageNicknames,
+  PermissionFlagsBits.ManageEmojisAndStickers,
+  PermissionFlagsBits.ManageWebhooks,
+];
+
 export function isAdminTarget(target: GuildMember): boolean {
   if (target.id === target.guild.ownerId) return true;
   const perms = target.permissions;
-  return (
-    perms.has(PermissionFlagsBits.Administrator) ||
-    perms.has(PermissionFlagsBits.ManageGuild)
-  );
+  return ADMIN_PERMS.some(p => perms.has(p));
 }
 
 // قائمة رولات التحذير المناسبة لنوع الهدف (إداري ⇐ adminIds، عضو ⇐ memberIds)
@@ -59,11 +71,14 @@ export async function applySequentialAdminWarnRoles(opts: {
   reason: string;
   /** إذا true، يجيب إعدادات طازجة من قاعدة البيانات متجاهلاً الكاش */
   forceFreshSettings?: boolean;
+  /** حقل اختياري: يُملأ بسبب الفشل الدقيق */
+  diag?: Record<string, any>;
 }): Promise<string | null> {
-  const { settings, guild, executor, target, reason, forceFreshSettings } = opts;
+  const { settings, guild, executor, target, reason, forceFreshSettings, diag } = opts;
+  const set = (k: string, v: any) => { if (diag) diag[k] = v; };
 
   // فقط للإداريين
-  if (!isAdminTarget(target)) return null;
+  if (!isAdminTarget(target)) { set('fail', 'not_admin_target'); return null; }
 
   // إذا طُلب بيانات طازجة، أبطل الكاش وجيب إعدادات جديدة
   let effectiveSettings = settings;
@@ -74,10 +89,11 @@ export async function applySequentialAdminWarnRoles(opts: {
   }
 
   const sequential = effectiveSettings?.warnRoles?.adminSequential;
-  if (!sequential) return null;
+  if (!sequential) { set('fail', 'no_sequential_config'); return null; }
 
   // حساب عدد التحذيرات الحالي (بما فيها التحذير الجديد)
   const currentCount = await getWarningCount(guild.id, target.id);
+  set('warnCount', currentCount);
 
   // تحديد الرول المناسب
   let roleId: string | undefined;
@@ -93,16 +109,23 @@ export async function applySequentialAdminWarnRoles(opts: {
     roleId = sequential.role3Id;
     roleNumber = 3;
   } else {
+    set('fail', `count_zero(${currentCount})`);
     return null; // لا يوجد رول لهذا العدد
   }
 
-  if (!roleId) return null;
+  set('roleId', roleId);
+  set('roleNumber', roleNumber);
+  if (!roleId) { set('fail', 'role_id_empty'); return null; }
 
   try {
     const botTop = guild.members.me?.roles.highest.position ?? 0;
     const role = guild.roles.cache.get(roleId);
+    set('botTop', botTop);
+    set('roleFound', !!role);
+    if (role) set('rolePos', role.position);
 
     if (!role || role.id === guild.id || role.managed || role.position >= botTop) {
+      set('fail', !role ? 'role_not_in_cache' : role.managed ? 'role_managed' : role.position >= botTop ? 'hierarchy_too_high' : 'role_is_everyone');
       logger.warn(`Sequential warn role ${roleId} not usable (hierarchy/managed)`);
       return null;
     }
@@ -116,6 +139,7 @@ export async function applySequentialAdminWarnRoles(opts: {
     logger.info(`Sequential admin warn role applied: ${role.name} (warning #${currentCount}) → ${target.id} (by ${executor.id})`);
     return `🎭 تم إعطاء رول التحذير رقم ${roleNumber}: <@&${roleId}>`;
   } catch (error: any) {
+    set('fail', `exception: ${error.message}`);
     logger.warn(`applySequentialAdminWarnRoles failed: ${error.message}`);
     return null;
   }

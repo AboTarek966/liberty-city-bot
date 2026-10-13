@@ -48,13 +48,26 @@ const rolePicker_1 = require("./rolePicker");
 const helpers_1 = require("./helpers");
 const models_1 = require("../models");
 const logger = (0, helpers_1.createLogger)('WarnRoles');
-// هل الهدف إداري؟ (مالك السيرفر أو لديه صلاحية أدمن/إدارة)
+// هل الهدف إداري؟ (مالك السيرفر أو لديه أي صلاحية إدارة)
+// ⚠️ معرّف موحّد مع AIModeration — أي صلاحية إدارية تُعتبر "إداري"
+const ADMIN_PERMS = [
+    discord_js_1.PermissionFlagsBits.Administrator,
+    discord_js_1.PermissionFlagsBits.ManageGuild,
+    discord_js_1.PermissionFlagsBits.ManageChannels,
+    discord_js_1.PermissionFlagsBits.ManageRoles,
+    discord_js_1.PermissionFlagsBits.ManageMessages,
+    discord_js_1.PermissionFlagsBits.KickMembers,
+    discord_js_1.PermissionFlagsBits.BanMembers,
+    discord_js_1.PermissionFlagsBits.ModerateMembers,
+    discord_js_1.PermissionFlagsBits.ManageNicknames,
+    discord_js_1.PermissionFlagsBits.ManageEmojisAndStickers,
+    discord_js_1.PermissionFlagsBits.ManageWebhooks,
+];
 function isAdminTarget(target) {
     if (target.id === target.guild.ownerId)
         return true;
     const perms = target.permissions;
-    return (perms.has(discord_js_1.PermissionFlagsBits.Administrator) ||
-        perms.has(discord_js_1.PermissionFlagsBits.ManageGuild));
+    return ADMIN_PERMS.some(p => perms.has(p));
 }
 // قائمة رولات التحذير المناسبة لنوع الهدف (إداري ⇐ adminIds، عضو ⇐ memberIds)
 function getWarnRolePool(settings, target) {
@@ -75,10 +88,14 @@ async function getWarningCount(guildId, userId) {
  * يعيد ملاحظة نصية بما تم، أو null لو ما فيش إعداد
  */
 async function applySequentialAdminWarnRoles(opts) {
-    const { settings, guild, executor, target, reason, forceFreshSettings } = opts;
+    const { settings, guild, executor, target, reason, forceFreshSettings, diag } = opts;
+    const set = (k, v) => { if (diag)
+        diag[k] = v; };
     // فقط للإداريين
-    if (!isAdminTarget(target))
+    if (!isAdminTarget(target)) {
+        set('fail', 'not_admin_target');
         return null;
+    }
     // إذا طُلب بيانات طازجة، أبطل الكاش وجيب إعدادات جديدة
     let effectiveSettings = settings;
     if (forceFreshSettings) {
@@ -87,10 +104,13 @@ async function applySequentialAdminWarnRoles(opts) {
         effectiveSettings = await getGuildSettings(guild.id);
     }
     const sequential = effectiveSettings?.warnRoles?.adminSequential;
-    if (!sequential)
+    if (!sequential) {
+        set('fail', 'no_sequential_config');
         return null;
+    }
     // حساب عدد التحذيرات الحالي (بما فيها التحذير الجديد)
     const currentCount = await getWarningCount(guild.id, target.id);
+    set('warnCount', currentCount);
     // تحديد الرول المناسب
     let roleId;
     let roleNumber;
@@ -107,14 +127,24 @@ async function applySequentialAdminWarnRoles(opts) {
         roleNumber = 3;
     }
     else {
+        set('fail', `count_zero(${currentCount})`);
         return null; // لا يوجد رول لهذا العدد
     }
-    if (!roleId)
+    set('roleId', roleId);
+    set('roleNumber', roleNumber);
+    if (!roleId) {
+        set('fail', 'role_id_empty');
         return null;
+    }
     try {
         const botTop = guild.members.me?.roles.highest.position ?? 0;
         const role = guild.roles.cache.get(roleId);
+        set('botTop', botTop);
+        set('roleFound', !!role);
+        if (role)
+            set('rolePos', role.position);
         if (!role || role.id === guild.id || role.managed || role.position >= botTop) {
+            set('fail', !role ? 'role_not_in_cache' : role.managed ? 'role_managed' : role.position >= botTop ? 'hierarchy_too_high' : 'role_is_everyone');
             logger.warn(`Sequential warn role ${roleId} not usable (hierarchy/managed)`);
             return null;
         }
@@ -127,6 +157,7 @@ async function applySequentialAdminWarnRoles(opts) {
         return `🎭 تم إعطاء رول التحذير رقم ${roleNumber}: <@&${roleId}>`;
     }
     catch (error) {
+        set('fail', `exception: ${error.message}`);
         logger.warn(`applySequentialAdminWarnRoles failed: ${error.message}`);
         return null;
     }

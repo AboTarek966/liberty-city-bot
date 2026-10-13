@@ -20,6 +20,8 @@ export declare function applySequentialAdminWarnRoles(opts: {
     reason: string;
     /** إذا true، يجيب إعدادات طازجة من قاعدة البيانات متجاهلاً الكاش */
     forceFreshSettings?: boolean;
+    /** حقل اختياري: يُملأ بسبب الفشل الدقيق */
+    diag?: Record<string, any>;
 }): Promise<string | null>;
 /**
  * يُطبّق رولات التحذير بعد التحذير:

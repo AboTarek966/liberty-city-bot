@@ -420,6 +420,7 @@ async function executeAIModeration(message, client, question) {
                         caseId: await (await Promise.resolve().then(() => __importStar(require('../models')))).getNextCaseId(guild.id),
                     });
                 }
+                const seqDiag = {};
                 const result = await applySequentialAdminWarnRoles({
                     settings,
                     guild,
@@ -427,22 +428,11 @@ async function executeAIModeration(message, client, question) {
                     target: targetMember,
                     reason: `تحذير تسلسلي رقم ${level} (يدوي)`,
                     forceFreshSettings: true, // 🔄 إجبار جلب إعدادات طازجة من قاعدة البيانات
+                    diag: seqDiag,
                 });
                 if (!result) {
-                    // 🔍 تشخيص: نعرض ما هو موجود فعلاً في الإعدادات
                     const seq = settings?.warnRoles?.adminSequential;
-                    const freshSeq = (await (async () => {
-                        try {
-                            const m = await Promise.resolve().then(() => __importStar(require('../models')));
-                            m.invalidateGuildSettings(guild.id);
-                            const s = await m.getGuildSettings(guild.id);
-                            return s?.warnRoles?.adminSequential;
-                        }
-                        catch {
-                            return undefined;
-                        }
-                    })());
-                    const diag = JSON.stringify({ cached: seq, fresh: freshSeq });
+                    const diag = JSON.stringify({ seq, ...seqDiag });
                     logger.warn(`sequential_warn failed. level=${level} diag=${diag}`);
                     throw new Error(`لا يوجد رول تحذير رقم ${level} مُعد — diagnostics: ${diag}`);
                 }

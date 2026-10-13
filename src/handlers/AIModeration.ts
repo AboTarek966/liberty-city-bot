@@ -445,6 +445,7 @@ export async function executeAIModeration(
           });
         }
         
+        const seqDiag: Record<string, any> = {};
         const result = await applySequentialAdminWarnRoles({
           settings,
           guild,
@@ -452,20 +453,12 @@ export async function executeAIModeration(
           target: targetMember,
           reason: `تحذير تسلسلي رقم ${level} (يدوي)`,
           forceFreshSettings: true, // 🔄 إجبار جلب إعدادات طازجة من قاعدة البيانات
+          diag: seqDiag,
         });
         
         if (!result) {
-          // 🔍 تشخيص: نعرض ما هو موجود فعلاً في الإعدادات
           const seq = settings?.warnRoles?.adminSequential;
-          const freshSeq = (await (async () => {
-            try {
-              const m = await import('../models');
-              m.invalidateGuildSettings(guild.id);
-              const s = await m.getGuildSettings(guild.id);
-              return s?.warnRoles?.adminSequential;
-            } catch { return undefined; }
-          })());
-          const diag = JSON.stringify({ cached: seq, fresh: freshSeq });
+          const diag = JSON.stringify({ seq, ...seqDiag });
           logger.warn(`sequential_warn failed. level=${level} diag=${diag}`);
           throw new Error(`لا يوجد رول تحذير رقم ${level} مُعد — diagnostics: ${diag}`);
         }
