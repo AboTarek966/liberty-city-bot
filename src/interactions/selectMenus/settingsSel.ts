@@ -417,44 +417,30 @@ const handler: SelectMenuHandler = {
         });
         return;
       }
-      case 'warnroles:seq1': {
-        // 1️⃣ رول التحذير الأول (للإداريين — نظام تسلسلي)
+      case 'warnroles:sequential': {
+        // ⚡ النظام التسلسلي: القيم المختارة هي role IDs مباشرة
         if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [], adminSequential: {} };
-        (settings.warnRoles as any).adminSequential = settings.warnRoles.adminSequential || {};
-        (settings.warnRoles as any).adminSequential.role1Id = values[0];
+        const seq = (settings.warnRoles.adminSequential = settings.warnRoles.adminSequential || {});
+
+        const selected = values || [];
+
+        seq.role1Id = selected[0] || '';
+        seq.role2Id = selected[1] || '';
+        seq.role3Id = selected[2] || '';
+
         await settings.save();
-        const wPanel1 = buildWarnRolesPanel(interaction.guild!, settings);
-        await interaction.editReply({ embeds: wPanel1.embeds, components: wPanel1.components as any });
+        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+
+        const labels = { role1Id: '1️⃣ تحذير 1', role2Id: '2️⃣ تحذير 2', role3Id: '3️⃣ تحذير 3+' };
+        const changes = [
+          `${labels.role1Id}: ${seq.role1Id ? `<@&${seq.role1Id}>` : '🗑️ تم المسح'}`,
+          `${labels.role2Id}: ${seq.role2Id ? `<@&${seq.role2Id}>` : '🗑️ تم المسح'}`,
+          `${labels.role3Id}: ${seq.role3Id ? `<@&${seq.role3Id}>` : '🗑️ تم المسح'}`,
+        ];
+
         await interaction.followUp({
-          content: values[0] ? `✅ رول التحذير 1: <@&${values[0]}>` : '🗑️ تم مسح رول التحذير 1',
-          ephemeral: true,
-        });
-        return;
-      }
-      case 'warnroles:seq2': {
-        // 2️⃣ رول التحذير الثاني (للإداريين — نظام تسلسلي)
-        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [], adminSequential: {} };
-        (settings.warnRoles as any).adminSequential = settings.warnRoles.adminSequential || {};
-        (settings.warnRoles as any).adminSequential.role2Id = values[0];
-        await settings.save();
-        const wPanel2 = buildWarnRolesPanel(interaction.guild!, settings);
-        await interaction.editReply({ embeds: wPanel2.embeds, components: wPanel2.components as any });
-        await interaction.followUp({
-          content: values[0] ? `✅ رول التحذير 2: <@&${values[0]}>` : '🗑️ تم مسح رول التحذير 2',
-          ephemeral: true,
-        });
-        return;
-      }
-      case 'warnroles:seq3': {
-        // 3️⃣ رول التحذير الثالث (للإداريين — نظام تسلسلي)
-        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [], adminSequential: {} };
-        (settings.warnRoles as any).adminSequential = settings.warnRoles.adminSequential || {};
-        (settings.warnRoles as any).adminSequential.role3Id = values[0];
-        await settings.save();
-        const wPanel3 = buildWarnRolesPanel(interaction.guild!, settings);
-        await interaction.editReply({ embeds: wPanel3.embeds, components: wPanel3.components as any });
-        await interaction.followUp({
-          content: values[0] ? `✅ رول التحذير 3: <@&${values[0]}>` : '🗑️ تم مسح رول التحذير 3',
+          content: changes.join('\n'),
           ephemeral: true,
         });
         return;

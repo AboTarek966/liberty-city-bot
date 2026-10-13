@@ -435,23 +435,14 @@ function buildWarnRolesPanel(guild, s) {
         .setPlaceholder('🛡️ اختر رولات تحذير الإداريين — القائمة (يمكن أكثر من واحدة)')
         .setMinValues(0)
         .setMaxValues(10));
-    const seq1Select = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
-        .setCustomId('settings_sel:warnroles:seq1')
-        .setPlaceholder('1️⃣ رول التحذير الأول (للتحذير الأول)')
+    // النظام التسلسلي: قائمة واحدة بـ 3 خيارات كحد أقصى (توفير components)
+    const seqSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:warnroles:sequential')
+        .setPlaceholder('⚡ اختر رولات النظام التسلسلي (تحذير 1، 2، 3+)')
         .setMinValues(0)
-        .setMaxValues(1));
-    const seq2Select = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
-        .setCustomId('settings_sel:warnroles:seq2')
-        .setPlaceholder('2️⃣ رول التحذير الثاني (للتحذير الثاني)')
-        .setMinValues(0)
-        .setMaxValues(1));
-    const seq3Select = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
-        .setCustomId('settings_sel:warnroles:seq3')
-        .setPlaceholder('3️⃣ رول التحذير الثالث (للتحذير الثالث وما بعده)')
-        .setMinValues(0)
-        .setMaxValues(1));
+        .setMaxValues(3));
     const backRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'));
-    return { embeds: [embed], components: [memberSelect, adminSelect, seq1Select, seq2Select, seq3Select, backRow] };
+    return { embeds: [embed], components: [memberSelect, adminSelect, seqSelect, backRow] };
 }
 // --------------------------------------------
 // Tickets
