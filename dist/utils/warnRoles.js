@@ -43,6 +43,7 @@ exports.getWarnRolePool = getWarnRolePool;
 exports.getWarningCount = getWarningCount;
 exports.applySequentialAdminWarnRoles = applySequentialAdminWarnRoles;
 exports.syncSequentialAdminWarnRoles = syncSequentialAdminWarnRoles;
+exports.removeWarnToLevel = removeWarnToLevel;
 exports.offerWarnRoles = offerWarnRoles;
 const discord_js_1 = require("discord.js");
 const rolePicker_1 = require("./rolePicker");
@@ -219,6 +220,55 @@ async function syncSequentialAdminWarnRoles(opts) {
         }
     }
     return notes.length ? notes.join('، ') : null;
+}
+/**
+ * 🔢 إنزال التحذير لمستوى محدد (للإداريين): "شيل 2 @admin"
+ * يحذف التحذيرات حتى يصبح عددها = level - 1، ثم يزامن رولات التحذير
+ * - شيل 1 → 0 تحذيرات (مسح كامل)
+ * - شيل 2 → تحذير واحد
+ * - شيل 3 → تحذيران
+ */
+async function removeWarnToLevel(opts) {
+    const { guild, moderator, target, level, reason } = opts;
+    const { Warning, ModerationCase, getNextCaseId, invalidateGuildSettings, getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../models')));
+    const current = await Warning.countDocuments({ guildId: guild.id, userId: target.id });
+    if (current === 0)
+        throw new Error('هذا العضو ليس لديه أي تحذيرات');
+    const targetCount = Math.max(0, level - 1);
+    if (targetCount >= current) {
+        throw new Error(`العضو عنده ${current} تحذير فقط — لا يوجد ما يُزال عند المستوى ${level}`);
+    }
+    // نحذف أحدث التحذيرات حتى نبلغ المستوى المطلوب
+    const toRemove = current - targetCount;
+    const docs = await Warning.find({ guildId: guild.id, userId: target.id })
+        .sort({ createdAt: -1 })
+        .limit(toRemove)
+        .select('_id');
+    if (docs.length > 0) {
+        await Warning.deleteMany({ _id: { $in: docs.map(d => d._id) } });
+    }
+    // سجل الحالة (في الخلفية — لا يؤخر الرد)
+    void ModerationCase.create({
+        guildId: guild.id,
+        caseId: await getNextCaseId(guild.id),
+        type: 'unwarn',
+        moderatorId: moderator.id,
+        targetId: target.id,
+        reason: `${reason} (${current} ← ${targetCount})`,
+        active: false,
+    }).catch(err => logger.warn(`Case create failed: ${err.message}`));
+    // 🔄 مزامنة رولات التحذير حسب العدد الجديد
+    let roleNote = null;
+    try {
+        invalidateGuildSettings(guild.id);
+        const settings = await getGuildSettings(guild.id);
+        roleNote = await syncSequentialAdminWarnRoles({ guild, target, settings });
+    }
+    catch (e) {
+        logger.warn(`sync after removeWarnToLevel failed: ${e.message}`);
+    }
+    logger.info(`Warn level lowered: ${target.id} ${current}→${targetCount} in ${guild.id} by ${moderator.id}`);
+    return `✅ **${target.user.tag}** تحذيراته: ${current} ← ${targetCount}${roleNote ? ` | ${roleNote}` : ''} | ${reason}`;
 }
 /**
  * يُطبّق رولات التحذير بعد التحذير:

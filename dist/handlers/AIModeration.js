@@ -76,7 +76,7 @@ const ACTIONS = [
     },
     {
         action: 'unwarn',
-        patterns: /(?:شيل|ازل|احذف|إزالة|امسح|لغي| remove)\s*(?:ال)?تحذير|(?:حذف|إزالة|ازالة|مسح)\s*تحذير|(?:^|\W)unwarn(?:$|\W)/i,
+        patterns: /(?:شيل|ازل|احذف|إزالة|امسح|لغي| remove)\s*(?:ال)?(?:تحذير|\d)|(?:حذف|إزالة|ازالة|مسح)\s*تحذير|(?:^|\W)unwarn(?:$|\W)/i,
         permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
         label: 'إزالة تحذير',
     },
@@ -441,6 +441,19 @@ async function executeAIModeration(message, client, question) {
             }
             case 'unwarn': {
                 const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+                if (!member)
+                    throw new Error('العضو غير موجود في السيرفر');
+                // 🔢 "شيل 2 @admin" ← رقم مستوى التحذير
+                const lvl = question.match(/(?:شيل|ازل|احذف|إزالة|امسح|لغي| remove)\s*([١-٩1-9])/i);
+                if (lvl) {
+                    const level = parseInt(lvl[1]
+                        .replace('١', '1').replace('٢', '2').replace('٣', '3').replace('٤', '4')
+                        .replace('٥', '5').replace('٦', '6').replace('٧', '7').replace('٨', '8')
+                        .replace('٩', '9'), 10);
+                    const { removeWarnToLevel } = await Promise.resolve().then(() => __importStar(require('../utils/warnRoles')));
+                    msg = await removeWarnToLevel({ guild, moderator, target: member, level, reason });
+                    break;
+                }
                 const result = await client.moderationHandler.unwarn({
                     guild,
                     moderator,

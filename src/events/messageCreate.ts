@@ -22,6 +22,7 @@ import { executeAIModeration, runSequentialWarn } from '../handlers/AIModeration
 import { executeCommandFromMessage } from '../utils/aliasRunner';
 import { getAliasesForShortcut } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
+import { removeWarnToLevel } from '../utils/warnRoles';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
@@ -700,6 +701,59 @@ async function runAliasCommand(
         reason,
       });
       return respond(message, result.simpleMsg);
+    }
+
+    case 'unwarn': {
+      // 🔢 "شيل 2 @admin" ← رقم مستوى التحذير | "شيل @member" ← إزالة عادية
+      let level = 0;
+      let rest = args;
+      const lvl = args[0]?.match(/^([١-٩1-9])$/);
+      if (lvl) {
+        level = parseInt(lvl[1].replace('١', '1').replace('٢', '2').replace('٣', '3')
+          .replace('٤', '4').replace('٥', '5').replace('٦', '6')
+          .replace('٧', '7').replace('٨', '8').replace('٩', '9'), 10);
+        rest = args.slice(1);
+      }
+
+      // نبحث عن المنشن (نتجاهل الكلمات الزائدة قبله مثل "تحذير")
+      const mentionIdx = rest.findIndex(t => parseUserId(t));
+      if (mentionIdx === -1) {
+        return usage(level ? '<1|2|3> <@المستخدم> [السبب]' : '<@المستخدم> [السبب]');
+      }
+      const userId = parseUserId(rest[mentionIdx])!;
+      const reason = rest.slice(mentionIdx + 1).join(' ') || 'إزالة تحذير';
+
+      const targetMember = await guild.members.fetch(userId).catch(() => null);
+      if (!targetMember) return respond(message, '❌ لم يتم العثور على المستخدم');
+
+      // 🔢 فيه رقم → إنزال لمستوى محدد + مزامنة رولات التحذير
+      if (level > 0) {
+        try {
+          const note = await removeWarnToLevel({
+            guild,
+            moderator: member,
+            target: targetMember,
+            level,
+            reason,
+          });
+          return respond(message, note);
+        } catch (e: any) {
+          return respond(message, `❌ ${e.message}`);
+        }
+      }
+
+      // ✅ بدون رقم → إزالة تحذير عادية (آخر تحذير + مزامنة الرول تلقائياً)
+      try {
+        const result = await client.moderationHandler.unwarn({
+          guild,
+          moderator: member,
+          target: targetMember,
+          reason,
+        });
+        return respond(message, result.simpleMsg);
+      } catch (e: any) {
+        return respond(message, `❌ ${e.message}`);
+      }
     }
 
     case 'mute': {
