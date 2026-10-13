@@ -222,18 +222,21 @@ async function syncSequentialAdminWarnRoles(opts) {
 }
 /**
  * يُطبّق رولات التحذير بعد التحذير:
- * - للإداريين: نظام تسلسلي تلقائي (1→role1, 2→role2, 3→role3)
- * - للأعضاء: رول واحد فقط → يُعطى مباشرة، أو لوحة اختيار
+ * - للإداريين فقط: نظام تسلسلي تلقائي (1→role1, 2→role2, 3→role3) أو pool adminIds
+ * - للأعضاء العاديين: ❌ لا يُعطون أي رول (تحذير عدّاد فقط)
  * - لا توجد رولات قابلة → يُرجع null
  */
 async function offerWarnRoles(opts) {
     const { settings, guild, executor, target, reason, reply } = opts;
+    // 🚫 الأعضاء العاديين لا يأخذون رول تحذير — تحذير عدّاد فقط
+    if (!isAdminTarget(target))
+        return null;
     try {
         // أولاً: جرب النظام التسلسلي للإداريين (تلقائي، بدون لوحة)
         const sequentialNote = await applySequentialAdminWarnRoles({ settings, guild, executor, target, reason, forceFreshSettings: true });
         if (sequentialNote)
             return sequentialNote;
-        // ثانياً: النظام القديم (pool من رولات التحذير)
+        // ثانياً: النظام القديم (pool من رولات التحذير الإدارية)
         const pool = getWarnRolePool(settings, target);
         if (pool.length === 0)
             return null;

@@ -39,8 +39,8 @@ export declare function syncSequentialAdminWarnRoles(opts: {
 }): Promise<string | null>;
 /**
  * يُطبّق رولات التحذير بعد التحذير:
- * - للإداريين: نظام تسلسلي تلقائي (1→role1, 2→role2, 3→role3)
- * - للأعضاء: رول واحد فقط → يُعطى مباشرة، أو لوحة اختيار
+ * - للإداريين فقط: نظام تسلسلي تلقائي (1→role1, 2→role2, 3→role3) أو pool adminIds
+ * - للأعضاء العاديين: ❌ لا يُعطون أي رول (تحذير عدّاد فقط)
  * - لا توجد رولات قابلة → يُرجع null
  */
 export declare function offerWarnRoles(opts: {
