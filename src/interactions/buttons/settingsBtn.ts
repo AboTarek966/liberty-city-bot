@@ -776,15 +776,21 @@ const handler: ButtonHandler = {
       case 'warnroles:refresh': {
         // 🔄 تحديث حقيقي: يعيد تحميل الإعدادات من قاعدة البيانات
         await interaction.deferUpdate();
-        invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش أولاً
-        const freshSettings = await getGuildSettings(interaction.guild.id);
         try {
+          invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش أولاً
+
+          // ⏱️ timeout آمن (8 ثواني) عشان MongoDB ما يعلّقش التفاعل
+          const freshSettings = await Promise.race([
+            getGuildSettings(interaction.guild.id),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('انتهت مهلة الاتصال بقاعدة البيانات (8s)')), 8000)),
+          ]) as any;
+
           const wPanel = buildWarnRolesPanel(interaction.guild!, freshSettings);
           await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
-          await interaction.followUp({ content: '✅ تم تحديث رولات التحذير من قاعدة البيانات', ephemeral: true });
+          await interaction.followUp({ content: '✅ تم تحديث رولات التحذير من قاعدة البيانات', ephemeral: true }).catch(() => {});
         } catch (error: any) {
           logger.error('warnroles refresh failed:', error);
-          await interaction.editReply({ content: `❌ فشل تحديث رولات التحذير: ${error.message}` }).catch(() => {});
+          await interaction.editReply({ content: `❌ فشل التحديث: ${error?.message || error}` }).catch(() => {});
         }
         return;
       }
