@@ -578,7 +578,7 @@ export function buildWarnRolesPanel(guild: Guild, s: any): BuiltPanel {
 
   const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:home', 'القائمة الرئيسية', ButtonStyle.Secondary, '🏠'),
-    btn('settings_back', '🔄 تحديث', ButtonStyle.Primary, '🔄'),
+    btn('settings_btn:warnroles:refresh', '🔄 تحديث', ButtonStyle.Primary, '🔄'),
   );
 
   return { embeds: [embed], components: [memberSelect, adminSelect, seqSelect, backRow] };

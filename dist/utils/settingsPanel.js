@@ -441,7 +441,7 @@ function buildWarnRolesPanel(guild, s) {
         .setPlaceholder('⚡ اختر رولات النظام التسلسلي (تحذير 1، 2، 3+)')
         .setMinValues(0)
         .setMaxValues(3));
-    const backRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'));
+    const backRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_btn:warnroles:refresh', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'));
     return { embeds: [embed], components: [memberSelect, adminSelect, seqSelect, backRow] };
 }
 // --------------------------------------------

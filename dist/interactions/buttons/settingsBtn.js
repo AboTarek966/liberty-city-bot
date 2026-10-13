@@ -657,6 +657,21 @@ const handler = {
                 }
                 return;
             }
+            case 'warnroles:refresh': {
+                // 🔄 تحديث حقيقي: يعيد تحميل الإعدادات من قاعدة البيانات
+                await interaction.deferUpdate();
+                const freshSettings = await (0, models_1.getGuildSettings)(interaction.guild.id);
+                try {
+                    const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, freshSettings);
+                    await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
+                    await interaction.followUp({ content: '✅ تم تحديث رولات التحذير من قاعدة البيانات', ephemeral: true });
+                }
+                catch (error) {
+                    logger.error('warnroles refresh failed:', error);
+                    await interaction.editReply({ content: `❌ فشل تحديث رولات التحذير: ${error.message}` }).catch(() => { });
+                }
+                return;
+            }
             case 'commands:clear': {
                 settings.customCommands = [];
                 await settings.save();
