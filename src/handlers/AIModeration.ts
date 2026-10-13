@@ -7,7 +7,7 @@
 // والتنفيذ حتمي (regex) وليس بقرار الذكاء الاصطناعي.
 // ============================================
 
-import { Message, GuildMember, User, PermissionFlagsBits, EmbedBuilder, ChannelType, TextChannel, ColorResolvable } from 'discord.js';
+import { Message, Guild, GuildMember, User, PermissionFlagsBits, EmbedBuilder, ChannelType, TextChannel, ColorResolvable } from 'discord.js';
 import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
 import { getGuildSettings } from '../models';
@@ -59,12 +59,7 @@ const ACTIONS: ActionDef[] = [
     permission: PermissionFlagsBits.ModerateMembers,
     label: 'إزالة تحذير',
   },
-  {
-    action: 'warn',
-    patterns: /تحذير|إنذار|انذار|(?:^|\W)warn(?:$|\W)/i,
-    permission: PermissionFlagsBits.ModerateMembers,
-    label: 'تحذير',
-  },
+  // ⚠️ التسلسلي (يحتوي رقم) يجب أن يُفحص قبل التحذير العادي
   {
     action: 'sequential_warn',
     patterns: /تحذير\s*[١٢٣123]/i,
@@ -76,6 +71,12 @@ const ACTIONS: ActionDef[] = [
     patterns: /(?:^|\s)(?:ت|تح|تحذ)\s*[123١٢٣]\b/i,
     permission: PermissionFlagsBits.ModerateMembers,
     label: 'اختصار تحذير تسلسلي (ت 1/2/3)',
+  },
+  {
+    action: 'warn',
+    patterns: /تحذير|إنذار|انذار|(?:^|\W)warn(?:$|\W)/i,
+    permission: PermissionFlagsBits.ModerateMembers,
+    label: 'تحذير',
   },
   // ========== أوامر إدارة السيرفر الجديدة ==========
   {
@@ -239,6 +240,78 @@ async function respond(
   } catch (error: any) {
     logger.error(`Fallback send failed: ${error.message}`);
   }
+}
+
+// --------------------------------------------
+// ⚠️ تحذير تسلسلي (1/2/3) — يُستخدم من مسار الـ AI ومن الاختصارات (ت2 @user)
+// ينشئ التحذيرات حتى المستوى المطلوب ثم يطبّق رول المستوى المقابل
+// --------------------------------------------
+const ADMIN_PERMISSIONS = [
+  PermissionFlagsBits.Administrator,
+  PermissionFlagsBits.ManageGuild,
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.ManageRoles,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.KickMembers,
+  PermissionFlagsBits.BanMembers,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.ManageNicknames,
+  PermissionFlagsBits.ManageEmojisAndStickers,
+  PermissionFlagsBits.ManageWebhooks,
+];
+
+export async function runSequentialWarn(opts: {
+  guild: Guild;
+  moderator: GuildMember;
+  targetMember: GuildMember;
+  level: number;
+  reason: string;
+}): Promise<string> {
+  const { guild, moderator, targetMember, level, reason } = opts;
+
+  // النظام التسلسلي للإداريين فقط
+  const isOwner = targetMember.id === guild.ownerId;
+  const isAdminTarget = isOwner || ADMIN_PERMISSIONS.some(p => targetMember.permissions.has(p));
+  if (!isAdminTarget) {
+    throw new Error('رول التحذير التسلسلي للإداريين فقط — للأعضاء العاديين اكتب بدون رقم (مثل: ت @العضو)');
+  }
+
+  const { applySequentialAdminWarnRoles } = await import('../utils/warnRoles');
+  const { Warning, getNextCaseId } = await import('../models');
+  const settings = await getGuildSettings(guild.id);
+
+  // نضاعف التحذيرات حتى نبلغ المستوى المطلوب
+  const currentCount = await Warning.countDocuments({ guildId: guild.id, userId: targetMember.id });
+  for (let i = currentCount; i < level; i++) {
+    await Warning.create({
+      guildId: guild.id,
+      userId: targetMember.id,
+      moderatorId: moderator.id,
+      reason: reason || `تحذير تسلسلي رقم ${i + 1}`,
+      caseId: await getNextCaseId(guild.id),
+    });
+  }
+
+  const seqDiag: Record<string, any> = {};
+  const roleResult = await applySequentialAdminWarnRoles({
+    settings,
+    guild,
+    executor: moderator,
+    target: targetMember,
+    reason: reason || `تحذير تسلسلي رقم ${level}`,
+    forceFreshSettings: true,
+    diag: seqDiag,
+  });
+
+  if (!roleResult) {
+    const seq = settings?.warnRoles?.adminSequential;
+    const diag = JSON.stringify({ seq, ...seqDiag });
+    logger.warn(`sequential_warn failed. level=${level} diag=${diag}`);
+    throw new Error(`لا يوجد رول تحذير رقم ${level} مُعد — راجع /settings → 🎭 رولات التحذير | diagnostics: ${diag}`);
+  }
+
+  const newCount = await Warning.countDocuments({ guildId: guild.id, userId: targetMember.id });
+  return `⚠️ تحذير تسلسلي رقم ${level} (المجموع: ${newCount}) | ${roleResult}`;
 }
 
 // --------------------------------------------
@@ -416,72 +489,11 @@ export async function executeAIModeration(
           match = question.match(/(?:ت|تح|تحذ)\s*([١٢٣123])\b/i);
         }
         const level = match ? parseInt(match[1].replace('١', '1').replace('٢', '2').replace('٣', '3'), 10) : 1;
-        
+
         const targetMember = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
         if (!targetMember) throw new Error('العضو غير موجود في السيرفر');
-        
-        // التحقق: النظام التسلسلي للإداريين فقط (أي حد عنده صلاحيات إدارة)
-        const adminPermissions = [
-          PermissionFlagsBits.Administrator,
-          PermissionFlagsBits.ManageGuild,
-          PermissionFlagsBits.ManageChannels,
-          PermissionFlagsBits.ManageRoles,
-          PermissionFlagsBits.ManageMessages,
-          PermissionFlagsBits.KickMembers,
-          PermissionFlagsBits.BanMembers,
-          PermissionFlagsBits.ModerateMembers,
-          PermissionFlagsBits.ManageNicknames,
-          PermissionFlagsBits.ManageEmojisAndStickers,
-          PermissionFlagsBits.ManageWebhooks,
-        ];
 
-        const isAdminTarget = targetMember.id === guild.ownerId || 
-          adminPermissions.some(p => targetMember.permissions.has(p));
-        
-        if (!isAdminTarget) {
-          throw new Error('النظام التسلسلي للإداريين فقط — للأعضاء العاديين استخدم `/warn`');
-        }
-        
-        // تطبيق الرول مباشرة حسب الرقم
-        const { applySequentialAdminWarnRoles } = await import('../utils/warnRoles');
-        const settings = await getGuildSettings(guild.id);
-        
-        // نحسب عدد التحذيرات الحالي ونعدل السبب ليتضمن المستوى المطلوب
-        const currentCount = await (await import('../models')).Warning.countDocuments({ guildId: guild.id, userId: targetMember.id });
-        const targetCount = Math.max(currentCount, level - 1);
-        
-        // نضيف تحذيرات وهمية للوصول للمستوى المطلوب (أو نستخدم دالة مباشرة)
-        // الحل الأبسط: نضيف التحذير في قاعدة البيانات ثم نطبق الرول
-        const { Warning } = await import('../models');
-        for (let i = currentCount; i < level; i++) {
-          await Warning.create({
-            guildId: guild.id,
-            userId: targetMember.id,
-            moderatorId: moderator.id,
-            reason: `تحذير تسلسلي رقم ${i + 1} (يدوي)`,
-            caseId: await (await import('../models')).getNextCaseId(guild.id),
-          });
-        }
-        
-        const seqDiag: Record<string, any> = {};
-        const result = await applySequentialAdminWarnRoles({
-          settings,
-          guild,
-          executor: moderator,
-          target: targetMember,
-          reason: `تحذير تسلسلي رقم ${level} (يدوي)`,
-          forceFreshSettings: true, // 🔄 إجبار جلب إعدادات طازجة من قاعدة البيانات
-          diag: seqDiag,
-        });
-        
-        if (!result) {
-          const seq = settings?.warnRoles?.adminSequential;
-          const diag = JSON.stringify({ seq, ...seqDiag });
-          logger.warn(`sequential_warn failed. level=${level} diag=${diag}`);
-          throw new Error(`لا يوجد رول تحذير رقم ${level} مُعد — diagnostics: ${diag}`);
-        }
-        
-        msg = `✅ ${result}`;
+        msg = await runSequentialWarn({ guild, moderator, targetMember, level, reason });
         break;
       }
       // ========== أوامر إدارة السيرفر الجديدة ==========

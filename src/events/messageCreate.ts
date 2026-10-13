@@ -18,11 +18,10 @@ import { createLogger, formatDuration } from '../utils/helpers';
 import { getGuildSettings, Warning, MuteRole } from '../models';
 import { ICommandAlias } from '../models/CommandAlias';
 import { Colors } from '../utils/embeds';
-import { executeAIModeration } from '../handlers/AIModeration';
+import { executeAIModeration, runSequentialWarn } from '../handlers/AIModeration';
 import { executeCommandFromMessage } from '../utils/aliasRunner';
 import { getAliasesForShortcut } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
-import { offerWarnRoles } from '../utils/warnRoles';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
@@ -664,11 +663,33 @@ async function runAliasCommand(
     }
 
     case 'warn': {
-      const userId = parseUserId(args[0]);
-      if (!userId) return usage('<@المستخدم> [السبب]');
-      const reason = args.slice(1).join(' ') || 'لم يتم تحديد سبب';
+      // 🔢 تحذير تسلسلي: "ت 2 @user" ← رقم المستوى قبل المنشن
+      let level = 0;
+      let rest = args;
+      const lvl = args[0]?.match(/^([١٢٣123])$/);
+      if (lvl) {
+        level = parseInt(lvl[1].replace('١', '1').replace('٢', '2').replace('٣', '3'), 10);
+        rest = args.slice(1);
+      }
+
+      const userId = parseUserId(rest[0]);
+      if (!userId) return usage(level ? '<1|2|3> <@المستخدم> [السبب]' : '<@المستخدم> [السبب]');
+      const reason = rest.slice(1).join(' ') || 'لم يتم تحديد سبب';
 
       const targetMember = await guild.members.fetch(userId).catch(() => null);
+
+      // 🔢 فيه رقم → تحذير تسلسلي مع رول (للإداريين فقط)
+      if (level > 0) {
+        if (!targetMember) return respond(message, '❌ لم يتم العثور على المستخدم');
+        try {
+          const note = await runSequentialWarn({ guild, moderator: member, targetMember, level, reason });
+          return respond(message, note);
+        } catch (e: any) {
+          return respond(message, `❌ ${e.message}`);
+        }
+      }
+
+      // ✅ بدون رقم → تحذير عادي (عدّاد فقط، بدون أي رول)
       const target = targetMember || (await client.users.fetch(userId).catch(() => null));
       if (!target) return respond(message, '❌ لم يتم العثور على المستخدم');
 
@@ -678,24 +699,7 @@ async function runAliasCommand(
         target,
         reason,
       });
-
-      // 🎭 رولات التحذير — إعطاء مباشر أو لوحة اختيار (من الإعدادات)
-      let warnRoleNote: string | null = null;
-      if (targetMember) {
-        const settings = await getGuildSettings(guild.id);
-        warnRoleNote = await offerWarnRoles({
-          settings,
-          guild,
-          executor: member,
-          target: targetMember,
-          reason,
-          reply: payload => respond(message, payload),
-        });
-      }
-      return respond(
-        message,
-        warnRoleNote ? `${result.simpleMsg} | 🎭 ${warnRoleNote}` : result.simpleMsg
-      );
+      return respond(message, result.simpleMsg);
     }
 
     case 'mute': {

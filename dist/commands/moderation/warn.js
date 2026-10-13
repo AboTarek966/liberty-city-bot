@@ -4,8 +4,6 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
-const models_1 = require("../../models");
-const warnRoles_1 = require("../../utils/warnRoles");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('warn')
@@ -42,29 +40,11 @@ const command = {
                 target,
                 reason,
             });
+            // ✅ تحذير عادي: عدّاد فقط — بدون رولات
+            // (الرولات التسلسلية تُعطى فقط بالأمر الرقمي: ت 1 / ت 2 / ت 3)
             await interaction.editReply({
                 content: `⚠️ **${target.tag}** تم تحذيره (${result.warningCount} تحذير) | ${reason}`,
             });
-            // 🎭 رولات التحذير — إعطاء مباشرة أو لوحة اختيار (من الإعدادات)
-            const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
-            if (targetMember) {
-                const executor = interaction.guild.members.cache.get(interaction.user.id) ||
-                    (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
-                if (executor) {
-                    await (0, warnRoles_1.offerWarnRoles)({
-                        settings: await (0, models_1.getGuildSettings)(interaction.guildId),
-                        guild: interaction.guild,
-                        executor,
-                        target: targetMember,
-                        reason,
-                        reply: payload => interaction.followUp({
-                            content: payload.content,
-                            components: payload.components,
-                            ephemeral: true,
-                        }),
-                    });
-                }
-            }
         }
         catch (error) {
             await interaction.editReply({
