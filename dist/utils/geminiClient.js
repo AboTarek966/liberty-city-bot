@@ -31,7 +31,7 @@ exports.GEMINI_VISION_MODELS = exports.GEMINI_TEXT_MODELS;
 function buildContents(history, message, images = []) {
     const contents = [];
     // ذاكرة المحادثة: assistant → model
-    for (const h of history.slice(-12)) {
+    for (const h of history.slice(-40)) {
         if (!h?.content)
             continue;
         const role = h.role === 'assistant' ? 'model' : 'user';

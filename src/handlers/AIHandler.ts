@@ -353,12 +353,8 @@ export class AIHandler {
       let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userContext, history, stream, searchContext, media);
       this.cooldowns.set(cooldownKey, now);
 
-      // حفظ المحادثة (الردود الناجحة فقط — لا نُخزّن الردود الافتراضية)
-      if (response && !response.fallback && guildId) {
-        await this.saveHistory(userId, guildId, message, response.content);
-      }
-
       // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
+      //   تتم قبل الحفظ — حتى تتذكّر الذاكرة الرد الفعلي الذي رآه المستخدم
       if (response && !response.fallback) {
         const stripped = this.stripQuestionEcho(message, response.content);
         if (stripped && stripped !== response.content) {
@@ -371,6 +367,12 @@ export class AIHandler {
       if (response && !response.fallback && this.isEchoResponse(message, response.content)) {
         logger.warn('Echo response detected from AI provider - replacing with fallback');
         response = this.getFallbackResponse(aiConfig.language || 'ar');
+      }
+
+      // 💾 حفظ المحادثة (الردود الناجحة فقط — لا نُخزّن الردود الافتراضية)
+      //    الذاكرة تعمل في السيرفرات وفي الرسائل الخاصة معاً ('dm')
+      if (response && !response.fallback) {
+        await this.saveHistory(userId, guildId || 'dm', message, response.content);
       }
 
       return response;
@@ -714,19 +716,22 @@ export class AIHandler {
 
   // --------------------------------------------
   // Conversation Memory (ذاكرة المحادثة)
+  //   تُخزَّن في MongoDB لكل (مستخدم + سيرفر)، والرسائل الخاصة تخزَّن بعنوان 'dm'.
+  //   نافذة القراءة7أيام — البوت لا ينسى حديثك إلا بعد أسبوع كامل من السكوت.
   // --------------------------------------------
   private async loadHistory(userId: string, guildId?: string): Promise<HistoryMessage[]> {
-    if (!guildId) return [];
+    const key = guildId || 'dm';
     try {
       const { AISession } = require('../models');
-      const session = await AISession.findOne({ userId, guildId });
+      const session = await AISession.findOne({ userId, guildId: key });
       if (!session?.messages?.length) return [];
 
-      const cutoff = Date.now() - 30 * 60 * 1000; //30 دقيقة — السياق القديم يُهمَل
+      //7أيام (كانت30دقيقة — هذا سبب "نسيان" البوت للمحادثة القصيرة)
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
       return session.messages
         .filter((m: any) => m.role !== 'system' && new Date(m.timestamp).getTime() >= cutoff)
-        .slice(-12) // آخر12 رسالة =6 أسئلة وأجوبة
-        .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 600) }));
+        .slice(-40) // آخر40 رسالة =20 سؤالاً وجواباً ضمن سياق النموذج
+        .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 1200) }));
     } catch (error) {
       logger.warn('Failed to load AI history:', error);
       return [];
@@ -743,10 +748,10 @@ export class AIHandler {
           $push: {
             messages: {
               $each: [
-                { role: 'user', content: userMessage.slice(0, 1000), timestamp: now },
-                { role: 'assistant', content: botResponse.slice(0, 1500), timestamp: now },
+                { role: 'user', content: userMessage.slice(0, 1500), timestamp: now },
+                { role: 'assistant', content: botResponse.slice(0, 2000), timestamp: now },
               ],
-              $slice: -20, // نحتفظ بآخر20 رسالة فقط
+              $slice: -200, // نحتفظ بآخر200 رسالة كذاكرة طويلة المدى
             },
           },
           $set: { lastActivity: now },
@@ -1546,7 +1551,7 @@ export class AIHandler {
   async clearHistory(userId: string, guildId: string, channelId: string): Promise<void> {
     try {
       const { AISession } = require('../models');
-      await AISession.deleteMany({ userId, guildId });
+      await AISession.deleteMany({ userId, guildId: guildId || 'dm' });
     } catch (error) {
       logger.error('Error clearing AI history:', error);
     }
@@ -1573,7 +1578,7 @@ export class AIHandler {
   async getSessionInfo(userId: string, guildId: string, channelId: string): Promise<{ messageCount: number }> {
     try {
       const { AISession } = require('../models');
-      const session = await AISession.findOne({ userId, guildId });
+      const session = await AISession.findOne({ userId, guildId: guildId || 'dm' });
       return { messageCount: session?.messages?.length || 0 };
     } catch (error) {
       return { messageCount: 0 };

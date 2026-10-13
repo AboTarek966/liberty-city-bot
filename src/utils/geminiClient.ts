@@ -48,7 +48,7 @@ function buildContents(
   const contents: Content[] = [];
 
   // ذاكرة المحادثة: assistant → model
-  for (const h of history.slice(-12)) {
+  for (const h of history.slice(-40)) {
     if (!h?.content) continue;
     const role = h.role === 'assistant' ? 'model' : 'user';
     // Gemini لا يقبل تتابع نفس الدور — ندمج الرسائل المتتالية لاحقًا
