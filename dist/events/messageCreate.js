@@ -934,12 +934,29 @@ async function handleAIResponse(message, client) {
     const question = message.content
         .replace(/<@!?\d+>/g, '')
         .trim();
-    if (!question) {
+    // 📎 الوسائط المرفقة (صور/رسائل صوتية/فيديو/ملفات)
+    // رسالة صوتية في ديسكورد → flag IsVoiceMessage (1 << 13)
+    const isVoiceNote = typeof message.flags?.bitfield === 'number'
+        ? (message.flags.bitfield & (1 << 13)) !== 0
+        : false;
+    const attachments = [...message.attachments.values()].map((a) => ({
+        id: a.id,
+        name: a.name,
+        url: a.url,
+        contentType: a.contentType,
+        size: a.size,
+        duration: a.duration,
+        flags: isVoiceNote ? 1 << 13 : (Number(a.flags?.bitfield ?? 0) || undefined),
+        height: a.height ?? undefined,
+        width: a.width ?? undefined,
+    }));
+    // فارغ وبدون مرفق → لا شيء لتحليله
+    if (!question && attachments.length === 0) {
         await message.reply('👋 نعم؟ اكتب سؤالك وسأجيبك!').catch(() => { });
         return;
     }
-    // أوامر العقوبات باللغة الطبيعية (فقط في السيرفرات)
-    if (message.guild) {
+    // أوامر العقوبات باللغة الطبيعية (فقط في السيرفرات، وعند وجود نص)
+    if (message.guild && question) {
         try {
             const executed = await (0, AIModeration_1.executeAIModeration)(message, client, question);
             if (executed)
@@ -976,7 +993,12 @@ async function handleAIResponse(message, client) {
     // 📡 بث مباشر — أول كلمات من الذكاء الاصطناعي تظهر فوراً
     let streamedMsg = null;
     let lastEditAt = 0;
-    const preview = (text) => text.length > 1900 ? text.slice(0, 1900) + '\n…' : text;
+    // أثناء البث قد تظهر علامة الأداة [[SEARCH:...]] — نُخفيها عن المستخدم
+    const preview = (text) => {
+        const clean = text.replace(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/gi, '').trimEnd();
+        const shown = clean || text.replace(/\[\[\s*(SEARCH|FETCH)\s*:/gi, '🔍 ');
+        return shown.length > 1900 ? shown.slice(0, 1900) + '\n…' : shown;
+    };
     // خيارات الرسالة للإيموجي والمنشنز بشكل صحيح
     const msgOptions = (text) => ({
         content: text,
@@ -997,7 +1019,7 @@ async function handleAIResponse(message, client) {
             await streamedMsg.edit(msgOptions(preview(text))).catch(() => { });
         },
     };
-    const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM });
+    const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM, attachments });
     if (response) {
         const parts = splitAiText(response.content, 1900);
         if (streamedMsg) {

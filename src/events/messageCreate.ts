@@ -1015,13 +1015,32 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
     .replace(/<@!?\d+>/g, '')
     .trim();
 
-  if (!question) {
+  // 📎 الوسائط المرفقة (صور/رسائل صوتية/فيديو/ملفات)
+  // رسالة صوتية في ديسكورد → flag IsVoiceMessage (1 << 13)
+  const isVoiceNote = typeof (message.flags as any)?.bitfield === 'number'
+    ? ((message.flags as any).bitfield & (1 << 13)) !== 0
+    : false;
+
+  const attachments = [...message.attachments.values()].map((a) => ({
+    id: a.id,
+    name: a.name,
+    url: a.url,
+    contentType: a.contentType,
+    size: a.size,
+    duration: a.duration,
+    flags: isVoiceNote ? 1 << 13 : (Number((a.flags as any)?.bitfield ?? 0) || undefined),
+    height: a.height ?? undefined,
+    width: a.width ?? undefined,
+  }));
+
+  // فارغ وبدون مرفق → لا شيء لتحليله
+  if (!question && attachments.length === 0) {
     await message.reply('👋 نعم؟ اكتب سؤالك وسأجيبك!').catch(() => {});
     return;
   }
 
-  // أوامر العقوبات باللغة الطبيعية (فقط في السيرفرات)
-  if (message.guild) {
+  // أوامر العقوبات باللغة الطبيعية (فقط في السيرفرات، وعند وجود نص)
+  if (message.guild && question) {
     try {
       const executed = await executeAIModeration(message, client, question);
       if (executed) return;
@@ -1061,8 +1080,12 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
   // 📡 بث مباشر — أول كلمات من الذكاء الاصطناعي تظهر فوراً
   let streamedMsg: any = null;
   let lastEditAt = 0;
-  const preview = (text: string): string =>
-    text.length > 1900 ? text.slice(0, 1900) + '\n…' : text;
+  // أثناء البث قد تظهر علامة الأداة [[SEARCH:...]] — نُخفيها عن المستخدم
+  const preview = (text: string): string => {
+    const clean = text.replace(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/gi, '').trimEnd();
+    const shown = clean || text.replace(/\[\[\s*(SEARCH|FETCH)\s*:/gi, '🔍 ');
+    return shown.length > 1900 ? shown.slice(0, 1900) + '\n…' : shown;
+  };
 
   // خيارات الرسالة للإيموجي والمنشنز بشكل صحيح
   const msgOptions = (text: string) => ({
@@ -1092,7 +1115,7 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
     memberRoles,
     isMention,
     repliedToBot,
-    { userContext, stream, safeMode: isDM }
+    { userContext, stream, safeMode: isDM, attachments }
   );
 
   if (response) {

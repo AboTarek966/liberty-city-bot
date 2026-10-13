@@ -106,6 +106,15 @@ exports.config = {
             maxTokens: getEnvNumber('GROQ_MAX_TOKENS', 800),
             temperature: parseFloat(getEnv('GROQ_TEMPERATURE', '0.7')),
         },
+        // Google Gemini — المزوّد الوحيد اللي يدعم الرؤية (صور/فيديو) مجاناً
+        // احصل على مفتاح مجاني: https://aistudio.google.com/apikey
+        gemini: {
+            apiKey: process.env.GEMINI_API_KEY || '',
+            model: getEnv('GEMINI_MODEL', 'gemini-2.5-flash'),
+            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
+            maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 800),
+            temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.7')),
+        },
         anthropic: {
             apiKey: process.env.ANTHROPIC_API_KEY || '',
             model: getEnv('ANTHROPIC_MODEL', 'claude-3-opus-20240229'),
@@ -246,8 +255,11 @@ function validateConfig() {
     if (exports.config.ai.enabled && exports.config.ai.provider === 'anthropic' && !exports.config.ai.anthropic.apiKey) {
         console.warn('[WARN] AI is enabled with Anthropic provider but ANTHROPIC_API_KEY is not set');
     }
-    if (exports.config.ai.enabled && !exports.config.ai.groq.apiKey && !exports.config.ai.openai.apiKey && !exports.config.ai.anthropic.apiKey) {
-        console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
+    if (exports.config.ai.enabled && !exports.config.ai.groq.apiKey && !exports.config.ai.openai.apiKey && !exports.config.ai.anthropic.apiKey && !exports.config.ai.gemini.apiKey) {
+        console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
+    }
+    if (exports.config.ai.enabled && !exports.config.ai.gemini.apiKey) {
+        console.warn('[INFO] GEMINI_API_KEY not set → images/video analysis is disabled (voice notes + web search still work). Free key: https://aistudio.google.com/apikey');
     }
     if (exports.config.dashboard.enabled && !exports.config.dashboard.secret) {
         throw new Error('DASHBOARD_SECRET is required when dashboard is enabled');

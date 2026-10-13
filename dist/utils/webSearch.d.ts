@@ -34,6 +34,18 @@ export declare function webSearchEnhanced(query: string, maxResults?: number): P
  * البحث عن فيديو يوتيوب
  */
 export declare function searchYouTube(query: string, maxResults?: number): Promise<SearchResult[]>;
+export interface PageContent {
+    ok: boolean;
+    title: string;
+    text: string;
+    error?: string;
+}
+/**
+ * جلب صفحة ويب واستخراج نصها المقروء — يُستخدم عندما:
+ * - يُرسل المستخدم رابطاً ويريد تلخيصه/تحليله
+ * - يحتاج البوت تفاصيل خارج نتائج البحث
+ */
+export declare function fetchWebPage(url: string, maxChars?: number): Promise<PageContent>;
 declare const _default: {
     webSearch: typeof webSearch;
     webSearchEnhanced: typeof webSearchEnhanced;
@@ -45,6 +57,7 @@ declare const _default: {
     searchAcademic: typeof searchAcademic;
     searchTechnical: typeof searchTechnical;
     searchYouTube: typeof searchYouTube;
+    fetchWebPage: typeof fetchWebPage;
 };
 export default _default;
 //# sourceMappingURL=webSearch.d.ts.map

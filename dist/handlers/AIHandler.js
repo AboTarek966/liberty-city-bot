@@ -2,6 +2,39 @@
 // ============================================
 // Liberty City Bot - Advanced AI Handler
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AIHandler = void 0;
 const discord_js_1 = require("discord.js");
@@ -15,6 +48,8 @@ class AIHandler {
     openai = null;
     anthropic = null;
     groq = null;
+    /** Gemini لا يحتاج SDK — نتحقق فقط من وجود المفتاح (الوحيد المدعوم للرؤية) */
+    geminiReady = false;
     cooldowns = new Map();
     fallbackResponses = new Map();
     constructor(client) {
@@ -23,6 +58,12 @@ class AIHandler {
         this.loadFallbackResponses();
     }
     initializeProviders() {
+        // Initialize Google Gemini (free key — supports VISION: images & video frames)
+        const geminiKey = config_1.config.ai.gemini?.apiKey;
+        if (geminiKey && geminiKey.length > 20 && !/^your_/i.test(geminiKey)) {
+            this.geminiReady = true;
+            logger.info(`Gemini provider initialized (model: ${config_1.config.ai.gemini.model}, vision: ${config_1.config.ai.gemini.visionModel})`);
+        }
         // Initialize Groq (free tier - preferred)
         const groqKey = config_1.config.ai.groq.apiKey;
         if (groqKey && groqKey.startsWith('gsk_')) {
@@ -98,7 +139,7 @@ class AIHandler {
     // Main Response Generation
     // --------------------------------------------
     async generateResponse(userId, guildId, channelId, message, userRoles = [], isMention = false, repliedToBot = false, opts = {}) {
-        const { fromCommand = false, userContext, stream, safeMode = false } = opts;
+        const { fromCommand = false, userContext, stream, safeMode = false, attachments } = opts;
         try {
             // Get AI config for guild (auto-create with defaults if missing)
             let aiConfig = guildId ? await models_1.AIConfig.findOne({ guildId }) : null;
@@ -166,9 +207,47 @@ class AIHandler {
             }
             // ذاكرة المحادثة — الرسائل السابقة تُمرَّر للنموذج لفهم الاستفسارات المتتابعة
             const history = await this.loadHistory(userId, guildId);
+            // 🖼️ تحليل الوسائط: صور (رؤية) · رسائل صوتية (تفريغ) · فيديو (إطارات + صوت) · ملفات نصية
+            let media;
+            if (attachments && attachments.length > 0) {
+                try {
+                    const { analyzeAttachments } = await Promise.resolve().then(() => __importStar(require('../utils/attachmentAnalyzer')));
+                    const canUseInlineVision = this.geminiReady;
+                    const analysis = await analyzeAttachments(attachments, {
+                        apiKey: config_1.config.ai.groq.apiKey?.startsWith('gsk_') ? config_1.config.ai.groq.apiKey : '',
+                        question: message,
+                        canSeeImages: canUseInlineVision,
+                    });
+                    if (analysis.context) {
+                        media = { context: analysis.context, images: analysis.images };
+                        logger.info(`Attachments analyzed: ${analysis.processed}/${attachments.length} (${analysis.images.length} images for vision)`);
+                    }
+                }
+                catch (e) {
+                    logger.warn(`Attachment analysis failed: ${e?.message || e}`);
+                }
+            }
             // 🔍 كشف الحاجة للبحث: أسئلة عن ترندات، أخبار، ميمز، أسعار، أحداث حالية، يوتيوب
             const needsSearch = this.needsWebSearch(message);
             let searchContext = '';
+            // 🔗 إن ذكر المستخدم رابطاً → نجلب محتوى الصفحة ونضعه في سياق الـ AI
+            const urlMatch = message.match(/https?:\/\/[^\s<>"']+/i);
+            if (urlMatch) {
+                try {
+                    const { fetchWebPage } = await Promise.resolve().then(() => __importStar(require('../utils/webSearch')));
+                    const page = await fetchWebPage(urlMatch[0]);
+                    if (page.ok && page.text) {
+                        searchContext += `\n\n=== محتوى صفحة ويب: ${page.title} (${urlMatch[0]}) ===\n${page.text}\n---`;
+                        logger.info(`Web page fetched for AI context: ${page.title} (${page.text.length} chars)`);
+                    }
+                    else if (page.error) {
+                        logger.warn(`Web page fetch failed: ${page.error}`);
+                    }
+                }
+                catch (e) {
+                    logger.warn(`Web page fetch error: ${e?.message || e}`);
+                }
+            }
             if (needsSearch) {
                 try {
                     // تصنيف نوع الاستعلام لاختيار البحث الأنسب
@@ -205,7 +284,7 @@ class AIHandler {
                         results = await (0, webSearch_1.webSearchEnhanced)(message, 4);
                     }
                     if (results.length > 0) {
-                        searchContext = `\n\n=== نتائج بحث ويب حديثة (${searchType}) ===\n${(0, webSearch_1.formatSearchResultsForContext)(results)}\n---`;
+                        searchContext += `\n\n=== نتائج بحث ويب حديثة (${searchType}) ===\n${(0, webSearch_1.formatSearchResultsForContext)(results)}\n---`;
                         logger.info(`${searchType.toUpperCase()} search triggered for: "${message.slice(0, 60)}..." — ${results.length} results`);
                     }
                 }
@@ -213,8 +292,8 @@ class AIHandler {
                     logger.warn('Web search failed:', e);
                 }
             }
-            // Generate AI response (مع سياق البحث إن وُجد)
-            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userContext, history, stream, searchContext);
+            // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
+            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userContext, history, stream, searchContext, media);
             this.cooldowns.set(cooldownKey, now);
             // حفظ المحادثة (الردود الناجحة فقط — لا نُخزّن الردود الافتراضية)
             if (response && !response.fallback && guildId) {
@@ -405,7 +484,7 @@ class AIHandler {
     // --------------------------------------------
     // Generate AI Response
     // --------------------------------------------
-    async generateAIResponse(message, aiConfig, userRoles, guildId, userContext, history = [], stream, searchContext = '') {
+    async generateAIResponse(message, aiConfig, userRoles, guildId, userContext, history = [], stream, searchContext = '', media) {
         // Check for role-specific personality
         let personality = aiConfig.customPersonality;
         for (const roleId of userRoles) {
@@ -415,23 +494,123 @@ class AIHandler {
             }
         }
         const systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext);
-        // Try AI providers (preferred first, others as automatic failover)
-        const providerOrder = this.resolveProviderOrder(aiConfig.provider);
-        for (const provider of providerOrder) {
-            try {
-                if (provider === 'groq')
-                    return await this.generateGroq(message, systemPrompt, aiConfig, history, stream);
-                if (provider === 'openai')
-                    return await this.generateOpenAI(message, systemPrompt, aiConfig, history, stream);
-                if (provider === 'anthropic')
-                    return await this.generateAnthropic(message, systemPrompt, aiConfig, history, stream);
+        // سياق الوسائط يُدمَج مع رسالة المستخدم (النموذج يرى الوصف + الصور نفسها)
+        let effectiveMessage = media?.context
+            ? `${media.context}\n\n${message}`.trim()
+            : message;
+        // رسالة فارغة (مستخدم أرسل مرفقاً فقط) → تعليم وصف/تحليل صريح
+        if (!effectiveMessage.trim()) {
+            effectiveMessage = media?.context ? 'حلّل وأجب عن المحتوى المرفق أعلاه.' : 'مرحباً';
+        }
+        // 🔭 الصور تحتاج مزوّد يدعم الرؤية — حاليًا Gemini فقط (Groq لا يملك موديل رؤية)
+        const canSeeImages = this.geminiReady && !!media?.images?.length;
+        const passImages = canSeeImages ? media.images : undefined;
+        // Try AI providers (preferred first, others as automatic failover) + حلقة بحث ذاتية
+        const callProviders = async (msg, useStream) => {
+            // عند وجود صور نُقدّم Gemini أولاً لأنه الوحيد القادر على رؤيتها
+            let providerOrder = this.resolveProviderOrder(aiConfig.provider);
+            if (passImages?.length) {
+                providerOrder = [
+                    ...providerOrder.filter((p) => p === 'gemini'),
+                    ...providerOrder.filter((p) => p !== 'gemini'),
+                ];
             }
-            catch (error) {
-                logger.warn(`AI provider "${provider}" failed: ${error?.message || error}`);
+            for (const provider of providerOrder) {
+                try {
+                    if (provider === 'gemini')
+                        return await this.generateGemini(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+                    if (provider === 'groq') {
+                        // Groq لا يدعم الصور — نتجاهلها حتى لا نستهلك محاولات فاشلة
+                        if (passImages?.length)
+                            continue;
+                        return await this.generateGroq(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+                    }
+                    if (provider === 'openai') {
+                        if (passImages?.length)
+                            continue;
+                        return await this.generateOpenAI(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+                    }
+                    if (provider === 'anthropic') {
+                        if (passImages?.length)
+                            continue;
+                        return await this.generateAnthropic(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+                    }
+                }
+                catch (error) {
+                    logger.warn(`AI provider "${provider}" failed: ${error?.message || error}`);
+                }
+            }
+            return null;
+        };
+        let response = await callProviders(effectiveMessage, true);
+        // 🔁 حلقة البحث الذاتي: لو النموذج طلب معلومة إضافية عبر [[SEARCH:...]] أو [[FETCH:...]]
+        //    ننفّذ الأداة مرة واحدة ثم نعيد التوليد بالنتيجة (جولة واحدة فقط — لا نُبطئ الرد)
+        for (let round = 0; round < 1; round++) {
+            if (!response || response.fallback)
+                break;
+            const tool = this.extractToolCall(response.content);
+            if (!tool)
+                break;
+            const toolResult = await this.runResearchTool(tool);
+            if (!toolResult)
+                break;
+            // نُنظّف الرد من العلامة وأُعيد التوليد بدون بث (البث بدأ بالفعل)
+            const cleaned = response.content.replace(tool.raw, '').trim();
+            const round2 = await callProviders(`${effectiveMessage}\n\n=== ${tool.label} ===\n${toolResult}\n===\nأكمل إجابتك اعتماداً على هذه النتيجة الجديدة، ولا تذكر أنك استخدمت أداة.`, false);
+            if (round2 && !round2.fallback) {
+                logger.info(`AI research tool used: ${tool.type} (${tool.args.slice(0, 60)})`);
+                response = { ...round2, content: round2.content || cleaned };
+            }
+            else {
+                // فشلت الجولة الثانية → نُعيد الرد الأصلي منزوع العلامة
+                response = { ...response, content: cleaned };
             }
         }
         // Fallback
-        return this.getFallbackResponse(aiConfig.language || 'ar');
+        const finalResponse = response || this.getFallbackResponse(aiConfig.language || 'ar');
+        // 🔒 تنظيف أخير — لا تصل أي علامة أداة إلى المستخدم أبداً
+        const leaked = /\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i.exec(finalResponse.content || '');
+        if (leaked) {
+            finalResponse.content = finalResponse.content.replace(leaked[0], '').trim() || finalResponse.content;
+        }
+        return finalResponse;
+    }
+    /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */
+    extractToolCall(text) {
+        const m = /\[\[\s*(SEARCH|FETCH)\s*:\s*([\s\S]{1,400}?)\s*\]\]/i.exec(text || '');
+        if (!m)
+            return null;
+        const type = m[1].toUpperCase();
+        const args = m[2].trim();
+        if (!args)
+            return null;
+        return {
+            raw: m[0],
+            type,
+            args,
+            label: type === 'SEARCH' ? 'نتائج بحث ويب إضافية' : 'محتوى صفحة ويب',
+        };
+    }
+    /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو null عند الفشل */
+    async runResearchTool(tool) {
+        try {
+            const ws = await Promise.resolve().then(() => __importStar(require('../utils/webSearch')));
+            if (tool.type === 'FETCH') {
+                const url = (tool.args.match(/https?:\/\/[^\s]+/) || [tool.args])[0];
+                const page = await ws.fetchWebPage(url);
+                if (!page.ok || !page.text)
+                    return null;
+                return `**${page.title}**\n${page.text.slice(0, 5000)}`;
+            }
+            const results = await ws.webSearchEnhanced(tool.args, 5);
+            if (!results.length)
+                return null;
+            return ws.formatSearchResultsForContext(results);
+        }
+        catch (e) {
+            logger.warn(`Research tool failed: ${e?.message || e}`);
+            return null;
+        }
     }
     // --------------------------------------------
     // Conversation Memory (ذاكرة المحادثة)
@@ -477,12 +656,28 @@ class AIHandler {
             logger.warn('Failed to save AI history:', error);
         }
     }
-    /** بناء رسائل الـ API: system + ذاكرة المحادثة + سؤال المستخدم */
-    buildMessages(systemPrompt, history, message) {
+    /** بناء رسائل الـ API: system + ذاكرة المحادثة + سؤال المستخدم (مع صور إن وُجدت) */
+    buildMessages(systemPrompt, history, message, images) {
+        // بدون صور → نص عادي (أسرع وأخف)
+        if (!images || images.length === 0) {
+            return [
+                { role: 'system', content: systemPrompt },
+                ...history,
+                { role: 'user', content: message },
+            ];
+        }
+        // مع صور → محتوى متعدد الأجزاء (نص + صور) لنموذج الرؤية
+        const content = [{ type: 'text', text: message }];
+        for (const img of images.slice(0, 4)) {
+            content.push({
+                type: 'image_url',
+                image_url: { url: `data:${img.mimeType};base64,${img.data}` },
+            });
+        }
         return [
             { role: 'system', content: systemPrompt },
             ...history,
-            { role: 'user', content: message },
+            { role: 'user', content },
         ];
     }
     /**
@@ -494,6 +689,8 @@ class AIHandler {
         const available = [];
         if (this.groq)
             available.push('groq');
+        if (this.geminiReady)
+            available.push('gemini');
         if (this.openai)
             available.push('openai');
         if (this.anthropic)
@@ -504,6 +701,9 @@ class AIHandler {
             case 'groq':
                 preferred = ['groq'];
                 break;
+            case 'gemini':
+                preferred = ['gemini'];
+                break;
             case 'openai':
                 preferred = ['openai'];
                 break;
@@ -513,7 +713,7 @@ class AIHandler {
             case 'both':
                 preferred = ['openai', 'anthropic'];
                 break;
-            default: preferred = ['groq', 'openai', 'anthropic']; // auto
+            default: preferred = ['groq', 'gemini', 'openai', 'anthropic']; // auto
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));
@@ -577,6 +777,30 @@ class AIHandler {
         prompt += `\nالحماية والأوتو مود، الترحيب وبطاقة الترحيب، التذاكر، السجلات والسنايب،`;
         prompt += `\nالمستويات والخبرة، العملات والمتجر، الأوامر المخصصة والاختصارات،`;
         prompt += `\nإعدادات شاملة (/settings)، الأدوار والأذونات، الحماية من الرويد، الذكاء الاصطناعي.`;
+        prompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        prompt += `\n[SENSES] **حواسك الممتدة — ما تستطيع إدراكه فعلياً**`;
+        prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        prompt += `\n- **الرؤية:** تُرفق الصور والرسوم والملصقات والفيديوهات (إطارات). تحلل محتواها، تقرأ النصوص بداخلها (OCR)، تصف الأشخاص وال_objects والألوان والمزاج.`;
+        prompt += `\n- **السمع:** الرسائل الصوتية وملفات الصوت مُفرَّغة لنص قبل وصولها لك — استمع لمحتواها وكأنه حوار مكتوب.`;
+        prompt += `\n- **الفيديو:** يُستخرج من الفيديو عدّة إطارات مفتاحية + تفريغ صوتي، فتعرف ما يدور فيه.`;
+        prompt += `\n- **القراءة:** الملفات النصية والشيفرة تصل محتوياتها إليك كاملاً.`;
+        prompt += `\n- **الإنترنت:** تبحث وتقرأ صفحات الويب، وتجمع معلومات حديثة عند الحاجة.`;
+        prompt += `\n\n**كيف تتصرّف مع الوسائط:**`;
+        prompt += `\n- إن أُرفقت صورة/صوت/فيديو، فذلك جزء من سؤال المستخدم — أجب عنه اعتماداً على ما تراه/تسمعه، ولا تسأل "أين الصورة؟".`;
+        prompt += `\n- إن لم تُرفق وسائط ولم يُذكر وجودها، لا تدّعِ أنك "ترى" شيئاً — قل بصراحة إنك لا ترى أي مرفق.`;
+        prompt += `\n- الوصف الوارد تحت "[صورة مرفقة]" أو "**النص المفرَّغ**" هو ما انتقلك له المحلّل، وقد تراه أنت مباشرة كصورة.`;
+        prompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        prompt += `\n[TOOLS] **أدواتك — متى وكيف تستخدمها**`;
+        prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        prompt += `\nتستطيع طلب معلومة من الإنترنت أثناء الإجابة بكتابة علامة واحدة داخل ردك:`;
+        prompt += `\n- \`[[SEARCH: استعلام]]\` — لبحث سريع عن حقائق حديثة، أسعار، أخبار، أسماء، تواريخ.`;
+        prompt += `\n- \`[[FETCH: رابط]]\` — لقراءة صفحة ويب كاملة عندما تحتاج تفاصيلها.`;
+        prompt += `\n**قواعد صارمة:**`;
+        prompt += `\n- ضع العلامة في نهاية ردك، في سطر واحد، ولا تكتب أي شيء بعدها.`;
+        prompt += `\n- استخدمها **فقط** حين لا تملك المعلومة أو تكون متحيزة للتحديث — لا تُسرف بها.`;
+        prompt += `\n- لا تستخدمها للأسئلة الشخصية، الآراء، الرياضيات، الشفرات، أو أي شيء تستطيع الإجابة عنه بنفسك.`;
+        prompt += `\n- بعد التنفيذ ستصلك النتيجة فوراً وتُجب بالكامل — لا تعتذر ولا تقل "سأبحث".`;
+        prompt += `\n- لا تذكر أبداً أنك استخدمت أداة؛ قدّم المعلومة كأنها من معرفتك مع الإشارة للمصدر عند الحاجة.`;
         // ---------------- سياق السيرفر (معلومات عامة اختيارية) ----------------
         const guild = this.client.guilds.cache.get(guildId);
         if (guild) {
@@ -721,15 +945,17 @@ class AIHandler {
         const backups = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
         return [primary, ...backups.filter((m) => m !== primary)];
     }
-    async generateGroq(message, systemPrompt, aiConfig, history = [], stream) {
+    async generateGroq(message, systemPrompt, aiConfig, history = [], stream, images) {
         const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : config_1.config.ai.groq.temperature;
         const maxTokens = Math.min(aiConfig.maxTokens || 500, config_1.config.ai.groq.maxTokens);
-        const messages = this.buildMessages(systemPrompt, history, message);
+        const messages = this.buildMessages(systemPrompt, history, message, images);
         let lastError = null;
-        for (const model of this.groqModelCandidates()) {
+        // عند وجود صور → نستخدم موديلات الرؤية بدل النصية
+        const candidates = images?.length ? this.groqVisionCandidates() : this.groqModelCandidates();
+        for (const model of candidates) {
             try {
-                // 📡 بث مباشر — أول كلمات تظهر فوراً (رد يبدو أسرع)
-                if (stream?.onFirstChunk) {
+                // 📡 بث مباشر — أول كلمات تظهر فوراً (رد يبدو أسرع) — لا يُستخدم مع الرؤية
+                if (stream?.onFirstChunk && !images?.length) {
                     return await this.streamGroq(model, messages, temperature, maxTokens, stream);
                 }
                 const completion = await this.groq.chat.completions.create({
@@ -757,6 +983,53 @@ class AIHandler {
             }
         }
         throw lastError || new Error('Groq request failed');
+    }
+    /** موديلات الرؤية على Groq (تدعم الصور) — تُستخدم فقط عند إرفاق صور */
+    groqVisionCandidates() {
+        const preferred = config_1.config.ai.groq.visionModel;
+        const list = [
+            preferred,
+            'meta-llama/llama-4-scout-17b-16e-instruct',
+            'meta-llama/llama-4-maverick-17b-128e-instruct',
+            'qwen/qwen3-vl-235b-a22b-instruct',
+        ].filter(Boolean);
+        return [...new Set(list)];
+    }
+    // --------------------------------------------
+    // Google Gemini — نص + رؤية صور/فيديو (REST، بدون SDK)
+    // --------------------------------------------
+    async generateGemini(message, systemPrompt, aiConfig, history = [], stream, images) {
+        if (!this.geminiReady)
+            throw new Error('Gemini not configured');
+        const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : config_1.config.ai.gemini.temperature;
+        const maxTokens = Math.min(aiConfig.maxTokens || 500, config_1.config.ai.gemini.maxTokens);
+        const opts = {
+            apiKey: config_1.config.ai.gemini.apiKey,
+            systemPrompt,
+            history,
+            message,
+            images: images?.length ? images : undefined,
+            temperature,
+            maxTokens,
+            preferredModel: (images?.length ? config_1.config.ai.gemini.visionModel : config_1.config.ai.gemini.model) || undefined,
+        };
+        const { geminiGenerate, geminiStream } = await Promise.resolve().then(() => __importStar(require('../utils/geminiClient')));
+        // 📡 بث مباشر (لا يُستخدم مع الصور — نبقي البث للنصوص فقط)
+        if (stream?.onFirstChunk && !images?.length) {
+            try {
+                const r = await geminiStream({
+                    ...opts,
+                    onFirstChunk: stream.onFirstChunk,
+                    onUpdate: stream.onUpdate,
+                });
+                return { content: r.content, tokensUsed: r.tokens, model: 'gemini-' + r.model, fallback: false };
+            }
+            catch (e) {
+                logger.warn(`Gemini stream failed, falling back to non-stream: ${e?.message || e}`);
+            }
+        }
+        const r = await geminiGenerate(opts);
+        return { content: r.content, tokensUsed: r.tokens, model: 'gemini-' + r.model, fallback: false };
     }
     /** بث رد Groq مباشرة أثناء التوليد */
     async streamGroq(model, messages, temperature, maxTokens, stream) {

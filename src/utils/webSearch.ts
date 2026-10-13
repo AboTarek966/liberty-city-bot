@@ -212,6 +212,103 @@ async function searchYouTubeAPI(query: string, maxResults: number, apiKey: strin
   }));
 }
 
+// --------------------------------------------
+// 🌐 قراءة صفحة ويب كاملة (لما يعطي المستخدم رابطاً أو يحتاج البوت تفاصيل)
+// --------------------------------------------
+export interface PageContent {
+  ok: boolean;
+  title: string;
+  text: string;
+  error?: string;
+}
+
+/** إزالة وسوم HTML واستخراج نص مقروء */
+function stripHtml(html: string): string {
+  let s = html;
+  // إزالة العناصر غير النصية
+  s = s.replace(/<script[\s\S]*?<\/script>/gi, ' ');
+  s = s.replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  s = s.replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ');
+  s = s.replace(/<!--[\s\S]*?-->/gi, ' ');
+  s = s.replace(/<svg[\s\S]*?<\/svg>/gi, ' ');
+  // العناصر ذات المعنى → مسافات
+  s = s.replace(/<\/(p|div|li|h[1-6]|tr|br|section|article|blockquote)>/gi, '\n');
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<li[^>]*>/gi, '\n• ');
+  // إزالة كل الوسوم المتبقية
+  s = s.replace(/<[^>]+>/g, ' ');
+  // فك ترميز HTML
+  s = s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&hellip;/g, '…')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d))
+    .replace(/&[a-z]+;/gi, ' ');
+  // تنظيف المسافات
+  s = s.replace(/[ \t\r\f\v]+/g, ' ');
+  s = s.replace(/\n\s*\n\s*\n+/g, '\n\n');
+  return s.trim();
+}
+
+/**
+ * جلب صفحة ويب واستخراج نصها المقروء — يُستخدم عندما:
+ * - يُرسل المستخدم رابطاً ويريد تلخيصه/تحليله
+ * - يحتاج البوت تفاصيل خارج نتائج البحث
+ */
+export async function fetchWebPage(url: string, maxChars = 6000): Promise<PageContent> {
+  try {
+    // التحقق من أن الرابط http/https فقط (أمان)
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { ok: false, title: '', text: '', error: 'رابط غير صالح' };
+    }
+    if (!/^https?:$/.test(parsed.protocol)) {
+      return { ok: false, title: '', text: '', error: 'بروتوكول غير مدعوم' };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+
+    const res = await fetch(parsed.toString(), {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ar,en;q=0.8',
+      },
+    }).finally(() => clearTimeout(timer));
+
+    if (!res.ok) return { ok: false, title: '', text: '', error: `HTTP ${res.status}` };
+
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType && !/html|text|xml|json/i.test(contentType)) {
+      return { ok: false, title: '', text: '', error: `نوع المحتوى غير نصي: ${contentType}` };
+    }
+
+    const html = await res.text();
+    const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+    const title = titleMatch ? stripHtml(titleMatch[1]).slice(0, 200) : parsed.hostname;
+
+    const text = stripHtml(html).slice(0, maxChars);
+    if (!text) return { ok: false, title, text: '', error: 'الصفحة فارغة أو محمية' };
+
+    logger.info(`Fetched page: ${parsed.hostname} (${text.length} chars)`);
+    return { ok: true, title, text };
+  } catch (e: any) {
+    const msg = e?.name === 'AbortError' ? 'انتهت مهلة الجلب' : String(e?.message || e);
+    logger.warn(`fetchWebPage failed for ${url}: ${msg}`);
+    return { ok: false, title: '', text: '', error: msg };
+  }
+}
+
 export default { 
   webSearch, 
   webSearchEnhanced,
@@ -222,5 +319,6 @@ export default {
   searchNews,
   searchAcademic,
   searchTechnical,
-  searchYouTube
+  searchYouTube,
+  fetchWebPage
 };

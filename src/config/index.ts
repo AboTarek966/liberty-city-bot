@@ -90,7 +90,7 @@ export const config = {
 
   // AI
   ai: {
-    provider: (getEnv('AI_PROVIDER', 'auto') as 'openai' | 'anthropic' | 'groq' | 'both' | 'auto'),
+    provider: (getEnv('AI_PROVIDER', 'auto') as 'openai' | 'anthropic' | 'groq' | 'gemini' | 'both' | 'auto'),
     openai: {
       apiKey: process.env.OPENAI_API_KEY || '',
       model: getEnv('OPENAI_MODEL', 'gpt-4o-mini'),
@@ -102,6 +102,15 @@ export const config = {
       model: getEnv('GROQ_MODEL', 'openai/gpt-oss-120b'),
       maxTokens: getEnvNumber('GROQ_MAX_TOKENS', 800),
       temperature: parseFloat(getEnv('GROQ_TEMPERATURE', '0.7')),
+    },
+    // Google Gemini — المزوّد الوحيد اللي يدعم الرؤية (صور/فيديو) مجاناً
+    // احصل على مفتاح مجاني: https://aistudio.google.com/apikey
+    gemini: {
+      apiKey: process.env.GEMINI_API_KEY || '',
+      model: getEnv('GEMINI_MODEL', 'gemini-2.5-flash'),
+      visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
+      maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 800),
+      temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.7')),
     },
     anthropic: {
       apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -258,8 +267,12 @@ export function validateConfig(): void {
     console.warn('[WARN] AI is enabled with Anthropic provider but ANTHROPIC_API_KEY is not set');
   }
 
-  if (config.ai.enabled && !config.ai.groq.apiKey && !config.ai.openai.apiKey && !config.ai.anthropic.apiKey) {
-    console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
+  if (config.ai.enabled && !config.ai.groq.apiKey && !config.ai.openai.apiKey && !config.ai.anthropic.apiKey && !config.ai.gemini.apiKey) {
+    console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
+  }
+
+  if (config.ai.enabled && !config.ai.gemini.apiKey) {
+    console.warn('[INFO] GEMINI_API_KEY not set → images/video analysis is disabled (voice notes + web search still work). Free key: https://aistudio.google.com/apikey');
   }
 
   if (config.dashboard.enabled && !config.dashboard.secret) {

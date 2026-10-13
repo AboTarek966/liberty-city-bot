@@ -18,7 +18,7 @@ export declare const config: {
         uri: string;
     };
     ai: {
-        provider: "auto" | "openai" | "anthropic" | "groq" | "both";
+        provider: "auto" | "openai" | "anthropic" | "groq" | "gemini" | "both";
         openai: {
             apiKey: string;
             model: string;
@@ -28,6 +28,13 @@ export declare const config: {
         groq: {
             apiKey: string;
             model: string;
+            maxTokens: number;
+            temperature: number;
+        };
+        gemini: {
+            apiKey: string;
+            model: string;
+            visionModel: string;
             maxTokens: number;
             temperature: number;
         };

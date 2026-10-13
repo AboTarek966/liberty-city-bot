@@ -23,6 +23,8 @@ export declare class AIHandler {
     private openai;
     private anthropic;
     private groq;
+    /** Gemini لا يحتاج SDK — نتحقق فقط من وجود المفتاح (الوحيد المدعوم للرؤية) */
+    private geminiReady;
     private cooldowns;
     private fallbackResponses;
     constructor(client: Client);
@@ -33,6 +35,18 @@ export declare class AIHandler {
         userContext?: AIUserContext;
         stream?: AIStreamHandlers;
         safeMode?: boolean;
+        /** وسائط الرسالة (صور/رسائل صوتية/فيديو/ملفات) — تُحلَّل قبل التوليد */
+        attachments?: Array<{
+            id: string;
+            name?: string | null;
+            url: string;
+            contentType?: string | null;
+            size?: number | null;
+            duration?: number | null;
+            flags?: number | null;
+            height?: number | null;
+            width?: number | null;
+        }>;
     }): Promise<AIResponse | null>;
     /**
      * Detects if an AI response is just (a near copy of) the user's question.
@@ -49,9 +63,13 @@ export declare class AIHandler {
     private shouldAutoReply;
     private needsWebSearch;
     private generateAIResponse;
+    /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */
+    private extractToolCall;
+    /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو null عند الفشل */
+    private runResearchTool;
     private loadHistory;
     private saveHistory;
-    /** بناء رسائل الـ API: system + ذاكرة المحادثة + سؤال المستخدم */
+    /** بناء رسائل الـ API: system + ذاكرة المحادثة + سؤال المستخدم (مع صور إن وُجدت) */
     private buildMessages;
     /**
      * Resolve the order in which AI providers should be tried.
@@ -64,6 +82,9 @@ export declare class AIHandler {
     /** موديلات Groq بالترتيب: المُهيّأ أولاً ثم بدائل معروفة بالحساب */
     private groqModelCandidates;
     private generateGroq;
+    /** موديلات الرؤية على Groq (تدعم الصور) — تُستخدم فقط عند إرفاق صور */
+    private groqVisionCandidates;
+    private generateGemini;
     /** بث رد Groq مباشرة أثناء التوليد */
     private streamGroq;
     private generateAnthropic;
