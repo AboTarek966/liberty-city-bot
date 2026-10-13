@@ -395,6 +395,22 @@ export class ModerationHandler {
 
     const remaining = Math.max(0, warningCount - 1);
 
+    // 🔄 مزامنة رولات التحذير التسلسلي بعد الإزالة (في الخلفية، لا يؤخر الرد)
+    void (async () => {
+      try {
+        const member = targetMember || (await guild.members.fetch(target.id).catch(() => null));
+        if (!member) return;
+        const { invalidateGuildSettings, getGuildSettings } = await import('../models');
+        invalidateGuildSettings(guild.id);
+        const settings = await getGuildSettings(guild.id);
+        const { syncSequentialAdminWarnRoles } = await import('../utils/warnRoles');
+        const note = await syncSequentialAdminWarnRoles({ guild, target: member, settings });
+        if (note) logger.info(`Sequential warn roles synced after unwarn: ${note} (${target.id})`);
+      } catch (e: any) {
+        logger.warn(`syncSequentialAdminWarnRoles after unwarn failed: ${e.message}`);
+      }
+    })();
+
     const embed = moderationEmbed({
       type: 'unwarn',
       moderator: moderator.user,

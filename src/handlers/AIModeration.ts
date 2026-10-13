@@ -16,7 +16,7 @@ import { Colors } from '../utils/embeds';
 const logger = createLogger('AIModeration');
 
 type ModerationAction = 
-  'ban' | 'kick' | 'timeout' | 'untimeout' | 'warn' |
+  'ban' | 'kick' | 'timeout' | 'untimeout' | 'warn' | 'unwarn' |
   'role_create' | 'role_delete' | 'role_add' | 'role_remove' | 'promote' | 'jail' | 'lockdown' | 'sequential_warn';
 
 interface ActionDef {
@@ -52,6 +52,12 @@ const ACTIONS: ActionDef[] = [
     patterns: /طرد|(?:^|\W)kick(?:$|\W)/i,
     permission: PermissionFlagsBits.KickMembers,
     label: 'طرد',
+  },
+  {
+    action: 'unwarn',
+    patterns: /(?:شيل|ازل|احذف|إزالة|امسح|لغي| remove)\s*(?:ال)?تحذير|(?:حذف|إزالة|ازالة|مسح)\s*تحذير|(?:^|\W)unwarn(?:$|\W)/i,
+    permission: PermissionFlagsBits.ModerateMembers,
+    label: 'إزالة تحذير',
   },
   {
     action: 'warn',
@@ -382,6 +388,18 @@ export async function executeAIModeration(
       case 'warn': {
         const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
         const result = await client.moderationHandler.warn({
+          guild,
+          moderator,
+          target: member || target.user,
+          reason,
+        });
+        embed = result.embed;
+        msg = result.simpleMsg;
+        break;
+      }
+      case 'unwarn': {
+        const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+        const result = await client.moderationHandler.unwarn({
           guild,
           moderator,
           target: member || target.user,

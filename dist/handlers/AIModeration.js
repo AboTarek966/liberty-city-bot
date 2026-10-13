@@ -74,6 +74,12 @@ const ACTIONS = [
         label: 'طرد',
     },
     {
+        action: 'unwarn',
+        patterns: /(?:شيل|ازل|احذف|إزالة|امسح|لغي| remove)\s*(?:ال)?تحذير|(?:حذف|إزالة|ازالة|مسح)\s*تحذير|(?:^|\W)unwarn(?:$|\W)/i,
+        permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
+        label: 'إزالة تحذير',
+    },
+    {
         action: 'warn',
         patterns: /تحذير|إنذار|انذار|(?:^|\W)warn(?:$|\W)/i,
         permission: discord_js_1.PermissionFlagsBits.ModerateMembers,
@@ -364,6 +370,18 @@ async function executeAIModeration(message, client, question) {
             case 'warn': {
                 const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
                 const result = await client.moderationHandler.warn({
+                    guild,
+                    moderator,
+                    target: member || target.user,
+                    reason,
+                });
+                embed = result.embed;
+                msg = result.simpleMsg;
+                break;
+            }
+            case 'unwarn': {
+                const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
+                const result = await client.moderationHandler.unwarn({
                     guild,
                     moderator,
                     target: member || target.user,

@@ -2,6 +2,39 @@
 // ============================================
 // Liberty City Bot - Moderation Handler
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ModerationHandler = void 0;
 const discord_js_1 = require("discord.js");
@@ -295,6 +328,24 @@ class ModerationHandler {
             await models_1.Warning.findByIdAndDelete(latest._id);
         }
         const remaining = Math.max(0, warningCount - 1);
+        // 🔄 مزامنة رولات التحذير التسلسلي بعد الإزالة (في الخلفية، لا يؤخر الرد)
+        void (async () => {
+            try {
+                const member = targetMember || (await guild.members.fetch(target.id).catch(() => null));
+                if (!member)
+                    return;
+                const { invalidateGuildSettings, getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../models')));
+                invalidateGuildSettings(guild.id);
+                const settings = await getGuildSettings(guild.id);
+                const { syncSequentialAdminWarnRoles } = await Promise.resolve().then(() => __importStar(require('../utils/warnRoles')));
+                const note = await syncSequentialAdminWarnRoles({ guild, target: member, settings });
+                if (note)
+                    logger.info(`Sequential warn roles synced after unwarn: ${note} (${target.id})`);
+            }
+            catch (e) {
+                logger.warn(`syncSequentialAdminWarnRoles after unwarn failed: ${e.message}`);
+            }
+        })();
         const embed = (0, embeds_1.moderationEmbed)({
             type: 'unwarn',
             moderator: moderator.user,

@@ -42,6 +42,7 @@ exports.isAdminTarget = isAdminTarget;
 exports.getWarnRolePool = getWarnRolePool;
 exports.getWarningCount = getWarningCount;
 exports.applySequentialAdminWarnRoles = applySequentialAdminWarnRoles;
+exports.syncSequentialAdminWarnRoles = syncSequentialAdminWarnRoles;
 exports.offerWarnRoles = offerWarnRoles;
 const discord_js_1 = require("discord.js");
 const rolePicker_1 = require("./rolePicker");
@@ -161,6 +162,63 @@ async function applySequentialAdminWarnRoles(opts) {
         logger.warn(`applySequentialAdminWarnRoles failed: ${error.message}`);
         return null;
     }
+}
+/**
+ * 🔄 مزامنة رولات التحذير التسلسلي بعد الإزالة (unwarn):
+ * يحسب عدد التحذيرات المتبقي ويضبط الرول accordingly:
+ * - 0 تحذيرات → يزيل كل رولات التحذير
+ * - 1 → role1Id فقط
+ * - 2 → role2Id فقط
+ * - 3+ → role3Id فقط
+ * يعيد ملاحظة بما تم، أو null لو ما فيش تغيير/إعداد
+ */
+async function syncSequentialAdminWarnRoles(opts) {
+    const { guild, target, settings } = opts;
+    if (!isAdminTarget(target))
+        return null;
+    const seq = settings?.warnRoles?.adminSequential;
+    if (!seq)
+        return null;
+    const count = await getWarningCount(guild.id, target.id);
+    // الرول المطلوب حسب العدد الحالي بعد الإزالة
+    const wantedId = count === 0 ? undefined
+        : count === 1 ? seq.role1Id
+            : count === 2 ? seq.role2Id
+                : seq.role3Id;
+    const allIds = [seq.role1Id, seq.role2Id, seq.role3Id].filter(Boolean);
+    const botTop = guild.members.me?.roles.highest.position ?? 0;
+    const notes = [];
+    // ① إزالة كل رولات التحذير اللي مش مطلوبة للعدد الحالي
+    for (const id of allIds) {
+        if (id === wantedId)
+            continue;
+        if (!target.roles.cache.has(id))
+            continue;
+        const role = guild.roles.cache.get(id);
+        if (!role)
+            continue;
+        try {
+            await target.roles.remove(role, `مزامنة رولات التحذير بعد إزالة تحذير (المتبقي: ${count})`);
+            notes.push(`تم إزالة ${role.name}`);
+        }
+        catch (e) {
+            logger.warn(`sync remove role failed: ${e.message}`);
+        }
+    }
+    // ② إعطاء الرول المناسب للعدد الجديد (لو مختلف)
+    if (wantedId && !target.roles.cache.has(wantedId)) {
+        const role = guild.roles.cache.get(wantedId);
+        if (role && !role.managed && role.position < botTop) {
+            try {
+                await target.roles.add(role, `مزامنة رولات التحذير بعد إزالة تحذير (المتبقي: ${count})`);
+                notes.push(`تم إعطاء ${role.name}`);
+            }
+            catch (e) {
+                logger.warn(`sync add role failed: ${e.message}`);
+            }
+        }
+    }
+    return notes.length ? notes.join('، ') : null;
 }
 /**
  * يُطبّق رولات التحذير بعد التحذير:

@@ -24,6 +24,20 @@ export declare function applySequentialAdminWarnRoles(opts: {
     diag?: Record<string, any>;
 }): Promise<string | null>;
 /**
+ * 🔄 مزامنة رولات التحذير التسلسلي بعد الإزالة (unwarn):
+ * يحسب عدد التحذيرات المتبقي ويضبط الرول accordingly:
+ * - 0 تحذيرات → يزيل كل رولات التحذير
+ * - 1 → role1Id فقط
+ * - 2 → role2Id فقط
+ * - 3+ → role3Id فقط
+ * يعيد ملاحظة بما تم، أو null لو ما فيش تغيير/إعداد
+ */
+export declare function syncSequentialAdminWarnRoles(opts: {
+    guild: Guild;
+    target: GuildMember;
+    settings: any;
+}): Promise<string | null>;
+/**
  * يُطبّق رولات التحذير بعد التحذير:
  * - للإداريين: نظام تسلسلي تلقائي (1→role1, 2→role2, 3→role3)
  * - للأعضاء: رول واحد فقط → يُعطى مباشرة، أو لوحة اختيار
