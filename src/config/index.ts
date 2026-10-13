@@ -112,6 +112,15 @@ export const config = {
       maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 800),
       temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.7')),
     },
+    // OpenRouter — بديل مجاني (موديلات رؤية مجانية بلاحقة :free)
+    // احصل على مفتاح مجاني: https://openrouter.ai/keys
+    openrouter: {
+      apiKey: process.env.OPENROUTER_API_KEY || '',
+      model: getEnv('OPENROUTER_MODEL', 'openrouter/free'),
+      visionModel: getEnv('OPENROUTER_VISION_MODEL', 'openrouter/free'),
+      maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 800),
+      temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.7')),
+    },
     anthropic: {
       apiKey: process.env.ANTHROPIC_API_KEY || '',
       model: getEnv('ANTHROPIC_MODEL', 'claude-3-opus-20240229'),
@@ -267,12 +276,12 @@ export function validateConfig(): void {
     console.warn('[WARN] AI is enabled with Anthropic provider but ANTHROPIC_API_KEY is not set');
   }
 
-  if (config.ai.enabled && !config.ai.groq.apiKey && !config.ai.openai.apiKey && !config.ai.anthropic.apiKey && !config.ai.gemini.apiKey) {
-    console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
+  if (config.ai.enabled && !config.ai.groq.apiKey && !config.ai.openai.apiKey && !config.ai.anthropic.apiKey && !config.ai.gemini.apiKey && !config.ai.openrouter.apiKey) {
+    console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
   }
 
-  if (config.ai.enabled && !config.ai.gemini.apiKey) {
-    console.warn('[INFO] GEMINI_API_KEY not set → images/video analysis is disabled (voice notes + web search still work). Free key: https://aistudio.google.com/apikey');
+  if (config.ai.enabled && !config.ai.gemini.apiKey && !config.ai.openrouter.apiKey) {
+    console.warn('[INFO] No vision provider set (GEMINI_API_KEY or OPENROUTER_API_KEY) → images/video analysis is disabled (voice notes + web search still work). Free keys: https://aistudio.google.com/apikey · https://openrouter.ai/keys');
   }
 
   if (config.dashboard.enabled && !config.dashboard.secret) {

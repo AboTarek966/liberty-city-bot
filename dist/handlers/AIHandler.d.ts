@@ -25,6 +25,8 @@ export declare class AIHandler {
     private groq;
     /** Gemini لا يحتاج SDK — نتحقق فقط من وجود المفتاح (الوحيد المدعوم للرؤية) */
     private geminiReady;
+    /** OpenRouter — بديل مجاني يدعم الرؤية عبر موديلات :free */
+    private openrouter;
     private cooldowns;
     private fallbackResponses;
     constructor(client: Client);
@@ -85,6 +87,9 @@ export declare class AIHandler {
     /** موديلات الرؤية على Groq (تدعم الصور) — تُستخدم فقط عند إرفاق صور */
     private groqVisionCandidates;
     private generateGemini;
+    /** موديلات OpenRouter المجانية للرؤية — مُتحقق منها لحظياً (7 موديلات رؤية مجانية) */
+    private openrouterVisionCandidates;
+    private generateOpenRouter;
     /** بث رد Groq مباشرة أثناء التوليد */
     private streamGroq;
     private generateAnthropic;

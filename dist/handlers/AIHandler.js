@@ -50,6 +50,8 @@ class AIHandler {
     groq = null;
     /** Gemini لا يحتاج SDK — نتحقق فقط من وجود المفتاح (الوحيد المدعوم للرؤية) */
     geminiReady = false;
+    /** OpenRouter — بديل مجاني يدعم الرؤية عبر موديلات :free */
+    openrouter = null;
     cooldowns = new Map();
     fallbackResponses = new Map();
     constructor(client) {
@@ -63,6 +65,25 @@ class AIHandler {
         if (geminiKey && geminiKey.length > 20 && !/^your_/i.test(geminiKey)) {
             this.geminiReady = true;
             logger.info(`Gemini provider initialized (model: ${config_1.config.ai.gemini.model}, vision: ${config_1.config.ai.gemini.visionModel})`);
+        }
+        // Initialize OpenRouter (free key — supports VISION via free vision models)
+        const orKey = config_1.config.ai.openrouter?.apiKey;
+        if (orKey && orKey.startsWith('sk-or-')) {
+            try {
+                const { OpenAI } = require('openai');
+                this.openrouter = new OpenAI({
+                    apiKey: orKey,
+                    baseURL: 'https://openrouter.ai/api/v1',
+                    defaultHeaders: {
+                        'HTTP-Referer': 'https://github.com/liberty-city-bot',
+                        'X-Title': 'Liberty City Bot',
+                    },
+                });
+                logger.info(`OpenRouter provider initialized (model: ${config_1.config.ai.openrouter.model})`);
+            }
+            catch (error) {
+                logger.warn('Failed to initialize OpenRouter:', error);
+            }
         }
         // Initialize Groq (free tier - preferred)
         const groqKey = config_1.config.ai.groq.apiKey;
@@ -502,23 +523,25 @@ class AIHandler {
         if (!effectiveMessage.trim()) {
             effectiveMessage = media?.context ? 'حلّل وأجب عن المحتوى المرفق أعلاه.' : 'مرحباً';
         }
-        // 🔭 الصور تحتاج مزوّد يدعم الرؤية — حاليًا Gemini فقط (Groq لا يملك موديل رؤية)
-        const canSeeImages = this.geminiReady && !!media?.images?.length;
+        // 🔭 الصور تحتاج مزوّد يدعم الرؤية — Gemini أو OpenRouter (Groq لا يملك موديل رؤية)
+        const canSeeImages = (this.geminiReady || !!this.openrouter) && !!media?.images?.length;
         const passImages = canSeeImages ? media.images : undefined;
         // Try AI providers (preferred first, others as automatic failover) + حلقة بحث ذاتية
         const callProviders = async (msg, useStream) => {
-            // عند وجود صور نُقدّم Gemini أولاً لأنه الوحيد القادر على رؤيتها
+            // عند وجود صور نُقدّم مزوّدي الرؤية أولاً (Gemini ثم OpenRouter)
             let providerOrder = this.resolveProviderOrder(aiConfig.provider);
             if (passImages?.length) {
                 providerOrder = [
-                    ...providerOrder.filter((p) => p === 'gemini'),
-                    ...providerOrder.filter((p) => p !== 'gemini'),
+                    ...providerOrder.filter((p) => p === 'gemini' || p === 'openrouter'),
+                    ...providerOrder.filter((p) => p !== 'gemini' && p !== 'openrouter'),
                 ];
             }
             for (const provider of providerOrder) {
                 try {
                     if (provider === 'gemini')
                         return await this.generateGemini(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+                    if (provider === 'openrouter')
+                        return await this.generateOpenRouter(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
                     if (provider === 'groq') {
                         // Groq لا يدعم الصور — نتجاهلها حتى لا نستهلك محاولات فاشلة
                         if (passImages?.length)
@@ -691,6 +714,8 @@ class AIHandler {
             available.push('groq');
         if (this.geminiReady)
             available.push('gemini');
+        if (this.openrouter)
+            available.push('openrouter');
         if (this.openai)
             available.push('openai');
         if (this.anthropic)
@@ -704,6 +729,9 @@ class AIHandler {
             case 'gemini':
                 preferred = ['gemini'];
                 break;
+            case 'openrouter':
+                preferred = ['openrouter'];
+                break;
             case 'openai':
                 preferred = ['openai'];
                 break;
@@ -713,7 +741,7 @@ class AIHandler {
             case 'both':
                 preferred = ['openai', 'anthropic'];
                 break;
-            default: preferred = ['groq', 'gemini', 'openai', 'anthropic']; // auto
+            default: preferred = ['groq', 'gemini', 'openrouter', 'openai', 'anthropic']; // auto
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));
@@ -1030,6 +1058,88 @@ class AIHandler {
         }
         const r = await geminiGenerate(opts);
         return { content: r.content, tokensUsed: r.tokens, model: 'gemini-' + r.model, fallback: false };
+    }
+    // --------------------------------------------
+    // OpenRouter — بديل مجاني يدعم الرؤية (موديلات :free)
+    // --------------------------------------------
+    /** موديلات OpenRouter المجانية للرؤية — مُتحقق منها لحظياً (7 موديلات رؤية مجانية) */
+    openrouterVisionCandidates() {
+        const preferred = config_1.config.ai.openrouter?.visionModel;
+        const list = [
+            preferred,
+            // الراوتر يختار تلقائياً موديلاً مجانياً يدعم الصور
+            'openrouter/free',
+            'google/gemma-4-31b-it:free',
+            'google/gemma-4-26b-a4b-it:free',
+            'thinkingmachines/inkling:free',
+            'thinkingmachines/inkling-small:free',
+        ].filter(Boolean);
+        return [...new Set(list)];
+    }
+    async generateOpenRouter(message, systemPrompt, aiConfig, history = [], stream, images) {
+        if (!this.openrouter)
+            throw new Error('OpenRouter not configured');
+        const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : config_1.config.ai.openrouter.temperature;
+        const maxTokens = Math.min(aiConfig.maxTokens || 500, config_1.config.ai.openrouter.maxTokens);
+        const messages = this.buildMessages(systemPrompt, history, message, images);
+        const candidates = images?.length
+            ? this.openrouterVisionCandidates()
+            : [config_1.config.ai.openrouter?.model || 'openrouter/free'];
+        let lastError = null;
+        for (const model of candidates) {
+            try {
+                // 📡 بث مباشر — لا يُستخدم مع الصور
+                if (stream?.onFirstChunk && !images?.length) {
+                    const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: maxTokens, stream: true }, { responseType: 'stream' });
+                    let full = '';
+                    let started = false;
+                    for await (const chunk of completion) {
+                        const piece = chunk?.choices?.[0]?.delta?.content || '';
+                        if (!piece)
+                            continue;
+                        full += piece;
+                        if (!started) {
+                            started = true;
+                            await stream.onFirstChunk(piece);
+                        }
+                        else if (stream.onUpdate)
+                            await stream.onUpdate(full);
+                    }
+                    if (!full)
+                        throw new Error('Empty streamed response from OpenRouter');
+                    if (stream.onUpdate)
+                        await stream.onUpdate(full);
+                    return { content: full, tokensUsed: 0, model: 'openrouter-' + model, fallback: false };
+                }
+                const completion = await this.openrouter.chat.completions.create({
+                    model,
+                    messages,
+                    temperature,
+                    max_tokens: maxTokens,
+                });
+                const content = completion.choices[0]?.message?.content?.trim();
+                if (!content)
+                    throw new Error('Empty response from OpenRouter');
+                return {
+                    content,
+                    tokensUsed: completion.usage?.total_tokens || 0,
+                    model: 'openrouter-' + model,
+                    fallback: false,
+                };
+            }
+            catch (error) {
+                lastError = error;
+                const status = Number(error?.status ?? error?.response?.status ?? 0);
+                const msg = String(error?.message || '');
+                // موديل غير متاح/حصة/لا يدعم الرؤية → جرّب التالي
+                const retryable = status === 400 || status === 404 || status === 429 || status === 503 ||
+                    /image|vision|modalit/i.test(msg);
+                if (!retryable)
+                    break;
+                logger.warn(`OpenRouter model "${model}" failed (${status}): ${msg.slice(0, 140)}`);
+            }
+        }
+        throw lastError || new Error('OpenRouter request failed');
     }
     /** بث رد Groq مباشرة أثناء التوليد */
     async streamGroq(model, messages, temperature, maxTokens, stream) {

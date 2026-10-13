@@ -38,6 +38,13 @@ export declare const config: {
             maxTokens: number;
             temperature: number;
         };
+        openrouter: {
+            apiKey: string;
+            model: string;
+            visionModel: string;
+            maxTokens: number;
+            temperature: number;
+        };
         anthropic: {
             apiKey: string;
             model: string;
