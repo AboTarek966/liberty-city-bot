@@ -1063,16 +1063,14 @@ class AIHandler {
     // --------------------------------------------
     // OpenRouter — بديل مجاني يدعم الرؤية (موديلات :free)
     // --------------------------------------------
-    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة */
+    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة والموثوقية */
     openrouterVisionCandidates() {
         const preferred = config_1.config.ai.openrouter?.visionModel;
         const list = [
-            preferred,
-            // مُختبرة: gemma-31b ~7ث، gemma-26b سريع، dots ~15ث، omni بطيء لكن يدعم فيديو+صوت
-            'google/gemma-4-31b-it:free',
-            'google/gemma-4-26b-a4b-it:free',
-            'dots-studio/dots-3-note-preview:free',
-            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+            preferred, // gemma-31b: ~7ث عندما لا تكون حصة Google مشغولة
+            'dots-studio/dots-3-note-preview:free', // موثوق ~12ث (بلا ازدحام Google)
+            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', // موثوق، يدعم صور+فيديو+صوت
+            'google/gemma-4-26b-a4b-it:free', // احتياطي أخير
         ].filter(Boolean);
         // لا نستخدم openrouter/free هنا لأنه قد يختار موديل "سلامة محتوى"
         return [...new Set(list)].filter((m) => m !== 'openrouter/free');
@@ -1085,7 +1083,9 @@ class AIHandler {
         const messages = this.buildMessages(systemPrompt, history, message, images);
         const candidates = images?.length
             ? this.openrouterVisionCandidates()
-            : [config_1.config.ai.openrouter?.model || 'openrouter/free'];
+            : [config_1.config.ai.openrouter?.model || 'google/gemma-4-26b-a4b-it:free'];
+        // 🔭 الرؤية تحتاج توكنز أكبر — الموديلات الاستدلالية تستهلكها في "التفكير" قبل الإجابة
+        const effMaxTokens = images?.length ? Math.max(maxTokens, 1800) : maxTokens;
         let lastError = null;
         for (const model of candidates) {
             // الحصة المجانية قد ترجع 429 مؤقتاً → نجرّب الموديل مرتين قبل التالي
@@ -1094,7 +1094,7 @@ class AIHandler {
                 try {
                     // 📡 بث مباشر — لا يُستخدم مع الصور
                     if (stream?.onFirstChunk && !images?.length) {
-                        const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: maxTokens, stream: true }, { responseType: 'stream' });
+                        const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: effMaxTokens, stream: true }, { responseType: 'stream' });
                         let full = '';
                         let started = false;
                         for await (const chunk of completion) {
@@ -1119,14 +1119,16 @@ class AIHandler {
                         model,
                         messages,
                         temperature,
-                        max_tokens: maxTokens,
+                        max_tokens: effMaxTokens,
                     });
-                    const content = completion.choices[0]?.message?.content?.trim();
+                    const msg = completion?.choices?.[0]?.message;
+                    const content = msg?.content?.trim();
+                    // استجابة فارغة (الموديل استهلك التوكنز في "التفكير") → جرّب الموديل التالي
                     if (!content)
-                        throw new Error('Empty response from OpenRouter');
+                        throw Object.assign(new Error('Empty response from OpenRouter'), { status: 400 });
                     return {
                         content,
-                        tokensUsed: completion.usage?.total_tokens || 0,
+                        tokensUsed: completion?.usage?.total_tokens || 0,
                         model: 'openrouter-' + model,
                         fallback: false,
                     };

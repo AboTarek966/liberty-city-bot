@@ -87,7 +87,7 @@ export declare class AIHandler {
     /** موديلات الرؤية على Groq (تدعم الصور) — تُستخدم فقط عند إرفاق صور */
     private groqVisionCandidates;
     private generateGemini;
-    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة */
+    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة والموثوقية */
     private openrouterVisionCandidates;
     private generateOpenRouter;
     /** بث رد Groq مباشرة أثناء التوليد */
