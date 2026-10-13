@@ -487,7 +487,7 @@ class TicketHandler {
                 const claimEmbed = (0, embeds_1.createEmbed)({
                     title: '🤝 تم استلام التذكرة',
                     description: `تم استلام التذكرة بواسطة ${claimedBy}\n\n` +
-                        `🔒 **تم قفل التذكرة:** الكتابة للمستلم + الأدمن فقط — بقية فريق الدعم للقراءة فقط.\n` +
+                        `🔒 **تم قفل التذكرة حصرية:** الكتابة للمستلم وصاحب التذكرة فقط — بقية فريق الدعم للقراءة فقط.\n` +
                         `📌 لمنح إداري معيّن صلاحية الكتابة اختر **➕ إضافة عضو أو إداري** من قائمة الخيارات.\n\n` +
                         (isNewClaimer
                             ? `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``
@@ -660,27 +660,10 @@ class TicketHandler {
                 grantWrite(claimedBy.id);
             }
         }
-        // 3) الإدارة العليا (Administrator فقط) — يمكنهم الكتابة دائماً
-        // ⚠️ لا يُمنح صلاحية الكتابة لمن يملك ManageGuild فقط — المستلم فقط + الأدمن
-        const adminRoleIds = new Set(guild.roles.cache
-            .filter(r => r.id !== guild.roles.everyone.id && r.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
-            .map(r => r.id));
-        for (const [memberId, member] of guild.members.cache) {
-            if (granted.includes(memberId))
-                continue;
-            if (member.id === ticket.userId)
-                continue; // صاحب التذكرة يملك الوصول أصلاً
-            if (member.id === this.client.user?.id)
-                continue; // البوت
-            if (!member.roles.cache.some(r => adminRoleIds.has(r.id)))
-                continue;
-            const ow = channel.permissionOverwrites.cache.get(memberId);
-            if (ow?.allow.has(discord_js_1.PermissionFlagsBits.SendMessages))
-                continue; // يملك الكتابة أصلاً
-            snapshotOverwrite(memberId);
-            granted.push(memberId);
-            grantWrite(memberId);
-        }
+        // 3) ❌ لم نمنح صلاحية الكتابة لكل من يملك Administrator تلقائياً بعد الاستلام.
+        //    الاستلام صار حصرياً: الكتابة للمستلم + صاحب التذكرة فقط،
+        //    وأي إداري آخر يحتاج ➕ إضافة عضو أو إداري ليدخل الكتابة.
+        //    (من يملك Administrator يتجاوز قفل القناة بقاعدة ديسكورد نفسها — لا يمكن منعه بالـoverwrites)
         // ⚡ كل التعديلات في نفس اللحظة — كانت تُنفَّذ واحدة تلو الأخرى وهو سبب البطء
         await Promise.all([
             ...supportRoleIds.map(id => channel.permissionOverwrites.edit(id, { SendMessages: false }).catch(() => { })),
