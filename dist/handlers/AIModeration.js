@@ -383,10 +383,22 @@ async function executeAIModeration(message, client, question) {
                 const targetMember = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
                 if (!targetMember)
                     throw new Error('العضو غير موجود في السيرفر');
-                // التحقق: النظام التسلسلي للإداريين فقط
+                // التحقق: النظام التسلسلي للإداريين فقط (أي حد عنده صلاحيات إدارة)
+                const adminPermissions = [
+                    discord_js_1.PermissionFlagsBits.Administrator,
+                    discord_js_1.PermissionFlagsBits.ManageGuild,
+                    discord_js_1.PermissionFlagsBits.ManageChannels,
+                    discord_js_1.PermissionFlagsBits.ManageRoles,
+                    discord_js_1.PermissionFlagsBits.ManageMessages,
+                    discord_js_1.PermissionFlagsBits.KickMembers,
+                    discord_js_1.PermissionFlagsBits.BanMembers,
+                    discord_js_1.PermissionFlagsBits.ModerateMembers,
+                    discord_js_1.PermissionFlagsBits.ManageNicknames,
+                    discord_js_1.PermissionFlagsBits.ManageEmojisAndStickers,
+                    discord_js_1.PermissionFlagsBits.ManageWebhooks,
+                ];
                 const isAdminTarget = targetMember.id === guild.ownerId ||
-                    targetMember.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
-                    targetMember.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild);
+                    adminPermissions.some(p => targetMember.permissions.has(p));
                 if (!isAdminTarget) {
                     throw new Error('النظام التسلسلي للإداريين فقط — للأعضاء العاديين استخدم `/warn`');
                 }
