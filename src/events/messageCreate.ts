@@ -25,6 +25,7 @@ import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
+import { detectImagePrompt, generateImageWithRetry } from '../utils/imageGen';
 
 const logger = createLogger('Event:MessageCreate');
 
@@ -980,6 +981,37 @@ async function runAliasCommand(
 // --------------------------------------------
 // AI Auto-Reply (Mention / Reply)
 // --------------------------------------------
+/**
+ * 🎨 توليد صورة بالذكاء الاصطناعي (مجاني — Pollinations.ai)
+ * يرد في نفس الروم، كرد على رسالة المستخدم، بعد ~6-12 ثانية.
+ */
+async function handleImageGeneration(message: Message, prompt: string): Promise<void> {
+  const short = prompt.length > 120 ? prompt.slice(0, 120) + '…' : prompt;
+
+  // رد فوري حتى لا يظن المستخدم أن البوت عطِل
+  const placeholder = await message.reply('🎨 برسملك الصورة…').catch(() => null);
+  if (!placeholder) return;
+
+  const started = Date.now();
+  const image = await generateImageWithRetry(prompt, { width: 1024, height: 1024, model: 'flux' });
+
+  if (!image) {
+    await placeholder
+      .edit('❌ فشل توليد الصورة — الخدمة المجانية مشغولة الآن، حاول بعد دقيقة.')
+      .catch(() => {});
+    return;
+  }
+
+  await placeholder
+    .edit({
+      content: `🎨 **${short}**`,
+      files: [{ attachment: image.data, name: `image.${image.ext}` }],
+    })
+    .catch(() => {});
+
+  logger.info(`Image generated for ${message.author.tag} in ${Date.now() - started}ms`);
+}
+
 async function handleAIResponse(message: Message, client: LibertyClient): Promise<void> {
   if (!client.aiHandler) return;
 
@@ -1046,6 +1078,16 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
       if (executed) return;
     } catch (error) {
       logger.error('Error in AI moderation:', error);
+    }
+  }
+
+  // 🎨 طلب توليد صورة — نُولّدها فوراً بدل إرسال الطلب للنموذج النصي
+  //   (يعمل في السيرفرات مع المنشن، وفي الرسائل الخاصة بدون منشن)
+  if (question && attachments.length === 0) {
+    const imagePrompt = detectImagePrompt(question);
+    if (imagePrompt) {
+      await handleImageGeneration(message, imagePrompt);
+      return;
     }
   }
 

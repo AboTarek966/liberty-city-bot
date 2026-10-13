@@ -49,6 +49,7 @@ const afk_1 = require("../utils/afk");
 const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
 const pendingUploads_1 = require("../utils/pendingUploads");
+const imageGen_1 = require("../utils/imageGen");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
@@ -903,6 +904,32 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
 // --------------------------------------------
 // AI Auto-Reply (Mention / Reply)
 // --------------------------------------------
+/**
+ * 🎨 توليد صورة بالذكاء الاصطناعي (مجاني — Pollinations.ai)
+ * يرد في نفس الروم، كرد على رسالة المستخدم، بعد ~6-12 ثانية.
+ */
+async function handleImageGeneration(message, prompt) {
+    const short = prompt.length > 120 ? prompt.slice(0, 120) + '…' : prompt;
+    // رد فوري حتى لا يظن المستخدم أن البوت عطِل
+    const placeholder = await message.reply('🎨 برسملك الصورة…').catch(() => null);
+    if (!placeholder)
+        return;
+    const started = Date.now();
+    const image = await (0, imageGen_1.generateImageWithRetry)(prompt, { width: 1024, height: 1024, model: 'flux' });
+    if (!image) {
+        await placeholder
+            .edit('❌ فشل توليد الصورة — الخدمة المجانية مشغولة الآن، حاول بعد دقيقة.')
+            .catch(() => { });
+        return;
+    }
+    await placeholder
+        .edit({
+        content: `🎨 **${short}**`,
+        files: [{ attachment: image.data, name: `image.${image.ext}` }],
+    })
+        .catch(() => { });
+    logger.info(`Image generated for ${message.author.tag} in ${Date.now() - started}ms`);
+}
 async function handleAIResponse(message, client) {
     if (!client.aiHandler)
         return;
@@ -964,6 +991,15 @@ async function handleAIResponse(message, client) {
         }
         catch (error) {
             logger.error('Error in AI moderation:', error);
+        }
+    }
+    // 🎨 طلب توليد صورة — نُولّدها فوراً بدل إرسال الطلب للنموذج النصي
+    //   (يعمل في السيرفرات مع المنشن، وفي الرسائل الخاصة بدون منشن)
+    if (question && attachments.length === 0) {
+        const imagePrompt = (0, imageGen_1.detectImagePrompt)(question);
+        if (imagePrompt) {
+            await handleImageGeneration(message, imagePrompt);
+            return;
         }
     }
     // Typing indicator
