@@ -1062,19 +1062,19 @@ class AIHandler {
     // --------------------------------------------
     // OpenRouter — بديل مجاني يدعم الرؤية (موديلات :free)
     // --------------------------------------------
-    /** موديلات OpenRouter المجانية للرؤية — مُتحقق منها لحظياً (7 موديلات رؤية مجانية) */
+    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة */
     openrouterVisionCandidates() {
         const preferred = config_1.config.ai.openrouter?.visionModel;
         const list = [
             preferred,
-            // الراوتر يختار تلقائياً موديلاً مجانياً يدعم الصور
-            'openrouter/free',
+            // مُختبرة: gemma-31b ~7ث، gemma-26b سريع، dots ~15ث، omni بطيء لكن يدعم فيديو+صوت
             'google/gemma-4-31b-it:free',
             'google/gemma-4-26b-a4b-it:free',
-            'thinkingmachines/inkling:free',
-            'thinkingmachines/inkling-small:free',
+            'dots-studio/dots-3-note-preview:free',
+            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
         ].filter(Boolean);
-        return [...new Set(list)];
+        // لا نستخدم openrouter/free هنا لأنه قد يختار موديل "سلامة محتوى"
+        return [...new Set(list)].filter((m) => m !== 'openrouter/free');
     }
     async generateOpenRouter(message, systemPrompt, aiConfig, history = [], stream, images) {
         if (!this.openrouter)
@@ -1087,56 +1087,66 @@ class AIHandler {
             : [config_1.config.ai.openrouter?.model || 'openrouter/free'];
         let lastError = null;
         for (const model of candidates) {
-            try {
-                // 📡 بث مباشر — لا يُستخدم مع الصور
-                if (stream?.onFirstChunk && !images?.length) {
-                    const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: maxTokens, stream: true }, { responseType: 'stream' });
-                    let full = '';
-                    let started = false;
-                    for await (const chunk of completion) {
-                        const piece = chunk?.choices?.[0]?.delta?.content || '';
-                        if (!piece)
-                            continue;
-                        full += piece;
-                        if (!started) {
-                            started = true;
-                            await stream.onFirstChunk(piece);
+            // الحصة المجانية قد ترجع 429 مؤقتاً → نجرّب الموديل مرتين قبل التالي
+            const attempts = 2;
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+                try {
+                    // 📡 بث مباشر — لا يُستخدم مع الصور
+                    if (stream?.onFirstChunk && !images?.length) {
+                        const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: maxTokens, stream: true }, { responseType: 'stream' });
+                        let full = '';
+                        let started = false;
+                        for await (const chunk of completion) {
+                            const piece = chunk?.choices?.[0]?.delta?.content || '';
+                            if (!piece)
+                                continue;
+                            full += piece;
+                            if (!started) {
+                                started = true;
+                                await stream.onFirstChunk(piece);
+                            }
+                            else if (stream.onUpdate)
+                                await stream.onUpdate(full);
                         }
-                        else if (stream.onUpdate)
+                        if (!full)
+                            throw new Error('Empty streamed response from OpenRouter');
+                        if (stream.onUpdate)
                             await stream.onUpdate(full);
+                        return { content: full, tokensUsed: 0, model: 'openrouter-' + model, fallback: false };
                     }
-                    if (!full)
-                        throw new Error('Empty streamed response from OpenRouter');
-                    if (stream.onUpdate)
-                        await stream.onUpdate(full);
-                    return { content: full, tokensUsed: 0, model: 'openrouter-' + model, fallback: false };
+                    const completion = await this.openrouter.chat.completions.create({
+                        model,
+                        messages,
+                        temperature,
+                        max_tokens: maxTokens,
+                    });
+                    const content = completion.choices[0]?.message?.content?.trim();
+                    if (!content)
+                        throw new Error('Empty response from OpenRouter');
+                    return {
+                        content,
+                        tokensUsed: completion.usage?.total_tokens || 0,
+                        model: 'openrouter-' + model,
+                        fallback: false,
+                    };
                 }
-                const completion = await this.openrouter.chat.completions.create({
-                    model,
-                    messages,
-                    temperature,
-                    max_tokens: maxTokens,
-                });
-                const content = completion.choices[0]?.message?.content?.trim();
-                if (!content)
-                    throw new Error('Empty response from OpenRouter');
-                return {
-                    content,
-                    tokensUsed: completion.usage?.total_tokens || 0,
-                    model: 'openrouter-' + model,
-                    fallback: false,
-                };
-            }
-            catch (error) {
-                lastError = error;
-                const status = Number(error?.status ?? error?.response?.status ?? 0);
-                const msg = String(error?.message || '');
-                // موديل غير متاح/حصة/لا يدعم الرؤية → جرّب التالي
-                const retryable = status === 400 || status === 404 || status === 429 || status === 503 ||
-                    /image|vision|modalit/i.test(msg);
-                if (!retryable)
+                catch (error) {
+                    lastError = error;
+                    const status = Number(error?.status ?? error?.response?.status ?? 0);
+                    const msg = String(error?.message || '');
+                    // 429 = حصة مؤقتة → انتظر وجرّب نفس الموديل مرة أخرى
+                    if (status === 429 && attempt < attempts) {
+                        await new Promise((r) => setTimeout(r, 2000));
+                        continue;
+                    }
+                    // موديل غير متاح/لا يدعم الرؤية → انتقل للموديل التالي
+                    const retryable = status === 400 || status === 404 || status === 429 || status === 503 ||
+                        /image|vision|modalit/i.test(msg);
+                    if (!retryable)
+                        throw error; // خطأ غير قابل للإصلاح (مفتاح/خادم) → لا فائدة من بقية الموديلات
+                    logger.warn(`OpenRouter model "${model}" failed (${status}): ${msg.slice(0, 140)}`);
                     break;
-                logger.warn(`OpenRouter model "${model}" failed (${status}): ${msg.slice(0, 140)}`);
+                }
             }
         }
         throw lastError || new Error('OpenRouter request failed');

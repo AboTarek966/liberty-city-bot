@@ -119,8 +119,8 @@ exports.config = {
         // احصل على مفتاح مجاني: https://openrouter.ai/keys
         openrouter: {
             apiKey: process.env.OPENROUTER_API_KEY || '',
-            model: getEnv('OPENROUTER_MODEL', 'openrouter/free'),
-            visionModel: getEnv('OPENROUTER_VISION_MODEL', 'openrouter/free'),
+            model: getEnv('OPENROUTER_MODEL', 'google/gemma-4-26b-a4b-it:free'),
+            visionModel: getEnv('OPENROUTER_VISION_MODEL', 'google/gemma-4-31b-it:free'),
             maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 800),
             temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.7')),
         },
