@@ -50,6 +50,7 @@ const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
 const pendingUploads_1 = require("../utils/pendingUploads");
 const imageGen_1 = require("../utils/imageGen");
+const mediaGen_1 = require("../utils/mediaGen");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
@@ -930,6 +931,35 @@ async function handleImageGeneration(message, prompt) {
         .catch(() => { });
     logger.info(`Image generated for ${message.author.tag} in ${Date.now() - started}ms`);
 }
+/**
+ * 🎵 توليد موسيقى بالذكاء الاصطناعي (مجاني — Hugging Face Spaces / Stable Audio 3)
+ * يحتاج حساب Hugging Face مجاني (بلا بطاقة). التوليد يستغرق ~1-2 دقيقة.
+ */
+async function handleMusicGeneration(message, prompt) {
+    const avail = (0, mediaGen_1.mediaGenAvailable)();
+    if (!avail.music) {
+        await message.reply(`❌ توليد الموسيقى غير مفعّل — ${avail.reason}`).catch(() => { });
+        return;
+    }
+    const short = prompt.length > 100 ? prompt.slice(0, 100) + '…' : prompt;
+    // رد فوري — التوليد يستغرق دقائق، ولا نريد أن يظن المستخدم أن البوت عطِل
+    const placeholder = await message.reply('🎵 بعزّف لك اللحن… (~1-2 دقيقة)').catch(() => null);
+    if (!placeholder)
+        return;
+    const music = await (0, mediaGen_1.generateMusic)(prompt, { seconds: 20 });
+    if (!music) {
+        await placeholder
+            .edit('❌ فشل توليد الموسيقى — المساحة المجانية مشغولة الآن، حاول بعد دقيقة.')
+            .catch(() => { });
+        return;
+    }
+    await placeholder
+        .edit({
+        content: `🎵 **${short}**`,
+        files: [{ attachment: music.data, name: `music.${music.ext}` }],
+    })
+        .catch(() => { });
+}
 async function handleAIResponse(message, client) {
     if (!client.aiHandler)
         return;
@@ -999,6 +1029,14 @@ async function handleAIResponse(message, client) {
         const imagePrompt = (0, imageGen_1.detectImagePrompt)(question);
         if (imagePrompt) {
             await handleImageGeneration(message, imagePrompt);
+            return;
+        }
+    }
+    // 🎵 طلب توليد موسيقى — يُولَّد عبر Hugging Face Spaces (مجاني)
+    if (question && attachments.length === 0) {
+        const musicPrompt = (0, mediaGen_1.detectMusicPrompt)(question);
+        if (musicPrompt) {
+            await handleMusicGeneration(message, musicPrompt);
             return;
         }
     }

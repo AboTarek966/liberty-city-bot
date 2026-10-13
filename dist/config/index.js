@@ -124,6 +124,19 @@ exports.config = {
             maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 800),
             temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.7')),
         },
+        // Hugging Face Spaces — توليد الموسيقى والفيديو مجاناً (ZeroGPU)
+        // ⚠️ يتطلب حساب Hugging Face مجاني (بلا بطاقة ائتمان) — https://huggingface.co/settings/tokens
+        // ملاحظة: fn_index = ترقيم الدالة داخل المساحة (من /config → dependencies[i])
+        //   Stable Audio 3: /infer = fn_index 3  (مُختبر — يرجع WAV فعلاً)
+        hf: {
+            token: process.env.HF_TOKEN || '',
+            musicSpace: getEnv('HF_MUSIC_SPACE', 'stabilityai/stable-audio-3'),
+            musicFnIndex: getEnvNumber('HF_MUSIC_FN_INDEX', 3),
+            videoSpace: getEnv('HF_VIDEO_SPACE', 'zerogpu-aoti/wan2-2-fp8da-aoti-faster'),
+            videoFnIndex: getEnvNumber('HF_VIDEO_FN_INDEX', 0),
+            musicTimeoutMs: getEnvNumber('HF_MUSIC_TIMEOUT', 5 * 60 * 1000),
+            videoTimeoutMs: getEnvNumber('HF_VIDEO_TIMEOUT', 12 * 60 * 1000),
+        },
         anthropic: {
             apiKey: process.env.ANTHROPIC_API_KEY || '',
             model: getEnv('ANTHROPIC_MODEL', 'claude-3-opus-20240229'),

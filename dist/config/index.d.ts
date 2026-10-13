@@ -45,6 +45,15 @@ export declare const config: {
             maxTokens: number;
             temperature: number;
         };
+        hf: {
+            token: string;
+            musicSpace: string;
+            musicFnIndex: number;
+            videoSpace: string;
+            videoFnIndex: number;
+            musicTimeoutMs: number;
+            videoTimeoutMs: number;
+        };
         anthropic: {
             apiKey: string;
             model: string;
