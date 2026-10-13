@@ -18,6 +18,8 @@ export declare function applySequentialAdminWarnRoles(opts: {
     executor: GuildMember;
     target: GuildMember;
     reason: string;
+    /** إذا true، يجيب إعدادات طازجة من قاعدة البيانات متجاهلاً الكاش */
+    forceFreshSettings?: boolean;
 }): Promise<string | null>;
 /**
  * يُطبّق رولات التحذير بعد التحذير:

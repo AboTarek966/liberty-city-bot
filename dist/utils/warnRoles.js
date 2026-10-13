@@ -4,6 +4,39 @@
 // عند التحذير: يُعطي رولاً واحداً مباشرة، أو يعرض لوحة اختيار
 // (بنظام roleadd) تحتوي على رولات التحذير المُعدّة في الإعدادات فقط
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isAdminTarget = isAdminTarget;
 exports.getWarnRolePool = getWarnRolePool;
@@ -42,11 +75,18 @@ async function getWarningCount(guildId, userId) {
  * يعيد ملاحظة نصية بما تم، أو null لو ما فيش إعداد
  */
 async function applySequentialAdminWarnRoles(opts) {
-    const { settings, guild, executor, target, reason } = opts;
+    const { settings, guild, executor, target, reason, forceFreshSettings } = opts;
     // فقط للإداريين
     if (!isAdminTarget(target))
         return null;
-    const sequential = settings?.warnRoles?.adminSequential;
+    // إذا طُلب بيانات طازجة، أبطل الكاش وجيب إعدادات جديدة
+    let effectiveSettings = settings;
+    if (forceFreshSettings) {
+        const { invalidateGuildSettings, getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../models')));
+        invalidateGuildSettings(guild.id);
+        effectiveSettings = await getGuildSettings(guild.id);
+    }
+    const sequential = effectiveSettings?.warnRoles?.adminSequential;
     if (!sequential)
         return null;
     // حساب عدد التحذيرات الحالي (بما فيها التحذير الجديد)
@@ -101,7 +141,7 @@ async function offerWarnRoles(opts) {
     const { settings, guild, executor, target, reason, reply } = opts;
     try {
         // أولاً: جرب النظام التسلسلي للإداريين (تلقائي، بدون لوحة)
-        const sequentialNote = await applySequentialAdminWarnRoles({ settings, guild, executor, target, reason });
+        const sequentialNote = await applySequentialAdminWarnRoles({ settings, guild, executor, target, reason, forceFreshSettings: true });
         if (sequentialNote)
             return sequentialNote;
         // ثانياً: النظام القديم (pool من رولات التحذير)

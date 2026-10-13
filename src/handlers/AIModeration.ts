@@ -451,6 +451,7 @@ export async function executeAIModeration(
           executor: moderator,
           target: targetMember,
           reason: `تحذير تسلسلي رقم ${level} (يدوي)`,
+          forceFreshSettings: true, // 🔄 إجبار جلب إعدادات طازجة من قاعدة البيانات
         });
         
         if (!result) {

@@ -57,13 +57,23 @@ export async function applySequentialAdminWarnRoles(opts: {
   executor: GuildMember;
   target: GuildMember;
   reason: string;
+  /** إذا true، يجيب إعدادات طازجة من قاعدة البيانات متجاهلاً الكاش */
+  forceFreshSettings?: boolean;
 }): Promise<string | null> {
-  const { settings, guild, executor, target, reason } = opts;
+  const { settings, guild, executor, target, reason, forceFreshSettings } = opts;
 
   // فقط للإداريين
   if (!isAdminTarget(target)) return null;
 
-  const sequential = settings?.warnRoles?.adminSequential;
+  // إذا طُلب بيانات طازجة، أبطل الكاش وجيب إعدادات جديدة
+  let effectiveSettings = settings;
+  if (forceFreshSettings) {
+    const { invalidateGuildSettings, getGuildSettings } = await import('../models');
+    invalidateGuildSettings(guild.id);
+    effectiveSettings = await getGuildSettings(guild.id);
+  }
+
+  const sequential = effectiveSettings?.warnRoles?.adminSequential;
   if (!sequential) return null;
 
   // حساب عدد التحذيرات الحالي (بما فيها التحذير الجديد)
@@ -129,7 +139,7 @@ export async function offerWarnRoles(opts: {
 
   try {
     // أولاً: جرب النظام التسلسلي للإداريين (تلقائي، بدون لوحة)
-    const sequentialNote = await applySequentialAdminWarnRoles({ settings, guild, executor, target, reason });
+    const sequentialNote = await applySequentialAdminWarnRoles({ settings, guild, executor, target, reason, forceFreshSettings: true });
     if (sequentialNote) return sequentialNote;
 
     // ثانياً: النظام القديم (pool من رولات التحذير)

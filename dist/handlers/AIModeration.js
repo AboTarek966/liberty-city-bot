@@ -426,6 +426,7 @@ async function executeAIModeration(message, client, question) {
                     executor: moderator,
                     target: targetMember,
                     reason: `تحذير تسلسلي رقم ${level} (يدوي)`,
+                    forceFreshSettings: true, // 🔄 إجبار جلب إعدادات طازجة من قاعدة البيانات
                 });
                 if (!result) {
                     throw new Error(`لا يوجد رول تحذير رقم ${level} مُعد — راجع /settings → 🎭 رولات التحذير`);
