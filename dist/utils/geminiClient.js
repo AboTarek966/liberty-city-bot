@@ -15,12 +15,15 @@ const axios_1 = __importDefault(require("axios"));
 const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('Gemini');
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
-/** موديلات Gemini بالترتيب (ال مجاني أولًا) */
+/**
+ * موديلات Gemini — مُختبرة فعلياً بهذا المفتاح ومرتّبة حسب السرعة.
+ * ملاحظة: `gemini-2.5-flash` و`gemini-2.0-flash` لم تعد متاحة لمستخدمين جدد (HTTP 404).
+ */
 exports.GEMINI_TEXT_MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-flash-latest',
-    'gemini-2.0-flash',
+    'gemini-3.5-flash', // ⭐ الأسرع — اختُبرت ~3.5 ثانية مع الصور
+    'gemini-3.1-flash-lite', // احتياطي سريع (~6 ثوانٍ)
+    'gemini-flash-latest', // قد يرجع 503 عند الضغط
+    'gemini-3.8-flash',
 ];
 /** موديلات Gemini للرؤية — نفس الموديلات تدعم الصور */
 exports.GEMINI_VISION_MODELS = exports.GEMINI_TEXT_MODELS;
@@ -99,32 +102,41 @@ async function geminiGenerate(opts) {
     const body = buildBody(opts);
     let lastErr = null;
     for (const model of pickModels(!!opts.images?.length, opts.preferredModel)) {
-        try {
-            const res = await axios_1.default.post(`${BASE}/models/${model}:generateContent`, body, {
-                headers: { 'x-goog-api-key': opts.apiKey, 'Content-Type': 'application/json' },
-                timeout: 60_000,
-            });
-            const content = extractText(res.data);
-            if (!content) {
-                const block = res.data?.promptFeedback?.blockReason;
-                if (block)
-                    throw new Error(`محجوب: ${block}`);
-                continue;
+        // 503 "high demand" و429 حصة مؤقتة → نجرّب نفس الموديل مرة أخرى قبل الانتقال
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const res = await axios_1.default.post(`${BASE}/models/${model}:generateContent`, body, {
+                    headers: { 'x-goog-api-key': opts.apiKey, 'Content-Type': 'application/json' },
+                    timeout: 60_000,
+                });
+                const content = extractText(res.data);
+                if (!content) {
+                    const block = res.data?.promptFeedback?.blockReason;
+                    if (block)
+                        throw new Error(`محجوب: ${block}`);
+                    break; // استجابة فارغة → جرّب الموديل التالي
+                }
+                return {
+                    content,
+                    model,
+                    tokens: (res.data?.usageMetadata?.promptTokenCount || 0) +
+                        (res.data?.usageMetadata?.candidatesTokenCount || 0),
+                };
             }
-            return {
-                content,
-                model,
-                tokens: (res.data?.usageMetadata?.promptTokenCount || 0) +
-                    (res.data?.usageMetadata?.candidatesTokenCount || 0),
-            };
-        }
-        catch (e) {
-            lastErr = e;
-            const s = statusOf(e);
-            // موديل غير متاح/حصة → جرّب التالي. غير ذلك توقف.
-            if (s !== 400 && s !== 404 && s !== 429 && s !== 503)
+            catch (e) {
+                lastErr = e;
+                const s = statusOf(e);
+                // ضغط مؤقت على الموديل → انتظر قليلاً وجرّب نفس الموديل
+                if ((s === 429 || s === 503) && attempt < 2) {
+                    await new Promise((r) => setTimeout(r, 1500));
+                    continue;
+                }
+                // موديل غير متاح/حصة → جرّب التالي. غير ذلك توقف.
+                if (s !== 400 && s !== 404 && s !== 429 && s !== 503)
+                    break;
+                logger.warn(`Gemini model "${model}" failed (${s}): ${String(e?.message || e).slice(0, 140)}`);
                 break;
-            logger.warn(`Gemini model "${model}" failed (${s}): ${String(e?.message || e).slice(0, 140)}`);
+            }
         }
     }
     throw lastErr || new Error('Gemini request failed');
@@ -138,11 +150,19 @@ async function geminiStream(opts) {
     for (const model of pickModels(!!opts.images?.length, opts.preferredModel)) {
         const url = `${BASE}/models/${model}:streamGenerateContent?alt=sse`;
         try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'x-goog-api-key': opts.apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
+            // 503 "high demand" و429 مؤقتان → نجرّب الطلب مرة أخرى قبل الانتقال
+            let res;
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'x-goog-api-key': opts.apiKey, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (res.ok || (res.status !== 429 && res.status !== 503))
+                    break;
+                if (attempt < 2)
+                    await new Promise((r) => setTimeout(r, 1500));
+            }
             if (!res.ok) {
                 const errText = await res.text().catch(() => '');
                 const e = new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);

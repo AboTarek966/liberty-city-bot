@@ -1,4 +1,7 @@
-/** موديلات Gemini بالترتيب (ال مجاني أولًا) */
+/**
+ * موديلات Gemini — مُختبرة فعلياً بهذا المفتاح ومرتّبة حسب السرعة.
+ * ملاحظة: `gemini-2.5-flash` و`gemini-2.0-flash` لم تعد متاحة لمستخدمين جدد (HTTP 404).
+ */
 export declare const GEMINI_TEXT_MODELS: string[];
 /** موديلات Gemini للرؤية — نفس الموديلات تدعم الصور */
 export declare const GEMINI_VISION_MODELS: string[];
