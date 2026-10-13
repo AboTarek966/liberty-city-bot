@@ -321,9 +321,22 @@ async function executeCommandFromMessage(message, client, commandName, args) {
                 type === discord_js_1.ApplicationCommandOptionType.Role ||
                 type === discord_js_1.ApplicationCommandOptionType.Channel ||
                 type === discord_js_1.ApplicationCommandOptionType.Mentionable) {
-                const token = remaining.shift();
-                const id = parseId(token);
+                // 🔎 ابحث عن أول معرّف صالح — تجاهل الكلمات الزائدة قبله
+                // مثال: "شيل تحذير @عضو" ← كلمة "تحذير" زائدة، المعرّف هو @عضو
+                let id = null;
+                const noise = [];
+                while (remaining.length > 0) {
+                    const parsed = parseId(remaining[0]);
+                    if (parsed) {
+                        remaining.shift();
+                        id = parsed;
+                        break;
+                    }
+                    noise.push(remaining.shift());
+                }
                 if (!id) {
+                    // لم نجد معرّفًا ← نُعيد الكلمات حتى تستخدمها خيارات لاحقة (مثل السبب)
+                    remaining.unshift(...noise);
                     if (opt.required)
                         return usageReply();
                     continue;

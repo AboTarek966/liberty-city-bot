@@ -364,9 +364,22 @@ export async function executeCommandFromMessage(
         type === ApplicationCommandOptionType.Channel ||
         type === ApplicationCommandOptionType.Mentionable
       ) {
-        const token = remaining.shift()!;
-        const id = parseId(token);
+        // 🔎 ابحث عن أول معرّف صالح — تجاهل الكلمات الزائدة قبله
+        // مثال: "شيل تحذير @عضو" ← كلمة "تحذير" زائدة، المعرّف هو @عضو
+        let id: string | null = null;
+        const noise: string[] = [];
+        while (remaining.length > 0) {
+          const parsed = parseId(remaining[0]);
+          if (parsed) {
+            remaining.shift();
+            id = parsed;
+            break;
+          }
+          noise.push(remaining.shift()!);
+        }
         if (!id) {
+          // لم نجد معرّفًا ← نُعيد الكلمات حتى تستخدمها خيارات لاحقة (مثل السبب)
+          remaining.unshift(...noise);
           if (opt.required) return usageReply();
           continue;
         }
