@@ -352,6 +352,11 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     warnRoles: {
         memberIds: [{ type: String }],
         adminIds: [{ type: String }],
+        adminSequential: {
+            role1Id: { type: String, default: '' },
+            role2Id: { type: String, default: '' },
+            role3Id: { type: String, default: '' },
+        },
     },
     updatedAt: { type: Date, default: Date.now },
 });
