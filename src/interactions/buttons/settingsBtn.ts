@@ -21,6 +21,7 @@ import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
 import { setPendingImageUpload } from '../../utils/pendingUploads';
+import { getPendingWarnRoles, clearPendingWarnRoles, setPendingWarnRoles } from '../../utils/pendingWarnRoles';
 import { CARD_DEFAULTS } from '../../utils/welcomeCard';
 import { createLogger } from '../../utils/helpers';
 
@@ -792,6 +793,57 @@ const handler: ButtonHandler = {
           logger.error('warnroles refresh failed:', error);
           await interaction.editReply({ content: `❌ فشل التحديث: ${error?.message || error}` }).catch(() => {});
         }
+        return;
+      }
+      case 'warnroles:confirm': {
+        // ✅ تأكيد وحفظ التغييرات المُعلّقة
+        await interaction.deferUpdate();
+        try {
+          const pending = getPendingWarnRoles(interaction.guild.id);
+          if (!pending) {
+            await interaction.editReply({ content: '⚠️ لا توجد تغييرات مُعلّقة للتأكيد' }).catch(() => {});
+            return;
+          }
+
+          if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [] };
+          const w = settings.warnRoles;
+
+          if (pending.members) w.memberIds = [...pending.members];
+          if (pending.admins) w.adminIds = [...pending.admins];
+          if (pending.sequential) {
+            w.adminSequential = w.adminSequential || {};
+            w.adminSequential.role1Id = pending.sequential[0] || '';
+            w.adminSequential.role2Id = pending.sequential[1] || '';
+            w.adminSequential.role3Id = pending.sequential[2] || '';
+          }
+
+          await settings.save();
+          invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش فوراً
+          clearPendingWarnRoles(interaction.guild.id);
+
+          const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+          await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+          await interaction.followUp({ content: '✅ تم حفظ رولات التحذير بنجاح', ephemeral: true }).catch(() => {});
+        } catch (error: any) {
+          logger.error('warnroles confirm failed:', error);
+          await interaction.editReply({ content: `❌ فشل الحفظ: ${error?.message || error}` }).catch(() => {});
+        }
+        return;
+      }
+      case 'warnroles:cancel': {
+        // ❌ إلغاء التغييرات المُعلّقة والعودة للحالة المحفوظة
+        clearPendingWarnRoles(interaction.guild.id);
+        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+        await interaction.followUp({ content: '❌ تم إلغاء التغييرات — لم يُحفظ أي شيء', ephemeral: true }).catch(() => {});
+        return;
+      }
+      case 'warnroles:clear': {
+        // 🗑️ تجهيز مسح الكل (يحتاج ✅ تأكيد بعدها)
+        setPendingWarnRoles(interaction.guild.id, { members: [], admins: [], sequential: [] }, interaction.user.id);
+        const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
+        await interaction.followUp({ content: '🗑️ تجهيز مسح **كل** رولات التحذير — اضغط **✅ تأكيد وحفظ** للتنفيذ', ephemeral: true }).catch(() => {});
         return;
       }
       case 'commands:clear': {

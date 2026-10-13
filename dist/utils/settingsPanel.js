@@ -64,6 +64,7 @@ exports.buildLevelIgnorePanel = buildLevelIgnorePanel;
 exports.buildLevelRewardsPanel = buildLevelRewardsPanel;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
+const pendingWarnRoles_1 = require("./pendingWarnRoles");
 const embeds_1 = require("./embeds");
 const welcomeCard_1 = require("./welcomeCard");
 // --------------------------------------------
@@ -386,63 +387,132 @@ function buildVerificationPanel(guild, s) {
     return { embeds: [embed], components: [roleSelect, channelSelect, row1] };
 }
 // --------------------------------------------
-// 🎭 رولات التحذير — لوحة فرعية (قائمتان: الأعضاء فوق، الإداريين تحت + النظام التسلسلي للإداريين)
+// 🎭 رولات التحذير — لوحة فرعية
+// (تصميم مُحسّن + تأكيد/إلغاء: لا يُحفظ شيء قبل ضغط ✅ تأكيد)
 // --------------------------------------------
 function buildWarnRolesPanel(guild, s) {
     const w = s.warnRoles || { memberIds: [], adminIds: [] };
-    const seq = w.adminSequential || { role1Id: '', role2Id: '', role3Id: '' };
-    const toLines = (ids) => {
-        const roles = (ids || [])
-            .map((id) => guild.roles.cache.get(id))
-            .filter(Boolean);
+    const seqSavedObj = w.adminSequential || { role1Id: '', role2Id: '', role3Id: '' };
+    const memberSaved = w.memberIds || [];
+    const adminSaved = w.adminIds || [];
+    const seqSaved = [seqSavedObj.role1Id, seqSavedObj.role2Id, seqSavedObj.role3Id].filter(Boolean);
+    // 🔎 التغييرات المُعلّقة (لم تُؤكَّد بعد) — تُعرض بدل المحفوظة
+    const pending = (0, pendingWarnRoles_1.getPendingWarnRoles)(guild.id);
+    const staged = {
+        members: pending?.members ?? memberSaved,
+        admins: pending?.admins ?? adminSaved,
+        sequential: pending?.sequential ?? seqSaved,
+    };
+    const isPending = !!pending &&
+        (0, pendingWarnRoles_1.pendingDiffers)(pending, { memberIds: memberSaved, adminIds: adminSaved, sequential: seqSaved });
+    // 🔹 عرض قائمة رولات
+    const listBlock = (ids, emptyText) => {
+        const roles = (ids || []).map((id) => guild.roles.cache.get(id)).filter(Boolean);
         if (!roles.length)
-            return '> 🔴 **لم تُحدد بعد**';
-        return roles.map(r => `> • <@&${r.id}>`).join('\n');
+            return emptyText;
+        return roles.map((r) => `> 🔹 <@&${r.id}>`).join('\n');
     };
-    const toLine = (id) => {
+    // 🔹 عرض رول واحد (مع تنبيه إن كان الرول حُذف من السيرفر)
+    const singleLine = (id, emptyText) => {
         if (!id)
-            return '> 🔴 **لم يُحدد بعد**';
+            return emptyText;
         const r = guild.roles.cache.get(id);
-        return r ? `> • <@&${r.id}>` : `> 🔴 **الرول غير موجود**`;
+        return r ? `> 🔹 <@&${r.id}>` : `> ⚠️ *الرول <\`${id}\`> غير موجود في السيرفر*`;
     };
-    const memberIds = w.memberIds || [];
-    const adminIds = w.adminIds || [];
+    const countOf = (ids) => (ids || []).filter((id) => guild.roles.cache.has(id)).length;
+    const EMPTY = '> 🔴 *لم تُحدد بعد*';
+    // ── التغييرات المُعلّقة (نص) ──
+    const pendingLines = [];
+    if (pending?.members)
+        pendingLines.push(`👮‍♂️ **رولات الأعضاء:** ${pending.members.length ? pending.members.map((v) => `<@&${v}>`).join(' , ') : '🗑️ مسح الكل'}`);
+    if (pending?.admins)
+        pendingLines.push(`🛡️ **رولات الإداريين (قائمة):** ${pending.admins.length ? pending.admins.map((v) => `<@&${v}>`).join(' , ') : '🗑️ مسح الكل'}`);
+    if (pending?.sequential) {
+        const seq = pending.sequential;
+        pendingLines.push(`⚡ **النظام التسلسلي:**` +
+            `\n> 1️⃣ تحذير 1 → ${seq[0] ? `<@&${seq[0]}>` : '—'}` +
+            `\n> 2️⃣ تحذير 2 → ${seq[1] ? `<@&${seq[1]}>` : '—'}` +
+            `\n> 3️⃣ تحذير 3+ → ${seq[2] ? `<@&${seq[2]}>` : '—'}`);
+    }
     const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('🎭 رولات التحذير')
-        .setDescription(`اختر الرولات التي تُستخدم كرولات تحذير — عند تنفيذ \`/warn\`:\n` +
-        `• **نظام تسلسلي للإداريين** (جديد): تحذير 1 → رول 1، تحذير 2 → رول 2، تحذير 3 → رول 3 (تلقائي)\n` +
-        `• **نظام القائمة** (للأعضاء/إداريين بلا نظام تسلسلي): يعرض لوحة اختيار من هذه الرولات\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👮‍♂️ **رولات تحذير الأعضاء (${memberIds.length}):**\n${toLines(memberIds)}\n\n` +
-        `🛡️ **رولات تحذير الإداريين — قائمة (${adminIds.length}):**\n${toLines(adminIds)}\n\n` +
-        `⚡ **النظام التسلسلي للإداريين (تلقائي حسب عدد التحذيرات):**\n` +
-        `1️⃣ **تحذير 1:** ${toLine(seq.role1Id)}\n` +
-        `2️⃣ **تحذير 2:** ${toLine(seq.role2Id)}\n` +
-        `3️⃣ **تحذير 3+:** ${toLine(seq.role3Id)}\n` +
-        `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `💡 *يُحدد النوع تلقائياً حسب صلاحيات العضو المُحذَّر (إداري ⇐ النظام التسلسلي، عضو ⇐ قائمة الأعضاء)*\n` +
-        `🗑️ *اترك القائمة فارغة (0 قيم) لمسحها*`)
-        .setColor((memberIds.length || adminIds.length || seq.role1Id || seq.role2Id || seq.role3Id) ? 0x2ecc71 : 0xe74c3c)
-        .setFooter({ text: `${guild.name} • Liberty City Settings` })
-        .setTimestamp();
+        .setTitle(isPending ? '🎭 رولات التحذير — ⏳ بانتظار تأكيدك' : '🎭 رولات التحذير')
+        .setDescription((isPending
+        ? `⚠️ **لديك تغييرات غير محفوظة بعد** — اضغط **✅ تأكيد وحفظ** لتطبيقها، أو **❌ إلغاء** للتراجع.\n`
+        : `اختر الرولات من القوائم بالأسفل، ثم **أكّد** التغييرات.\n`) +
+        `\n> 👮‍♂️ **الأعضاء العاديون:** يحصلون على رول من *قائمة الأعضاء* (بدون تراكم).` +
+        `\n> 🛡️ **الإداريون:** يحصلون على **رولات تراكمية** تلقائياً حسب عدد التحذيرات:\n` +
+        `> \`1 تحذير ← رول 1\` · \`2 ← رول 1 + رول 2\` · \`3+ ← رول 1 + 2 + 3\``)
+        .addFields({
+        name: `👮‍♂️ رولات تحذير الأعضاء  (${countOf(staged.members)})`,
+        value: listBlock(staged.members, EMPTY),
+        inline: false,
+    }, {
+        name: `🛡️ رولات تحذير الإداريين — القائمة  (${countOf(staged.admins)})`,
+        value: listBlock(staged.admins, EMPTY),
+        inline: false,
+    }, {
+        name: '⚡ النظام التسلسلي — التراكمي (تلقائي)',
+        value: `1️⃣ **تحذير 1:** ${singleLine(staged.sequential[0], '—')}\n` +
+            `2️⃣ **تحذير 2:** ${singleLine(staged.sequential[1], '—')}\n` +
+            `3️⃣ **تحذير 3+:** ${singleLine(staged.sequential[2], '—')}`,
+        inline: false,
+    })
+        .setColor(isPending ? 0xf1c40f : countOf(staged.members) + countOf(staged.admins) + staged.sequential.filter(Boolean).length ? 0x2ecc71 : 0xe74c3c)
+        .setFooter({ text: `${guild.name} • ${isPending ? 'لم يُحفظ بعد' : 'Liberty City Settings'}` });
+    if (isPending) {
+        embed.addFields({ name: '⏳ التغييرات المُعلّقة', value: pendingLines.join('\n').slice(0, 1024), inline: false });
+        embed.setTimestamp();
+    }
+    // ── قوائم الاختيار (تعرض القيم المُعلّقة أو المحفوظة) ──
+    // ⚠️ عدد القيم الافتراضية لا يتجاوز الحد الأقصى للقائمة (وإلا يرفض Discord الطلب)
+    const roleDefaults = (ids, limit) => (ids || []).filter((id) => guild.roles.cache.has(id)).slice(0, limit);
     const memberSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
         .setCustomId('settings_sel:warnroles:members')
-        .setPlaceholder('👮‍♂️ اختر رولات تحذير الأعضاء (يمكن أكثر من واحدة)')
+        .setPlaceholder('👮‍♂️ اختر رولات تحذير الأعضاء (أكثر من واحد مسموح)')
         .setMinValues(0)
         .setMaxValues(10));
+    const md = roleDefaults(staged.members, 10);
+    if (md.length)
+        memberSelect.components[0].setDefaultRoles(md);
     const adminSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
         .setCustomId('settings_sel:warnroles:admins')
-        .setPlaceholder('🛡️ اختر رولات تحذير الإداريين — القائمة (يمكن أكثر من واحدة)')
+        .setPlaceholder('🛡️ اختر رولات الإداريين — القائمة (احتياطي)')
         .setMinValues(0)
         .setMaxValues(10));
-    // النظام التسلسلي: قائمة واحدة بـ 3 خيارات كحد أقصى (توفير components)
+    const ad = roleDefaults(staged.admins, 10);
+    if (ad.length)
+        adminSelect.components[0].setDefaultRoles(ad);
     const seqSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
         .setCustomId('settings_sel:warnroles:sequential')
-        .setPlaceholder('⚡ اختر رولات النظام التسلسلي (تحذير 1، 2، 3+)')
+        .setPlaceholder('⚡ رولات النظام التسلسلي — بالترتيب: تحذير 1، 2، 3+')
         .setMinValues(0)
         .setMaxValues(3));
-    const backRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_btn:warnroles:refresh', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'));
-    return { embeds: [embed], components: [memberSelect, adminSelect, seqSelect, backRow] };
+    const sq = roleDefaults(staged.sequential, 3);
+    if (sq.length)
+        seqSelect.components[0].setDefaultRoles(sq);
+    const rows = [memberSelect, adminSelect, seqSelect];
+    // ✅❌ صف التأكيد — يظهر فقط عند وجود تغييرات مُعلّقة
+    if (isPending) {
+        rows.push(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+            .setCustomId('settings_btn:warnroles:confirm')
+            .setLabel('تأكيد وحفظ')
+            .setStyle(discord_js_1.ButtonStyle.Success)
+            .setEmoji('✅'), new discord_js_1.ButtonBuilder()
+            .setCustomId('settings_btn:warnroles:cancel')
+            .setLabel('إلغاء التغييرات')
+            .setStyle(discord_js_1.ButtonStyle.Danger)
+            .setEmoji('❌')));
+    }
+    rows.push(new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:home', 'القائمة الرئيسية', discord_js_1.ButtonStyle.Secondary, '🏠'), btn('settings_btn:warnroles:refresh', '🔄 تحديث', discord_js_1.ButtonStyle.Primary, '🔄'), ...(isPending
+        ? [
+            new discord_js_1.ButtonBuilder()
+                .setCustomId('settings_btn:warnroles:clear')
+                .setLabel('مسح الكل')
+                .setStyle(discord_js_1.ButtonStyle.Secondary)
+                .setEmoji('🗑️'),
+        ]
+        : [])));
+    return { embeds: [embed], components: rows };
 }
 // --------------------------------------------
 // Tickets

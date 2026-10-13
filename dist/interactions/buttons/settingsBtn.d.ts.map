@@ -1,1 +1,1 @@
-{"version":3,"file":"settingsBtn.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/settingsBtn.ts"],"names":[],"mappings":"AAgBA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAelE,QAAA,MAAM,OAAO,EAAE,aA+wBd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"settingsBtn.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/settingsBtn.ts"],"names":[],"mappings":"AAgBA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAgBlE,QAAA,MAAM,OAAO,EAAE,aAk0Bd,CAAC;AAEF,eAAe,OAAO,CAAC"}

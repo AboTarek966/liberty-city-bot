@@ -21,6 +21,7 @@ import {
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
+import { setPendingWarnRoles } from '../../utils/pendingWarnRoles';
 import { LibertyClient } from '../../LibertyClient';
 
 type AnySelect =
@@ -388,60 +389,43 @@ const handler: SelectMenuHandler = {
         return;
       }
       case 'warnroles:members': {
-        // 👮‍♂️ رولات تحذير الأعضاء
-        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [] };
-        settings.warnRoles.memberIds = [...values];
-        await settings.save();
+        // 👮‍♂️ رولات تحذير الأعضاء — تُجهَّز مؤقتاً ولا تُحفظ إلا بـ ✅ تأكيد
+        setPendingWarnRoles(interaction.guild.id, { members: [...values] }, interaction.user.id);
         const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
         await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
         await interaction.followUp({
           content: values.length
-            ? `✅ رولات تحذير الأعضاء: ${values.map((v: string) => `<@&${v}>`).join(' , ')}`
-            : '🗑️ تم مسح رولات تحذير الأعضاء',
+            ? `⏳ **رولات تحذير الأعضاء:** ${values.map((v: string) => `<@&${v}>`).join(' , ')}\n👉 اضغط **✅ تأكيد وحفظ** لتطبيقها`
+            : `⏳ سيتم **مسح** رولات تحذير الأعضاء\n👉 اضغط **✅ تأكيد وحفظ** للتأكيد`,
           ephemeral: true,
         });
         return;
       }
       case 'warnroles:admins': {
-        // 🛡️ رولات تحذير الإداريين
-        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [] };
-        settings.warnRoles.adminIds = [...values];
-        await settings.save();
+        // 🛡️ رولات تحذير الإداريين (قائمة) — تُجهَّز مؤقتاً
+        setPendingWarnRoles(interaction.guild.id, { admins: [...values] }, interaction.user.id);
         const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
         await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
         await interaction.followUp({
           content: values.length
-            ? `✅ رولات تحذير الإداريين: ${values.map((v: string) => `<@&${v}>`).join(' , ')}`
-            : '🗑️ تم مسح رولات تحذير الإداريين',
+            ? `⏳ **رولات تحذير الإداريين:** ${values.map((v: string) => `<@&${v}>`).join(' , ')}\n👉 اضغط **✅ تأكيد وحفظ** لتطبيقها`
+            : `⏳ سيتم **مسح** رولات تحذير الإداريين\n👉 اضغط **✅ تأكيد وحفظ** للتأكيد`,
           ephemeral: true,
         });
         return;
       }
       case 'warnroles:sequential': {
-        // ⚡ النظام التسلسلي: القيم المختارة هي role IDs مباشرة
-        if (!settings.warnRoles) (settings as any).warnRoles = { memberIds: [], adminIds: [], adminSequential: {} };
-        const seq = (settings.warnRoles.adminSequential = settings.warnRoles.adminSequential || {});
-
-        const selected = values || [];
-
-        seq.role1Id = selected[0] || '';
-        seq.role2Id = selected[1] || '';
-        seq.role3Id = selected[2] || '';
-
-        await settings.save();
-        invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش فوراً
+        // ⚡ النظام التسلسلي: القيم المختارة هي role IDs مباشرة (بالترتيب 1، 2، 3+)
+        setPendingWarnRoles(interaction.guild.id, { sequential: [...values] }, interaction.user.id);
         const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
         await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
 
-        const labels = { role1Id: '1️⃣ تحذير 1', role2Id: '2️⃣ تحذير 2', role3Id: '3️⃣ تحذير 3+' };
-        const changes = [
-          `${labels.role1Id}: ${seq.role1Id ? `<@&${seq.role1Id}>` : '🗑️ تم المسح'}`,
-          `${labels.role2Id}: ${seq.role2Id ? `<@&${seq.role2Id}>` : '🗑️ تم المسح'}`,
-          `${labels.role3Id}: ${seq.role3Id ? `<@&${seq.role3Id}>` : '🗑️ تم المسح'}`,
-        ];
-
+        const seqLabels = ['1️⃣ تحذير 1', '2️⃣ تحذير 2', '3️⃣ تحذير 3+'];
         await interaction.followUp({
-          content: changes.join('\n'),
+          content:
+            `⏳ **النظام التسلسلي (تجميعي):**\n` +
+            seqLabels.map((l, i) => `${l}: ${values[i] ? `<@&${values[i]}>` : '—'}`).join('\n') +
+            `\n👉 اضغط **✅ تأكيد وحفظ** لتطبيقها`,
           ephemeral: true,
         });
         return;
