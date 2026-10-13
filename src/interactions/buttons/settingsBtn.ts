@@ -16,7 +16,7 @@ import {
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
-import { getGuildSettings, AIConfig } from '../../models';
+import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
@@ -776,6 +776,7 @@ const handler: ButtonHandler = {
       case 'warnroles:refresh': {
         // 🔄 تحديث حقيقي: يعيد تحميل الإعدادات من قاعدة البيانات
         await interaction.deferUpdate();
+        invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش أولاً
         const freshSettings = await getGuildSettings(interaction.guild.id);
         try {
           const wPanel = buildWarnRolesPanel(interaction.guild!, freshSettings);

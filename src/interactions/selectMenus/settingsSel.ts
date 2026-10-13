@@ -20,7 +20,7 @@ import {
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
-import { getGuildSettings, AIConfig } from '../../models';
+import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 
 type AnySelect =
@@ -429,6 +429,7 @@ const handler: SelectMenuHandler = {
         seq.role3Id = selected[2] || '';
 
         await settings.save();
+        invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش فوراً
         const wPanel = buildWarnRolesPanel(interaction.guild!, settings);
         await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components as any });
 

@@ -660,6 +660,7 @@ const handler = {
             case 'warnroles:refresh': {
                 // 🔄 تحديث حقيقي: يعيد تحميل الإعدادات من قاعدة البيانات
                 await interaction.deferUpdate();
+                (0, models_1.invalidateGuildSettings)(interaction.guild.id); // 🔄 إبطال الكاش أولاً
                 const freshSettings = await (0, models_1.getGuildSettings)(interaction.guild.id);
                 try {
                     const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, freshSettings);

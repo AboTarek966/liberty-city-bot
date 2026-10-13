@@ -389,6 +389,7 @@ const handler = {
                 seq.role2Id = selected[1] || '';
                 seq.role3Id = selected[2] || '';
                 await settings.save();
+                (0, models_1.invalidateGuildSettings)(interaction.guild.id); // 🔄 إبطال الكاش فوراً
                 const wPanel = (0, settingsPanel_1.buildWarnRolesPanel)(interaction.guild, settings);
                 await interaction.editReply({ embeds: wPanel.embeds, components: wPanel.components });
                 const labels = { role1Id: '1️⃣ تحذير 1', role2Id: '2️⃣ تحذير 2', role3Id: '3️⃣ تحذير 3+' };
