@@ -286,6 +286,8 @@ export interface ICustomCommand {
     name: string;
     content: string;
     embed: boolean;
+    /** 🔒 'public' = للجميع · 'admin' = لحاملي Administrator فقط */
+    scope?: 'public' | 'admin';
     createdBy: string;
     createdAt: Date;
     uses: number;

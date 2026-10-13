@@ -3,7 +3,7 @@
 // الأوامر المخصصة + نشاط التذاكر + الرصيد العشوائي
 // ============================================
 
-import { Message } from 'discord.js';
+import { Message, PermissionFlagsBits } from 'discord.js';
 import { getGuildSettings, Ticket, UserProfile } from '../models';
 import { createLogger } from './helpers';
 
@@ -28,6 +28,13 @@ export async function handleCustomCommand(message: Message): Promise<boolean> {
     commands.find(c => c.name.toLowerCase() === content) ||
     commands.find(c => c.name.toLowerCase() === firstWord);
   if (!cmd) return false;
+
+  // 🔒 أمر إداري — يرد فقط على حاملي صلاحية Administrator.
+  //   نرجع `false` بصمت (بدون رسالة خطأ) حتى لا نكشف للعضو العادي وجود هذا الأمر أصلاً.
+  if (cmd.scope === 'admin') {
+    const member = message.member;
+    if (!member?.permissions?.has?.(PermissionFlagsBits.Administrator)) return false;
+  }
 
   const reply = cmd.content
     .replace(/\{user\}/g, `<@${message.author.id}>`)

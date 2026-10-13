@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleCustomCommand = handleCustomCommand;
 exports.touchTicketActivity = touchTicketActivity;
 exports.earnCreditsRandom = earnCreditsRandom;
+const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('MessageSystems');
@@ -30,6 +31,13 @@ async function handleCustomCommand(message) {
         commands.find(c => c.name.toLowerCase() === firstWord);
     if (!cmd)
         return false;
+    // 🔒 أمر إداري — يرد فقط على حاملي صلاحية Administrator.
+    //   نرجع `false` بصمت (بدون رسالة خطأ) حتى لا نكشف للعضو العادي وجود هذا الأمر أصلاً.
+    if (cmd.scope === 'admin') {
+        const member = message.member;
+        if (!member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator))
+            return false;
+    }
     const reply = cmd.content
         .replace(/\{user\}/g, `<@${message.author.id}>`)
         .replace(/\{server\}/g, message.guild.name);

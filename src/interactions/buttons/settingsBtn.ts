@@ -60,7 +60,7 @@ const handler: ButtonHandler = {
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
       'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
-      'commands:add', 'welcome:cardnum', 'shop:add',
+      'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
     ]);
 
     // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
@@ -322,8 +322,11 @@ const handler: ButtonHandler = {
 
     // ---------- إجراءات ترد فوراً (مودال أو رسالة + قائمة اختيار) ----------
     // ⚠️ يجب أن تتم قبل deferUpdate — لا يمكن فتح مودال أو رد بعد التأكيد
-    if (`${section}:${action}` === 'commands:add') {
-      // مودال بحقلين: اسم الأمر + الرد
+    if (`${section}:${action}` === 'commands:add' || `${section}:${action}` === 'commands:addadmin') {
+      // 🔓 أمر للجميع · 🔒 أمر إداري — نفس المودال، والنطاق يُرسل في customId
+      const isAdmin = `${section}:${action}` === 'commands:addadmin';
+      const scope = isAdmin ? 'admin' : 'public';
+
       const nameInput = new TextInputBuilder()
         .setCustomId('name')
         .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
@@ -337,8 +340,8 @@ const handler: ButtonHandler = {
         .setMaxLength(1900)
         .setRequired(true);
       const modal = new ModalBuilder()
-        .setCustomId('settings_modal:commands:add')
-        .setTitle('➕ إضافة أمر مخصص')
+        .setCustomId(`settings_modal:commands:add:${scope}`)
+        .setTitle(isAdmin ? '🔒 أمر للإداريين فقط' : '🔓 أمر للجميع')
         .addComponents(
           new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
           new ActionRowBuilder<TextInputBuilder>().addComponents(contentInput)

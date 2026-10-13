@@ -308,6 +308,8 @@ const handler = {
                 return;
             }
             case 'commands:add': {
+                // 🔓/🔒 النطاق يصل من customId: settings_modal:commands:add:public|admin
+                const scope = parts[3] === 'admin' ? 'admin' : 'public';
                 const name = interaction.fields.getTextInputValue('name').trim().toLowerCase().substring(0, 50);
                 const content = interaction.fields.getTextInputValue('content').trim().substring(0, 1900);
                 if (!name || !content) {
@@ -318,7 +320,8 @@ const handler = {
                     settings.customCommands = [];
                 const existing = settings.customCommands.find((c) => c.name.toLowerCase() === name);
                 if (existing) {
-                    existing.content = content; // تحديث الأمر الموجود
+                    existing.content = content; // تحديث الرد
+                    existing.scope = scope; // تحديث النطاق أيضاً
                 }
                 else {
                     if (settings.customCommands.length >= 25) {
@@ -326,7 +329,7 @@ const handler = {
                         return;
                     }
                     settings.customCommands.push({
-                        name, content, embed: false,
+                        name, content, embed: false, scope,
                         createdBy: interaction.user.id, createdAt: new Date(), uses: 0,
                     });
                 }
@@ -334,7 +337,9 @@ const handler = {
                 const cPanel = (0, settingsPanel_1.buildCommands)(interaction.guild, settings);
                 await interaction.editReply({ embeds: cPanel.embeds, components: cPanel.components });
                 await interaction.followUp({
-                    content: `✅ تم ${existing ? 'تحديث' : 'إضافة'} الأمر \`${name}\` — أي عضو يكتب الكلمة يرد البوت فوراً`,
+                    content: scope === 'admin'
+                        ? `🔒 تم ${existing ? 'تحديث' : 'إضافة'} الأمر \`${name}\` — **للإداريين فقط** (لا يرد على الأعضاء العاديين إطلاقاً)`
+                        : `🔓 تم ${existing ? 'تحديث' : 'إضافة'} الأمر \`${name}\` — **للجميع** (أي عضو يكتب الكلمة يرد البوت)`,
                     ephemeral: true,
                 });
                 return;

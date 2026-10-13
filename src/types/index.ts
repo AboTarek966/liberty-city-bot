@@ -429,6 +429,8 @@ export interface CustomCommand {
   name: string;
   content: string;
   embed?: boolean;
+  /** نطاق الأمر: 'public' يرد لأي عضو · 'admin' لا يرد إلا لحاملي صلاحية Administrator */
+  scope?: 'public' | 'admin';
   createdBy: string;
   createdAt: Date;
   uses: number;

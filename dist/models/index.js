@@ -81,6 +81,8 @@ const CustomCommandSchema = new mongoose_1.Schema({
     name: { type: String, required: true },
     content: { type: String, required: true },
     embed: { type: Boolean, default: false },
+    // 🔒 نطاق الأمر: 'public' = للجميع · 'admin' = لحاملي Administrator فقط
+    scope: { type: String, enum: ['public', 'admin'], default: 'public' },
     createdBy: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     uses: { type: Number, default: 0 },

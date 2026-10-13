@@ -333,6 +333,8 @@ export interface ICustomCommand {
   name: string;
   content: string;
   embed: boolean;
+  /** 🔒 'public' = للجميع · 'admin' = لحاملي Administrator فقط */
+  scope?: 'public' | 'admin';
   createdBy: string;
   createdAt: Date;
   uses: number;
@@ -562,6 +564,8 @@ const CustomCommandSchema = new Schema<ICustomCommand>({
   name: { type: String, required: true },
   content: { type: String, required: true },
   embed: { type: Boolean, default: false },
+  // 🔒 نطاق الأمر: 'public' = للجميع · 'admin' = لحاملي Administrator فقط
+  scope: { type: String, enum: ['public', 'admin'], default: 'public' },
   createdBy: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   uses: { type: Number, default: 0 },

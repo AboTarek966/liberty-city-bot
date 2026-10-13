@@ -42,7 +42,7 @@ const handler = {
             'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
             'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
             'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
-            'commands:add', 'welcome:cardnum', 'shop:add',
+            'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
         ]);
         // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
         if (!immediateKeys.has(key)) {
@@ -219,8 +219,10 @@ const handler = {
         }
         // ---------- إجراءات ترد فوراً (مودال أو رسالة + قائمة اختيار) ----------
         // ⚠️ يجب أن تتم قبل deferUpdate — لا يمكن فتح مودال أو رد بعد التأكيد
-        if (`${section}:${action}` === 'commands:add') {
-            // مودال بحقلين: اسم الأمر + الرد
+        if (`${section}:${action}` === 'commands:add' || `${section}:${action}` === 'commands:addadmin') {
+            // 🔓 أمر للجميع · 🔒 أمر إداري — نفس المودال، والنطاق يُرسل في customId
+            const isAdmin = `${section}:${action}` === 'commands:addadmin';
+            const scope = isAdmin ? 'admin' : 'public';
             const nameInput = new discord_js_1.TextInputBuilder()
                 .setCustomId('name')
                 .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
@@ -234,8 +236,8 @@ const handler = {
                 .setMaxLength(1900)
                 .setRequired(true);
             const modal = new discord_js_1.ModalBuilder()
-                .setCustomId('settings_modal:commands:add')
-                .setTitle('➕ إضافة أمر مخصص')
+                .setCustomId(`settings_modal:commands:add:${scope}`)
+                .setTitle(isAdmin ? '🔒 أمر للإداريين فقط' : '🔓 أمر للجميع')
                 .addComponents(new discord_js_1.ActionRowBuilder().addComponents(nameInput), new discord_js_1.ActionRowBuilder().addComponents(contentInput));
             await interaction.showModal(modal);
             return;

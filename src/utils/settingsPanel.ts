@@ -696,24 +696,32 @@ export function getActivePanel(settings: any): any {
 // --------------------------------------------
 export function buildCommands(guild: Guild, s: any): BuiltPanel {
   const cmds = s.customCommands || [];
+  const isAdmin = (c: any) => c.scope === 'admin';
+
   const list = cmds.length
     ? cmds.slice(0, 15)
-        .map((c: any, i: number) => `> \`${i + 1}.\` **${c.name}** → ${String(c.content).substring(0, 60)}${String(c.content).length > 60 ? '…' : ''} *(الاستخدامات: ${c.uses || 0})*`)
+        .map((c: any, i: number) => `> \`${i + 1}.\` ${isAdmin(c) ? '🔒' : '🔓'} **${c.name}** → ${String(c.content).substring(0, 60)}${String(c.content).length > 60 ? '…' : ''} *(${isAdmin(c) ? 'إداريون فقط' : 'للجميع'} · استخدامات: ${c.uses || 0})*`)
         .join('\n')
-    : '> 🔴 **لا توجد أوامر مخصصة بعد** — اضغط **➕ إضافة أمر** لإنشاء أول أمر';
+    : '> 🔴 **لا توجد أوامر مخصصة بعد** — اضغط **➕ أمر للجميع** أو **🔒 أمر للإداريين**';
+
+  const adminCount = cmds.filter(isAdmin).length;
+  const publicCount = cmds.length - adminCount;
 
   const embed = categoryEmbed(
     'commands',
     guild,
     `اكتب الكلمة المُعرّفة في أي قناة — يرد بها البوت فوراً (بدون شرطة مائلة)\n\n` +
     `📋 **الأوامر الحالية (${cmds.length}/25):**\n${list}\n\n` +
-    `💡 *مثال: أضف كلمة \`.rules\` ورد \`قوانين السيرفر هنا...\` — أي عضو يكتب rules يرد البوت*\n` +
-    `🔤 *متغيرات متاحة في الرد: {user} = منشن صاحب الرسالة، {server} = اسم السيرفر*`
+    `> 🔓 **للجميع:** ${publicCount} · 🔒 **للإداريين فقط:** ${adminCount}\n\n` +
+    `💡 *مثال عام: كلمة \`سلام\` → رد \`وعليكم السلام\` — يرد لأي عضو*\n` +
+    `🔒 *مثال إداري: كلمة \`نماذج\` → رد يحتوي قوالب الإدارة — **لا يظهر للأعضاء العاديين إطلاقاً***\n` +
+    `🔤 *متغيرات في الرد: {user} = منشن صاحب الرسالة، {server} = اسم السيرفر*`
   );
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    btn('settings_btn:commands:add', '➕ إضافة أمر', ButtonStyle.Success, '➕'),
-    btn('settings_btn:commands:clear', '🗑️ حذف الكل', ButtonStyle.Danger, '🗑️'),
+    btn('settings_btn:commands:add', '➕ أمر للجميع', ButtonStyle.Success, '🔓'),
+    btn('settings_btn:commands:addadmin', '🔒 أمر للإداريين', ButtonStyle.Danger, '🔒'),
+    btn('settings_btn:commands:clear', '🗑️ حذف الكل', ButtonStyle.Secondary, '🗑️'),
   );
 
   const rows: PanelComponent[] = [row1];
@@ -724,7 +732,7 @@ export function buildCommands(guild: Guild, s: any): BuiltPanel {
       .setPlaceholder('🗑️ اختر أمراً لحذفه')
       .addOptions(
         cmds.slice(0, 25).map((c: any) => ({
-          label: String(c.name).substring(0, 100),
+          label: `${isAdmin(c) ? '🔒' : '🔓'} ${String(c.name)}`.substring(0, 100),
           description: String(c.content).substring(0, 90),
           value: String(c.name),
         }))
