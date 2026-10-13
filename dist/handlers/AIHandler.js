@@ -233,7 +233,8 @@ class AIHandler {
             if (attachments && attachments.length > 0) {
                 try {
                     const { analyzeAttachments } = await Promise.resolve().then(() => __importStar(require('../utils/attachmentAnalyzer')));
-                    const canUseInlineVision = this.geminiReady;
+                    // 🔭 الرؤية متاحة مع Gemini أو OpenRouter (كلاهما مزوّدان يدعمان الصور)
+                    const canUseInlineVision = this.geminiReady || !!this.openrouter;
                     const analysis = await analyzeAttachments(attachments, {
                         apiKey: config_1.config.ai.groq.apiKey?.startsWith('gsk_') ? config_1.config.ai.groq.apiKey : '',
                         question: message,
