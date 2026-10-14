@@ -59,7 +59,9 @@ async function translateForImage(text) {
                 ],
                 temperature: 0.3,
                 max_tokens: 600,
-            }, { timeout: 8_000 });
+            }, 
+            // ⚠️ بدون هذه الترويسة يرجع Groq 401 وتسكت الترجمة بصمت
+            { timeout: 8_000, headers: { Authorization: `Bearer ${apiKey}` } });
             const out = res.data?.choices?.[0]?.message?.content;
             const clean = (out || '').replace(/^["'`]+|["'`]+$/g, '').trim();
             // نرفض الناتج إذا بقي عربياً أو كان فارغاً/قصيرأً ثم نجرب الموديل التالي

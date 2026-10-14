@@ -60,7 +60,8 @@ export async function translateForImage(text: string): Promise<string> {
           temperature: 0.3,
           max_tokens: 600,
         },
-        { timeout: 8_000 }
+        // ⚠️ بدون هذه الترويسة يرجع Groq 401 وتسكت الترجمة بصمت
+        { timeout: 8_000, headers: { Authorization: `Bearer ${apiKey}` } }
       );
 
       const out: string | undefined = res.data?.choices?.[0]?.message?.content;
