@@ -939,31 +939,69 @@ async function handleImageGeneration(message, prompt) {
     logger.info(`Image generated for ${message.author.tag} in ${Date.now() - started}ms`);
 }
 /**
- * 🎵 توليد موسيقى بالذكاء الاصطناعي (مجاني — Hugging Face Spaces / Stable Audio 3)
- * يحتاج حساب Hugging Face مجاني (بلا بطاقة). التوليد يستغرق ~1-2 دقيقة.
+ * 🎤 توليد أغنية كاملة بالذكاء الاصطناعي (مجاني — Hugging Face)
+ *
+ * الافتراضي: أغنية كاملة = كلمات باللهجة المطلوبة + غناء + لحن (ACE-Step).
+ * إذا طلب المستخدم عزفاً فقط ("لحن بس"، "بدون كلمات") نستخدم Stable Audio.
+ * إن فشل توليد الأغنية نسقط إلى العزف حتى لا يخرج المستخدم بلا شيء.
  */
-async function handleMusicGeneration(message, prompt) {
+async function handleMusicGeneration(message, prompt, question) {
     const avail = (0, mediaGen_1.mediaGenAvailable)();
     if (!avail.music) {
         await message.reply(`❌ توليد الموسيقى غير مفعّل — ${avail.reason}`).catch(() => { });
         return;
     }
     const short = prompt.length > 100 ? prompt.slice(0, 100) + '…' : prompt;
-    // رد فوري — التوليد يستغرق دقائق، ولا نريد أن يظن المستخدم أن البوت عطِل
-    const placeholder = await message.reply('🎵 بعزّف لك اللحن… (~1-2 دقيقة)').catch(() => null);
+    const topic = prompt === mediaGen_1.DEFAULT_INSTRUMENTAL_PROMPT ? '' : prompt;
+    const instrumental = (0, mediaGen_1.isInstrumentalOnly)(question);
+    // رد فوري — التوليد يستغرق ثوانٍ إلى دقائق، ولا نريد أن يظن المستخدم أن البوت عطِل
+    const placeholder = await message
+        .reply(instrumental ? '🎵 بعزّف لك اللحن… (~30-60 ثانية)' : '🎤 بكتب الكلمات وببني الأغنية… (~1 دقيقة)')
+        .catch(() => null);
     if (!placeholder)
         return;
-    const music = await (0, mediaGen_1.generateMusic)(prompt, { seconds: 20 });
+    let music = null;
+    let lyrics = '';
+    let note = '';
+    let label = null;
+    if (!instrumental) {
+        const outcome = await (0, mediaGen_1.generateSong)({ topic, question });
+        if (outcome.ok) {
+            music = outcome.media;
+            lyrics = outcome.media.lyrics;
+            label = outcome.media.dialectLabel;
+        }
+        else if (outcome.lyrics) {
+            // لا معالج متاح — نرسل الكلمات المكتوبة (مجانية بلا حدود) حتى لا يخرج المستخدم خالي الوفاض
+            await placeholder
+                .edit({
+                content: [
+                    `✍️ **${short}** · اللهجة ${outcome.dialectLabel}`,
+                    outcome.lyrics,
+                    `\n_(${(0, mediaGen_1.songFailText)(outcome.reason)} — الغناء يعود خلال 24 ساعة)_`,
+                ].join('\n'),
+            })
+                .catch(() => { });
+            return;
+        }
+        else {
+            note = `⚠️ ${(0, mediaGen_1.songFailText)(outcome.reason)} — أرسلت لك لحن موسيقي بدلها.`;
+            logger.warn(`Song generation failed [${outcome.reason}] — falling back to instrumental for "${short}"`);
+        }
+    }
+    if (!music)
+        music = await (0, mediaGen_1.generateMusic)(prompt, { seconds: 20 });
     if (!music) {
         await placeholder
             .edit('❌ فشل توليد الموسيقى — المساحة المجانية مشغولة الآن، حاول بعد دقيقة.')
             .catch(() => { });
         return;
     }
+    const title = `🎵 **${short}**${label ? ` · اللهجة ${label}` : ''}`;
     await placeholder
         .edit({
-        content: `🎵 **${short}**`,
-        files: [{ attachment: music.data, name: `music.${music.ext}` }],
+        content: [title, note, lyrics].filter(Boolean).join('\n'),
+        files: [{ attachment: music.data, name: `song.${music.ext}` }],
     })
         .catch(() => { });
 }
@@ -1035,7 +1073,7 @@ async function handleAIResponse(message, client) {
     if (question && attachments.length === 0) {
         const musicPrompt = (0, mediaGen_1.detectMusicPrompt)(question);
         if (musicPrompt) {
-            await handleMusicGeneration(message, musicPrompt);
+            await handleMusicGeneration(message, musicPrompt, question);
             return;
         }
     }

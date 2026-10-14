@@ -39,16 +39,17 @@ const TRANSLATE_MODELS = ['allam-2-7b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'
  * يعيد النص الأصلي إذا لم يكن عربياً أو فشلت الترجمة (لا نكسر الميزة).
  * زمن مقاس: ~300-900ms.
  */
-async function translateForImage(text) {
+async function translateForImage(text, systemOverride) {
     const trimmed = (text || '').trim();
     if (trimmed.length < 3 || !ARABIC_RE.test(trimmed))
         return trimmed;
     const apiKey = config_1.config.ai.groq.apiKey;
     if (!apiKey)
         return trimmed;
-    const SYSTEM = 'You convert a user request into a vivid English image-generation prompt. ' +
-        'Keep every detail (subject, action, place, colours, style). ' +
-        'Reply with ONLY the English prompt — no quotes, no explanation, max 80 words.';
+    const SYSTEM = systemOverride ||
+        'You convert a user request into a vivid English image-generation prompt. ' +
+            'Keep every detail (subject, action, place, colours, style). ' +
+            'Reply with ONLY the English prompt — no quotes, no explanation, max 80 words.';
     for (const model of TRANSLATE_MODELS) {
         try {
             const res = await axios_1.default.post('https://api.groq.com/openai/v1/chat/completions', {

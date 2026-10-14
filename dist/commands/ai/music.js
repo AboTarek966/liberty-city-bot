@@ -1,27 +1,45 @@
 "use strict";
 // ============================================
 // Liberty City Bot - Music Generation Command
-// توليد موسيقى بالذكاء الاصطناعي — مجاني بالكامل عبر Hugging Face Spaces
+// توليد أغنية كاملة بالذكاء الاصطناعي — مجاني بالكامل عبر Hugging Face
+// الافتراضي: كلمات + غناء + لحن (ACE-Step) — اختيارياً لحن عزف فقط
 // يتطلب HF_TOKEN (حساب Hugging Face مجاني — بلا بطاقة ائتمان)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const mediaGen_1 = require("../../utils/mediaGen");
+const DIALECT_CHOICES = [
+    { name: 'مصرية', value: 'egyptian' },
+    { name: 'خليجية', value: 'gulf' },
+    { name: 'شامية', value: 'levant' },
+    { name: 'عراقية', value: 'iraqi' },
+    { name: 'فصحى', value: 'msa' },
+    { name: 'إنجليزية', value: 'english' },
+];
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('music')
-        .setDescription('توليد موسيقى بالذكاء الاصطناعي (مجاني)')
+        .setDescription('توليد أغنية كاملة بكلمات وغناء (مجاني)')
         .addStringOption((opt) => opt
         .setName('prompt')
-        .setDescription('وصف اللحن — بالعربي أو الإنجليزي (الإنجليزي أدق)')
+        .setDescription('موضوع الأغنية — بالعربي أو الإنجليزي')
         .setRequired(true)
         .setMaxLength(400))
+        .addStringOption((opt) => opt
+        .setName('dialect')
+        .setDescription('لهجة الكلمات (يُكتشف تلقائياً إذا تُرك فارغاً)')
+        .setRequired(false)
+        .addChoices(DIALECT_CHOICES))
+        .addBooleanOption((opt) => opt
+        .setName('instrumental')
+        .setDescription('لحن عزف فقط — بدون كلمات ولا غناء')
+        .setRequired(false))
         .addIntegerOption((opt) => opt
         .setName('seconds')
-        .setDescription('مدة المقطع بالثواني (1-60)')
+        .setDescription('مدة الأغنية بالثواني (15-120)')
         .setRequired(false)
-        .setMinValue(1)
-        .setMaxValue(60)),
+        .setMinValue(15)
+        .setMaxValue(120)),
     cooldown: 15,
     async execute(interaction) {
         const avail = (0, mediaGen_1.mediaGenAvailable)();
@@ -31,20 +49,52 @@ const command = {
         }
         const prompt = interaction.options.getString('prompt', true).trim();
         if (prompt.length < 3) {
-            await interaction.reply({ content: '❌ اكتب وصفاً أوضح للحن (٣ أحرف على الأقل).' });
+            await interaction.reply({ content: '❌ اكتب موضوعاً أوضح للأغنية (٣ أحرف على الأقل).' });
             return;
         }
-        const seconds = interaction.options.getInteger('seconds') ?? 15;
+        const dialectRaw = interaction.options.getString('dialect');
+        const dialect = (dialectRaw || undefined);
+        const instrumental = interaction.options.getBoolean('instrumental') ?? false;
+        const seconds = interaction.options.getInteger('seconds') ?? (instrumental ? 45 : 60);
         const short = prompt.length > 100 ? prompt.slice(0, 100) + '…' : prompt;
         await interaction.deferReply();
-        const music = await (0, mediaGen_1.generateMusic)(prompt, { seconds });
+        let music = null;
+        let lyrics = '';
+        let label = null;
+        let note = '';
+        if (!instrumental) {
+            const outcome = await (0, mediaGen_1.generateSong)({ topic: prompt, question: prompt, seconds, dialect });
+            if (outcome.ok) {
+                music = outcome.media;
+                lyrics = outcome.media.lyrics;
+                label = outcome.media.dialectLabel;
+            }
+            else if (outcome.lyrics) {
+                // الحصة اليومية انتهت أو المعالج مشغول — نرسل الكلمات المكتوبة (مجانية بلا حدود)
+                await interaction.editReply({
+                    content: [
+                        `✍️ **${short}** · اللهجة ${outcome.dialectLabel}`,
+                        outcome.lyrics,
+                        `\n_(${(0, mediaGen_1.songFailText)(outcome.reason)} — الغناء يعود خلال 24 ساعة)_`,
+                    ].join('\n'),
+                });
+                return;
+            }
+            else {
+                note = `⚠️ ${(0, mediaGen_1.songFailText)(outcome.reason)} — أرسلت لك لحن موسيقي بدلها.`;
+            }
+        }
+        if (!music)
+            music = await (0, mediaGen_1.generateMusic)(prompt, { seconds });
         if (!music) {
             await interaction.editReply('❌ فشل توليد الموسيقى — قد تكون المساحة المجانية مشغولة الآن. حاول بعد دقيقة.');
             return;
         }
         await interaction.editReply({
-            content: `🎵 **${short}**`,
-            files: [{ attachment: music.data, name: `music.${music.ext}` }],
+            content: [`🎵 **${short}**${label ? ` · اللهجة ${label}` : ''}`, note, lyrics]
+                .filter(Boolean)
+                .join('\n'),
+            files: [{ attachment: music.data, name: `song.${music.ext}` }],
         });
     },
 };

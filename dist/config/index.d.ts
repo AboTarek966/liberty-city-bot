@@ -53,6 +53,10 @@ export declare const config: {
             videoFnIndex: number;
             musicTimeoutMs: number;
             videoTimeoutMs: number;
+            songSpace: string;
+            songFnIndex: number;
+            songTimeoutMs: number;
+            songMinIntervalMs: number;
         };
         anthropic: {
             apiKey: string;

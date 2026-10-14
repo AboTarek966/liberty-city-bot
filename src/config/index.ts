@@ -133,6 +133,12 @@ export const config = {
       videoFnIndex: getEnvNumber('HF_VIDEO_FN_INDEX', 0),
       musicTimeoutMs: getEnvNumber('HF_MUSIC_TIMEOUT', 5 * 60 * 1000),
       videoTimeoutMs: getEnvNumber('HF_VIDEO_TIMEOUT', 12 * 60 * 1000),
+      // 🎤 أغنية كاملة بكلمات + غناء (ACE-Step) — مُختبَرة: 45 ثانية MP3 في ~12 ثانية
+      //   ACE-Step يقبل كلمات عربية بوسوم [verse]/[chorus] ويعيد ملف MP3 مغنّى
+      songSpace: getEnv('HF_SONG_SPACE', 'ACE-Step/ACE-Step'),
+      songFnIndex: getEnvNumber('HF_SONG_FN_INDEX', 11),
+      songTimeoutMs: getEnvNumber('HF_SONG_TIMEOUT', 5 * 60 * 1000),
+      songMinIntervalMs: getEnvNumber('HF_SONG_MIN_INTERVAL', 20_000),
     },
     anthropic: {
       apiKey: process.env.ANTHROPIC_API_KEY || '',

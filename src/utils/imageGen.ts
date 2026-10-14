@@ -35,7 +35,7 @@ const TRANSLATE_MODELS = ['allam-2-7b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'
  * يعيد النص الأصلي إذا لم يكن عربياً أو فشلت الترجمة (لا نكسر الميزة).
  * زمن مقاس: ~300-900ms.
  */
-export async function translateForImage(text: string): Promise<string> {
+export async function translateForImage(text: string, systemOverride?: string): Promise<string> {
   const trimmed = (text || '').trim();
   if (trimmed.length < 3 || !ARABIC_RE.test(trimmed)) return trimmed;
 
@@ -43,6 +43,7 @@ export async function translateForImage(text: string): Promise<string> {
   if (!apiKey) return trimmed;
 
   const SYSTEM =
+    systemOverride ||
     'You convert a user request into a vivid English image-generation prompt. ' +
     'Keep every detail (subject, action, place, colours, style). ' +
     'Reply with ONLY the English prompt — no quotes, no explanation, max 80 words.';
