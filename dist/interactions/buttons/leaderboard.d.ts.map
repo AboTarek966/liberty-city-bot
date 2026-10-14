@@ -1,1 +1,1 @@
-{"version":3,"file":"leaderboard.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/leaderboard.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAclE,QAAA,MAAM,OAAO,EAAE,aAwBd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"leaderboard.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/leaderboard.ts"],"names":[],"mappings":"AAQA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AASlE,QAAA,MAAM,OAAO,EAAE,aAqCd,CAAC;AAEF,eAAe,OAAO,CAAC"}

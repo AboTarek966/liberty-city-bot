@@ -1,26 +1,37 @@
 "use strict";
 // ============================================
 // Liberty City Bot - Leaderboard Buttons
-// customId format: lb|<type>|<period>|<limit>
+// customId: lb|<type>|<period>|<limit>|<page>[|<mark>]
+//   mark: prev / next / r (تحديث) / p (فترة) / t (نوع)
+// التنسيق القديم (بدون صفحة) يُعامَل كصفحة 1
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const leaderboard_1 = require("../../commands/utility/leaderboard");
-const VALID_TYPES = ['all', 'messages', 'voiceMinutes'];
-const VALID_PERIODS = ['day', 'week', 'month', 'total'];
-const VALID_LIMITS = ['10', '25', 'all'];
 const handler = {
     id: 'lb',
     async execute(interaction) {
         // ✅ الرد السريع فوراً لمنع انتهاء صلاحية التفاعل (خطأ 10062)
         await interaction.deferUpdate();
         const parts = interaction.customId.split('|');
-        const type = (VALID_TYPES.includes(parts[1]) ? parts[1] : 'all');
-        const period = (VALID_PERIODS.includes(parts[2]) ? parts[2] : 'week');
-        const limit = (VALID_LIMITS.includes(parts[3]) ? parts[3] : '10');
+        const type = (0, leaderboard_1.sanitizeType)(parts[1]);
+        const period = (0, leaderboard_1.sanitizePeriod)(parts[2]);
+        const limit = (0, leaderboard_1.sanitizeLimit)(parts[3]);
+        // التنسيق القديم = صفحة 1
+        const rawPage = parseInt(parts[4], 10);
+        let page = Number.isFinite(rawPage) ? rawPage : 1;
+        const mark = parts[5] || '';
+        if (mark === 'prev')
+            page -= 1;
+        else if (mark === 'next')
+            page += 1;
         const client = interaction.client;
-        const embed = await (0, leaderboard_1.buildLeaderboardEmbed)(client, interaction.guildId, type, period, limit);
-        const components = (0, leaderboard_1.buildLeaderboardButtons)(type, period, limit);
-        await interaction.editReply({ embeds: [embed], components });
+        // (تجميع الصفوف ثم تقسيمها إلى صفحات يتم داخل الباني،
+        //  ورقم الصفحة يُصحَّح تلقائياً إذا تجاوز الإجمالي)
+        const result = await (0, leaderboard_1.buildLeaderboardPage)(client, interaction.guild, type, period, limit, page);
+        await interaction.editReply({
+            embeds: [result.embed],
+            components: result.components,
+        });
     },
 };
 exports.default = handler;

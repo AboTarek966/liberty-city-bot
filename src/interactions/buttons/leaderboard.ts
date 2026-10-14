@@ -1,22 +1,19 @@
 // ============================================
 // Liberty City Bot - Leaderboard Buttons
-// customId format: lb|<type>|<period>|<limit>
+// customId: lb|<type>|<period>|<limit>|<page>[|<mark>]
+//   mark: prev / next / r (تحديث) / p (فترة) / t (نوع)
+// التنسيق القديم (بدون صفحة) يُعامَل كصفحة 1
 // ============================================
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { LibertyClient } from '../../LibertyClient';
 import {
-  buildLeaderboardEmbed,
-  buildLeaderboardButtons,
-  LBType,
-  LBPeriod,
-  LBLimit,
+  buildLeaderboardPage,
+  sanitizeType,
+  sanitizePeriod,
+  sanitizeLimit,
 } from '../../commands/utility/leaderboard';
-
-const VALID_TYPES = ['all', 'messages', 'voiceMinutes'];
-const VALID_PERIODS = ['day', 'week', 'month', 'total'];
-const VALID_LIMITS = ['10', '25', 'all'];
 
 const handler: ButtonHandler = {
   id: 'lb',
@@ -25,22 +22,35 @@ const handler: ButtonHandler = {
     await interaction.deferUpdate();
 
     const parts = interaction.customId.split('|');
-    const type = (VALID_TYPES.includes(parts[1]) ? parts[1] : 'all') as LBType;
-    const period = (VALID_PERIODS.includes(parts[2]) ? parts[2] : 'week') as LBPeriod;
-    const limit = (VALID_LIMITS.includes(parts[3]) ? parts[3] : '10') as LBLimit;
+    const type = sanitizeType(parts[1]);
+    const period = sanitizePeriod(parts[2]);
+    const limit = sanitizeLimit(parts[3]);
+
+    // التنسيق القديم = صفحة 1
+    const rawPage = parseInt(parts[4], 10);
+    let page = Number.isFinite(rawPage) ? rawPage : 1;
+
+    const mark = parts[5] || '';
+    if (mark === 'prev') page -= 1;
+    else if (mark === 'next') page += 1;
 
     const client = interaction.client as LibertyClient;
 
-    const embed = await buildLeaderboardEmbed(
+    // (تجميع الصفوف ثم تقسيمها إلى صفحات يتم داخل الباني،
+    //  ورقم الصفحة يُصحَّح تلقائياً إذا تجاوز الإجمالي)
+    const result = await buildLeaderboardPage(
       client,
-      interaction.guildId!,
+      interaction.guild!,
       type,
       period,
-      limit
+      limit,
+      page
     );
-    const components = buildLeaderboardButtons(type, period, limit);
 
-    await interaction.editReply({ embeds: [embed], components });
+    await interaction.editReply({
+      embeds: [result.embed],
+      components: result.components,
+    });
   },
 };
 

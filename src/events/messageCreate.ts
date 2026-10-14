@@ -20,6 +20,7 @@ import { ICommandAlias } from '../models/CommandAlias';
 import { Colors } from '../utils/embeds';
 import { executeAIModeration, runSequentialWarn } from '../handlers/AIModeration';
 import { executeCommandFromMessage } from '../utils/aliasRunner';
+import { handleTopCommand } from '../utils/topCommand';
 import { getAliasesForShortcut } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
@@ -138,6 +139,14 @@ const event: Event = {
         if (handled) return;
       } catch (error) {
         logger.error('Error handling alias command:', error);
+      }
+
+      // 🏆 أمر النصي `top` (يومي/أسبوعي/شهري) — بعد الألياس حتى لا يعطّل اختصارات المستخدم
+      try {
+        const topHandled = await handleTopCommand(message, client);
+        if (topHandled) return;
+      } catch (error) {
+        logger.error('Error in top command:', error);
       }
 
       // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)

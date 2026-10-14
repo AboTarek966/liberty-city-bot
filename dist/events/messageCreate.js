@@ -44,6 +44,7 @@ const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const AIModeration_1 = require("../handlers/AIModeration");
 const aliasRunner_1 = require("../utils/aliasRunner");
+const topCommand_1 = require("../utils/topCommand");
 const aliasCache_1 = require("../utils/aliasCache");
 const afk_1 = require("../utils/afk");
 const scamFilter_1 = require("../utils/scamFilter");
@@ -151,6 +152,15 @@ const event = {
             }
             catch (error) {
                 logger.error('Error handling alias command:', error);
+            }
+            // 🏆 أمر النصي `top` (يومي/أسبوعي/شهري) — بعد الألياس حتى لا يعطّل اختصارات المستخدم
+            try {
+                const topHandled = await (0, topCommand_1.handleTopCommand)(message, client);
+                if (topHandled)
+                    return;
+            }
+            catch (error) {
+                logger.error('Error in top command:', error);
             }
             // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)
             try {
