@@ -1,3 +1,9 @@
+/**
+ * يُترجم الوصف العربي إلى إنجليزي قبل إرساله لموديل الرسم.
+ * يعيد النص الأصلي إذا لم يكن عربياً أو فشلت الترجمة (لا نكسر الميزة).
+ * زمن مقاس: ~300-900ms.
+ */
+export declare function translateForImage(text: string): Promise<string>;
 export interface GeneratedImage {
     data: Buffer;
     mimeType: string;

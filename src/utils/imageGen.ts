@@ -12,8 +12,74 @@
 
 import axios from 'axios';
 import { createLogger } from './helpers';
+import { config } from '../config';
 
 const logger = createLogger('ImageGen');
+
+// --------------------------------------------
+// الترجمة: موديل الرسم (flux) لا يفهم العربية إطلاقاً
+//   تجربة مثبتة بالدليل: "كلب على شط البحر" → رسم وجه فتاة!
+//   لذلك نُترجم الوصف إلى الإنجليزي أولاً (Groq — مجاني، < 1 ثانية)
+// --------------------------------------------
+const ARABIC_RE = /[\u0600-\u06FF]/;
+
+/**
+ * موديلات الترجمة بالترتيب — الأول عربي أصلي وسريع (غير استدلالي).
+ * ⚠️ لا نستخدم موديلات استدلالية بحدّ رموز صغير: التفكير يستهلك الرموز
+ *    ويعيد محتوىً فارغاً (هذا سبب فشل النسخة الأولى فعلياً).
+ */
+const TRANSLATE_MODELS = ['allam-2-7b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'];
+
+/**
+ * يُترجم الوصف العربي إلى إنجليزي قبل إرساله لموديل الرسم.
+ * يعيد النص الأصلي إذا لم يكن عربياً أو فشلت الترجمة (لا نكسر الميزة).
+ * زمن مقاس: ~300-900ms.
+ */
+export async function translateForImage(text: string): Promise<string> {
+  const trimmed = (text || '').trim();
+  if (trimmed.length < 3 || !ARABIC_RE.test(trimmed)) return trimmed;
+
+  const apiKey = config.ai.groq.apiKey;
+  if (!apiKey) return trimmed;
+
+  const SYSTEM =
+    'You convert a user request into a vivid English image-generation prompt. ' +
+    'Keep every detail (subject, action, place, colours, style). ' +
+    'Reply with ONLY the English prompt — no quotes, no explanation, max 80 words.';
+
+  for (const model of TRANSLATE_MODELS) {
+    try {
+      const res = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model,
+          messages: [
+            { role: 'system', content: SYSTEM },
+            { role: 'user', content: trimmed },
+          ],
+          temperature: 0.3,
+          max_tokens: 600,
+        },
+        { timeout: 8_000 }
+      );
+
+      const out: string | undefined = res.data?.choices?.[0]?.message?.content;
+      const clean = (out || '').replace(/^["'`]+|["'`]+$/g, '').trim();
+
+      // نرفض الناتج إذا بقي عربياً أو كان فارغاً/قصيرأً ثم نجرب الموديل التالي
+      if (clean.length >= 3 && !ARABIC_RE.test(clean)) {
+        logger.info(`Prompt translated [${model}]: "${trimmed.slice(0, 40)}" -> "${clean.slice(0, 60)}"`);
+        return clean;
+      }
+      logger.warn(`Model ${model} returned empty/non-English output — trying next`);
+    } catch (err: any) {
+      logger.warn(`Translation model ${model} failed: ${err?.message || err}`);
+    }
+  }
+
+  logger.warn('All translation models failed — using original prompt');
+  return trimmed;
+}
 
 const BASE = 'https://image.pollinations.ai/prompt/';
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB — سقف ديسكورد للمرفقات القديمة
@@ -32,8 +98,11 @@ const TRIGGERS: RegExp[] = [
   /^\s*(?:ابغى|ابي|أبغى|أبي|ابي|بدي)\s+(?:اشوف\s+|انشئ\s+|انشيلي\s+)?(?:صورة|صوره)\s*(?:[:\-–،,]\s*|لـ|لف|عن\s*)?(.{3,})$/is,
   // "صورة قطة" / "رسمة مدينة" — وصف مباشر بعد الاسم
   /^\s*(?:صورة|صوره|رسمة|رسمه|لوحه)\s+(?:لـ|لف|عن\s*)?(.{3,})$/is,
-  // إنجليزي: generate/create/make/draw an image of ...
+  // إنجليزي: generate/create/make an image of ...
   /^\s*(?:please\s+)?(?:generate|create|make|draw|render|paint|design|illustrate)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|drawing|illustration|art|wallpaper|logo|avatar)\s*(?:of|for|:|with)?\s*(.{3,})$/is,
+  // إنجليزي بدون كلمة "image": "draw me a dog on the beach"
+  //   أفعال الرسم فقط (draw/paint/illustrate) — لا نضمّن make/create لأنها عامة جداً
+  /^\s*(?:please\s+)?(?:draw|paint|illustrate)\s+(?:me\s+)?(?:an?\s+|the\s+)?(.{3,})$/is,
   /^\s*(?:image|picture|photo)\s+(?:of|:|with)\s+(.{3,})$/is,
 ];
 
@@ -109,17 +178,26 @@ export async function generatePollinationsImage(
 export async function generateImageWithRetry(
   prompt: string,
   opts: { width?: number; height?: number; model?: string } = {},
-  attempts = 3
+  attempts = 4
 ): Promise<GeneratedImage | null> {
   for (let i = 1; i <= attempts; i++) {
     try {
       const img = await generatePollinationsImage(prompt, opts);
-      // نعتبر الصورة صالحة فقط إذا تجاوزت 2KB (أحياناً يرجع خادم خطأ بصيغة صورة فارغة)
       if (img && img.data.length > 2048) return img;
+      logger.warn(`Image attempt ${i}/${attempts}: empty/invalid image`);
     } catch (err: any) {
-      logger.warn(`Image attempt ${i}/${attempts} failed: ${err?.message || err}`);
+      const status = err?.response?.status;
+      // 402/429 = حدّد المجاني مؤقت — ننتظر أطول قبل إعادة المحاولة
+      const rateLimited = status === 402 || status === 429;
+      logger.warn(
+        `Image attempt ${i}/${attempts} failed${status ? ` (HTTP ${status})` : ''}: ${err?.message || err}`
+      );
+      if (rateLimited && i < attempts) {
+        await new Promise((r) => setTimeout(r, 5_000 * i));
+        continue;
+      }
     }
-    if (i < attempts) await new Promise((r) => setTimeout(r, 1200 * i));
+    if (i < attempts) await new Promise((r) => setTimeout(r, 1_500 * i));
   }
   return null;
 }

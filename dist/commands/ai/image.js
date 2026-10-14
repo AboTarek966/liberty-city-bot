@@ -52,7 +52,9 @@ const command = {
         const size = SIZES.find((s) => s.name === sizeName) || SIZES[0];
         const short = rawPrompt.length > 120 ? rawPrompt.slice(0, 120) + '…' : rawPrompt;
         await interaction.deferReply();
-        const image = await (0, imageGen_1.generateImageWithRetry)(`${rawPrompt}${style.suffix}`, { width: size.width, height: size.height, model: 'flux' });
+        // ⚠️ موديل الرسم لا يفهم العربية → نُترجم الوصف أولاً (النمط يُضاف بعد الترجمة)
+        const englishPrompt = await (0, imageGen_1.translateForImage)(rawPrompt);
+        const image = await (0, imageGen_1.generateImageWithRetry)(`${englishPrompt}${style.suffix}`, { width: size.width, height: size.height, model: 'flux' });
         if (!image) {
             await interaction.editReply('❌ فشل توليد الصورة — الخدمة المجانية مشغولة الآن، حاول بعد دقيقة.');
             return;

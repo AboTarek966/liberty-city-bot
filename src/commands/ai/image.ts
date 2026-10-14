@@ -5,7 +5,7 @@
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { generateImageWithRetry } from '../../utils/imageGen';
+import { generateImageWithRetry, translateForImage } from '../../utils/imageGen';
 
 /** أنماط الرسم — تُضاف كوصف إنجليزي لأن النماذج الإنجليزية أدق */
 const STYLES: Array<{ name: string; suffix: string }> = [
@@ -68,8 +68,10 @@ const command: Command = {
 
     await interaction.deferReply();
 
+    // ⚠️ موديل الرسم لا يفهم العربية → نُترجم الوصف أولاً (النمط يُضاف بعد الترجمة)
+    const englishPrompt = await translateForImage(rawPrompt);
     const image = await generateImageWithRetry(
-      `${rawPrompt}${style.suffix}`,
+      `${englishPrompt}${style.suffix}`,
       { width: size.width, height: size.height, model: 'flux' }
     );
 

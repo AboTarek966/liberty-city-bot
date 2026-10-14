@@ -25,7 +25,7 @@ import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
-import { detectImagePrompt, generateImageWithRetry } from '../utils/imageGen';
+import { detectImagePrompt, generateImageWithRetry, translateForImage } from '../utils/imageGen';
 import { detectMusicPrompt, generateMusic, mediaGenAvailable } from '../utils/mediaGen';
 
 const logger = createLogger('Event:MessageCreate');
@@ -994,7 +994,16 @@ async function handleImageGeneration(message: Message, prompt: string): Promise<
   if (!placeholder) return;
 
   const started = Date.now();
-  const image = await generateImageWithRetry(prompt, { width: 1024, height: 1024, model: 'flux' });
+
+  // ⚠️ موديل الرسم (flux) لا يفهم العربية إطلاقاً — تجربة مثبتة:
+  //    "كلب على شط البحر" رسمت وجه فتاة! لذلك نُترجم أولاً (Groq، < 1 ثانية)
+  const englishPrompt = await translateForImage(prompt);
+
+  const image = await generateImageWithRetry(englishPrompt, {
+    width: 1024,
+    height: 1024,
+    model: 'flux',
+  });
 
   if (!image) {
     await placeholder

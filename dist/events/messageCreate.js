@@ -916,7 +916,14 @@ async function handleImageGeneration(message, prompt) {
     if (!placeholder)
         return;
     const started = Date.now();
-    const image = await (0, imageGen_1.generateImageWithRetry)(prompt, { width: 1024, height: 1024, model: 'flux' });
+    // ⚠️ موديل الرسم (flux) لا يفهم العربية إطلاقاً — تجربة مثبتة:
+    //    "كلب على شط البحر" رسمت وجه فتاة! لذلك نُترجم أولاً (Groq، < 1 ثانية)
+    const englishPrompt = await (0, imageGen_1.translateForImage)(prompt);
+    const image = await (0, imageGen_1.generateImageWithRetry)(englishPrompt, {
+        width: 1024,
+        height: 1024,
+        model: 'flux',
+    });
     if (!image) {
         await placeholder
             .edit('❌ فشل توليد الصورة — الخدمة المجانية مشغولة الآن، حاول بعد دقيقة.')
