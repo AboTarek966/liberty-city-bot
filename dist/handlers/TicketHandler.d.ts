@@ -38,6 +38,26 @@ export interface CreateTicketOptions {
         answer: string;
     }>;
 }
+export interface ReopenAccessArgs {
+    ticket: {
+        closedBy?: string | null;
+    };
+    member: {
+        id: string;
+        permissions?: {
+            has: (p: bigint) => boolean;
+        };
+        roles?: {
+            cache?: {
+                has: (id: string) => boolean;
+            };
+        };
+    };
+    guildOwnerId?: string;
+    supportRoleIds?: string[] | null;
+    adminRoleIds?: string[] | null;
+}
+export declare function canReopenTicket(args: ReopenAccessArgs): boolean;
 export declare class TicketHandler {
     private client;
     private activeTickets;

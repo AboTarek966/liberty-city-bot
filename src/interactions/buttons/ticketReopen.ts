@@ -29,7 +29,7 @@ const handler: ButtonHandler = {
       }
 
       // ⛔ القاعدة تُطبَّق داخل reopenTicket (مصدر واحد للحقيقة):
-      //    إعادة الفتح لمن أغلقها فقط، مع تجاوز لحاملي Administrator
+      //    من أغلقها، أو أي إداري معاه رول الدعم/الإدارة، أو Administrator
       const member = interaction.guild.members.cache.get(interaction.user.id) ??
         await interaction.guild.members.fetch(interaction.user.id);
 

@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TicketHandler = exports.DEFAULT_TICKET_TYPES = void 0;
+exports.canReopenTicket = canReopenTicket;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
@@ -16,6 +17,40 @@ exports.DEFAULT_TICKET_TYPES = [
     { label: 'استفسار', description: 'للاستفسارات العامة', emoji: '❓' },
     { label: 'إبلاغ', description: 'للإبلاغ عن مشكلة', emoji: '⚠️' },
 ];
+function canReopenTicket(args) {
+    const { ticket, member, guildOwnerId } = args;
+    // من أغلقها يعاد فتحها دائماً
+    if (ticket.closedBy && ticket.closedBy === member.id)
+        return true;
+    // رولات فريق الدعم + رولات الإدارة العليا
+    const staffRoles = [...(args.supportRoleIds || []), ...(args.adminRoleIds || [])];
+    if (staffRoles.length > 0) {
+        const hasRole = staffRoles.some((roleId) => {
+            try {
+                return !!member.roles?.cache?.has(roleId);
+            }
+            catch {
+                return false;
+            }
+        });
+        if (hasRole)
+            return true;
+    }
+    // صلاحيات رفعية (بما فيها Administrator)
+    try {
+        if (member.permissions?.has(discord_js_1.PermissionFlagsBits.ManageChannels))
+            return true;
+        if (member.permissions?.has(discord_js_1.PermissionFlagsBits.Administrator))
+            return true;
+    }
+    catch {
+        /* bitfield غير صالح — تجاهل */
+    }
+    // صاحب السيرفر لا يُعلَّق أبداً
+    if (guildOwnerId && guildOwnerId === member.id)
+        return true;
+    return false;
+}
 // --------------------------------------------
 // Ticket Handler Class
 // --------------------------------------------
@@ -294,7 +329,8 @@ class TicketHandler {
         ticket.transcript = transcript;
         ticket.closedAt = new Date();
         // 🔒 قفل صلاحيات القناة أثناء الإغلاق — لا يكتب أحد (لا إداري ولا صاحب التذكرة)
-        //    إعادة الفتح متاحة لمن أغلقها فقط، وعندها تُرجع الصلاحيات كما كانت.
+        //    إعادة الفتح: من أغلقها، أو أي إداري معاه رول الدعم/الإدارة، أو Administrator.
+        //    وعند إعادة الفتح تُرجع الصلاحيات كما كانت تماماً.
         ticket.closeSnapshots = await this.applyCloseLock(channel);
         await ticket.save();
         this.activeTickets.delete(channelId);
@@ -306,8 +342,8 @@ class TicketHandler {
             description: `تم إغلاق التذكرة بواسطة ${closedBy}\n` +
                 `السبب: ${reason || 'غير محدد'}\n\n` +
                 `⛔ **القناة مقفلة الآن:** لا يمكن لأحد الكتابة — لا الإدارة ولا صاحب التذكرة.\n` +
-                `🔓 إعادة الفتح متاحة لـ **${closerName}** فقط.\n` +
-                `🛡️ أصحاب صلاحية **Administrator** يتجاوزون القفل دائماً.`,
+                `🔓 **إعادة الفتح:** لـ **${closerName}** أو لأي إداري معاه رول فريق الدعم/الإدارة.\n` +
+                `🛡️ حاملو **Administrator** يتجاوزون القفل ويقدرون الكتابة دائماً.`,
             color: embeds_1.Colors.error,
             footer: { text: 'Liberty City Tickets' },
         });
@@ -580,11 +616,17 @@ class TicketHandler {
             throw new Error('لم يتم العثور على التذكرة');
         if (ticket.status !== 'closed')
             throw new Error('التذكرة غير مغلقة');
-        // ⛔ إعادة الفتح لمن أغلقها فقط — (+ Administrator كصلاحية عليا تمنع التعلّق)
-        const isCloser = !!ticket.closedBy && ticket.closedBy === reopenedBy.id;
-        const isAdmin = reopenedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
-        if (!isCloser && !isAdmin) {
-            throw new Error('فقط من أغلق التذكرة هو من يستطيع إعادة فتحها');
+        // ⛔ من يُسمح له بإعادة الفتح — القاعدة كاملة في canReopenTicket()
+        const settings = await (0, models_1.getGuildSettings)(guild.id);
+        const allowed = canReopenTicket({
+            ticket,
+            member: reopenedBy,
+            guildOwnerId: guild.ownerId,
+            supportRoleIds: settings.tickets.supportRoleIds,
+            adminRoleIds: settings.tickets.adminRoleIds,
+        });
+        if (!allowed) {
+            throw new Error('فقط من أغلق التذكرة أو أعضاء فريق الدعم/الإدارة يمكنهم إعادة فتحها');
         }
         const channel = guild.channels.cache.get(channelId);
         // 🔓 إرجاع صلاحيات القناة كما كانت قبل الإغلاق تماماً

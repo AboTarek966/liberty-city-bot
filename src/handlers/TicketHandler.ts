@@ -72,6 +72,58 @@ export interface CreateTicketOptions {
 }
 
 // --------------------------------------------
+// صلاحية إعادة فتح التذكرة (مصدر واحد للحقيقة)
+// --------------------------------------------
+// 1) من أغلق التذكرة نفسه
+// 2) أي إداري معاه رول من رولات فريق الدعم أو رولات الإدارة
+// 3) حاملو ManageChannels / Administrator
+// 4) صاحب السيرفر
+export interface ReopenAccessArgs {
+  ticket: { closedBy?: string | null };
+  member: {
+    id: string;
+    permissions?: { has: (p: bigint) => boolean };
+    roles?: { cache?: { has: (id: string) => boolean } };
+  };
+  guildOwnerId?: string;
+  supportRoleIds?: string[] | null;
+  adminRoleIds?: string[] | null;
+}
+
+export function canReopenTicket(args: ReopenAccessArgs): boolean {
+  const { ticket, member, guildOwnerId } = args;
+
+  // من أغلقها يعاد فتحها دائماً
+  if (ticket.closedBy && ticket.closedBy === member.id) return true;
+
+  // رولات فريق الدعم + رولات الإدارة العليا
+  const staffRoles = [...(args.supportRoleIds || []), ...(args.adminRoleIds || [])];
+  if (staffRoles.length > 0) {
+    const hasRole = staffRoles.some((roleId) => {
+      try {
+        return !!member.roles?.cache?.has(roleId);
+      } catch {
+        return false;
+      }
+    });
+    if (hasRole) return true;
+  }
+
+  // صلاحيات رفعية (بما فيها Administrator)
+  try {
+    if (member.permissions?.has(PermissionFlagsBits.ManageChannels)) return true;
+    if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  } catch {
+    /* bitfield غير صالح — تجاهل */
+  }
+
+  // صاحب السيرفر لا يُعلَّق أبداً
+  if (guildOwnerId && guildOwnerId === member.id) return true;
+
+  return false;
+}
+
+// --------------------------------------------
 // Ticket Handler Class
 // --------------------------------------------
 export class TicketHandler {
@@ -393,7 +445,8 @@ export class TicketHandler {
     ticket.closedAt = new Date();
 
     // 🔒 قفل صلاحيات القناة أثناء الإغلاق — لا يكتب أحد (لا إداري ولا صاحب التذكرة)
-    //    إعادة الفتح متاحة لمن أغلقها فقط، وعندها تُرجع الصلاحيات كما كانت.
+    //    إعادة الفتح: من أغلقها، أو أي إداري معاه رول الدعم/الإدارة، أو Administrator.
+    //    وعند إعادة الفتح تُرجع الصلاحيات كما كانت تماماً.
     ticket.closeSnapshots = await this.applyCloseLock(channel);
 
     await ticket.save();
@@ -410,8 +463,8 @@ export class TicketHandler {
         `تم إغلاق التذكرة بواسطة ${closedBy}\n` +
         `السبب: ${reason || 'غير محدد'}\n\n` +
         `⛔ **القناة مقفلة الآن:** لا يمكن لأحد الكتابة — لا الإدارة ولا صاحب التذكرة.\n` +
-        `🔓 إعادة الفتح متاحة لـ **${closerName}** فقط.\n` +
-        `🛡️ أصحاب صلاحية **Administrator** يتجاوزون القفل دائماً.`,
+        `🔓 **إعادة الفتح:** لـ **${closerName}** أو لأي إداري معاه رول فريق الدعم/الإدارة.\n` +
+        `🛡️ حاملو **Administrator** يتجاوزون القفل ويقدرون الكتابة دائماً.`,
       color: Colors.error,
       footer: { text: 'Liberty City Tickets' },
     });
@@ -753,11 +806,20 @@ export class TicketHandler {
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
     if (ticket.status !== 'closed') throw new Error('التذكرة غير مغلقة');
 
-    // ⛔ إعادة الفتح لمن أغلقها فقط — (+ Administrator كصلاحية عليا تمنع التعلّق)
-    const isCloser = !!ticket.closedBy && ticket.closedBy === reopenedBy.id;
-    const isAdmin = reopenedBy.permissions.has(PermissionFlagsBits.Administrator);
-    if (!isCloser && !isAdmin) {
-      throw new Error('فقط من أغلق التذكرة هو من يستطيع إعادة فتحها');
+    // ⛔ من يُسمح له بإعادة الفتح — القاعدة كاملة في canReopenTicket()
+    const settings = await getGuildSettings(guild.id);
+    const allowed = canReopenTicket({
+      ticket,
+      member: reopenedBy,
+      guildOwnerId: guild.ownerId,
+      supportRoleIds: settings.tickets.supportRoleIds,
+      adminRoleIds: settings.tickets.adminRoleIds,
+    });
+
+    if (!allowed) {
+      throw new Error(
+        'فقط من أغلق التذكرة أو أعضاء فريق الدعم/الإدارة يمكنهم إعادة فتحها'
+      );
     }
 
     const channel = guild.channels.cache.get(channelId) as TextChannel | undefined;
