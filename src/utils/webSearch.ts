@@ -15,18 +15,32 @@ export interface SearchResult {
 
 /**
  * بحث ويب — سلسلة مصادر بأولوية الجودة.
- *   1) Brave Search API   (إن وُجد مفتاح — مجاني2000 استعلام/شهر بلا بطاقة)
- *   2) SerpAPI            (إن وُجد مفتاح)
- *   3) ويكيبيديا          (بلا مفتاح — المصدر الوحيد الذي يسمح للمرور الآلي فعلاً)
- *   4) DuckDuckGo HTML    (احتياطي — محجوب غالباً من عناوين السيرفرات)
+ *   1) Tavily            ✅ **يعمل بلا مفتاح وبلا تسجيل** — نتائج ويب حقيقية
+ *   2) Brave Search API   (إن وُجد مفتاح — 1000 استعلام/شهر، يحتاج تحقق بطاقة)
+ *   3) SerpAPI            (إن وُجد مفتاح — 250 استعلام/شهر بلا بطاقة)
+ *   4) ويكيبيديا          (بلا مفتاح — ضمانة دائمة للمعلومات المرجعية)
+ *   5) DuckDuckGo HTML    (احتياطي — محجوب غالباً من عناوين السيرفرات)
  *
  * ⚠️ ملاحظة تشغيلية مُثبتة بالقياس (14/10/2026): كل محركات البحث الكبرى
  *    (DuckDuckGo HTML وLite، Brave HTML، Startpage، Ecosia، Mojeek، Searx)
  *    تحجب المرور الآلي من IP سيرفر — تسترجع202/403/429 أو صفحة كابتشا.
- *    لذلك ويكيبيديا هي الضمانة التي تشتغل دائماً بلا مفتاح وبلا إعداد.
+ *    لذلك Tavily (keyless) ثم ويكيبيديا هما الضمانة التي تشتغل دائماً.
  */
 export async function webSearch(query: string, maxResults = 5): Promise<SearchResult[]> {
-  // 1) Brave Search API — أعلى جودة إن وُجد مفتاح
+  // 1) Tavily — نتائج ويب حقيقية (أخبار/أسعار/طقس) وتعمل بلا أي مفتاح
+  try {
+    const t0 = Date.now();
+    const r = await searchTavily(query, maxResults, process.env.TAVILY_API_KEY);
+    if (r.length) {
+      logger.info(`Tavily ok: ${r.length} results in ${Date.now() - t0}ms${process.env.TAVILY_API_KEY ? ' (keyed)' : ' (keyless)'}`);
+      return r;
+    }
+    logger.warn(`Tavily returned 0 results for "${query.slice(0, 50)}"`);
+  } catch (e: any) {
+    logger.warn(`Tavily failed: ${e?.message || e}`);
+  }
+
+  // 2) Brave Search API — أعلى جودة إن وُجد مفتاح
   const braveKey = process.env.BRAVE_API_KEY;
   if (braveKey) {
     try {
@@ -37,7 +51,7 @@ export async function webSearch(query: string, maxResults = 5): Promise<SearchRe
     }
   }
 
-  // 2) SerpAPI إن وُجد مفتاح
+  // 3) SerpAPI إن وُجد مفتاح
   const serpKey = process.env.SERPAPI_KEY;
   if (serpKey) {
     try {
@@ -48,7 +62,7 @@ export async function webSearch(query: string, maxResults = 5): Promise<SearchRe
     }
   }
 
-  // 3) ويكيبيديا — بلا مفتاح، سريعة، ومصادر حقيقية (عربية ثم إنجليزية)
+  // 4) ويكيبيديا — بلا مفتاح، سريعة، ومصادر حقيقية (عربية ثم إنجليزية)
   try {
     const r = await searchWikipedia(query, maxResults);
     if (r.length) return r;
@@ -56,13 +70,47 @@ export async function webSearch(query: string, maxResults = 5): Promise<SearchRe
     logger.warn('Wikipedia search failed:', e);
   }
 
-  // 4) احتياطي أخير
+  // 5) احتياطي أخير
   try {
     return await searchDuckDuckGo(query, maxResults);
   } catch (error) {
     logger.error('All search methods failed:', error);
     return [];
   }
+}
+
+/**
+ * بحث عبر Tavily — محرك بحث مصمّم للنماذج اللغوية.
+ *
+ * ✅ يعمل **بلا مفتاح وبلا تسجيل** عبر ترويسة `X-Tavily-Access-Mode: keyless`
+ *    (مُثبت بالقياس 14/10/2026: "سعر الذهب اليوم" أعطت أسعار 14 أكتوبر 2026
+ *    الحقيقية خلال 1.4-3.3 ثانية — نتيجة ويب حقيقية لا مقالة مرجعية).
+ * ⬆️ اختياري: مفتاح مجاني 1000 استعلام/شهر بلا بطاقة يرفع الحدود
+ *    (يُضبط تلقائياً بمجرد إضافة TAVILY_API_KEY).
+ */
+async function searchTavily(query: string, maxResults: number, apiKey?: string): Promise<SearchResult[]> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+  else headers['X-Tavily-Access-Mode'] = 'keyless';
+
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      query,
+      max_results: Math.min(maxResults, 10),
+      include_answer: false,
+      include_raw_content: false,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) throw new Error(`Tavily ${res.status}`);
+  const data: any = await res.json();
+  return (data.results || []).slice(0, maxResults).map((r: any) => ({
+    title: r.title || 'نتيجة بحث',
+    url: r.url || '',
+    snippet: String(r.content || '').slice(0, 700),
+  }));
 }
 
 /**

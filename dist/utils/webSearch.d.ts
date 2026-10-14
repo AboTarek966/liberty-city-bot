@@ -5,15 +5,16 @@ export interface SearchResult {
 }
 /**
  * بحث ويب — سلسلة مصادر بأولوية الجودة.
- *   1) Brave Search API   (إن وُجد مفتاح — مجاني2000 استعلام/شهر بلا بطاقة)
- *   2) SerpAPI            (إن وُجد مفتاح)
- *   3) ويكيبيديا          (بلا مفتاح — المصدر الوحيد الذي يسمح للمرور الآلي فعلاً)
- *   4) DuckDuckGo HTML    (احتياطي — محجوب غالباً من عناوين السيرفرات)
+ *   1) Tavily            ✅ **يعمل بلا مفتاح وبلا تسجيل** — نتائج ويب حقيقية
+ *   2) Brave Search API   (إن وُجد مفتاح — 1000 استعلام/شهر، يحتاج تحقق بطاقة)
+ *   3) SerpAPI            (إن وُجد مفتاح — 250 استعلام/شهر بلا بطاقة)
+ *   4) ويكيبيديا          (بلا مفتاح — ضمانة دائمة للمعلومات المرجعية)
+ *   5) DuckDuckGo HTML    (احتياطي — محجوب غالباً من عناوين السيرفرات)
  *
  * ⚠️ ملاحظة تشغيلية مُثبتة بالقياس (14/10/2026): كل محركات البحث الكبرى
  *    (DuckDuckGo HTML وLite، Brave HTML، Startpage، Ecosia، Mojeek، Searx)
  *    تحجب المرور الآلي من IP سيرفر — تسترجع202/403/429 أو صفحة كابتشا.
- *    لذلك ويكيبيديا هي الضمانة التي تشتغل دائماً بلا مفتاح وبلا إعداد.
+ *    لذلك Tavily (keyless) ثم ويكيبيديا هما الضمانة التي تشتغل دائماً.
  */
 export declare function webSearch(query: string, maxResults?: number): Promise<SearchResult[]>;
 export declare function searchWikipedia(query: string, maxResults?: number): Promise<SearchResult[]>;
