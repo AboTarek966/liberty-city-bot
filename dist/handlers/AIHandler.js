@@ -619,25 +619,32 @@ class AIHandler {
             label: type === 'SEARCH' ? 'نتائج بحث ويب إضافية' : 'محتوى صفحة ويب',
         };
     }
-    /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو null عند الفشل */
+    /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     async runResearchTool(tool) {
         try {
             const ws = await Promise.resolve().then(() => __importStar(require('../utils/webSearch')));
             if (tool.type === 'FETCH') {
                 const url = (tool.args.match(/https?:\/\/[^\s]+/) || [tool.args])[0];
                 const page = await ws.fetchWebPage(url);
-                if (!page.ok || !page.text)
-                    return null;
+                if (!page.ok || !page.text) {
+                    logger.warn(`FETCH failed for ${url.slice(0, 100)} (${page.ok ? 'empty' : 'blocked/404'})`);
+                    return `⚠️ تعذّرت قراءة الصفحة: ${url}`;
+                }
                 return `**${page.title}**\n${page.text.slice(0, 5000)}`;
             }
+            const t0 = Date.now();
             const results = await ws.webSearchEnhanced(tool.args, 5);
-            if (!results.length)
-                return null;
+            if (!results.length) {
+                // ⚠️ كان يُرجع null بصمت → النموذج يُكمل كأن البحث نجح ويترك المستخدم بلا إجابة
+                logger.warn(`SEARCH returned 0 results for "${tool.args.slice(0, 60)}" (${Date.now() - t0}ms)`);
+                return `⚠️ لم أعثر على نتائج بحث لـ"${tool.args}". أجب من معرفتك مع التأكيد أنك غير متأكد من التفاصيل الحديثة.`;
+            }
+            logger.info(`SEARCH ok: ${results.length} results for "${tool.args.slice(0, 60)}" (${Date.now() - t0}ms)`);
             return ws.formatSearchResultsForContext(results);
         }
         catch (e) {
             logger.warn(`Research tool failed: ${e?.message || e}`);
-            return null;
+            return '⚠️ تعذّر الوصول لخدمة البحث الآن. أجب من معرفتك مع ذكر أنك لم تتمكّن من التحقق من الإنترنت.';
         }
     }
     // --------------------------------------------

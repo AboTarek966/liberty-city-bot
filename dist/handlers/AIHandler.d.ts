@@ -67,7 +67,7 @@ export declare class AIHandler {
     private generateAIResponse;
     /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */
     private extractToolCall;
-    /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو null عند الفشل */
+    /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     private runResearchTool;
     private loadHistory;
     private saveHistory;

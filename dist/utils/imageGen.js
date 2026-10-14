@@ -103,6 +103,10 @@ const TRIGGERS = [
 ];
 /** صياغة جودة تُلحق بالإنجليزي — ترفع دقّة النتيجة بغضّ النظر عن لغة الوصف */
 const QUALITY_SUFFIX = ', highly detailed, sharp focus, professional lighting, 4k';
+/** أسماء الموسيقى — تمنع كاشف الصور من اعتراض طلبات الأغاني (حاجز) */
+const MUSIC_NOUN_RE = /(أغني[هة]|اغني[هة]|لحن|موسيق[اة]|موسيقه|مزيكا|نغم[هة]|نغمه|انشوده|أنشوده|\bsong\b|\bmusic\b|\bmelody\b|\btune\b|\binstrumental\b)/i;
+/** أسماء الصور — وجودها يُلغي حاجز الموسيقى ("ارسملي صورة حفلة موسيقية" طلب رسم صحيح) */
+const IMAGE_NOUN_RE = /(صورة|صوره|رسمة|رسمه|تصميم|لوحه|\bimage\b|\bpicture\b|\bphoto\b|\bdrawing\b|\billustration\b)/i;
 /**
  * يكشف هل طلب المستخدم توليد صورة، ويعيد الوصف النظيف.
  * يعيد `null` إذا لم يكن طلب صورة.
@@ -111,6 +115,14 @@ function detectImagePrompt(text) {
     const raw = (text || '').trim();
     if (raw.length < 4)
         return null;
+    // ⚠️ حاجز الموسيقى: "صمملي أغنية" / "ارسملي لحن" ليست طلبات رسم.
+    //   كاشف الموسيقى لا يلتقطها (لأن "صمملي" ليست فعل موسيقي)، فلولا هذا الحاجز
+    //   لكانت الصورة تُرسم بوصف غير قابل للرسم إطلاقاً.
+    //   الشرط: يحتوي اسم موسيقى ولا يحتوي اسم صورة ("ارسملي صورة حفلة موسيقية" مقبول).
+    if (MUSIC_NOUN_RE.test(raw) && !IMAGE_NOUN_RE.test(raw)) {
+        logger.info(`Image request rejected (looks like music): "${raw.slice(0, 60)}"`);
+        return null;
+    }
     for (const re of TRIGGERS) {
         const m = raw.match(re);
         if (!m)

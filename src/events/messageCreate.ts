@@ -1125,21 +1125,23 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
     }
   }
 
-  // 🎨 طلب توليد صورة — نُولّدها فوراً بدل إرسال الطلب للنموذج النصي
-  //   (يعمل في السيرفرات مع المنشن، وفي الرسائل الخاصة بدون منشن)
-  if (question && attachments.length === 0) {
-    const imagePrompt = detectImagePrompt(question);
-    if (imagePrompt) {
-      await handleImageGeneration(message, imagePrompt);
-      return;
-    }
-  }
-
-  // 🎵 طلب توليد موسيقى — يُولَّد عبر Hugging Face Spaces (مجاني)
+  // 🎵 طلب توليد موسيقى — أولاً لأن بعض صياغاتها ("ارسملي أغنية") تُشابه طلبات الرسم
+  //   يُولَّد عبر Hugging Face Spaces (مجاني، يتطلب HF_TOKEN)
   if (question && attachments.length === 0) {
     const musicPrompt = detectMusicPrompt(question);
     if (musicPrompt) {
       await handleMusicGeneration(message, musicPrompt);
+      return;
+    }
+  }
+
+  // 🎨 طلب توليد صورة — نُولّدها فوراً بدل إرسال الطلب للنموذج النصي
+  //   (يعمل في السيرفرات مع المنشن، وفي الرسائل الخاصة بدون منشن)
+  //   ⚠️ كاشف الصور يرفض بدوره الطلبات الموسيقية المتبقية ("صمملي أغنية")
+  if (question && attachments.length === 0) {
+    const imagePrompt = detectImagePrompt(question);
+    if (imagePrompt) {
+      await handleImageGeneration(message, imagePrompt);
       return;
     }
   }

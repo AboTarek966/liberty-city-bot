@@ -32,11 +32,11 @@ function mediaGenAvailable() {
 // --------------------------------------------
 const MUSIC_TRIGGERS = [
     // اعزفلي / اعزف / انشغل / سوي لحن / اعمل اغنية
-    /^\s*(?:من\s*فضلك|لو\s*سمحت|بليز)?\s*(?:اعزفلي|اعزف\s*لي|اعزف|انشغل\s*لي|انشغل|شغل\s*لي|شغل|اسمعلي|اسمع\s*لي|سوي\s*لي|سوي|اعمل\s*لي|اعمل|اكتب\s*لي)\s*(?:اغنيه|أغنية|لحن|موسيقى|موسيقه|صوت|مقطع|مزيكا|انسترومنتال|لحن موسيقي)\s*(?:[:\-–،,]\s*|لـ|عن\s*)?(.{3,})$/is,
+    /^\s*(?:من\s*فضلك|لو\s*سمحت|بليز)?\s*(?:اعزفلي|اعزف\s*لي|اعزف|انشغل\s*لي|انشغل|شغل\s*لي|شغل|اسمعلي|اسمع\s*لي|غني\s*لي|غني|سوي\s*لي|سوي|سوّي\s*لي|سوّي|اعمل\s*لي|اعمل|اكتب\s*لي|اكتب|ارسملي|ارسم\s*لي|ارسم|صمملي|صمم\s*لي|صمم|طلّع\s*لي|طلّع|طلع\s*لي|طلع|انشئ\s*لي|انشئ)\s*(?:أغني[هة]|اغني[هة]|لحن|موسيق[اة]|موسيقه|مزيكا|نغم[هة]|نغمه|كوبليه|انسترومنتال|انشوده|أنشوده|مقطوعه|مقطوعة|صوت|مقطع)\s*(?:[:\-–،,]\s*|لـ|عن\s*)?(.{0,200})$/is,
     // "اغنية ..." / "لحن ..." كطلب مباشر
-    /^\s*(?:من\s*فضلك|لو\s*سمحت|بليز)?\s*(?:اغنيه|أغنية|لحن|موسيقى|موسيقه|مزيكا)\s*(?:جديده|جديد)?\s*(?:[:\-–،,]\s*|لـ|لف|عن\s*)?(.{3,})$/is,
+    /^\s*(?:من\s*فضلك|لو\s*سمحت|بليز)?\s*(?:ابغى|أبغى|ابي|أبي|بدي|ودي|ابغى\s*لي|ابي\s*لي)?\s*(?:لي\s*)?(?:أغني[هة]|اغني[هة]|لحن|موسيق[اة]|موسيقه|مزيكا|نغم[هة]|نغمه|انشوده|أنشوده)\s*(?:جديده|جديدة|جديد)?\s*(?:[:\-–،,]\s*|لـ|لف|عن\s*)?(.{3,})$/is,
     // إنجليزي: play/make/create a song, music, melody
-    /^\s*(?:please\s+)?(?:play|make|create|generate|compose|sing|write)\s+(?:me\s+)?(?:an?\s+)?(?:song|music|melody|tune|track|beat|instrumental|jingle|anthem)\s*(?:of|about|for|called|:|with)?\s*(.{3,})$/is,
+    /^\s*(?:please\s+)?(?:play|make|create|generate|compose|sing|write|perform|give\s+me)\s+(?:me\s+)?(?:an?\s+)?(?:song|music|melody|tune|track|beat|instrumental|jingle|anthem|rap|jazz|piano|guitar|orchestra)\b\s*(?:of|about|for|called|:|with|-)?\s*(.{0,200})$/is,
     /^\s*(?:song|music|melody|tune|beat)\s*(?:about|of|:|with)\s*(.{3,})$/is,
 ];
 function detectMusicPrompt(text) {
@@ -48,8 +48,8 @@ function detectMusicPrompt(text) {
         if (!m)
             continue;
         const prompt = (m[1] || '').replace(/["“”'‘’]/g, '').replace(/\s+/g, ' ').trim();
-        if (prompt.length >= 3)
-            return prompt.slice(0, 400);
+        // الوصف اختياري — "اعزف مزيكا" يبقى طلباً صحيحاً رغم خلوّه من الوصف
+        return prompt.length >= 3 ? prompt.slice(0, 400) : 'a pleasant instrumental melody, calm and uplifting';
     }
     return null;
 }

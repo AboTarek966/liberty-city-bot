@@ -4,9 +4,19 @@ export interface SearchResult {
     snippet: string;
 }
 /**
- * بحث ويب — يحاول SerpAPI أولاً (إن وُجد مفتاح)، ثم DuckDuckGo fallback
+ * بحث ويب — سلسلة مصادر بأولوية الجودة.
+ *   1) Brave Search API   (إن وُجد مفتاح — مجاني2000 استعلام/شهر بلا بطاقة)
+ *   2) SerpAPI            (إن وُجد مفتاح)
+ *   3) ويكيبيديا          (بلا مفتاح — المصدر الوحيد الذي يسمح للمرور الآلي فعلاً)
+ *   4) DuckDuckGo HTML    (احتياطي — محجوب غالباً من عناوين السيرفرات)
+ *
+ * ⚠️ ملاحظة تشغيلية مُثبتة بالقياس (14/10/2026): كل محركات البحث الكبرى
+ *    (DuckDuckGo HTML وLite، Brave HTML، Startpage، Ecosia، Mojeek، Searx)
+ *    تحجب المرور الآلي من IP سيرفر — تسترجع202/403/429 أو صفحة كابتشا.
+ *    لذلك ويكيبيديا هي الضمانة التي تشتغل دائماً بلا مفتاح وبلا إعداد.
  */
 export declare function webSearch(query: string, maxResults?: number): Promise<SearchResult[]>;
+export declare function searchWikipedia(query: string, maxResults?: number): Promise<SearchResult[]>;
 export declare function formatSearchResults(results: SearchResult[]): string;
 /**
  * تنسيق نتائج البحث للسياق الغني (للتضمين في البرومبت)
@@ -27,7 +37,11 @@ export declare function searchAcademic(query: string): Promise<string>;
  */
 export declare function searchTechnical(query: string): Promise<string>;
 /**
- * بحث عام محسّن مع محاولات متعددة
+ * بحث عام محسّن مع محاولات محدودة.
+ *
+ * ⚠️ تعديل مهم: نُضيف الاستعلامات البديلة فقط إذا كان المصدر الأساسي
+ *    أرجع نتائج أصلاً. سلوكه القديم كان يُطلق4استعلامات بديلة بعد كل فشل —
+ *    وكل واحد يفشل بعد ~1-2 ثانية (حظر) — فيستهلك ~15 ثانية بلا فائدة.
  */
 export declare function webSearchEnhanced(query: string, maxResults?: number): Promise<SearchResult[]>;
 /**

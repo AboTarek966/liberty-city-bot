@@ -14,26 +14,172 @@ export interface SearchResult {
 }
 
 /**
- * بحث ويب — يحاول SerpAPI أولاً (إن وُجد مفتاح)، ثم DuckDuckGo fallback
+ * بحث ويب — سلسلة مصادر بأولوية الجودة.
+ *   1) Brave Search API   (إن وُجد مفتاح — مجاني2000 استعلام/شهر بلا بطاقة)
+ *   2) SerpAPI            (إن وُجد مفتاح)
+ *   3) ويكيبيديا          (بلا مفتاح — المصدر الوحيد الذي يسمح للمرور الآلي فعلاً)
+ *   4) DuckDuckGo HTML    (احتياطي — محجوب غالباً من عناوين السيرفرات)
+ *
+ * ⚠️ ملاحظة تشغيلية مُثبتة بالقياس (14/10/2026): كل محركات البحث الكبرى
+ *    (DuckDuckGo HTML وLite، Brave HTML، Startpage، Ecosia، Mojeek، Searx)
+ *    تحجب المرور الآلي من IP سيرفر — تسترجع202/403/429 أو صفحة كابتشا.
+ *    لذلك ويكيبيديا هي الضمانة التي تشتغل دائماً بلا مفتاح وبلا إعداد.
  */
 export async function webSearch(query: string, maxResults = 5): Promise<SearchResult[]> {
-  // 1) جرب SerpAPI إن وُجد مفتاح
+  // 1) Brave Search API — أعلى جودة إن وُجد مفتاح
+  const braveKey = process.env.BRAVE_API_KEY;
+  if (braveKey) {
+    try {
+      const r = await searchBrave(query, maxResults, braveKey);
+      if (r.length) return r;
+    } catch (e) {
+      logger.warn('Brave Search failed:', e);
+    }
+  }
+
+  // 2) SerpAPI إن وُجد مفتاح
   const serpKey = process.env.SERPAPI_KEY;
   if (serpKey) {
     try {
-      return await searchSerpAPI(query, maxResults, serpKey);
+      const r = await searchSerpAPI(query, maxResults, serpKey);
+      if (r.length) return r;
     } catch (e) {
       logger.warn('SerpAPI failed, falling back:', e);
     }
   }
 
-  // 2) Fallback: DuckDuckGo HTML
+  // 3) ويكيبيديا — بلا مفتاح، سريعة، ومصادر حقيقية (عربية ثم إنجليزية)
+  try {
+    const r = await searchWikipedia(query, maxResults);
+    if (r.length) return r;
+  } catch (e) {
+    logger.warn('Wikipedia search failed:', e);
+  }
+
+  // 4) احتياطي أخير
   try {
     return await searchDuckDuckGo(query, maxResults);
   } catch (error) {
     logger.error('All search methods failed:', error);
     return [];
   }
+}
+
+/**
+ * بحث عبر Brave Search API — الخطة المجانية2000 استعلام/شهر بلا بطاقة ائتمان.
+ * يُفعَّل تلقائياً بمجرد إضافة BRAVE_API_KEY إلى متغيرات البيئة.
+ */
+async function searchBrave(query: string, maxResults: number, apiKey: string): Promise<SearchResult[]> {
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${Math.min(maxResults, 20)}&searchlang=ar&country=SA`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json', 'X-Subscription-Token': apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`Brave ${res.status}`);
+  const data: any = await res.json();
+  return (data.web?.results || []).slice(0, maxResults).map((r: any) => ({
+    title: r.title || 'نتيجة',
+    url: r.url || '',
+    snippet: r.description || '',
+  }));
+}
+
+/**
+ * بحث في ويكيبيديا العربية ثم الإنجليزية — بلا مفتاح وبلا حظر.
+ * يستخدم opensearch للبحث ثم summary لكل نتيجة لجلب وصف حقيقي.
+ */
+/** كاش بسيط لنتائج ويكيبيديا — يقلّل الطلبات ويمنع حدود الـAPI عند تكرار الأسئلة */
+const wikiCache = new Map<string, { at: number; results: SearchResult[] }>();
+const WIKI_CACHE_TTL = 15 * 60 * 1000;
+
+/**
+ * مُقيّد سرعة لطلبات ويكيبيديا.
+ * ⚠️ مُثبت بالقياس (14/10/2026):8استعلامات متتالية بلا تباعد أعطت0نتائج للأوامر
+ *    الثلاثة الأخيرة — ويكيبيديا ترفض الطلبات المتقاربة. مع تباعد400ms نجحت كلها.
+ *    التباعد لا يبطئ الشيء المطلوب فردياً (طلب واحد يبقى ~0.6-2 ثانية) بل يمنع
+ *    تراكم الطلبات عبر الاستعلامات المتتالية.
+ */
+let lastWikiCallAt = 0;
+const WIKI_MIN_GAP_MS = 400;
+
+async function wikiFetch(url: string, timeoutMs = 12_000): Promise<Response> {
+  const wait = Math.max(0, lastWikiCallAt + WIKI_MIN_GAP_MS - Date.now());
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastWikiCallAt = Date.now();
+  return fetch(url, {
+    headers: { 'User-Agent': 'LibertyCityBot/2.0 (Discord bot)' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
+export async function searchWikipedia(query: string, maxResults = 5): Promise<SearchResult[]> {
+  const cacheKey = `${query.toLowerCase()}|${maxResults}`;
+  const hit = wikiCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < WIKI_CACHE_TTL) return hit.results;
+
+  let out: SearchResult[] = [];
+
+  for (const lang of ['ar', 'en']) {
+    try {
+      // (1) العناوين والروابط — طلب واحد
+      const searchUrl =
+        `https://${lang}.wikipedia.org/w/api.php?action=opensearch` +
+        `&search=${encodeURIComponent(query)}&limit=${maxResults}&namespace=0&format=json&origin=*`;
+
+      const res = await wikiFetch(searchUrl);
+      if (!res.ok) continue;
+
+      const data: any = await res.json();
+      const titles: string[] = data?.[1] || [];
+      const links: string[] = data?.[3] || [];
+      if (!titles.length) continue;
+
+      // (2) الأوصاف لكل العناوين في طلب واحد.
+      //     ⚠️ الطريقة القديمة كانت ملخصاً لكل عنوان (=5طلبات) فاستنزفت حدود الـAPI
+      //        وسبّبت رفض الاستعلامات التالية بصمت.
+      const extracts = new Map<string, string>();
+      try {
+        const exUrl =
+          `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts` +
+          `&exintro&explaintext&exsentences=2&redirects=1` +
+          `&titles=${encodeURIComponent(titles.slice(0, maxResults).join('|'))}` +
+          `&format=json&origin=*`;
+
+        const exRes = await wikiFetch(exUrl);
+        if (exRes.ok) {
+          const exData: any = await exRes.json();
+          for (const p of Object.values<any>(exData?.query?.pages || {})) {
+            if (p?.title && typeof p.extract === 'string') {
+              extracts.set(p.title, p.extract.trim());
+              // redirects=1 يُعيد العنوان بعد التوجيه ("مكة المكرمة"→"مكة")
+              // نربطه أيضاً بالعنوان الذي طلبناه حتى لا تضيع الأوصاف.
+              const red = (exData?.query?.redirects || []).find((r: any) => r.to === p.title);
+              if (red?.from) extracts.set(red.from, p.extract.trim());
+            }
+          }
+        }
+      } catch (e: any) {
+        logger.warn(`Wikipedia extracts ${lang} failed: ${e?.message || e}`);
+      }
+
+      out = titles.slice(0, maxResults).map((title, i) => {
+        const extract = extracts.get(title) || '';
+        return {
+          title: `${title} — ويكيبيديا${lang === 'ar' ? ' العربية' : ''}`,
+          url: links[i] || '',
+          snippet: extract || 'نتيجة من ويكيبيديا',
+        };
+      });
+
+      if (out.length) break; // العربية كفيلة — لا نُطيل بالإنجليزية
+    } catch (e: any) {
+      logger.warn(`Wikipedia ${lang} failed: ${e?.message || e}`);
+    }
+  }
+
+  out = out.slice(0, maxResults);
+  if (out.length) wikiCache.set(cacheKey, { at: Date.now(), results: out });
+  return out;
 }
 
 /** بحث عبر SerpAPI (Google) — أدق النتائج */
@@ -153,32 +299,27 @@ export async function searchTechnical(query: string): Promise<string> {
 }
 
 /**
- * بحث عام محسّن مع محاولات متعددة
+ * بحث عام محسّن مع محاولات محدودة.
+ *
+ * ⚠️ تعديل مهم: نُضيف الاستعلامات البديلة فقط إذا كان المصدر الأساسي
+ *    أرجع نتائج أصلاً. سلوكه القديم كان يُطلق4استعلامات بديلة بعد كل فشل —
+ *    وكل واحد يفشل بعد ~1-2 ثانية (حظر) — فيستهلك ~15 ثانية بلا فائدة.
  */
 export async function webSearchEnhanced(query: string, maxResults = 5): Promise<SearchResult[]> {
-  // محاولة 1: استعلام محسّن
-  let results = await webSearch(query, maxResults);
-  
-  // إذا كانت النتائج قليلة، جرب استعلامات بديلة
-  if (results.length < 3) {
-    const alternativeQueries = [
-      `${query} شرح`,
-      `${query} ما هو`,
-      `${query} كيف`,
-      `${query} 2024 2025`,
-    ];
-    
-    for (const altQuery of alternativeQueries) {
-      const more = await webSearch(altQuery, maxResults - results.length);
-      for (const r of more) {
-        if (!results.some(existing => existing.url === r.url)) {
-          results.push(r);
-        }
-      }
-      if (results.length >= maxResults) break;
+  const results = await webSearch(query, maxResults);
+  if (!results.length || results.length >= maxResults) return results.slice(0, maxResults);
+
+  // المصدر أرجع شيئاً → نُوسّع ببديل واحد فقط (لا نُبطئ الرد)
+  const alternativeQueries = [`${query} شرح`, `${query} 2025 2026`];
+
+  for (const altQuery of alternativeQueries) {
+    const more = await webSearch(altQuery, maxResults - results.length);
+    for (const r of more) {
+      if (!results.some((existing) => existing.url === r.url)) results.push(r);
     }
+    if (results.length >= maxResults) break;
   }
-  
+
   return results.slice(0, maxResults);
 }
 
