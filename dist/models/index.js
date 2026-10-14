@@ -181,8 +181,10 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             enabled: { type: Boolean, default: true },
             threshold: { type: Number, default: 3 },
             timeWindow: { type: Number, default: 10000 },
-            action: { type: String, enum: ['alert', 'kick', 'ban'], default: 'kick' },
+            action: { type: String, enum: ['alert', 'kick', 'ban', 'strip'], default: 'kick' },
             logChannel: { type: String },
+            /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
+            autoRestore: { type: Boolean, default: true },
         },
         antiBot: {
             enabled: { type: Boolean, default: false },

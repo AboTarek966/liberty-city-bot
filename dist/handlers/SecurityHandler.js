@@ -9,6 +9,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SecurityHandler = void 0;
+exports.computeHierarchy = computeHierarchy;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
@@ -25,12 +26,61 @@ const RESTORABLE_CHANNEL_TYPES = [
     discord_js_1.ChannelType.GuildCategory,
     discord_js_1.ChannelType.GuildMedia,
 ];
+/**
+ * 🛡️ فحص تسلّم البوت — أهم مؤشر أمني في السيرفر
+ *
+ * Discord يمنع المساس بأحد أعلى منك في الرتب مهما كانت صلاحياتك،
+ * فلو رول المهاجم فوق رول البوت: `ban`/`kick`/سحب الرولات **تفشل كلها بصمت**.
+ * هذا الفحص هو ما يميّز حماية حقيقية عن حماية ورقية.
+ *
+ * دالة مستقلة (لا تعتمد على `this`) لتُختبر وتُستخدم من لوحة الإعدادات.
+ */
+function computeHierarchy(guild) {
+    const me = guild.members.me;
+    if (!me) {
+        return { ok: false, botRoleName: '—', botPosition: -1, offenders: [], offenderCount: 0, dangerous: false };
+    }
+    const botTop = me.roles.highest;
+    const botPosition = botTop.position;
+    const DANGEROUS = [
+        discord_js_1.PermissionFlagsBits.Administrator,
+        discord_js_1.PermissionFlagsBits.ManageGuild,
+        discord_js_1.PermissionFlagsBits.ManageRoles,
+        discord_js_1.PermissionFlagsBits.ManageChannels,
+        discord_js_1.PermissionFlagsBits.BanMembers,
+        discord_js_1.PermissionFlagsBits.KickMembers,
+        discord_js_1.PermissionFlagsBits.ModerateMembers,
+    ];
+    const above = guild.roles.cache.filter(r => r.id !== guild.id && // ليس @everyone
+        !r.managed && // رولات التكاملات تُستثنى
+        r.id !== botTop.id &&
+        r.position > botPosition);
+    const offenders = above
+        .sort((a, b) => b.position - a.position)
+        .map(r => `${r.name} (\`#${r.position}\`)`)
+        .slice(0, 15);
+    const dangerous = above.some(r => DANGEROUS.some(p => r.permissions.has(p)));
+    return {
+        ok: above.size === 0,
+        botRoleName: botTop.name,
+        botPosition,
+        offenders,
+        offenderCount: above.size,
+        dangerous,
+    };
+}
 class SecurityHandler {
     client;
     // تتبّع عمليات الحذف: guildId → { نوع → توقيتات }
     deletionTracker = new Map();
     // مؤقتات النسخ الاحتياطي التلقائي
     backupTimers = new Map();
+    // آخر حالة تسلّم مُبلَّغ عنها لكل سيرفر (ننبّه فقط عند تغيّر الحالة)
+    hierarchyState = new Map();
+    // مؤقتات الاستعادة التلقائية المؤجلة (تُجمَّع عدة حذفات في استعادة واحدة)
+    restoreTimers = new Map();
+    // 🔒 مقفل استعادة لكل سيرفر — يمنع إنشاء قنوات مكرّرة عند التزامن
+    restoreLocks = new Map();
     constructor(client) {
         this.client = client;
     }
@@ -38,6 +88,10 @@ class SecurityHandler {
         for (const timer of this.backupTimers.values())
             clearInterval(timer);
         this.backupTimers.clear();
+        for (const timer of this.restoreTimers.values())
+            clearTimeout(timer);
+        this.restoreTimers.clear();
+        this.restoreLocks.clear();
     }
     // --------------------------------------------
     // Helpers
@@ -84,6 +138,7 @@ class SecurityHandler {
         }
     }
     // معاقبة المخالف (تجاهل: المالك، البوت نفسه، غير الموجود)
+    // نوع العقوبة: alert | kick | ban | strip (سلب كل الرولات)
     async punish(guild, executor, action, reason) {
         if (executor.id === guild.ownerId)
             return '⏭️ المالك مستثناً';
@@ -93,6 +148,18 @@ class SecurityHandler {
             (await guild.members.fetch(executor.id).catch(() => null));
         if (!member)
             return '⚠️ المخالف لم يعد عضواً';
+        // 🛡️ فحص التسلّم قبل التنفيذ — أخطر حالة: عقوبة تفشل بصمت
+        const me = guild.members.me;
+        if (me) {
+            const botTop = me.roles.highest;
+            const targetTop = member.roles.highest;
+            if (targetTop.comparePositionTo(botTop) >= 0) {
+                // نبلّغ عن مشكلة التسلّم (تنبيه واحد فقط عند التغيّر)
+                void this.ensureHierarchyAlert(guild);
+                return (`⛔ **رتبته فوق البوت** (‎${targetTop.name}‎ ≥ ‎${botTop.name}‎) — ` +
+                    `العقوبة مستحيلة. اسحب رول البوت لأعلى القائمة`);
+            }
+        }
         try {
             if (action === 'ban') {
                 await member.ban({ reason });
@@ -102,10 +169,32 @@ class SecurityHandler {
                 await member.kick(reason);
                 return '👢 تم طرد المخالف';
             }
+            if (action === 'strip') {
+                const target = [...member.roles.cache.values()].filter(r => r.id !== guild.id && !r.managed);
+                if (target.length === 0)
+                    return '⚠️ المخالف بلا رولات لسحبها';
+                let removed = 0;
+                for (const role of target) {
+                    // كل رولة على حدة — لو فشلت واحدة بسبب التسلّم نكمل الباقي
+                    const ok = await role
+                        .delete(`Liberty City Anti-Nuke: ${reason}`)
+                        .then(() => true)
+                        .catch(() => false);
+                    if (ok)
+                        removed++;
+                }
+                if (removed === 0) {
+                    void this.ensureHierarchyAlert(guild);
+                    return (`⛔ تعذّر سلب أي رولة من ${target.length} — ` +
+                        `تحقّق من تسلّم البوت (ارفع رول البوت للأعلى)`);
+                }
+                return `🗡️ تم سلب **${removed}/${target.length}** رولة — باقٍ في السيرفر بلا صلاحيات`;
+            }
         }
         catch (error) {
             logger.warn(`punish failed (${action}) in ${guild.name}: ${error.message}`);
-            return `⚠️ فشل التنفيذ (${error.message})`;
+            void this.ensureHierarchyAlert(guild);
+            return `⚠️ فشل التنفيذ (${error.message}) — راجع تسلّم البوت`;
         }
         return '📢 تم الإشعار فقط';
     }
@@ -120,6 +209,93 @@ class SecurityHandler {
         tracker[type].push(now);
         tracker[type] = tracker[type].filter(t => now - t <= windowMs);
         return tracker[type].length;
+    }
+    // --------------------------------------------
+    // 0) HIERARCHY GUARD — فحص تسلّم البوت
+    // --------------------------------------------
+    // أهم فحص أمني: لو رول فوق البوت، كل العقوبات تفشل بصمت
+    // (Discord يمنع المساس بأحد أعلى منك في الرتب مهما كانت صلاحياتك)
+    checkHierarchy(guild) {
+        return computeHierarchy(guild);
+    }
+    /**
+     * يبلّغ عن مشكلة التسلّم — **عند تغيّر الحالة فقط** حتى لا نكرّر التنبيه
+     * يستدعى: عند الإقلاع، عند الانضمام، وعند كل محاولة عقوبة فاشلة
+     */
+    async ensureHierarchyAlert(guild) {
+        const status = this.checkHierarchy(guild);
+        try {
+            const known = this.hierarchyState.get(guild.id);
+            // الحالة لم تتغيّر → لا نعيد التنبيه
+            if (known !== undefined && known === status.ok)
+                return status;
+            // أول فحص على سيرفر سليم → نسجّل الحالة فقط **بدون أي رسالة**
+            // (وإلا يُبلّغ البوت "تم الإصلاح" وهو لم يُصلَح شيء بعد)
+            if (known === undefined && status.ok) {
+                this.hierarchyState.set(guild.id, true);
+                return status;
+            }
+            this.hierarchyState.set(guild.id, status.ok);
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
+            if (!channel)
+                return status;
+            // ✅ شُفّت المشكلة — نؤكد للّي صلّحها
+            if (status.ok) {
+                await channel
+                    .send({
+                    embeds: [
+                        new discord_js_1.EmbedBuilder()
+                            .setTitle('✅ إصلاح التسلّم — البوت الآن أعلى رتبة')
+                            .setDescription(`**${status.botRoleName}** أصبحت أعلى رتبة في السيرفر — الحماية تعمل بالكامل الآن: مضاد النيوك يطرد ويحظر، والاستعادة التلقائية تعمل.`)
+                            .setColor(embeds_1.Colors.success)
+                            .setFooter({ text: 'Liberty City — Hierarchy Guard' })
+                            .setTimestamp(),
+                    ],
+                })
+                    .catch(() => { });
+                logger.info(`✅ Hierarchy fixed in ${guild.name}`);
+                return status;
+            }
+            // ❌ مشكلة جديدة → تنبيه عالي الخطورة مع الخطوات
+            const lines = status.offenders.length
+                ? status.offenders.join('\n')
+                : '— (رول غير مُدار أعلى البوت)';
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle('🚨 فحص التسلّم — البوت ليس أعلى رتبة!')
+                .setDescription('**هذه أخطر ثغرة في حماية السيرفر.**\n' +
+                'لو أي أحد فوق البوت، **كل العقوبات تفشل بصمت**: مضاد النيوك ما يقدر يطرد ولا يحظر المخالف، والاستعادة التلقائية قد تتعطّل — والهجوم ينجح بلا مقاومة.')
+                .setColor(embeds_1.Colors.error)
+                .addFields({
+                name: '📌 أعلى رتبة للبوت',
+                value: `${status.botRoleName} — الموقع \`#${status.botPosition}\``,
+                inline: true,
+            }, {
+                name: `⛔ الرولات فوق البوت (${status.offenderCount})`,
+                value: lines,
+                inline: false,
+            }, {
+                name: '🎯 الخطر الحالي',
+                value: status.dangerous
+                    ? '⚠️ **رول فوق البوت يحمل صلاحيات خطيرة** (أدمنستريتر/إدارة/حظر) — أي صاحبه لا يُمسّ.'
+                    : 'الرولات فوق البوت أدنى خطر، لكنها تمنع معاقبة أصحابها.',
+                inline: false,
+            }, {
+                name: '✅ الخطوتين للاصلاح',
+                value: '**1.** افتح Server Settings ← Roles\n' +
+                    `**2.** اسحب رول البوت (‎${status.botRoleName}‎) **لأعلى القائمة** — يبقى الأول مباشرة تحت @everyone\n\n` +
+                    '_ملاحظة: من يملك المالك (⭐) يبقى فوق الجميع تلقائياً._',
+                inline: false,
+            })
+                .setFooter({ text: 'Liberty City — Hierarchy Guard' })
+                .setTimestamp();
+            await channel.send({ embeds: [embed], content: `<@${guild.ownerId}>` }).catch(() => { });
+            logger.warn(`🚨 Hierarchy: bot NOT top in ${guild.name} | bot=#${status.botPosition} | offenders=${status.offenderCount}`);
+        }
+        catch (error) {
+            logger.error(`ensureHierarchyAlert error: ${error.message}`);
+        }
+        return status;
     }
     // --------------------------------------------
     // 1) ANTI-NUKE: كشف الحذف الجماعي
@@ -201,8 +377,14 @@ class SecurityHandler {
             .setDescription(`${labels[type].emoji} تم حذف **${labels[type].label}** بشكل مكثف خلال ${windowSec} ثانية — هذا نمط هجوم "نيوك" على السيرفر!`)
             .setColor(embeds_1.Colors.error)
             .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
-            name: '🔔 التوصية',
-            value: 'إن استُمر الحذف: استخدم `/backup restore` لاستعادة بنية السيرفر من آخر نسخة احتياطية',
+            name: '🛡️ مستوى تسلّم البوت',
+            value: await this.hierarchyField(guild),
+            inline: false,
+        }, {
+            name: '♻️ التعافي',
+            value: cfg.autoRestore === false
+                ? 'الاستعادة التلقائية **مطفأة** — استخدم `/backup restore` يدوياً لاستعادة البنية'
+                : 'جاري الاستعادة التلقائية من آخر نسخة احتياطية…',
             inline: false,
         })
             .setFooter({ text: 'Liberty City Anti-Nuke' })
@@ -212,6 +394,59 @@ class SecurityHandler {
             await channel.send({ embeds: [embed], content: executor ? `<@${guild.ownerId}>` : undefined }).catch(() => { });
         }
         logger.warn(`🚨 Anti-Nuke: ${type} x${cfg.threshold} in ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
+        // ♻️ استعادة تلقائية للبنية (قنوات/رولات) — تجاهل الحظر لأنه بنية لا تُستعاد من النسخة
+        if (type !== 'ban' && cfg.autoRestore !== false) {
+            await this.runAutoRestore(guild, settings, type);
+        }
+    }
+    // سطر يوضّح إذا كان البوت قادرًا فعلاً على العقوبة
+    async hierarchyField(guild) {
+        try {
+            const s = this.checkHierarchy(guild);
+            return s.ok
+                ? `✅ البوت أعلى رتبة (${s.botRoleName}) — يقدر يعاقب أي أحد`
+                : `⛔ **البوت ليس أعلى رتبة** — ${s.offenderCount} رول فوقه، العقوبات تفشل. اسحب رول البوت للأعلى!`;
+        }
+        catch {
+            return '—';
+        }
+    }
+    // ♻️ الاستعادة التلقائية — تعيد القنوات والرولات المفقودة من آخر نسخة احتياطية
+    async runAutoRestore(guild, settings, type) {
+        const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
+        try {
+            const result = await this.restoreBackup(guild);
+            const nothing = result.channels === 0 && result.roles === 0;
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle(nothing ? '♻️ الاستعادة التلقائية — لا يوجد شيء ناقص' : '♻️ الاستعادة التلقائية اكتملت')
+                .setDescription(nothing
+                ? 'كل البنية المحفوظة موجودة أصلاً — لا حاجة لإعادة إنشاء شيء.'
+                : 'أُعيدت بنية السيرفر من آخر نسخة احتياطية تلقائياً بعد هجوم الحذف المكثف.')
+                .setColor(nothing ? embeds_1.Colors.warning : embeds_1.Colors.success)
+                .addFields({ name: '📢 قنوات', value: `+${result.channels}`, inline: true }, { name: '🎭 رولات', value: `+${result.roles}`, inline: true }, { name: '⏭️ مُتجاوَز', value: `${result.skipped}`, inline: true })
+                .setFooter({ text: 'Liberty City — Auto Restore' })
+                .setTimestamp();
+            if (channel)
+                await channel.send({ embeds: [embed] }).catch(() => { });
+            logger.info(`♻️ Auto-restore ${guild.name} (${type}): +${result.channels} قناة، +${result.roles} رولة`);
+        }
+        catch (error) {
+            logger.warn(`Auto-restore failed in ${guild.name}: ${error.message}`);
+            if (channel) {
+                await channel
+                    .send({
+                    embeds: [
+                        new discord_js_1.EmbedBuilder()
+                            .setTitle('⚠️ فشلت الاستعادة التلقائية')
+                            .setDescription(`**السبب:** ${error.message}\nجرّب يدوياً: \`/backup restore\``)
+                            .setColor(embeds_1.Colors.warning)
+                            .setFooter({ text: 'Liberty City — Auto Restore' })
+                            .setTimestamp(),
+                    ],
+                })
+                    .catch(() => { });
+            }
+        }
     }
     // --------------------------------------------
     // 2) ANTI-BOT: طرد بوت غير مصرح به
@@ -253,10 +488,65 @@ class SecurityHandler {
     // --------------------------------------------
     // 3) ANTI-ADMIN: منح صلاحية Administrator
     // --------------------------------------------
+    // 🚨 تنبيه حرج: خُفّضت رتبة البوت ففقد أعلى رتبة
+    async announceBotDemotion(guild, oldRole, newRole) {
+        // نُلغي كتم التنبيه ليعاد إطلاقه مع هذه الحالة
+        this.hierarchyState.set(guild.id, false);
+        try {
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id);
+            const s = this.checkHierarchy(guild);
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle('🚨🚨 خُفّضت رتبة البوت — الحماية معطّلة الآن!')
+                .setDescription('**هذا أكثر هجوم صامت ضد السيرفر.**\n' +
+                `رتبة **${oldRole.name}** نزلت من \`#${oldRole.position}\` إلى \`#${newRole.position}\`، ` +
+                'وبذلك **فقد البوت أعلى رتبة**: مضاد النيوك لن يطرد ولا يحظر، والاستعادة التلقائية قد تفشل — ' +
+                'والهجوم التالي على السيرفر **سينجح بلا مقاومة**.')
+                .setColor(embeds_1.Colors.error)
+                .addFields({
+                name: '🎯 المنفّذ',
+                value: executor ? `${executor} (\`${executor.tag}\`)` : '⚠️ غير معروف — راجع سجل التدقيق',
+                inline: true,
+            }, {
+                name: '📌 حالة البوت الآن',
+                value: `أعلى رتبة: **${s.botRoleName}** — الموقع \`#${s.botPosition}\``,
+                inline: true,
+            }, {
+                name: `⛔ الرولات فوق البوت (${s.offenderCount})`,
+                value: s.offenders.join('\n') || '—',
+                inline: false,
+            }, {
+                name: '✅ أعدّها الآن (خطوتين)',
+                value: '**1.** Server Settings ← Roles\n' +
+                    `**2.** اسحب رول البوت (‎${s.botRoleName}‎) **لأعلى القائمة** تحت @everyone مباشرة\n\n` +
+                    '_بعد التصحيح يرسل البوت رسالة تأكيد بأن الحماية رجعت تعمل._',
+                inline: false,
+            })
+                .setFooter({ text: 'Liberty City — Hierarchy Guard' })
+                .setTimestamp();
+            if (channel) {
+                await channel.send({ embeds: [embed], content: `<@${guild.ownerId}>` }).catch(() => { });
+            }
+            logger.error(`🚨🚨 Bot demoted in ${guild.name}: #${oldRole.position} → #${newRole.position} | executor=${executor?.tag ?? 'unknown'}`);
+        }
+        catch (error) {
+            logger.error(`announceBotDemotion error: ${error.message}`);
+        }
+    }
     async onRoleUpdate(oldRole, newRole) {
         try {
             if (!newRole.guild)
                 return;
+            // 🚨 أخطر هجوم صامت: خفض رتبة البوت — يعطّل كل الحماية دفعة واحدة
+            //    (مضاد النيوك + الاستعادة التلقائية + العقوبات تفشل فجأة بلا سبب ظاهر)
+            const me = newRole.guild.members.me;
+            if (me &&
+                me.roles.cache.has(newRole.id) &&
+                newRole.position < oldRole.position &&
+                !this.checkHierarchy(newRole.guild).ok) {
+                await this.announceBotDemotion(newRole.guild, oldRole, newRole);
+            }
             const gainedAdmin = !oldRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) &&
                 newRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
             if (!gainedAdmin)
@@ -374,7 +664,19 @@ class SecurityHandler {
         return { channels: channels.length, roles: roles.length, size };
     }
     // استعادة البنية — يُعاد إنشاء القنوات/الرولات المفقودة فقط (غير هدام)
+    // 🔒 مقفل تزامن: لو استعادة جارية على نفس السيرفر ننتظر نتيجتها بدل
+    //    تشغيل استعادة ثانية — وإلا تُنشأ القنوات مكرّرة عند الهجوم المتسارع
     async restoreBackup(guild, backupIndex) {
+        const inflight = this.restoreLocks.get(guild.id);
+        if (inflight) {
+            logger.info(`♻️ استعادة جارية بالفعل في ${guild.name} — ننتظر نتيجتها`);
+            return inflight;
+        }
+        const run = this.performRestore(guild, backupIndex).finally(() => this.restoreLocks.delete(guild.id));
+        this.restoreLocks.set(guild.id, run);
+        return run;
+    }
+    async performRestore(guild, backupIndex) {
         const doc = await models_1.BackupConfig.findOne({ guildId: guild.id });
         if (!doc?.backups?.length)
             throw new Error('لا توجد نسخ احتياطية — أنشئ واحدة أولاً بـ `/backup create`');

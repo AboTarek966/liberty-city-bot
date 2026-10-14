@@ -33,6 +33,16 @@ const event = {
                 lc.securityHandler.syncAutoBackup(guild).catch(err => logger.error(`syncAutoBackup failed for ${guild.name}:`, err));
             }, delay);
         });
+        // 🛡️ فحص التسلّم عند الإقلاع — ينبّه فوراً لو البوت ليس أعلى رتبة
+        //    (بدونه: مضاد النيوك والاستعادة التلقائية تفشل بصمت عند الهجوم)
+        let hIndex = 0;
+        client.guilds.cache.forEach(guild => {
+            const delay = 25000 + hIndex * 8000;
+            hIndex++;
+            setTimeout(() => {
+                lc.securityHandler.ensureHierarchyAlert(guild).catch(err => logger.error(`hierarchy check failed for ${guild.name}:`, err));
+            }, delay);
+        });
         // 📈 نظام المستويات: استئناف جلسات الصوت الجارية + احتساب دوري كل 5 دقائق
         client.guilds.cache.forEach(guild => {
             guild.voiceStates.cache.forEach(vs => {

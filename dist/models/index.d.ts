@@ -57,8 +57,10 @@ export interface IGuildSettings extends Document {
             enabled: boolean;
             threshold: number;
             timeWindow: number;
-            action: 'alert' | 'kick' | 'ban';
+            action: 'alert' | 'kick' | 'ban' | 'strip';
             logChannel?: string;
+            /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
+            autoRestore?: boolean;
         };
         antiBot: {
             enabled: boolean;

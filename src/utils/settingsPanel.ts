@@ -22,6 +22,7 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { getGuildSettings } from '../models';
+import { computeHierarchy } from '../handlers/SecurityHandler';
 import { getPendingWarnRoles, pendingDiffers } from './pendingWarnRoles';
 import { Colors } from './embeds';
 import { renderWelcomeCard, CARD_DEFAULTS } from './welcomeCard';
@@ -381,11 +382,19 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     p.scamFilter?.enabled,
   ].filter(Boolean).length;
 
+  // 🛡️ حالة تسلّم البوت — أهم مؤشر: بدونه كل العقوبات فشل
+  const hs = computeHierarchy(guild);
+  const hierarchyLine = hs.ok
+    ? `> ✅ **تسلّم البوت** — أعلى رتبة (‎${hs.botRoleName}‎ \`#${hs.botPosition}\`)، الحماية تعمل بالكامل`
+    : `> 🚨 **${hs.offenderCount} رول فوق البوت** — مضاد النيوك والاستعادة **ستفشل**! ارفع رول البوت ← \`/protection hierarchy\``;
+
   const embed = categoryEmbed(
     'protection',
     guild,
     `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
     `**المحميات المفعّلة: ${active}/12**\n\n` +
+    `${hierarchyLine}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
     `> ${on(p.antiSpam.enabled)} **مكافحة السبام** — يوقف تكرار الرسائل\n` +
     `> ${on(p.antiLink.enabled)} **مكافحة الروابط** — يمنع الروابط الخارجية\n` +

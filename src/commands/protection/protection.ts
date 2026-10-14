@@ -154,9 +154,20 @@ const command: Command = {
             .addChoices(
               { name: 'تنبيه فقط', value: 'alert' },
               { name: 'طرد', value: 'kick' },
-              { name: 'حظر', value: 'ban' }
+              { name: 'حظر', value: 'ban' },
+              { name: '🗡️ سلب كل الرولات (يبقى في السيرفر معطّلاً)', value: 'strip' }
             )
         )
+        .addBooleanOption(opt =>
+          opt
+            .setName('autorestore')
+            .setDescription('♻️ إعادة بنية السيرفر تلقائياً بعد هجوم الحذف (الافتراضي: مفعّل)')
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('hierarchy')
+        .setDescription('🛡️ فحص التسلّم — هل البوت أعلى رتبة؟ أهم فحص أمني')
     )
     .addSubcommand(sub =>
       sub
@@ -232,6 +243,8 @@ const command: Command = {
         return configureAntiInvite(interaction, settings);
       case 'antinuke':
         return configureAntiNuke(interaction, settings);
+      case 'hierarchy':
+        return configureHierarchy(interaction);
       case 'antibot':
         return configureAntiBot(interaction, settings);
       case 'antiadmin':
@@ -449,16 +462,34 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
   const threshold = interaction.options.getInteger('threshold');
   const windowSec = interaction.options.getInteger('window');
   const action = interaction.options.getString('action');
+  const autoRestore = interaction.options.getBoolean('autorestore');
 
   if (!settings.protection.antiNuke) settings.protection.antiNuke = {};
   settings.protection.antiNuke.enabled = enabled;
   if (threshold) settings.protection.antiNuke.threshold = threshold;
   if (windowSec) settings.protection.antiNuke.timeWindow = windowSec * 1000;
   if (action) settings.protection.antiNuke.action = action;
+  if (autoRestore !== null && autoRestore !== undefined) {
+    settings.protection.antiNuke.autoRestore = autoRestore;
+  } else if (settings.protection.antiNuke.autoRestore === undefined) {
+    settings.protection.antiNuke.autoRestore = true; // الافتراضي: مفعّل
+  }
 
   await settings.save();
 
   const n = settings.protection.antiNuke;
+
+  // 🛡️ قراءة تسلّم البوت — أهم مؤشر يحدّد إن كانت العقوبة ستنجح أصلاً
+  const hierarchy = interaction.guild
+    ? (interaction.client as LibertyClient).securityHandler.checkHierarchy(interaction.guild)
+    : null;
+
+  const hierarchyLine = !hierarchy
+    ? '—'
+    : hierarchy.ok
+      ? `✅ البوت أعلى رتبة (\`${hierarchy.botPosition}\`) — **العقوبات تنفّذ فعلاً**`
+      : `⛔ **البوت ليس أعلى رتبة** — ${hierarchy.offenderCount} رول فوقه، العقوبات **ستفشل**. ارفع رول البوت!`;
+
   const embed = new EmbedBuilder()
     .setTitle('💣 مضاد النيوك')
     .setColor(enabled ? Colors.success : Colors.error)
@@ -467,12 +498,84 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
       { name: 'العتاد', value: `${n.threshold ?? 3} عناصر / ${Math.round((n.timeWindow ?? 10000) / 1000)} ثانية`, inline: true },
       { name: 'عقوبة المخالف', value: getActionName(n.action || 'kick'), inline: true },
       {
+        name: '♻️ الاستعادة التلقائية',
+        value: n.autoRestore !== false ? '✅ مفعّلة — يُعاد بناء السيرفر من آخر نسخة' : '❌ مطفأة',
+        inline: true,
+      },
+      { name: '🛡️ تسلّم البوت', value: hierarchyLine, inline: false },
+      {
         name: 'كيف يعمل؟',
-        value: 'يرصد الحذف المكثف للقنوات/الرولات/الحظر، يحدد المنفّذ من سجلات التدقيق، ينفّذ العقوبة، ويذكّرك باستعادة `/backup restore`',
+        value:
+          'يرصد الحذف المكثف للقنوات/الرولات/الحظر، يحدّد المنفّذ من سجلات التدقيق، ' +
+          'ينفّذ العقوبة **بعد التأكد من التسلّم**، ثم **يعيد البناء تلقائياً** من آخر نسخة احتياطية.',
         inline: false,
-      }
+      },
+      ...(hierarchy && !hierarchy.ok
+        ? [{
+            name: '⚠️ افعل هذا الآن',
+            value:
+              `Server Settings ← Roles ← اسحب رول البوت (‎${hierarchy.botRoleName}‎) لأعلى القائمة\n` +
+              '_أو شغّل `/protection hierarchy` بعد التصحيح للتأكد._',
+            inline: false,
+          }]
+        : [])
     )
     .setFooter({ text: 'Liberty City Protection' })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// --------------------------------------------
+// Configure / Show Hierarchy — فحص التسلّم
+// --------------------------------------------
+async function configureHierarchy(interaction: ChatInputCommandInteraction): Promise<void> {
+  const guild = interaction.guild;
+  if (!guild) {
+    await interaction.editReply({ content: '❌ هذا الأمر داخل السيرفر فقط' });
+    return;
+  }
+
+  const client = interaction.client as LibertyClient;
+  const s = client.securityHandler.checkHierarchy(guild);
+
+  const embed = new EmbedBuilder()
+    .setTitle(s.ok ? '🛡️ فحص التسلّم — الحالة ممتازة' : '🚨 فحص التسلّم — ثغرة خطيرة!')
+    .setDescription(
+      s.ok
+        ? '**البوت يملك أعلى رتبة في السيرفر** — يقدر يطرد ويحظر ويسلب الرولات من أي أحد ' +
+          'بما فيهم الأشمنستريتر، والاستعادة التلقائية تعمل.'
+        : '**البوت ليس أعلى رتبة.** أي رول فوقه يعني أن صاحبه **لا يُمسّ**: مضاد النيوك سيفشل ' +
+          'بصمت عند الهجوم، والاستعادة قد تتعطّل. لازم تصلحها الحين.'
+    )
+    .setColor(s.ok ? Colors.success : Colors.error)
+    .addFields(
+      { name: '📌 أعلى رتبة للبوت', value: `${s.botRoleName} — الموقع \`#${s.botPosition}\``, inline: true },
+      { name: '👥 إجمالي الرولات', value: `${guild.roles.cache.size}`, inline: true },
+      {
+        name: s.ok ? '✅ فوق البوت' : `⛔ فوق البوت (${s.offenderCount})`,
+        value: s.ok ? 'لا يوجد — البوت في القمة' : s.offenders.join('\n') || '—',
+        inline: false,
+      },
+      ...(s.ok
+        ? [{
+            name: '✅ ماذا يعني هذا؟',
+            value:
+              '- مضاد النيوك يطرد/يحظر/يسلب الرولات ✅\n' +
+              '- الاستعادة التلقائية بعد الهجوم ✅\n' +
+              '- منع منح الأدمنستريتر ✅',
+            inline: false,
+          }]
+        : [{
+            name: '✅ كيف تصلحها (خطوتين)',
+            value:
+              '**1.** Server Settings ← Roles\n' +
+              `**2.** اسحب رول البوت (‎${s.botRoleName}‎) **لأعلى القائمة** — يبقى الأول تحت @everyone مباشرة\n\n` +
+              '_بعد التصحيح شغّل الأمر مرة ثانية للتأكد._',
+            inline: false,
+          }])
+    )
+    .setFooter({ text: 'Liberty City — Hierarchy Guard' })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -624,6 +727,7 @@ function getActionName(action: string): string {
     mute: '🔇 كتم',
     delete: '🗑️ حذف',
     alert: '📢 تنبيه فقط',
+    strip: '🗡️ سلب الرولات',
   };
   return actions[action] || action;
 }

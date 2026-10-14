@@ -22,6 +22,16 @@ const guildCreateEvent: Event = {
     } catch (error) {
       logger.warn(`Failed to register commands in new guild ${guild.id}:`, error);
     }
+
+    // 🛡️ تأمين السيرفر الجديد فوراً:
+    //    1) فحص التسلّم — البوت لازم أعلى رتبة وإلا كل الحماية معطّلة
+    //    2) نسخة احتياطية أولى — تمهيداً للاستعادة التلقائية
+    try {
+      await client.securityHandler.ensureHierarchyAlert(guild);
+      await client.securityHandler.syncAutoBackup(guild, true);
+    } catch (error) {
+      logger.warn(`Security setup failed in ${guild.id}:`, error);
+    }
   },
 };
 

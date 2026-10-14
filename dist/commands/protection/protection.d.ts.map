@@ -1,1 +1,1 @@
-{"version":3,"file":"protection.d.ts","sourceRoot":"","sources":["../../../src/commands/protection/protection.ts"],"names":[],"mappings":"AAUA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAKxD,QAAA,MAAM,OAAO,EAAE,OAmOd,CAAC;AAoYF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"protection.d.ts","sourceRoot":"","sources":["../../../src/commands/protection/protection.ts"],"names":[],"mappings":"AAUA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAKxD,QAAA,MAAM,OAAO,EAAE,OAgPd,CAAC;AA+dF,eAAe,OAAO,CAAC"}
