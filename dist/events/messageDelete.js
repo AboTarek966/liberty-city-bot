@@ -11,7 +11,8 @@ const messageDeleteEvent = {
         const client = message.client;
         // 🕵️ حفظ نسخة من الرسالة محذوفة (سنايب) قبل معالجة السجلات
         (0, snipeCache_1.recordDeletedMessage)(message);
-        await client.loggingHandler.handleMessageDelete(message);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleMessageDelete(message).catch((err) => client.loggingHandler.reportFailure('messageDelete', err));
     },
 };
 exports.default = messageDeleteEvent;

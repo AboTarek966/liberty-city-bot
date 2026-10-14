@@ -434,6 +434,7 @@ const TicketSchema = new mongoose_1.Schema({
     /** سجل الإداريين الذين استلموا هذه التذكرة — لعدم احتساب نقاط مكررة */
     claimHistory: [{ type: String }],
     lockSnapshots: [TicketLockSnapshotSchema],
+    closeSnapshots: [TicketLockSnapshotSchema],
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     closedAt: { type: Date },

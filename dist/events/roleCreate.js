@@ -7,7 +7,8 @@ const roleCreateEvent = {
     name: 'roleCreate',
     async execute(role) {
         const client = role.client;
-        await client.loggingHandler.handleRoleCreate(role);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleRoleCreate(role).catch((err) => client.loggingHandler.reportFailure('roleCreate', err));
     },
 };
 exports.default = roleCreateEvent;

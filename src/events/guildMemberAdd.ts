@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Guild Member Add Event
 // ============================================
 
@@ -187,7 +187,8 @@ export async function handleWelcome(
 // --------------------------------------------
 async function logMemberJoin(member: GuildMember): Promise<void> {
   const client = member.client as LibertyClient;
-  await client.loggingHandler.handleMemberJoin(member).catch(() => {});
+  // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+  client.loggingHandler.handleMemberJoin(member).catch((err) => client.loggingHandler.reportFailure('guildMemberAdd', err));
 }
 
 // --------------------------------------------

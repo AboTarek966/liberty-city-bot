@@ -7,7 +7,8 @@ const event = {
     name: 'channelDelete',
     async execute(channel) {
         const client = channel.client;
-        await client.loggingHandler.handleChannelDelete(channel);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleChannelDelete(channel).catch((err) => client.loggingHandler.reportFailure('channelDelete', err));
         // 🛡️ Anti-Nuke: رصد الحذف الجماعي
         await client.securityHandler.onChannelDelete(channel).catch(() => { });
     },

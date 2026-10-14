@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Role Logging Events
 // ============================================
 
@@ -9,7 +9,8 @@ const roleCreateEvent: Event = {
   name: 'roleCreate',
   async execute(role: any) {
     const client = role.client as LibertyClient;
-    await client.loggingHandler.handleRoleCreate(role);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleRoleCreate(role).catch((err) => client.loggingHandler.reportFailure('roleCreate', err));
   },
 };
 

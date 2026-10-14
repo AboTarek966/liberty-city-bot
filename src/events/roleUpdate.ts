@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Role Update (Logging + Anti-Admin)
 // ============================================
 
@@ -11,7 +11,8 @@ const event: Event = {
   async execute(oldRole: Role, newRole: Role) {
     const client = newRole.client as LibertyClient;
     // 📋 سجل تعديل الرولات
-    await client.loggingHandler.handleRoleUpdate(oldRole, newRole).catch(() => {});
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleRoleUpdate(oldRole, newRole).catch((err) => client.loggingHandler.reportFailure('roleUpdate', err));
     // 🛡️ Anti-Admin: تنبيه عند منح صلاحية Administrator
     await client.securityHandler.onRoleUpdate(oldRole, newRole).catch(() => {});
   },

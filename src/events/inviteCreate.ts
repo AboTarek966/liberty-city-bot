@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Invite Logging Events
 // ============================================
 
@@ -9,7 +9,8 @@ const inviteCreateEvent: Event = {
   name: 'inviteCreate',
   async execute(invite: any) {
     const client = invite.client as LibertyClient;
-    await client.loggingHandler.handleInviteCreate(invite);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleInviteCreate(invite).catch((err) => client.loggingHandler.reportFailure('inviteCreate', err));
   },
 };
 

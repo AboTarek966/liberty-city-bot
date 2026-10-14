@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Guild Member Remove Event
 // ============================================
 
@@ -87,7 +87,8 @@ export async function handleLeave(
 // --------------------------------------------
 async function logMemberLeave(member: GuildMember): Promise<void> {
   const client = member.client as LibertyClient;
-  await client.loggingHandler.handleMemberLeave(member).catch(() => {});
+  // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+  client.loggingHandler.handleMemberLeave(member).catch((err) => client.loggingHandler.reportFailure('guildMemberRemove', err));
 
   // Handle open tickets
   await handleMemberTickets(member);

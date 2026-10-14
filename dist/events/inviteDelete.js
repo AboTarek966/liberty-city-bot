@@ -7,7 +7,8 @@ const event = {
     name: 'inviteDelete',
     async execute(invite) {
         const client = invite.client;
-        await client.loggingHandler.handleInviteDelete(invite);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleInviteDelete(invite).catch((err) => client.loggingHandler.reportFailure('inviteDelete', err));
     },
 };
 exports.default = event;

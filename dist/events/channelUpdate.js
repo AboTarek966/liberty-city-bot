@@ -7,7 +7,8 @@ const event = {
     name: 'channelUpdate',
     async execute(oldChannel, newChannel) {
         const client = newChannel.client;
-        await client.loggingHandler.handleChannelUpdate(oldChannel, newChannel);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleChannelUpdate(oldChannel, newChannel).catch((err) => client.loggingHandler.reportFailure('channelUpdate', err));
     },
 };
 exports.default = event;

@@ -7,7 +7,8 @@ const event = {
     name: 'guildMemberUpdate',
     async execute(oldMember, newMember) {
         const client = newMember.client;
-        await client.loggingHandler.handleGuildMemberUpdate(oldMember, newMember);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleGuildMemberUpdate(oldMember, newMember).catch((err) => client.loggingHandler.reportFailure('guildMemberUpdate', err));
     },
 };
 exports.default = event;

@@ -8,7 +8,8 @@ const event = {
     async execute(oldState, newState) {
         const client = (oldState.client || newState.client);
         // سجلات الصوت
-        await client.loggingHandler.handleVoiceStateUpdate(oldState, newState);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleVoiceStateUpdate(oldState, newState).catch((err) => client.loggingHandler.reportFailure('voiceStateUpdate', err));
         // ===== نظام المستويات: XP الصوت =====
         try {
             const guild = newState.guild || oldState.guild;

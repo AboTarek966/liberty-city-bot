@@ -7,7 +7,8 @@ const event = {
     name: 'guildBanRemove',
     async execute(ban) {
         const client = ban.client;
-        await client.loggingHandler.handleGuildBanRemove(ban);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleGuildBanRemove(ban).catch((err) => client.loggingHandler.reportFailure('guildBanRemove', err));
     },
 };
 exports.default = event;

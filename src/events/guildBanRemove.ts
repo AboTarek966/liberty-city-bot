@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Unban Logging
 // ============================================
 
@@ -9,7 +9,8 @@ const event: Event = {
   name: 'guildBanRemove',
   async execute(ban: any) {
     const client = ban.client as LibertyClient;
-    await client.loggingHandler.handleGuildBanRemove(ban);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleGuildBanRemove(ban).catch((err) => client.loggingHandler.reportFailure('guildBanRemove', err));
   },
 };
 

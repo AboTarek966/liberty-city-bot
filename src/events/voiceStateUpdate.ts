@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Voice State (Logging + Leveling XP)
 // ============================================
 
@@ -11,7 +11,8 @@ const event: Event = {
     const client = (oldState.client || newState.client) as LibertyClient;
 
     // سجلات الصوت
-    await client.loggingHandler.handleVoiceStateUpdate(oldState, newState);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleVoiceStateUpdate(oldState, newState).catch((err) => client.loggingHandler.reportFailure('voiceStateUpdate', err));
 
     // ===== نظام المستويات: XP الصوت =====
     try {

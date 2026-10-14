@@ -5,10 +5,42 @@ export declare class LoggingHandler {
     private client;
     private enabledCache;
     private readonly CACHE_TTL;
+    /**
+     * ⚡ طابور إرسال لكل سيرفر — يحلّ مشاكل السجلات الثلاث:
+     *   1) الترتيب: السجلات تُرسل كما وقعت فعلاً (لا سجلات مقلوبة أو مبعثرة)
+     *   2) السرعة: الإرسال مستقل عن مسار الحدث → لا يعطّل الترحيب/الحماية/الأوامر
+     *   3) عدم الضياع: تأخير واحد لا يُسقط بقية السجلات المكدّسة
+     */
+    private queues;
+    /** ذاكرة محتوى الرسائل الأخيرة — لعرض "النص قبل التعديل" حتى لو الرسالة غير مخزّنة */
+    private recentContent;
+    private contentCounter;
+    private readonly CONTENT_TTL;
+    private readonly CONTENT_MAX;
     constructor(client: Client);
     private getLogConfig;
     invalidateCache(guildId: string): void;
+    /**
+     * تتبّع فشل أي معالج سجل — بدون هذا الدالة كانت الأخطاء تُبتلع صامتاً
+     * فلا يظهر للإدارة أي سبب لاختفاء السجل (وكأنه "ما انصلك أصلاً").
+     */
+    reportFailure(eventName: string, error: unknown): void;
     private sendLog;
+    /** إضافة مهمة إلى طابور السيرفر (تنفيذ تسلسلي بالترتيب) */
+    private enqueue;
+    /** الإرسال الفعلي: جلب القناة (كاش ثم fetch) + تحقق الصلاحيات + إعادة محاولة واحدة */
+    private deliverLog;
+    /**
+     * تصحيح الإيمبد قبل الإرسال — يمنع رفض Discord للرسالة بالكامل
+     * (خطأ 50035 = سجل ضائع بالكامل، وهو سبب "أوقات ما ترسل"):
+     *   • حقل فارغ أو "undefined" → يُستبدل بـ "—"
+     *   • تجاوز حد 1024 حرف للحقل أو 4096 للوصف أو 250 للعنوان → يُقصّر
+     */
+    private sanitizeEmbed;
+    /** يُستدعى من messageCreate — يخزّن نص الرسالة لاستخدامه عند التعديل أو الحذف */
+    recordMessageContent(message: any): void;
+    /** جلب النص المخزّن لرسالة (إن وُجد ولم تنتهِ صلاحيته) */
+    private getCachedContent;
     /** Truncate text for embed fields (max ~500 chars, "..." suffix) */
     private truncate;
     /** Format a user with tag + mention (handles unknown users) */
@@ -17,13 +49,18 @@ export declare class LoggingHandler {
     private getAccountAgeDays;
     /** Account creation date + age fields (only when known) */
     private accountFields;
-    /** Fetch the audit-log entry (executor + reason) for a recent action on a target */
+    /**
+     * Fetch the audit-log entry (executor + reason) for a recent action on a target.
+     * ⚠️ سجل التدقيق قد يظهر بفارق ~1-2 ثانية عن الحدث نفسه،
+     * لذلك نجرّب 3 مرات بفارق 600ms حتى لا يظهر "غير معروف" في السجل.
+     */
     private fetchAuditInfo;
     /** Human-readable executor field value (moderator) */
     private executorValue;
     handleMemberJoin(member: any): Promise<void>;
     handleMemberLeave(member: any): Promise<void>;
     handleMessageDelete(message: any): Promise<void>;
+    handleMessageDeleteBulk(messages: any, channel: any): Promise<void>;
     handleMessageEdit(oldMessage: any, newMessage: any): Promise<void>;
     handleGuildBanAdd(ban: any): Promise<void>;
     handleGuildBanRemove(ban: any): Promise<void>;

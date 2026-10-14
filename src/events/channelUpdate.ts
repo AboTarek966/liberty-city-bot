@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Channel Update Logging
 // ============================================
 
@@ -9,7 +9,8 @@ const event: Event = {
   name: 'channelUpdate',
   async execute(oldChannel: any, newChannel: any) {
     const client = newChannel.client as LibertyClient;
-    await client.loggingHandler.handleChannelUpdate(oldChannel, newChannel);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleChannelUpdate(oldChannel, newChannel).catch((err) => client.loggingHandler.reportFailure('channelUpdate', err));
   },
 };
 

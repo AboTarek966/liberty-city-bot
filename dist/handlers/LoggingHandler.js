@@ -101,6 +101,18 @@ class LoggingHandler {
     client;
     enabledCache = new Map();
     CACHE_TTL = 30000; // 30 ثانية
+    /**
+     * ⚡ طابور إرسال لكل سيرفر — يحلّ مشاكل السجلات الثلاث:
+     *   1) الترتيب: السجلات تُرسل كما وقعت فعلاً (لا سجلات مقلوبة أو مبعثرة)
+     *   2) السرعة: الإرسال مستقل عن مسار الحدث → لا يعطّل الترحيب/الحماية/الأوامر
+     *   3) عدم الضياع: تأخير واحد لا يُسقط بقية السجلات المكدّسة
+     */
+    queues = new Map();
+    /** ذاكرة محتوى الرسائل الأخيرة — لعرض "النص قبل التعديل" حتى لو الرسالة غير مخزّنة */
+    recentContent = new Map();
+    contentCounter = 0;
+    CONTENT_TTL = 30 * 60 * 1000; // 30 دقيقة
+    CONTENT_MAX = 4000; // حد أقصى لعدد الرسائل المحفوظة
     constructor(client) {
         this.client = client;
     }
@@ -108,21 +120,32 @@ class LoggingHandler {
     // Check if event should be logged
     // --------------------------------------------
     async getLogConfig(guild) {
-        // Check cache first (with TTL)
+        // Check cache first (with TTL) — النتيجة "غير مفعّل" تُخزَّن أيضاً
+        // حتى لا نقرأ قاعدة البيانات مع كل حدث عندما تكون اللوقس مطفأة
         const cached = this.enabledCache.get(guild.id);
         if (cached && Date.now() - cached.timestamp < this.CACHE_TTL)
             return cached;
         try {
             const settings = await (0, models_1.getGuildSettings)(guild.id);
-            if (!settings.logging?.enabled)
+            const OFF = {
+                channelId: undefined,
+                splits: {},
+                types: new Set(),
+                timestamp: Date.now(),
+            };
+            if (!settings.logging?.enabled) {
+                this.enabledCache.set(guild.id, OFF);
                 return null;
+            }
             // 🔀 تقسيم: كل نوع حدث قد يملك قناة خاصة (وإلا → القناة الرئيسية)
             const splits = {
                 ...(settings.logging.channels || {}),
             };
             const channelId = settings.logging.channelId;
-            if (!channelId && Object.keys(splits).length === 0)
+            if (!channelId && Object.keys(splits).length === 0) {
+                this.enabledCache.set(guild.id, OFF);
                 return null;
+            }
             const types = new Set(settings.logging.types || []);
             const config = { channelId, splits, types, timestamp: Date.now() };
             // Cache with timestamp
@@ -138,8 +161,16 @@ class LoggingHandler {
     invalidateCache(guildId) {
         this.enabledCache.delete(guildId);
     }
+    /**
+     * تتبّع فشل أي معالج سجل — بدون هذا الدالة كانت الأخطاء تُبتلع صامتاً
+     * فلا يظهر للإدارة أي سبب لاختفاء السجل (وكأنه "ما انصلك أصلاً").
+     */
+    reportFailure(eventName, error) {
+        logger.error(`⚠️ Log handler "${eventName}" failed:`, error);
+    }
     // --------------------------------------------
     // Send log embed (مُوجَّه لقناة نوع الحدث إن وُجدت)
+    // الإرسال عبر طابور مُرتَّب لكل سيرفر — لا ينتظره مسار الحدث
     // --------------------------------------------
     async sendLog(guild, eventType, embed) {
         try {
@@ -155,31 +186,136 @@ class LoggingHandler {
             const targetId = config.splits[eventType] || config.channelId;
             if (!targetId)
                 return;
-            const channel = guild.channels.cache.get(targetId);
-            if (!channel || channel.type !== discord_js_1.ChannelType.GuildText) {
-                logger.warn(`Log channel ${targetId} not found or not a text channel for ${eventType} in ${guild.name}`);
-                // Invalidate cache to force refresh next time
-                this.enabledCache.delete(guild.id);
-                return;
-            }
-            // Check bot permissions in the channel
-            const perms = channel.permissionsFor(guild.members.me);
-            if (!perms?.has(discord_js_1.PermissionFlagsBits.SendMessages) || !perms?.has(discord_js_1.PermissionFlagsBits.EmbedLinks)) {
-                logger.warn(`Missing SendMessages/EmbedLinks in log channel ${targetId} for ${eventType} in ${guild.name}`);
-                return;
-            }
             embed.setFooter({ text: `Liberty City • ${eventType}` });
             embed.setTimestamp();
-            await channel.send({ embeds: [embed] }).catch((err) => {
-                logger.error(`Failed to send log to channel ${targetId}:`, err);
-                // Invalidate cache on send failure
-                this.enabledCache.delete(guild.id);
-            });
-            logger.debug(`Logged event: ${eventType} in ${guild.name} → #${channel.name}`);
+            this.sanitizeEmbed(embed);
+            // ⚡ طابور السيرفر: ترتيب تام + استقلال عن الحدث (لا بطء ولا ضياع)
+            this.enqueue(guild.id, () => this.deliverLog(guild.id, targetId, embed));
         }
         catch (error) {
             logger.error(`Error sending log for ${eventType}:`, error);
         }
+    }
+    /** إضافة مهمة إلى طابور السيرفر (تنفيذ تسلسلي بالترتيب) */
+    enqueue(guildId, job) {
+        const previous = this.queues.get(guildId) ?? Promise.resolve();
+        const next = previous.then(job).catch((err) => {
+            logger.error(`Queued log job failed for ${guildId}:`, err);
+        });
+        this.queues.set(guildId, next);
+        // تنظيف الوعاء بعد انتهائه لتجنّب تسرّب الذاكرة
+        void next.then(() => {
+            if (this.queues.get(guildId) === next)
+                this.queues.delete(guildId);
+        });
+    }
+    /** الإرسال الفعلي: جلب القناة (كاش ثم fetch) + تحقق الصلاحيات + إعادة محاولة واحدة */
+    async deliverLog(guildId, channelId, embed) {
+        const guild = this.client.guilds.cache.get(guildId);
+        if (!guild)
+            return;
+        // الكاش أولاً ثم الجلب الفعلي — يمنع ضياع السجل إذا لم تكن القناة في الكاش
+        let channel = guild.channels.cache.get(channelId);
+        if (!channel) {
+            channel = (await guild.channels.fetch(channelId).catch(() => null)) ?? undefined;
+        }
+        if (!channel || channel.type !== discord_js_1.ChannelType.GuildText) {
+            logger.warn(`Log channel ${channelId} not found or not a text channel in ${guild.name}`);
+            this.enabledCache.delete(guildId);
+            return;
+        }
+        const me = guild.members.me;
+        const perms = me ? channel.permissionsFor(me) : null;
+        if (!perms?.has(discord_js_1.PermissionFlagsBits.SendMessages) || !perms?.has(discord_js_1.PermissionFlagsBits.EmbedLinks)) {
+            logger.warn(`Missing SendMessages/EmbedLinks in log channel #${channel.name} in ${guild.name}`);
+            return;
+        }
+        const payload = { embeds: [embed] };
+        // المحاولة الأولى، ثم إعادة محاولة واحدة بعد 1.2 ثانية للأعطال المؤقتة
+        const firstError = await channel.send(payload).then(() => null).catch((err) => err);
+        if (firstError) {
+            logger.warn(`Log send failed in ${guild.name} (#${channel.name}), retrying once:`, firstError);
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            await channel.send(payload).catch((err) => {
+                logger.error(`Log send failed permanently in ${guild.name} (#${channel.name}):`, err);
+            });
+        }
+        logger.debug(`Logged event in ${guild.name} → #${channel.name}`);
+    }
+    /**
+     * تصحيح الإيمبد قبل الإرسال — يمنع رفض Discord للرسالة بالكامل
+     * (خطأ 50035 = سجل ضائع بالكامل، وهو سبب "أوقات ما ترسل"):
+     *   • حقل فارغ أو "undefined" → يُستبدل بـ "—"
+     *   • تجاوز حد 1024 حرف للحقل أو 4096 للوصف أو 250 للعنوان → يُقصّر
+     */
+    sanitizeEmbed(embed) {
+        try {
+            const data = embed.data;
+            if (typeof data.title === 'string' && data.title.length > 250) {
+                embed.setTitle(`${data.title.slice(0, 247)}…`);
+            }
+            if (typeof data.description === 'string' && data.description.length > 4000) {
+                embed.setDescription(`${data.description.slice(0, 3997)}…`);
+            }
+            if (Array.isArray(data.fields)) {
+                const fixed = data.fields.map((f) => {
+                    let name = typeof f?.name === 'string' && f.name.trim() ? f.name : '—';
+                    let value = typeof f?.value === 'string' && f.value.trim() ? f.value : '—';
+                    if (name.length > 250)
+                        name = `${name.slice(0, 247)}…`;
+                    if (value.length > 1020)
+                        value = `${value.slice(0, 1017)}…`;
+                    return { name, value, inline: !!f?.inline };
+                });
+                embed.setFields(fixed);
+            }
+        }
+        catch (error) {
+            logger.warn('sanitizeEmbed failed:', error);
+        }
+    }
+    // --------------------------------------------
+    // ذاكرة محتوى الرسائل (تعويض الرسائل غير المخزّنة)
+    // --------------------------------------------
+    /** يُستدعى من messageCreate — يخزّن نص الرسالة لاستخدامه عند التعديل أو الحذف */
+    recordMessageContent(message) {
+        try {
+            const id = message?.id;
+            const content = message?.content;
+            if (!id || typeof content !== 'string' || content.length === 0)
+                return;
+            this.recentContent.set(id, { content, at: Date.now() });
+            // تنظيف دوري كل 400 رسالة (عملية رخيصة ولا تُحسّ في المسار الحارّ)
+            if (++this.contentCounter % 400 === 0) {
+                const now = Date.now();
+                for (const [key, entry] of this.recentContent) {
+                    if (now - entry.at > this.CONTENT_TTL)
+                        this.recentContent.delete(key);
+                }
+                while (this.recentContent.size > this.CONTENT_MAX) {
+                    const oldest = this.recentContent.keys().next();
+                    if (oldest.done)
+                        break;
+                    this.recentContent.delete(oldest.value);
+                }
+            }
+        }
+        catch {
+            /* لا نعطّل مسار الرسائل أبداً */
+        }
+    }
+    /** جلب النص المخزّن لرسالة (إن وُجد ولم تنتهِ صلاحيته) */
+    getCachedContent(messageId) {
+        if (!messageId)
+            return null;
+        const entry = this.recentContent.get(messageId);
+        if (!entry)
+            return null;
+        if (Date.now() - entry.at > this.CONTENT_TTL) {
+            this.recentContent.delete(messageId);
+            return null;
+        }
+        return entry.content;
     }
     // --------------------------------------------
     // Shared formatting helpers
@@ -217,14 +353,23 @@ class LoggingHandler {
             { name: '⏳ عمر الحساب', value: `${ageDays} يوم`, inline: true },
         ];
     }
-    /** Fetch the audit-log entry (executor + reason) for a recent action on a target */
-    async fetchAuditInfo(guild, type, targetId, maxAgeMs = 15000) {
+    /**
+     * Fetch the audit-log entry (executor + reason) for a recent action on a target.
+     * ⚠️ سجل التدقيق قد يظهر بفارق ~1-2 ثانية عن الحدث نفسه،
+     * لذلك نجرّب 3 مرات بفارق 600ms حتى لا يظهر "غير معروف" في السجل.
+     */
+    async fetchAuditInfo(guild, type, targetId, maxAgeMs = 20000) {
         try {
-            const logs = await guild.fetchAuditLogs({ type, limit: 5 });
-            const entry = logs.entries.find((e) => e.target?.id === targetId && Date.now() - e.createdTimestamp <= maxAgeMs);
-            if (!entry)
-                return null;
-            return { executor: entry.executor, reason: entry.reason || 'غير محدد' };
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const logs = await guild.fetchAuditLogs({ type, limit: 10 }).catch(() => null);
+                const entry = logs?.entries?.find((e) => e.target?.id === targetId && Date.now() - e.createdTimestamp <= maxAgeMs);
+                if (entry) {
+                    return { executor: entry.executor, reason: entry.reason || 'غير محدد' };
+                }
+                if (attempt < 2)
+                    await new Promise((resolve) => setTimeout(resolve, 600));
+            }
+            return null;
         }
         catch {
             return null;
@@ -307,11 +452,18 @@ class LoggingHandler {
         if (message.content && message.content.trim().length > 0) {
             content = this.truncate(message.content, 500);
         }
-        else if (attachmentCount > 0) {
-            content = 'مرفق (بدون نص)';
-        }
         else {
-            content = 'رسالة نظام أو محتوى غير متاح';
+            // 🔁 الرسائل غير المقدّرة تصل بلا محتوى — نعوّض من ذاكرتنا الأخيرة
+            const cached = this.getCachedContent(message.id);
+            if (cached && cached.trim().length > 0) {
+                content = this.truncate(cached, 500);
+            }
+            else if (attachmentCount > 0) {
+                content = 'مرفق (بدون نص)';
+            }
+            else {
+                content = 'رسالة نظام أو محتوى غير متاح';
+            }
         }
         const fields = [
             { name: '👤 الكاتب', value: author, inline: true },
@@ -332,6 +484,47 @@ class LoggingHandler {
         await this.sendLog(message.guild, 'messageDelete', embed);
     }
     // --------------------------------------------
+    // Bulk Message Delete (حذف جماعي — كان غير موجود)
+    // --------------------------------------------
+    async handleMessageDeleteBulk(messages, channel) {
+        try {
+            const guild = channel?.guild ?? messages?.first?.()?.guild;
+            if (!guild)
+                return;
+            // discord.js يمرّر Collection، وقد يمرّر مصفوفة أو Map — نتعامل مع الثلاثة
+            const list = Array.isArray(messages)
+                ? messages
+                : typeof messages?.values === 'function'
+                    ? Array.from(messages.values())
+                    : [];
+            const rows = [];
+            for (const m of list.slice(0, 20)) {
+                if (m?.author?.bot)
+                    continue;
+                const who = m?.author ? this.formatUser(m.author) : 'غير معروف';
+                const text = (typeof m?.content === 'string' && m.content.trim()) ||
+                    this.getCachedContent(m?.id) ||
+                    '(بدون نص)';
+                rows.push(`• ${who}: ${this.truncate(text, 120)}`);
+            }
+            const fields = [
+                { name: '📍 القناة', value: channel?.id ? `<#${channel.id}>` : 'غير معروف', inline: true },
+                { name: '🔢 عدد الرسائل المحذوفة', value: `${list.length}`, inline: true },
+            ];
+            if (rows.length > 0) {
+                fields.push({ name: '📝 عيّنة من المحتوى', value: this.truncate(rows.join('\n'), 1000), inline: false });
+            }
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle('🗑️ حذف جماعي للرسائل')
+                .setColor(EVENT_COLORS.messageDelete)
+                .addFields(fields);
+            await this.sendLog(guild, 'messageDelete', embed);
+        }
+        catch (error) {
+            logger.error('handleMessageDeleteBulk failed:', error);
+        }
+    }
+    // --------------------------------------------
     // Message Edit
     // --------------------------------------------
     async handleMessageEdit(oldMessage, newMessage) {
@@ -341,10 +534,19 @@ class LoggingHandler {
             return;
         if (oldMessage.content === newMessage.content)
             return;
+        // 🔁 الرسائل غير المقدّرة (partials) تصل بلا نص قديم — نعوّض من ذاكرتنا
+        //    حتى لا يظهر الحقل "فارغ" (وهو سبب الشكوى "أشياء مو كاملة")
+        const cachedBefore = this.getCachedContent(oldMessage?.id);
+        const before = typeof oldMessage.content === 'string' && oldMessage.content.trim().length > 0
+            ? oldMessage.content
+            : cachedBefore;
+        const beforeText = before
+            ? this.truncate(before, 500)
+            : '⚠️ غير متاح — الرسالة الأصلية لم تكن مخزّنة';
         const embed = new discord_js_1.EmbedBuilder()
             .setTitle('✏️ تعديل رسالة')
             .setColor(EVENT_COLORS.messageEdit)
-            .addFields({ name: '👤 الكاتب', value: this.formatUser(newMessage.author), inline: true }, { name: '📍 القناة', value: newMessage.channel?.id ? `<#${newMessage.channel.id}>` : 'غير معروف', inline: true }, { name: '🆔 معرّف الرسالة', value: `\`${newMessage.id}\``, inline: true }, { name: '📝 المحتوى قبل التعديل', value: this.truncate(oldMessage.content, 500), inline: false }, { name: '📝 المحتوى بعد التعديل', value: this.truncate(newMessage.content, 500), inline: false });
+            .addFields({ name: '👤 الكاتب', value: this.formatUser(newMessage.author), inline: true }, { name: '📍 القناة', value: newMessage.channel?.id ? `<#${newMessage.channel.id}>` : 'غير معروف', inline: true }, { name: '🆔 معرّف الرسالة', value: `\`${newMessage.id}\``, inline: true }, { name: '📝 المحتوى قبل التعديل', value: beforeText, inline: false }, { name: '📝 المحتوى بعد التعديل', value: this.truncate(newMessage.content, 500), inline: false });
         if (typeof newMessage.author.displayAvatarURL === 'function') {
             embed.setThumbnail(newMessage.author.displayAvatarURL());
         }

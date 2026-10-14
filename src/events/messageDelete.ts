@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Logging Events (All-in-one)
 // ============================================
 
@@ -13,7 +13,8 @@ const messageDeleteEvent: Event = {
     const client = message.client as LibertyClient;
     // 🕵️ حفظ نسخة من الرسالة محذوفة (سنايب) قبل معالجة السجلات
     recordDeletedMessage(message);
-    await client.loggingHandler.handleMessageDelete(message);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleMessageDelete(message).catch((err) => client.loggingHandler.reportFailure('messageDelete', err));
   },
 };
 

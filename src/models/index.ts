@@ -427,6 +427,12 @@ export interface ITicket extends Document {
   lockGrantedUsers?: string[];
   /** لقطة لحالة صلاحيات القناة قبل القفل — لإرجاعها كما كانت عند إلغاء القفل */
   lockSnapshots?: ITicketLockSnapshot[];
+  /**
+   * لقطة صلاحيات القناة قبل الإغلاق — تُطبَّق قاعدة الإغلاق الصارمة:
+   * لا يكتب أحد أثناء الإغلاق (لا الإداريون ولا صاحب التذكرة)، ويُعاد فتحها
+   * من قبل من أغلقها فقط، وعندها تُرجع الصلاحيات كما كانت تماماً.
+   */
+  closeSnapshots?: ITicketLockSnapshot[];
   /** آخر نشاط في التذكرة (رسالة) — للكشف عن الخمول والإغلاق التلقائي */
   lastActivityAt?: Date;
   /** تم إرسال تحذير الخمول لهذه التذكرة */
@@ -949,6 +955,7 @@ const TicketSchema = new Schema<ITicket>({
   /** سجل الإداريين الذين استلموا هذه التذكرة — لعدم احتساب نقاط مكررة */
   claimHistory: [{ type: String }],
   lockSnapshots: [TicketLockSnapshotSchema],
+  closeSnapshots: [TicketLockSnapshotSchema],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   closedAt: { type: Date },

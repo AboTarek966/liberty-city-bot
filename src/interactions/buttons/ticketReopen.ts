@@ -2,7 +2,7 @@
 // Liberty City Bot - Ticket Reopen Button
 // ============================================
 
-import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
+import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { Ticket } from '../../models';
@@ -23,20 +23,15 @@ const handler: ButtonHandler = {
         return;
       }
 
-      // التحقق من الصلاحيات
-      const member = interaction.guild.members.cache.get(interaction.user.id) ??
-        await interaction.guild.members.fetch(interaction.user.id);
-      const canManage = member.permissions.has(PermissionFlagsBits.ManageChannels);
-
-      if (!canManage) {
-        await interaction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لإعادة فتح التذكرة' });
-        return;
-      }
-
       if (ticket.status !== 'closed') {
         await interaction.editReply({ content: '❌ التذكرة غير مغلقة' });
         return;
       }
+
+      // ⛔ القاعدة تُطبَّق داخل reopenTicket (مصدر واحد للحقيقة):
+      //    إعادة الفتح لمن أغلقها فقط، مع تجاوز لحاملي Administrator
+      const member = interaction.guild.members.cache.get(interaction.user.id) ??
+        await interaction.guild.members.fetch(interaction.user.id);
 
       await client.ticketHandler.reopenTicket(ticket.channelId, member);
 

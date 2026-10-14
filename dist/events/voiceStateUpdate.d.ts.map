@@ -1,1 +1,1 @@
-{"version":3,"file":"voiceStateUpdate.d.ts","sourceRoot":"","sources":["../../src/events/voiceStateUpdate.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,KAAK,EAAE,MAAM,0BAA0B,CAAC;AAGjD,QAAA,MAAM,KAAK,EAAE,KA8BZ,CAAC;AAEF,eAAe,KAAK,CAAC"}
+{"version":3,"file":"voiceStateUpdate.d.ts","sourceRoot":"","sources":["../../src/events/voiceStateUpdate.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,KAAK,EAAE,MAAM,0BAA0B,CAAC;AAGjD,QAAA,MAAM,KAAK,EAAE,KA+BZ,CAAC;AAEF,eAAe,KAAK,CAAC"}

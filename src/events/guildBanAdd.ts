@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Ban Logging
 // ============================================
 
@@ -9,7 +9,8 @@ const event: Event = {
   name: 'guildBanAdd',
   async execute(ban: any) {
     const client = ban.client as LibertyClient;
-    await client.loggingHandler.handleGuildBanAdd(ban);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleGuildBanAdd(ban).catch((err) => client.loggingHandler.reportFailure('guildBanAdd', err));
     // 🛡️ Anti-Nuke: رصد الحظر الجماعي
     await client.securityHandler.onBanAdd(ban).catch(() => {});
   },

@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Ticket Handler (Enhanced)
 // ============================================
 
@@ -78,6 +78,9 @@ export class TicketHandler {
   private client: Client;
   private activeTickets: Collection<string, ITicket> = new Collection();
   private callCooldowns: Collection<string, number> = new Collection();
+
+  /** ⚡ طابور إرسال سجلات التذاكر لكل سيرفر — ترتيب تام + لا يعطّل مسار التذكرة */
+  private ticketLogQueues: Map<string, Promise<void>> = new Map();
 
   constructor(client: Client) {
     this.client = client;
@@ -288,7 +291,9 @@ export class TicketHandler {
       },
     ];
 
-    // صلاحيات فريق الدعم: قراءة + أدوات دائماً، والكتابة حسب خيار القفل
+    // صلاحيات فريق الدعم: قراءة + أدوات دائماً.
+    // ⛔ الكتابة ممنوعة على فريق الدعم حتى يستلم أحدٌهم التذكرة —
+    //    (لا يُفعَّل بخيار الإعدادات — قاعدة ثابتة طلباً من الإدارة)
     const supportAllow: bigint[] = [
       PermissionFlagsBits.ViewChannel,
       PermissionFlagsBits.ReadMessageHistory,
@@ -296,13 +301,12 @@ export class TicketHandler {
       PermissionFlagsBits.EmbedLinks,
       PermissionFlagsBits.ManageMessages,
     ];
-    if (!lockClaim) supportAllow.push(PermissionFlagsBits.SendMessages);
 
     for (const role of supportRoles) {
       permissionOverwrites.push({
         id: role.id,
         allow: supportAllow,
-        ...(lockClaim ? { deny: [PermissionFlagsBits.SendMessages] } : {}),
+        deny: [PermissionFlagsBits.SendMessages],
       });
     }
 
@@ -358,7 +362,7 @@ export class TicketHandler {
       });
     }
 
-    await this.logTicketEvent(guild, 'create', ticket, user.user);
+    this.logTicketEvent(guild, 'create', ticket, user.user);
 
     logger.info(`Created ticket ${ticketId} for ${user.user.tag}`);
     return ticket;
@@ -387,16 +391,27 @@ export class TicketHandler {
     ticket.closeReason = reason || 'غير محدد';
     ticket.transcript = transcript;
     ticket.closedAt = new Date();
+
+    // 🔒 قفل صلاحيات القناة أثناء الإغلاق — لا يكتب أحد (لا إداري ولا صاحب التذكرة)
+    //    إعادة الفتح متاحة لمن أغلقها فقط، وعندها تُرجع الصلاحيات كما كانت.
+    ticket.closeSnapshots = await this.applyCloseLock(channel);
+
     await ticket.save();
 
     this.activeTickets.delete(channelId);
+
+    const closer = guild.members.cache.get(closedBy.id);
+    const closerName = closer?.displayName || closedBy.user.username;
 
     // إيمبد الإغلاق + أزرار "إعادة الفتح" و "حذف"
     const closingEmbed = createEmbed({
       title: '🔒 تم إغلاق التذكرة',
       description:
         `تم إغلاق التذكرة بواسطة ${closedBy}\n` +
-        `السبب: ${reason || 'غير محدد'}`,
+        `السبب: ${reason || 'غير محدد'}\n\n` +
+        `⛔ **القناة مقفلة الآن:** لا يمكن لأحد الكتابة — لا الإدارة ولا صاحب التذكرة.\n` +
+        `🔓 إعادة الفتح متاحة لـ **${closerName}** فقط.\n` +
+        `🛡️ أصحاب صلاحية **Administrator** يتجاوزون القفل دائماً.`,
       color: Colors.error,
       footer: { text: 'Liberty City Tickets' },
     });
@@ -415,7 +430,7 @@ export class TicketHandler {
     await channel.send({ embeds: [closingEmbed], components: [actionRow] });
     await this.saveTranscript(guild, ticket, transcript);
 
-    await this.logTicketEvent(guild, 'close', ticket, closedBy.user, reason);
+    this.logTicketEvent(guild, 'close', ticket, closedBy.user, reason);
 
     // ⭐ استبيان الرضا — رسالة خاصة لصاحب التذكرة بعد الإغلاق
     try {
@@ -546,7 +561,7 @@ export class TicketHandler {
     }
 
     this.activeTickets.delete(channelId);
-    await this.logTicketEvent(guild, 'delete', ticket, deletedBy.user);
+    this.logTicketEvent(guild, 'delete', ticket, deletedBy.user);
 
     logger.info(`Deleted ticket channel ${channelId}`);
   }
@@ -647,7 +662,7 @@ export class TicketHandler {
         jobs.push(this.updateTicketButtons(channel, true));
       }
 
-      jobs.push(this.logTicketEvent(guild, 'claim', ticket, claimedBy.user));
+      this.logTicketEvent(guild, 'claim', ticket, claimedBy.user);
       await Promise.allSettled(jobs);
     } catch (err) {
       logger.warn('finalizeClaim failed:', err);
@@ -664,10 +679,10 @@ export class TicketHandler {
     if (ticket.status !== 'claimed') throw new Error('التذكرة غير مستلمة');
 
     const isClaimer = ticket.claimedBy === unclaimedBy.id;
-    const canManage = unclaimedBy.permissions.has(PermissionFlagsBits.ManageChannels);
 
-    if (!isClaimer && !canManage) {
-      throw new Error('فقط المستلم أو مشرف القنوات يمكنه إلغاء الاستلام');
+    // ⛔ إلغاء الاستلام للمستلم فقط — لا يمكن لإداري آخر تحرير تذكرة استلمها زميله
+    if (!isClaimer) {
+      throw new Error('فقط المستلم هو من يستطيع إلغاء استلام التذكرة');
     }
 
     const previousClaimer = guild.members.cache.get(ticket.claimedBy!);
@@ -722,7 +737,7 @@ export class TicketHandler {
         jobs.push(this.updateTicketButtons(channel, false));
       }
 
-      jobs.push(this.logTicketEvent(guild, 'unclaim', ticket, unclaimedBy.user));
+      this.logTicketEvent(guild, 'unclaim', ticket, unclaimedBy.user);
       await Promise.allSettled(jobs);
     } catch (err) {
       logger.warn('finalizeUnclaim failed:', err);
@@ -738,13 +753,25 @@ export class TicketHandler {
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
     if (ticket.status !== 'closed') throw new Error('التذكرة غير مغلقة');
 
-    const canManage = reopenedBy.permissions.has(PermissionFlagsBits.ManageChannels);
-    if (!canManage) {
-      throw new Error('تحتاج صلاحية إدارة القنوات لإعادة فتح التذكرة');
+    // ⛔ إعادة الفتح لمن أغلقها فقط — (+ Administrator كصلاحية عليا تمنع التعلّق)
+    const isCloser = !!ticket.closedBy && ticket.closedBy === reopenedBy.id;
+    const isAdmin = reopenedBy.permissions.has(PermissionFlagsBits.Administrator);
+    if (!isCloser && !isAdmin) {
+      throw new Error('فقط من أغلق التذكرة هو من يستطيع إعادة فتحها');
     }
 
-    ticket.status = 'open';
-    ticket.claimedBy = undefined;
+    const channel = guild.channels.cache.get(channelId) as TextChannel | undefined;
+
+    // 🔓 إرجاع صلاحيات القناة كما كانت قبل الإغلاق تماماً
+    if (channel && ticket.closeSnapshots && ticket.closeSnapshots.length > 0) {
+      await this.restoreSnapshots(channel, ticket.closeSnapshots).catch((err) =>
+        logger.warn('Failed to restore close snapshots:', err)
+      );
+      ticket.closeSnapshots = [];
+    }
+
+    // 🔁 الاستلام يبقى كما كان (غالباً من أعاد الفتح هو المستلم نفسه)
+    ticket.status = ticket.claimedBy ? 'claimed' : 'open';
     ticket.closedBy = undefined;
     ticket.closeReason = undefined;
     ticket.closedAt = undefined;
@@ -752,7 +779,6 @@ export class TicketHandler {
 
     this.activeTickets.set(channelId, ticket);
 
-    const channel = guild.channels.cache.get(channelId) as TextChannel | undefined;
     logger.info(`Reopened ticket by ${reopenedBy.user.tag}`);
 
     // الأعمال في الخلفية
@@ -791,10 +817,11 @@ export class TicketHandler {
         });
 
         jobs.push(channel.send({ embeds: [reopenEmbed] }));
-        jobs.push(this.updateTicketButtons(channel, false));
+        // الاستلام محفوظ → نعرض زر "إلغاء الاستلام" لا زر "استلام"
+        jobs.push(this.updateTicketButtons(channel, !!ticket.claimedBy));
       }
 
-      jobs.push(this.logTicketEvent(guild, 'close', ticket, reopenedBy.user, 'إعادة فتح'));
+      this.logTicketEvent(guild, 'close', ticket, reopenedBy.user, 'إعادة فتح');
       await Promise.allSettled(jobs);
     } catch (err) {
       logger.warn('finalizeReopen failed:', err);
@@ -940,6 +967,65 @@ export class TicketHandler {
     await ticket.save();
 
     logger.info(`🔓 Ticket unlocked: ${ticket.channelId}`);
+  }
+
+  // --------------------------------------------
+  // 🔒 قفل التذكرة عند الإغلاق — لا يكتب أحد أثناء الإغلاق
+  //    (لا صاحب التذكرة ولا فريق الدعم ولا المستلم)
+  //    يُرفض الكتابة على كل overwrite موجود في القناة عدا البوت،
+  //    وتُحفظ لقطة كاملة حتى تُرجع الصلاحيات كما كانت عند إعادة الفتح.
+  //    حاملو Administrator يتجاوزون هذا القفل بقاعدة ديسكورد نفسها.
+  // --------------------------------------------
+  private async applyCloseLock(channel: TextChannel): Promise<ITicketLockSnapshot[]> {
+    const snapshots: ITicketLockSnapshot[] = [];
+    const meId = this.client.user?.id;
+
+    for (const [id, ow] of channel.permissionOverwrites.cache) {
+      // البوت يبقى قادراً على الإرسال (لرسالة الإغلاق وأزرار إعادة الفتح)
+      if (id === meId) continue;
+
+      snapshots.push({
+        id,
+        allow: ow.allow.bitfield.toString(),
+        deny: ow.deny.bitfield.toString(),
+        existed: true,
+      });
+    }
+
+    await Promise.all(
+      snapshots.map(snap =>
+        channel.permissionOverwrites.edit(snap.id, { SendMessages: false }).catch(() => {})
+      )
+    );
+
+    logger.info(`🔒 Ticket close-lock applied: ${channel.id} (${snapshots.length} overwrites)`);
+    return snapshots;
+  }
+
+  // --------------------------------------------
+  // 🔓 إرجاع صلاحيات القناة كما كانت تماماً (من لقطات محفوظة)
+  // --------------------------------------------
+  private async restoreSnapshots(channel: TextChannel, snapshots: ITicketLockSnapshot[]): Promise<void> {
+    for (const snap of snapshots) {
+      try {
+        if (!snap.existed) {
+          // لم يكن هناك overwrite → نحذف ما أنشأه القفل
+          await channel.permissionOverwrites.delete(snap.id);
+          continue;
+        }
+
+        const allow = new PermissionsBitField(BigInt(snap.allow));
+        const deny = new PermissionsBitField(BigInt(snap.deny));
+        const perms: Record<string, boolean | null> = {};
+        for (const [name, bit] of Object.entries(PermissionFlagsBits)) {
+          // true = allow, false = deny, null = إلغاء (غير محدد)
+          perms[name] = allow.has(bit) ? true : deny.has(bit) ? false : null;
+        }
+        await channel.permissionOverwrites.edit(snap.id, perms);
+      } catch (err) {
+        logger.warn(`Failed to restore close snapshot for ${snap.id}:`, err);
+      }
+    }
   }
 
   // --------------------------------------------
@@ -1107,8 +1193,30 @@ export class TicketHandler {
 
   // --------------------------------------------
   // Log Ticket Event
+  // ⚡ لا يعطّل مسار التذكرة: يُنفَّذ عبر طابور مستقل لكل سيرفر،
+  //    مع جلب القناة من الكاش ثم fetch، وإعادة محاولة واحدة عند الفشل.
+  //    (سابقاً كان السجل يضيع صامتاً إذا لم تكن القناة في الكاش أو حدث خطأ مؤقت)
   // --------------------------------------------
-  private async logTicketEvent(
+  private logTicketEvent(
+    guild: Guild,
+    event: 'create' | 'close' | 'claim' | 'delete' | 'unclaim' | 'call' | 'add_member',
+    ticket: ITicket,
+    user: any,
+    reason?: string
+  ): void {
+    const previous = this.ticketLogQueues.get(guild.id) ?? Promise.resolve();
+    const next = previous
+      .then(() => this.emitTicketLog(guild, event, ticket, user, reason))
+      .catch((err: any) => logger.error('Ticket log job failed:', err));
+    this.ticketLogQueues.set(guild.id, next);
+    // تنظيف الوعاء بعد انتهائه لتجنّب تسرّب الذاكرة
+    void next.then(() => {
+      if (this.ticketLogQueues.get(guild.id) === next) this.ticketLogQueues.delete(guild.id);
+    });
+  }
+
+  /** الإرسال الفعلي لسجل التذكرة */
+  private async emitTicketLog(
     guild: Guild,
     event: 'create' | 'close' | 'claim' | 'delete' | 'unclaim' | 'call' | 'add_member',
     ticket: ITicket,
@@ -1117,87 +1225,82 @@ export class TicketHandler {
   ): Promise<void> {
     try {
       const settings = await getGuildSettings(guild.id);
-      if (!settings.tickets.logChannelId) return;
-
-      const logChannel = guild.channels.cache.get(settings.tickets.logChannelId) as TextChannel;
-      if (!logChannel) return;
+      const logChannelId = settings.tickets.logChannelId;
+      if (!logChannelId) return;
 
       const eventEmojis: Record<string, string> = {
-        create: '➕',
-        close: '➖',
-        claim: '🤝',
-        unclaim: '↩️',
-        delete: '🗑️',
-        call: '🔔',
-        add_member: '👤',
+        create: '➕', close: '➖', claim: '🤝', unclaim: '↩️',
+        delete: '🗑️', call: '🔔', add_member: '👤',
+      };
+      const eventNames: Record<string, string> = {
+        create: 'إنشاء', close: 'إغلاق', claim: 'استلام', unclaim: 'إلغاء استلام',
+        delete: 'حذف', call: 'استدعاء إدارة', add_member: 'إضافة عضو',
       };
 
-      const eventNames: Record<string, string> = {
-        create: 'إنشاء',
-        close: 'إغلاق',
-        claim: 'استلام',
-        unclaim: 'إلغاء استلام',
-        delete: 'حذف',
-        call: 'استدعاء إدارة',
-        add_member: 'إضافة عضو',
-      };
+      // رقم التذكرة — حتى يُميّز المشرف أي تذكرة إن اختفت القناة بعد الحذف
+      const ticketRef = ticket.channelId ? `\`#${ticket.channelId.slice(-6)}\`` : 'غير معروف';
+      const opener = await guild.members.fetch(ticket.userId).catch(() => null);
+      const claimer = ticket.claimedBy
+        ? await guild.members.fetch(ticket.claimedBy).catch(() => null)
+        : null;
+
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [
+        { name: '🎫 رقم التذكرة', value: ticketRef, inline: true },
+        { name: '📂 النوع', value: ticket.type || 'غير محدد', inline: true },
+        { name: '📍 القناة', value: `<#${ticket.channelId}>`, inline: true },
+        { name: `${eventEmojis[event] || '👤'} المنفِّذ`, value: user ? `${user}` : 'غير معروف', inline: true },
+        { name: '🙋 فتحها', value: opener ? `${opener}` : `\`${ticket.userId}\``, inline: true },
+      ];
+
+      if (claimer) fields.push({ name: '🤝 المستلم', value: `${claimer}`, inline: true });
+
+      if (reason && reason.trim()) {
+        // ⚠️ حقل يتجاوز 1024 حرف = رفض Discord للإيمبد بالكامل = سجل ضائع
+        const safeReason = reason.length > 1000 ? `${reason.slice(0, 997)}…` : reason;
+        fields.push({ name: '📝 السبب', value: safeReason, inline: false });
+      }
 
       const logEmbed = createEmbed({
         title: `${eventEmojis[event] || '📌'} ${eventNames[event] || event} تذكرة`,
         color: event === 'close' || event === 'delete' ? Colors.error : Colors.success,
-        fields: [
-          { name: '👤 المستخدم', value: `${user}`, inline: true },
-          { name: '📍 القناة', value: `<#${ticket.channelId}>`, inline: true },
-          { name: '📂 النوع', value: ticket.type, inline: true },
-        ],
+        fields,
         footer: { text: 'Liberty City Ticket Logs' },
       });
 
-      if (reason) {
-        logEmbed.addFields({ name: '📝 السبب', value: reason, inline: false });
+      // الكاش أولاً ثم الجلب الفعلي — يمنع ضياع السجل إذا لم تكن القناة مخزّنة
+      let channel = guild.channels.cache.get(logChannelId) as TextChannel | undefined;
+      if (!channel) {
+        channel = ((await guild.channels.fetch(logChannelId).catch(() => null)) as TextChannel | null) ?? undefined;
+      }
+      if (!channel || !channel.isTextBased?.()) return;
+
+      const payload = { embeds: [logEmbed] };
+      const firstError: unknown = await channel.send(payload).then(() => null).catch((err) => err);
+      if (firstError) {
+        logger.warn(`Ticket log send failed in ${guild.name}, retrying once:`, firstError);
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        await channel.send(payload).catch((err: any) => {
+          logger.error(`Ticket log failed permanently in ${guild.name}:`, err);
+        });
       }
 
-      await logChannel.send({ embeds: [logEmbed] });
-      
-      // Also send to LoggingHandler for ticket event tracking
-      const libertyClient = this.client as any; // LibertyClient
-      const loggingHandler = libertyClient.loggingHandler;
+      // 📡 إعادة الإرسال إلى LoggingHandler (قنوات اللوقس المخصّصة) — في الخلفية
+      const loggingHandler = (this.client as any).loggingHandler;
       if (loggingHandler) {
-        const map: Record<string, 'ticketCreate' | 'ticketClose' | 'ticketReopen' | 'ticketDelete' | 'ticketClaim' | 'ticketTransfer' | 'ticketAddUser' | 'ticketRemoveUser'> = {
+        const map: Record<string, 'ticketCreate' | 'ticketClose' | 'ticketReopen' | 'ticketDelete' | 'ticketClaim'> = {
           create: 'ticketCreate',
           close: 'ticketClose',
-          claim: 'ticketClaim',
-          delete: 'ticketDelete',
           unclaim: 'ticketReopen',
-          call_admin: 'ticketTransfer', // closest match
-          add_member: 'ticketAddUser',
+          delete: 'ticketDelete',
+          claim: 'ticketClaim',
         };
         const logEvent = map[event];
-        if (logEvent) {
-          const ticketData = {
-            guild,
-            channel: { id: ticket.channelId },
-            creator: user,
-            panelName: 'Ticket',
-            closer: user,
-            reason: reason,
-            transcriptUrl: undefined,
-            reopener: user,
-            deleter: user,
-            claimer: user,
-            from: user,
-            to: user,
-            adder: user,
-            added: user,
-            removed: user,
-          };
-          // Call the appropriate handler
-          if (logEvent === 'ticketCreate') loggingHandler.handleTicketCreate({ guild, channel: { id: ticket.channelId }, creator: user });
-          else if (logEvent === 'ticketClose') loggingHandler.handleTicketClose({ guild, channel: { id: ticket.channelId }, closer: user, reason });
-          else if (logEvent === 'ticketReopen') loggingHandler.handleTicketReopen({ guild, channel: { id: ticket.channelId }, reopener: user });
-          else if (logEvent === 'ticketDelete') loggingHandler.handleTicketDelete({ guild, channelId: ticket.channelId, deleter: user });
-          else if (logEvent === 'ticketClaim') loggingHandler.handleTicketClaim({ guild, channel: { id: ticket.channelId }, claimer: user });
-        }
+        const base = { guild, channel: { id: ticket.channelId } };
+        if (logEvent === 'ticketCreate') loggingHandler.handleTicketCreate({ ...base, creator: user }).catch(() => {});
+        else if (logEvent === 'ticketClose') loggingHandler.handleTicketClose({ ...base, closer: user, reason }).catch(() => {});
+        else if (logEvent === 'ticketReopen') loggingHandler.handleTicketReopen({ ...base, reopener: user }).catch(() => {});
+        else if (logEvent === 'ticketDelete') loggingHandler.handleTicketDelete({ guild, channelId: ticket.channelId, deleter: user }).catch(() => {});
+        else if (logEvent === 'ticketClaim') loggingHandler.handleTicketClaim({ ...base, claimer: user }).catch(() => {});
       }
     } catch (error) {
       logger.error('Failed to log ticket event:', error);

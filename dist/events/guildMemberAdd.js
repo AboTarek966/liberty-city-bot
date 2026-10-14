@@ -196,7 +196,8 @@ async function handleWelcome(member, opts = {}) {
 // --------------------------------------------
 async function logMemberJoin(member) {
     const client = member.client;
-    await client.loggingHandler.handleMemberJoin(member).catch(() => { });
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleMemberJoin(member).catch((err) => client.loggingHandler.reportFailure('guildMemberAdd', err));
 }
 // --------------------------------------------
 // Log Raid

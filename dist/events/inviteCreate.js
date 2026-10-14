@@ -7,7 +7,8 @@ const inviteCreateEvent = {
     name: 'inviteCreate',
     async execute(invite) {
         const client = invite.client;
-        await client.loggingHandler.handleInviteCreate(invite);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleInviteCreate(invite).catch((err) => client.loggingHandler.reportFailure('inviteCreate', err));
     },
 };
 exports.default = inviteCreateEvent;

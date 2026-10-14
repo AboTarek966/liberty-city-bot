@@ -49,6 +49,16 @@ const event: Event = {
 
     const isDM = !message.guild;
 
+    // 🧠 خزّن نص الرسائل (سيرفر فقط) — يُستخدم لاحقاً بسجلات "التعديل/الحذف"
+    //    حتى لا تظهر "فارغ" عندما لا تكون الرسالة مخزّنة عند Discord
+    if (!isDM) {
+      try {
+        client.loggingHandler?.recordMessageContent(message);
+      } catch {
+        /* لا نعطّل مسار الرسائل */
+      }
+    }
+
     // 📤 رفع مباشر لصورة لوحة التذاكر (سيرفرات فقط)
     if (!isDM && hasPendingImageUpload(message.author.id) && message.attachments.size > 0) {
       try {

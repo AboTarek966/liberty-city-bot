@@ -70,7 +70,8 @@ async function handleLeave(member, opts = {}) {
 // --------------------------------------------
 async function logMemberLeave(member) {
     const client = member.client;
-    await client.loggingHandler.handleMemberLeave(member).catch(() => { });
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleMemberLeave(member).catch((err) => client.loggingHandler.reportFailure('guildMemberRemove', err));
     // Handle open tickets
     await handleMemberTickets(member);
 }

@@ -1,1 +1,1 @@
-{"version":3,"file":"channelDelete.d.ts","sourceRoot":"","sources":["../../src/events/channelDelete.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,KAAK,EAAE,MAAM,0BAA0B,CAAC;AAGjD,QAAA,MAAM,KAAK,EAAE,KAQZ,CAAC;AAEF,eAAe,KAAK,CAAC"}
+{"version":3,"file":"channelDelete.d.ts","sourceRoot":"","sources":["../../src/events/channelDelete.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,KAAK,EAAE,MAAM,0BAA0B,CAAC;AAGjD,QAAA,MAAM,KAAK,EAAE,KASZ,CAAC;AAEF,eAAe,KAAK,CAAC"}

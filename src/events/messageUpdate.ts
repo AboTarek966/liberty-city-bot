@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // Liberty City Bot - Message Edit Logging
 // ============================================
 
@@ -9,7 +9,8 @@ const event: Event = {
   name: 'messageUpdate',
   async execute(oldMessage: any, newMessage: any) {
     const client = newMessage.client as LibertyClient;
-    await client.loggingHandler.handleMessageEdit(oldMessage, newMessage);
+    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+    client.loggingHandler.handleMessageEdit(oldMessage, newMessage).catch((err) => client.loggingHandler.reportFailure('messageUpdate', err));
   },
 };
 

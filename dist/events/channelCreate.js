@@ -7,7 +7,8 @@ const event = {
     name: 'channelCreate',
     async execute(channel) {
         const client = channel.client;
-        await client.loggingHandler.handleChannelCreate(channel);
+        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
+        client.loggingHandler.handleChannelCreate(channel).catch((err) => client.loggingHandler.reportFailure('channelCreate', err));
     },
 };
 exports.default = event;
