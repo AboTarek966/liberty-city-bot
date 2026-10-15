@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Channel Update Logging
+// Liberty City Bot - Channel Update Protection
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
@@ -9,8 +9,8 @@ const event: Event = {
   name: 'channelUpdate',
   async execute(oldChannel: any, newChannel: any) {
     const client = newChannel.client as LibertyClient;
-    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-    client.loggingHandler.handleChannelUpdate(oldChannel, newChannel).catch((err) => client.loggingHandler.reportFailure('channelUpdate', err));
+    // 🛡️ Anti-Rename: تغيير اسم قناة بسرعة → رد على المنفذ
+    await client.securityHandler.onChannelUpdate(oldChannel, newChannel).catch(() => {});
   },
 };
 

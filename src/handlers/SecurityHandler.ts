@@ -127,6 +127,9 @@ export class SecurityHandler {
   // تتبّع عمليات الحذف: guildId → { نوع → توقيتات }
   private deletionTracker: Map<string, DeletionTracker> = new Map();
 
+  // تتبّع تغيير الأسماء السريع: key → توقيتات
+  private renameTracker: Map<string, number[]> = new Map();
+
   // مؤقتات النسخ الاحتياطي التلقائي
   private backupTimers: Map<string, NodeJS.Timeout> = new Map();
 
@@ -459,6 +462,70 @@ export class SecurityHandler {
     } catch (error: any) {
       logger.error(`onRoleCreate error: ${error.message}`);
     }
+  }
+
+  // --------------------------------------------
+  // 0b) ANTI-RENAME: تغيير اسم قناة بسرعة → رد على المنفذ
+  // --------------------------------------------
+  async onChannelUpdate(oldChannel: any, newChannel: any): Promise<void> {
+    try {
+      if (!newChannel?.guild || oldChannel.name === newChannel.name) return;
+      const logs = await newChannel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelUpdate, limit: 5 });
+      const entry = logs.entries.first();
+      if (!entry?.executor) return;
+      if (Date.now() - entry.createdTimestamp > 3000) return;
+      if (entry.executor.id === this.client.user?.id) return;
+      const member = newChannel.guild.members.cache.get(entry.executor.id);
+      if (member?.permissions.has(PermissionFlagsBits.Administrator)) return;
+      // Track rapid renames
+      const key = `${newChannel.guild.id}:${entry.executor.id}:rename`;
+      if (!this.renameTracker.has(key)) this.renameTracker.set(key, []);
+      const arr = this.renameTracker.get(key)!;
+      const now = Date.now();
+      arr.push(now);
+      const recent = arr.filter(t => now - t < 10000);
+      this.renameTracker.set(key, recent);
+      // Restore original name
+      try { await newChannel.setName(oldChannel.name, 'Security: rapid rename detected'); } catch {}
+      // If 3+ renames in 10s → strip
+      if (recent.length >= 3) {
+        if (member) {
+          try { await member.roles.set([], 'Security: mass rename'); } catch {}
+          try { await member.kick('Security: mass channel rename'); } catch {}
+        }
+        this.renameTracker.set(key, []);
+      }
+      const settings = await getGuildSettings(newChannel.guild.id);
+      const alert = await this.getAlertChannel(newChannel.guild, settings);
+      alert?.send({ content: `✏️ **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر اسم قناة بسرعة:** ${entry.executor.tag} — تمت إعادة الاسم${recent.length >= 3 ? ' + طرد المنفذ' : ''}` }).catch(() => {});
+    } catch (error: any) {
+      logger.error(`onChannelUpdate error: ${error.message}`);
+    }
+  }
+
+  // --------------------------------------------
+  // 0c) AUTO-CLEAN: حذف تلقائي لأي روم/رول مشبوه بعد الهكر
+  // --------------------------------------------
+  async cleanupSuspicious(guild: Guild): Promise<number> {
+    let deleted = 0;
+    const pattern = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123/i;
+    for (const [, ch] of guild.channels.cache) {
+      if (pattern.test(ch.name)) {
+        try { await ch.delete('Security: auto-cleanup suspicious channel'); deleted++; } catch {}
+      }
+    }
+    for (const [, role] of guild.roles.cache) {
+      if (role.id === guild.id || role.managed) continue;
+      if (pattern.test(role.name)) {
+        try { await role.delete('Security: auto-cleanup suspicious role'); deleted++; } catch {}
+      }
+    }
+    if (deleted > 0) {
+      const settings = await getGuildSettings(guild.id);
+      const alert = await this.getAlertChannel(guild, settings);
+      alert?.send({ content: `🧹 **تنظيف تلقائي:** تم حذف ${deleted} روم/رول مشبوه` }).catch(() => {});
+    }
+    return deleted;
   }
 
   // --------------------------------------------
@@ -818,6 +885,8 @@ export class SecurityHandler {
     //    (المطرودين نستعيدهم عبر رابط الدعوة — انظر scheduleKickedRecovery)
     if ((type === 'channel' || type === 'role') && cfg.autoRestore !== false) {
       await this.runAutoRestore(guild, settings, type);
+      // 🧹 تنظيف تلقائي: حذف أي روم/رول مشبوه بعد الهكر
+      setTimeout(() => this.cleanupSuspicious(guild).catch(() => {}), 3000);
     }
   }
 

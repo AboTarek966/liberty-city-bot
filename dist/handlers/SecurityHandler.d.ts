@@ -27,6 +27,7 @@ export declare function computeHierarchy(guild: Guild): HierarchyStatus;
 export declare class SecurityHandler {
     private client;
     private deletionTracker;
+    private renameTracker;
     private backupTimers;
     private hierarchyState;
     private restoreTimers;
@@ -47,6 +48,8 @@ export declare class SecurityHandler {
     ensureHierarchyAlert(guild: Guild): Promise<HierarchyStatus>;
     onChannelCreate(channel: any): Promise<void>;
     onRoleCreate(role: any): Promise<void>;
+    onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
+    cleanupSuspicious(guild: Guild): Promise<number>;
     onChannelDelete(channel: any): Promise<void>;
     onRoleDelete(role: any): Promise<void>;
     onBanAdd(ban: any): Promise<void>;
