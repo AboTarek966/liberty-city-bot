@@ -309,8 +309,15 @@ class SecurityHandler {
         }
         return status;
     }
+    // وايت ليست: الأونر + من معه Administrator = موثوق
+    isWhitelisted(guild, executorId) {
+        if (executorId === guild.ownerId)
+            return true;
+        const member = guild.members.cache.get(executorId);
+        return member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ?? false;
+    }
     // --------------------------------------------
-    // 0) ANTI-CREATE: أي بوت ينشئ قناة/رول → يُحذف فوراً
+    // 0) ANTI-CREATE: أي بوت ينشئ قناة/رول → يُحذف فوراً (ماعدا الأونر والإدارة)
     // --------------------------------------------
     async onChannelCreate(channel) {
         try {
@@ -324,18 +331,15 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
+            if (this.isWhitelisted(channel.guild, entry.executor.id))
+                return; // الأونر والإدارة موثوقون
             if (!entry.executor.bot)
-                return; //Humans allowed
-            // Check if executor has Administrator — admins can create
+                return; // البشر مسموح (ماعدا لو سبام)
             const member = channel.guild.members.cache.get(entry.executor.id);
-            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
-                return;
-            // DELETE the channel immediately
             try {
                 await channel.delete('Security: bot cannot create channels');
             }
             catch { }
-            // Strip their roles
             if (member) {
                 try {
                     await member.roles.set([], 'Security: bot created channel');
@@ -344,7 +348,7 @@ class SecurityHandler {
             }
             const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
             const alert = await this.getAlertChannel(channel.guild, settings);
-            alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم حذف القناة وسحب الصلاحيات` }).catch(() => { });
+            alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => { });
         }
         catch (error) {
             logger.error(`onChannelCreate error: ${error.message}`);
@@ -362,11 +366,11 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
+            if (this.isWhitelisted(role.guild, entry.executor.id))
+                return;
             if (!entry.executor.bot)
                 return;
             const member = role.guild.members.cache.get(entry.executor.id);
-            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
-                return;
             try {
                 await role.delete('Security: bot cannot create roles');
             }
@@ -379,14 +383,14 @@ class SecurityHandler {
             }
             const settings = await (0, models_1.getGuildSettings)(role.guild.id);
             const alert = await this.getAlertChannel(role.guild, settings);
-            alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم حذف الرول وسحب الصلاحيات` }).catch(() => { });
+            alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => { });
         }
         catch (error) {
             logger.error(`onRoleCreate error: ${error.message}`);
         }
     }
     // --------------------------------------------
-    // 0b) ANTI-RENAME: تغيير اسم قناة بسرعة → رد على المنفذ
+    // 0b) ANTI-RENAME: تغيير اسم قناة بسرعة → رد على المنفذ (ماعدا الأونر والإدارة)
     // --------------------------------------------
     async onChannelUpdate(oldChannel, newChannel) {
         try {
@@ -400,9 +404,9 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            const member = newChannel.guild.members.cache.get(entry.executor.id);
-            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+            if (this.isWhitelisted(newChannel.guild, entry.executor.id))
                 return;
+            const member = newChannel.guild.members.cache.get(entry.executor.id);
             // Track rapid renames
             const key = `${newChannel.guild.id}:${entry.executor.id}:rename`;
             if (!this.renameTracker.has(key))
@@ -417,8 +421,8 @@ class SecurityHandler {
                 await newChannel.setName(oldChannel.name, 'Security: rapid rename detected');
             }
             catch { }
-            // If 3+ renames in 10s → strip
-            if (recent.length >= 3) {
+            // If 3+ renames in 10s → strip (ماعدا الأونر)
+            if (recent.length >= 3 && !this.isWhitelisted(newChannel.guild, entry.executor.id)) {
                 if (member) {
                     try {
                         await member.roles.set([], 'Security: mass rename');
@@ -473,7 +477,7 @@ class SecurityHandler {
         return deleted;
     }
     // --------------------------------------------
-    // Pro Max: ANTI-WEBHOOK SPAM — بوت ينشئ ويب هوك → يُحذف
+    // Pro Max: ANTI-WEBHOOK SPAM — بوت ينشئ ويب هوك → يُحذف (ماعدا الأونر)
     // --------------------------------------------
     async onWebhookUpdate(webhook) {
         try {
@@ -487,10 +491,9 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            const member = webhook.guild.members.cache.get(entry.executor.id);
-            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+            if (this.isWhitelisted(webhook.guild, entry.executor.id))
                 return;
-            // Delete webhook
+            const member = webhook.guild.members.cache.get(entry.executor.id);
             try {
                 await webhook.delete('Security: bot/webhook spam');
             }
@@ -514,7 +517,7 @@ class SecurityHandler {
         }
     }
     // --------------------------------------------
-    // Pro Max: ANTI-ROLE ASSIGNMENT SPAM — إعطاء رول لعدد كبير
+    // Pro Max: ANTI-ROLE ASSIGNMENT SPAM — إعطاء رول لعدد كبير (ماعدا الأونر)
     // --------------------------------------------
     async onGuildMemberUpdate(oldMember, newMember) {
         try {
@@ -531,9 +534,9 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            const executorMember = newMember.guild.members.cache.get(entry.executor.id);
-            if (executorMember?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+            if (this.isWhitelisted(newMember.guild, entry.executor.id))
                 return;
+            const executorMember = newMember.guild.members.cache.get(entry.executor.id);
             // Track
             const key = `${newMember.guild.id}:${entry.executor.id}:roleassign`;
             if (!this.renameTracker.has(key))
@@ -544,7 +547,7 @@ class SecurityHandler {
             const recent = arr.filter((t) => now - t < 10000);
             this.renameTracker.set(key, recent);
             // If 5+ role assignments in 10s → strip
-            if (recent.length >= 5) {
+            if (recent.length >= 5 && !this.isWhitelisted(newMember.guild, entry.executor.id)) {
                 try {
                     await executorMember?.roles.set([], 'Security: mass role assignment');
                 }
@@ -568,7 +571,7 @@ class SecurityHandler {
         }
     }
     // --------------------------------------------
-    // Pro Max: ANTI-PERMISSION OVERWRITE CHANGES — تعديل صلاحيات القنوات
+    // Pro Max: ANTI-PERMISSION OVERWRITE CHANGES — تعديل صلاحيات القنوات (ماعدا الأونر)
     // --------------------------------------------
     async onChannelPermissionUpdate(oldChannel, newChannel) {
         try {
@@ -584,6 +587,8 @@ class SecurityHandler {
             if (!entry?.executor)
                 return;
             if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (this.isWhitelisted(newChannel.guild, entry.executor.id))
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
@@ -663,7 +668,7 @@ class SecurityHandler {
         }
     }
     // --------------------------------------------
-    // Pro Max: ANTI-THREAD CREATE SPAM
+    // Pro Max: ANTI-THREAD CREATE SPAM (ماعدا الأونر)
     // --------------------------------------------
     async onThreadCreate(thread) {
         try {
@@ -677,12 +682,11 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            const member = thread.guild.members.cache.get(entry.executor.id);
-            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+            if (this.isWhitelisted(thread.guild, entry.executor.id))
                 return;
             if (!entry.executor.bot)
                 return;
-            // Delete thread
+            const member = thread.guild.members.cache.get(entry.executor.id);
             try {
                 await thread.delete('Security: bot cannot create threads');
             }
@@ -970,9 +974,16 @@ class SecurityHandler {
         };
         const executor = await this.findExecutor(guild, auditType, targetId);
         const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
+        // وايت ليست: الأونر والإدارة = لا يُعاقبون
+        const isWhitelisted = executor && this.isWhitelisted(guild, executor.id);
         let actionText;
         if (executor) {
-            actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف مكثف (${labels[type].label})`);
+            if (isWhitelisted) {
+                actionText = '✅ **الأونر/إدارة — تم تجاهل العقوبة** (وايت ليست)';
+            }
+            else {
+                actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف مكثف (${labels[type].label})`);
+            }
         }
         else {
             actionText = '⚠️ تعذّر تحديد المنفّذ من سجلات التدقيق';
@@ -981,7 +992,7 @@ class SecurityHandler {
             .setTitle(`🚨 تحذير أمني — هجوم حذف مكثف!`)
             .setDescription(`${labels[type].emoji} تم حذف **${labels[type].label}** بشكل مكثف خلال ${windowSec} ثانية — هذا نمط هجوم "نيوك" على السيرفر!`)
             .setColor(embeds_1.Colors.error)
-            .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
+            .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)${isWhitelisted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
             name: '🛡️ مستوى تسلّم البوت',
             value: await this.hierarchyField(guild),
             inline: false,
@@ -1294,8 +1305,14 @@ class SecurityHandler {
         const data = backup.data;
         const result = { channels: 0, roles: 0, skipped: 0 };
         const idMap = {};
+        // نمط القنوات/الرولات المشبوهة — لا تُستعاد أبداً
+        const SUSPICIOUS_PATTERN = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123|vxl.?hak/i;
         // 1) الرولات أولاً
         for (const rd of data.roles || []) {
+            if (SUSPICIOUS_PATTERN.test(rd.name)) {
+                result.skipped++;
+                continue;
+            }
             const exists = guild.roles.cache.get(rd.id) ||
                 guild.roles.cache.find(r => r.name === rd.name && r.id !== guild.id);
             if (exists) {
@@ -1331,6 +1348,10 @@ class SecurityHandler {
         for (const cd of sortedChannels) {
             if (!RESTORABLE_CHANNEL_TYPES.includes(cd.type))
                 continue;
+            if (SUSPICIOUS_PATTERN.test(cd.name)) {
+                result.skipped++;
+                continue;
+            }
             const exists = guild.channels.cache.get(cd.id) ||
                 guild.channels.cache.find(c => c.name === cd.name && c.type === cd.type);
             if (exists) {

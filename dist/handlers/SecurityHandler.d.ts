@@ -47,6 +47,7 @@ export declare class SecurityHandler {
      * يستدعى: عند الإقلاع، عند الانضمام، وعند كل محاولة عقوبة فاشلة
      */
     ensureHierarchyAlert(guild: Guild): Promise<HierarchyStatus>;
+    private isWhitelisted;
     onChannelCreate(channel: any): Promise<void>;
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
