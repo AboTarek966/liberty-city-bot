@@ -15,6 +15,13 @@ const event: Event = {
   name: 'guildMemberRemove',
   async execute(member: GuildMember) {
     try {
+      // 🛡️ Anti-Nuke: رصد الطرد الجماعي + ربط المطرودين برابط الدعوة
+      //    (لا يُعطّل رحلة المغادرة — ينفّذ بمعزل عن باقي العمل)
+      //    ⚠️ قبل هذه الإضافة كان الطرد الجماعي يمرّ بلا أي استجابة
+      ;(member.client as LibertyClient).securityHandler
+        .onMemberKick(member)
+        .catch(err => logger.warn(`onMemberKick failed: ${err?.message ?? err}`));
+
       // Leave message
       const leaveResult = await handleLeave(member);
       if (leaveResult !== 'sent' && leaveResult !== 'disabled') {

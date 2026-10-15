@@ -81,6 +81,10 @@ class SecurityHandler {
     restoreTimers = new Map();
     // 🔒 مقفل استعادة لكل سيرفر — يمنع إنشاء قنوات مكرّرة عند التزامن
     restoreLocks = new Map();
+    // 👢 المطرودون بانتظار إرسال رابط الدعوة (استعادة تلقائية)
+    //    الطرد لا يُلغى في ديسكورد — الطريقة الوحيدة لإرجاعهم هي الرابط
+    kickedQueue = new Map();
+    kickedTimers = new Map();
     constructor(client) {
         this.client = client;
     }
@@ -92,6 +96,10 @@ class SecurityHandler {
             clearTimeout(timer);
         this.restoreTimers.clear();
         this.restoreLocks.clear();
+        for (const timer of this.kickedTimers.values())
+            clearTimeout(timer);
+        this.kickedTimers.clear();
+        this.kickedQueue.clear();
     }
     // --------------------------------------------
     // Helpers
@@ -203,7 +211,7 @@ class SecurityHandler {
         const now = Date.now();
         let tracker = this.deletionTracker.get(guildId);
         if (!tracker) {
-            tracker = { channel: [], role: [], ban: [] };
+            tracker = { channel: [], role: [], ban: [], kick: [] };
             this.deletionTracker.set(guildId, tracker);
         }
         tracker[type].push(now);
@@ -298,6 +306,82 @@ class SecurityHandler {
         return status;
     }
     // --------------------------------------------
+    // 0) ANTI-CREATE: أي بوت ينشئ قناة/رول → يُحذف فوراً
+    // --------------------------------------------
+    async onChannelCreate(channel) {
+        try {
+            if (!channel?.guild)
+                return;
+            const logs = await channel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelCreate, limit: 5 });
+            const entry = logs.entries.first();
+            if (!entry?.executor)
+                return;
+            if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (entry.executor.id === this.client.user?.id)
+                return;
+            if (!entry.executor.bot)
+                return; //Humans allowed
+            // Check if executor has Administrator — admins can create
+            const member = channel.guild.members.cache.get(entry.executor.id);
+            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+                return;
+            // DELETE the channel immediately
+            try {
+                await channel.delete('Security: bot cannot create channels');
+            }
+            catch { }
+            // Strip their roles
+            if (member) {
+                try {
+                    await member.roles.set([], 'Security: bot created channel');
+                }
+                catch { }
+            }
+            const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
+            const alert = await this.getAlertChannel(channel.guild, settings);
+            alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم حذف القناة وسحب الصلاحيات` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`onChannelCreate error: ${error.message}`);
+        }
+    }
+    async onRoleCreate(role) {
+        try {
+            if (!role?.guild || role.managed)
+                return;
+            const logs = await role.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.RoleCreate, limit: 5 });
+            const entry = logs.entries.first();
+            if (!entry?.executor)
+                return;
+            if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (entry.executor.id === this.client.user?.id)
+                return;
+            if (!entry.executor.bot)
+                return;
+            const member = role.guild.members.cache.get(entry.executor.id);
+            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+                return;
+            try {
+                await role.delete('Security: bot cannot create roles');
+            }
+            catch { }
+            if (member) {
+                try {
+                    await member.roles.set([], 'Security: bot created role');
+                }
+                catch { }
+            }
+            const settings = await (0, models_1.getGuildSettings)(role.guild.id);
+            const alert = await this.getAlertChannel(role.guild, settings);
+            alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم حذف الرول وسحب الصلاحيات` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`onRoleCreate error: ${error.message}`);
+        }
+    }
+    // --------------------------------------------
     // 1) ANTI-NUKE: كشف الحذف الجماعي
     // --------------------------------------------
     async onChannelDelete(channel) {
@@ -357,11 +441,212 @@ class SecurityHandler {
             logger.error(`onBanAdd error: ${error.message}`);
         }
     }
+    // --------------------------------------------
+    // 1b) ANTI-KICK: رصد الطرد الجماعي + استعادة المطرودين
+    // --------------------------------------------
+    // 🔴 الثغرة التي حدثت فعلاً: مضاد النيوك كان يراقب القنوات والرولات والحظر
+    //    **ولا يراقب الطرد إطلاقاً** → ٧٥ طرد في ثوانٍ = صفر استجابة.
+    //
+    // وديسكورد **ما فيها أمر "إلغاء طرد"** — المطرود يرجع بالرابط فقط،
+    // فالمستعادة الوحيدة الممكنة هي إرسال رابط الدعوة للمطرودين.
+    async onMemberKick(member) {
+        try {
+            if (!member?.guild || member.user.bot)
+                return;
+            const settings = await (0, models_1.getGuildSettings)(member.guild.id);
+            const cfg = settings.protection?.antiNuke;
+            if (!cfg?.enabled)
+                return;
+            // نميّز الطرد عن الاستقالة الطوعية عبر سجلات التدقيق
+            const executor = await this.findKickExecutor(member.guild, member.id);
+            if (!executor)
+                return; // استقالة عادية → لا نتدخل
+            // نحتفظ بالمطرود ليرسل له رابط الدعوة (استعادة تلقائية)
+            const queue = this.kickedQueue.get(member.guild.id) ?? [];
+            if (!queue.some(e => e.userId === member.id)) {
+                queue.push({ userId: member.id, tag: member.user.tag, at: Date.now() });
+                this.kickedQueue.set(member.guild.id, queue);
+                this.scheduleKickedRecovery(member.guild, settings);
+            }
+            // تتبّع العتبة (نفس منطق القنوات/الرولات/الحظر)
+            const count = this.track(member.guild.id, 'kick', cfg.timeWindow ?? 10000);
+            const threshold = cfg.threshold ?? 3;
+            if (count < threshold)
+                return;
+            this.deletionTracker.get(member.guild.id).kick = [];
+            await this.respondMassDeletion(member.guild, settings, cfg, 'kick', discord_js_1.AuditLogEvent.MemberKick, member.id);
+        }
+        catch (error) {
+            logger.error(`onMemberKick error: ${error.message}`);
+        }
+    }
+    // يبحث في سجلات التدقيق عن أمر طرد يستهدف هذا العضو → يعيد المنفّذ
+    // (سجلات التدقيق تتأخر ثانية أو ثانيتين، فنحاول ٣ مرات)
+    async findKickExecutor(guild, targetId) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.MemberKick, targetId);
+            if (executor)
+                return executor;
+            if (attempt < 2)
+                await sleep(600);
+        }
+        return null;
+    }
+    // يجمّع عدة طرود في محاولة استعادة واحدة (مؤجّل ٦ ثوانٍ)
+    scheduleKickedRecovery(guild, settings) {
+        if (settings?.protection?.antiNuke?.autoDmRecovery === false)
+            return;
+        const existing = this.kickedTimers.get(guild.id);
+        if (existing)
+            clearTimeout(existing);
+        const timer = setTimeout(() => {
+            this.kickedTimers.delete(guild.id);
+            this.flushKickedRecovery(guild).catch(() => { });
+        }, 6000);
+        this.kickedTimers.set(guild.id, timer);
+    }
+    // يرسل رابط الدعوة لكل المطرودين المجمّعين ثم يفرّغ القائمة
+    async flushKickedRecovery(guild) {
+        const queue = this.kickedQueue.get(guild.id) ?? [];
+        if (!queue.length)
+            return;
+        this.kickedQueue.set(guild.id, []);
+        try {
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const invite = await this.getInviteLink(guild);
+            if (!invite) {
+                logger.warn(`👢 استعادة الطرد في ${guild.name}: لا يوجد رابط دعوة`);
+                return;
+            }
+            let sent = 0;
+            for (const e of queue) {
+                if (await this.dmInvite(guild, e.userId, invite))
+                    sent++;
+                await sleep(1500);
+            }
+            const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
+            if (channel) {
+                await channel
+                    .send({
+                    embeds: [
+                        new discord_js_1.EmbedBuilder()
+                            .setTitle('👢 استعادة المطرودين — اكتملت')
+                            .setDescription(`أُرسل رابط الدعوة إلى **${sent}/${queue.length}** عضو مطرود.\n` +
+                            '**مهم:** ديسكورد ما فيها "إلغاء طرد" — المطرود **يرجع بنفسه** من الرابط.')
+                            .setColor(sent > 0 ? embeds_1.Colors.success : embeds_1.Colors.warning)
+                            .addFields({ name: '📨 وصلت الرسالة', value: `${sent}`, inline: true }, { name: '⛔ لم تصل', value: `${queue.length - sent}`, inline: true }, { name: '🔗 الرابط', value: invite, inline: false })
+                            .setFooter({ text: 'Liberty City — Kick Recovery' })
+                            .setTimestamp(),
+                    ],
+                })
+                    .catch(() => { });
+            }
+            logger.info(`👢 استعادة الطرد في ${guild.name}: ${sent}/${queue.length} رسالة`);
+        }
+        catch (error) {
+            logger.error(`flushKickedRecovery error: ${error.message}`);
+        }
+    }
+    /**
+     * 👢 استعادة المطرودين يدوياً — يقرأ سجلات التدقيق ويرسل لكل مطرود رابط الدعوة
+     * (للاستعادة بعد هجوم وقع بالفعل — لا يمكن إلغاء الطرد في ديسكورد)
+     */
+    async recoverKickedFromAudit(guild, limit) {
+        const invite = await this.getInviteLink(guild);
+        if (!invite)
+            return { total: 0, sent: 0, failed: 0, invite: null };
+        // نقرأ سجلات التدقيق على دفعات حتى نغطّي `limit`
+        const kickedIds = [];
+        let before;
+        while (kickedIds.length < limit) {
+            let logs;
+            try {
+                logs = await guild.fetchAuditLogs({
+                    type: discord_js_1.AuditLogEvent.MemberKick,
+                    limit: 100,
+                    ...(before ? { before } : {}),
+                });
+            }
+            catch {
+                break;
+            }
+            const entries = [...logs.entries.values()];
+            if (!entries.length)
+                break;
+            for (const e of entries) {
+                if (e.targetId && !kickedIds.includes(e.targetId))
+                    kickedIds.push(e.targetId);
+                if (kickedIds.length >= limit)
+                    break;
+            }
+            if (entries.length < 100)
+                break;
+            before = entries[entries.length - 1].id;
+            await sleep(400);
+        }
+        let sent = 0;
+        let failed = 0;
+        for (const userId of kickedIds) {
+            if (await this.dmInvite(guild, userId, invite))
+                sent++;
+            else
+                failed++;
+            await sleep(1500);
+        }
+        return { total: kickedIds.length, sent, failed, invite };
+    }
+    /** يرسل رسالة خاصة برابط الدعوة — يعيد true لو وصلت */
+    async dmInvite(guild, userId, invite) {
+        try {
+            const user = await this.client.users.fetch(userId);
+            if (user.bot)
+                return false;
+            await user.send(`👋 مرحباً ${user.username}\n` +
+                `انتطردت من **${guild.name}** — غالباً بالخطأ.\n` +
+                `تقدر ترجع الحين من هنا:\n${invite}`);
+            return true;
+        }
+        catch {
+            return false; // الخصوصية مغلقة أو الحساب غير موجود
+        }
+    }
+    /** رابط دعوة دائم — يستخدم الموجود أو ينشئ واحداً جديداً */
+    async getInviteLink(guild) {
+        try {
+            const existing = await guild.invites.fetch();
+            const first = existing.first();
+            if (first)
+                return `https://discord.gg/${first.code}`;
+        }
+        catch {
+            /* لا صلاحية أو لا توجد دعوات محفوظة */
+        }
+        try {
+            const me = guild.members.me;
+            const channel = guild.channels.cache.find((c) => c.type === discord_js_1.ChannelType.GuildText &&
+                !!me &&
+                !!c.permissionsFor(me)?.has(discord_js_1.PermissionFlagsBits.CreateInstantInvite));
+            if (!channel)
+                return null;
+            const inv = await channel.createInvite({
+                maxAge: 0,
+                maxUses: 0,
+                unique: false,
+                reason: 'Liberty City — استعادة الأعضاء المطرودين',
+            });
+            return `https://discord.gg/${inv.code}`;
+        }
+        catch (error) {
+            logger.warn(`getInviteLink failed in ${guild.name}: ${error.message}`);
+            return null;
+        }
+    }
     async respondMassDeletion(guild, settings, cfg, type, auditType, targetId) {
         const labels = {
             channel: { emoji: '📢', label: 'قنوات' },
             role: { emoji: '🎭', label: 'رولات' },
             ban: { emoji: '🔨', label: 'حظر جماعي' },
+            kick: { emoji: '👢', label: 'طرد جماعي' },
         };
         const executor = await this.findExecutor(guild, auditType, targetId);
         const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
@@ -394,8 +679,9 @@ class SecurityHandler {
             await channel.send({ embeds: [embed], content: executor ? `<@${guild.ownerId}>` : undefined }).catch(() => { });
         }
         logger.warn(`🚨 Anti-Nuke: ${type} x${cfg.threshold} in ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
-        // ♻️ استعادة تلقائية للبنية (قنوات/رولات) — تجاهل الحظر لأنه بنية لا تُستعاد من النسخة
-        if (type !== 'ban' && cfg.autoRestore !== false) {
+        // ♻️ استعادة تلقائية للبنية — الحظر والطرد لا يُستعادان من النسخة
+        //    (المطرودين نستعيدهم عبر رابط الدعوة — انظر scheduleKickedRecovery)
+        if ((type === 'channel' || type === 'role') && cfg.autoRestore !== false) {
             await this.runAutoRestore(guild, settings, type);
         }
     }

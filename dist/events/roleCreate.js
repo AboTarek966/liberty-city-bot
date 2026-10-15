@@ -1,15 +1,15 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Logging Events
+// Liberty City Bot - Role Create Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-const roleCreateEvent = {
+const event = {
     name: 'roleCreate',
     async execute(role) {
         const client = role.client;
-        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-        client.loggingHandler.handleRoleCreate(role).catch((err) => client.loggingHandler.reportFailure('roleCreate', err));
+        // 🛡️ Anti-Create: أي بوت ينشئ رول → يُحذف فوراً
+        await client.securityHandler.onRoleCreate(role).catch(() => { });
     },
 };
-exports.default = roleCreateEvent;
+exports.default = event;
 //# sourceMappingURL=roleCreate.js.map

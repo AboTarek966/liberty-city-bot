@@ -31,6 +31,8 @@ export declare class SecurityHandler {
     private hierarchyState;
     private restoreTimers;
     private restoreLocks;
+    private kickedQueue;
+    private kickedTimers;
     constructor(client: Client);
     cleanup(): void;
     private getAlertChannel;
@@ -43,9 +45,29 @@ export declare class SecurityHandler {
      * يستدعى: عند الإقلاع، عند الانضمام، وعند كل محاولة عقوبة فاشلة
      */
     ensureHierarchyAlert(guild: Guild): Promise<HierarchyStatus>;
+    onChannelCreate(channel: any): Promise<void>;
+    onRoleCreate(role: any): Promise<void>;
     onChannelDelete(channel: any): Promise<void>;
     onRoleDelete(role: any): Promise<void>;
     onBanAdd(ban: any): Promise<void>;
+    onMemberKick(member: GuildMember): Promise<void>;
+    private findKickExecutor;
+    private scheduleKickedRecovery;
+    private flushKickedRecovery;
+    /**
+     * 👢 استعادة المطرودين يدوياً — يقرأ سجلات التدقيق ويرسل لكل مطرود رابط الدعوة
+     * (للاستعادة بعد هجوم وقع بالفعل — لا يمكن إلغاء الطرد في ديسكورد)
+     */
+    recoverKickedFromAudit(guild: Guild, limit: number): Promise<{
+        total: number;
+        sent: number;
+        failed: number;
+        invite: string | null;
+    }>;
+    /** يرسل رسالة خاصة برابط الدعوة — يعيد true لو وصلت */
+    private dmInvite;
+    /** رابط دعوة دائم — يستخدم الموجود أو ينشئ واحداً جديداً */
+    getInviteLink(guild: Guild): Promise<string | null>;
     private respondMassDeletion;
     private hierarchyField;
     private runAutoRestore;

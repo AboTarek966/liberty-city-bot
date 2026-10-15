@@ -185,6 +185,8 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             logChannel: { type: String },
             /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
             autoRestore: { type: Boolean, default: true },
+            /** 👢 إرسال رابط الدعوة للمطرودين تلقائياً (الطرد لا يُلغى في ديسكورد) */
+            autoDmRecovery: { type: Boolean, default: true },
         },
         antiBot: {
             enabled: { type: Boolean, default: false },

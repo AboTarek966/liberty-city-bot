@@ -61,6 +61,8 @@ export interface IGuildSettings extends Document {
             logChannel?: string;
             /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
             autoRestore?: boolean;
+            /** 👢 ربط المطرودين تلقائياً برابط الدعوة (الطرد لا يُلغى في ديسكورد) */
+            autoDmRecovery?: boolean;
         };
         antiBot: {
             enabled: boolean;

@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Channel Create Logging
+// Liberty City Bot - Channel Create Protection
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
@@ -9,8 +9,8 @@ const event: Event = {
   name: 'channelCreate',
   async execute(channel: any) {
     const client = channel.client as LibertyClient;
-    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-    client.loggingHandler.handleChannelCreate(channel).catch((err) => client.loggingHandler.reportFailure('channelCreate', err));
+    // 🛡️ Anti-Create: أي بوت ينشئ قناة → يُحذف فوراً
+    await client.securityHandler.onChannelCreate(channel).catch(() => {});
   },
 };
 

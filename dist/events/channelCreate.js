@@ -1,14 +1,14 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Channel Create Logging
+// Liberty City Bot - Channel Create Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {
     name: 'channelCreate',
     async execute(channel) {
         const client = channel.client;
-        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-        client.loggingHandler.handleChannelCreate(channel).catch((err) => client.loggingHandler.reportFailure('channelCreate', err));
+        // 🛡️ Anti-Create: أي بوت ينشئ قناة → يُحذف فوراً
+        await client.securityHandler.onChannelCreate(channel).catch(() => { });
     },
 };
 exports.default = event;

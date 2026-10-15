@@ -1,4 +1,4 @@
 import { Event } from '../handlers/EventHandler';
-declare const roleCreateEvent: Event;
-export default roleCreateEvent;
+declare const event: Event;
+export default event;
 //# sourceMappingURL=roleCreate.d.ts.map

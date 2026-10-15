@@ -80,6 +80,8 @@ export interface IGuildSettings extends Document {
       logChannel?: string;
       /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
       autoRestore?: boolean;
+      /** 👢 ربط المطرودين تلقائياً برابط الدعوة (الطرد لا يُلغى في ديسكورد) */
+      autoDmRecovery?: boolean;
     };
     antiBot: {
       enabled: boolean;
@@ -684,6 +686,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       logChannel: { type: String },
       /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
       autoRestore: { type: Boolean, default: true },
+      /** 👢 إرسال رابط الدعوة للمطرودين تلقائياً (الطرد لا يُلغى في ديسكورد) */
+      autoDmRecovery: { type: Boolean, default: true },
     },
     antiBot: {
       enabled: { type: Boolean, default: false },
