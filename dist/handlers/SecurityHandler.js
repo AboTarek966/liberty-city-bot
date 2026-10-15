@@ -1311,7 +1311,8 @@ class SecurityHandler {
         const idMap = {};
         // نمط القنوات/الرولات المشبوهة — لا تُستعاد أبداً
         const SUSPICIOUS_PATTERN = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123|vxl.?hak/i;
-        // 1) الرولات أولاً
+        // 1) الرولات أولاً — استراتيجية الصمت: لو اتحددنا نوقف تماماً 30 دقيقة
+        let rateLimitStrikes = 0;
         for (const rd of data.roles || []) {
             if (SUSPICIOUS_PATTERN.test(rd.name)) {
                 result.skipped++;
@@ -1325,7 +1326,7 @@ class SecurityHandler {
             }
             let attempts = 0;
             let created2 = false;
-            while (!created2 && attempts < 5) {
+            while (!created2 && attempts < 10) {
                 attempts++;
                 try {
                     const created = await guild.roles.create({
@@ -1339,22 +1340,31 @@ class SecurityHandler {
                     idMap[`role:${rd.id}`] = created.id;
                     result.roles++;
                     created2 = true;
+                    rateLimitStrikes = 0; // reset strikes on success
                 }
                 catch (error) {
                     const isRateLimit = error?.status === 429 ||
                         error?.httpStatus === 429 ||
                         /rate limit|too many/i.test(error?.message || '');
-                    if (isRateLimit && attempts < 5) {
-                        // Extract retry_after if available
+                    if (isRateLimit) {
+                        rateLimitStrikes++;
                         const retryAfter = error?.retry_after ?? error?.data?.retry_after ?? 60;
-                        const waitMs = Math.min((Number(retryAfter) || 60) * 1000 + 2000, 700000);
-                        logger.warn(`restore role "${rd.name}" — rate limited, waiting ${Math.round(waitMs / 1000)}s (attempt ${attempts}/5)`);
-                        await sleep(waitMs);
+                        if (rateLimitStrikes >= 2) {
+                            // محاولة ثالثة = صمت كامل 30 دقيقة
+                            logger.warn(`restore role "${rd.name}" — strike ${rateLimitStrikes}, full silence 30min`);
+                            await sleep(30 * 60 * 1000);
+                            rateLimitStrikes = 0;
+                        }
+                        else {
+                            const waitMs = Math.min((Number(retryAfter) || 60) * 1000 + 3000, 700000);
+                            logger.warn(`restore role "${rd.name}" — RL, waiting ${Math.round(waitMs / 1000)}s`);
+                            await sleep(waitMs);
+                        }
                     }
                     else {
                         logger.warn(`restore role "${rd.name}" failed: ${error.message}`);
                         result.skipped++;
-                        created2 = true; // don't retry non-rate-limit errors
+                        created2 = true;
                     }
                 }
             }
