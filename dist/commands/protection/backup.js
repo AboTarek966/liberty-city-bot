@@ -114,31 +114,35 @@ const command = {
                 const number = interaction.options.getInteger('number');
                 const backupIndex = number !== null && number !== undefined ? number - 1 : undefined;
                 const embed = new discord_js_1.EmbedBuilder()
-                    .setTitle('⏳ جارٍ الاستعادة...')
-                    .setDescription('يتم إعادة إنشاء القنوات والرولات المفقودة فقط — قد يستغرق دقيقة حسب حجم السيرفر.')
+                    .setTitle('⏳ الاستعادة تعمل في الخلفية')
+                    .setDescription('يتم إعادة إنشاء الرولات والقنوات المفقودة واحدة واحدة — ممكن تاخد ساعات بسبب حدود Discord.\n**مش لازم تفضل هنا** — الاستعادة هتكمل لوحدها وبعتلك تقرير لما تخلص.')
                     .setColor(embeds_1.Colors.warning);
                 await interaction.editReply({ embeds: [embed] });
-                try {
-                    const result = await lc.securityHandler.restoreBackup(guild, backupIndex);
+                // Run in background — don't await
+                const channelId = interaction.channelId;
+                lc.securityHandler
+                    .restoreBackup(guild, backupIndex)
+                    .then(result => {
                     const done = new discord_js_1.EmbedBuilder()
-                        .setTitle('✅ تمت الاستعادة بنجاح')
-                        .setDescription('أُعيد فقط ما كان مفقوداً — العناصر الموجودة لم تُمسّ. راجع ترتيب القنوات وتعديل الصلاحيات حسب الحاجة.')
+                        .setTitle('✅ انتهت الاستعادة')
+                        .setDescription('أُعيد فقط ما كان مفقوداً — راجع ترتيب القنوات حسب الحاجة.')
                         .setColor(embeds_1.Colors.success)
                         .addFields({ name: '📢 قنوات أُعيدت', value: `${result.channels}`, inline: true }, { name: '🎭 رولات أُعيدت', value: `${result.roles}`, inline: true }, { name: '⏭️ تخطّي (موجود)', value: `${result.skipped}`, inline: true })
                         .setFooter({ text: 'Liberty City Backup' })
                         .setTimestamp();
-                    await interaction.editReply({ embeds: [done] });
-                }
-                catch (err) {
-                    await interaction.editReply({
-                        embeds: [
-                            new discord_js_1.EmbedBuilder()
-                                .setTitle('❌ فشل الاستعادة')
-                                .setDescription(err.message)
-                                .setColor(embeds_1.Colors.error),
-                        ],
-                    });
-                }
+                    const target = guild.channels.cache.get(channelId);
+                    const dest = target && 'send' in target ? target : guild.systemChannel;
+                    dest?.send({ embeds: [done] }).catch(() => { });
+                })
+                    .catch((err) => {
+                    const fail = new discord_js_1.EmbedBuilder()
+                        .setTitle('❌ فشل الاستعادة')
+                        .setDescription(err.message)
+                        .setColor(embeds_1.Colors.error);
+                    const target = guild.channels.cache.get(channelId);
+                    const dest = target && 'send' in target ? target : guild.systemChannel;
+                    dest?.send({ embeds: [fail] }).catch(() => { });
+                });
                 return;
             }
         }

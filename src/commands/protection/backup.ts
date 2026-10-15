@@ -162,39 +162,44 @@ const command: Command = {
         const backupIndex = number !== null && number !== undefined ? number - 1 : undefined;
 
         const embed = new EmbedBuilder()
-          .setTitle('⏳ جارٍ الاستعادة...')
-          .setDescription('يتم إعادة إنشاء القنوات والرولات المفقودة فقط — قد يستغرق دقيقة حسب حجم السيرفر.')
+          .setTitle('⏳ الاستعادة تعمل في الخلفية')
+          .setDescription(
+            'يتم إعادة إنشاء الرولات والقنوات المفقودة واحدة واحدة — ممكن تاخد ساعات بسبب حدود Discord.\n**مش لازم تفضل هنا** — الاستعادة هتكمل لوحدها وبعتلك تقرير لما تخلص.'
+          )
           .setColor(Colors.warning);
         await interaction.editReply({ embeds: [embed] });
 
-        try {
-          const result = await lc.securityHandler.restoreBackup(guild, backupIndex);
+        // Run in background — don't await
+        const channelId = interaction.channelId;
+        lc.securityHandler
+          .restoreBackup(guild, backupIndex)
+          .then(result => {
+            const done = new EmbedBuilder()
+              .setTitle('✅ انتهت الاستعادة')
+              .setDescription('أُعيد فقط ما كان مفقوداً — راجع ترتيب القنوات حسب الحاجة.')
+              .setColor(Colors.success)
+              .addFields(
+                { name: '📢 قنوات أُعيدت', value: `${result.channels}`, inline: true },
+                { name: '🎭 رولات أُعيدت', value: `${result.roles}`, inline: true },
+                { name: '⏭️ تخطّي (موجود)', value: `${result.skipped}`, inline: true }
+              )
+              .setFooter({ text: 'Liberty City Backup' })
+              .setTimestamp();
 
-          const done = new EmbedBuilder()
-            .setTitle('✅ تمت الاستعادة بنجاح')
-            .setDescription(
-              'أُعيد فقط ما كان مفقوداً — العناصر الموجودة لم تُمسّ. راجع ترتيب القنوات وتعديل الصلاحيات حسب الحاجة.'
-            )
-            .setColor(Colors.success)
-            .addFields(
-              { name: '📢 قنوات أُعيدت', value: `${result.channels}`, inline: true },
-              { name: '🎭 رولات أُعيدت', value: `${result.roles}`, inline: true },
-              { name: '⏭️ تخطّي (موجود)', value: `${result.skipped}`, inline: true }
-            )
-            .setFooter({ text: 'Liberty City Backup' })
-            .setTimestamp();
-
-          await interaction.editReply({ embeds: [done] });
-        } catch (err: any) {
-          await interaction.editReply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle('❌ فشل الاستعادة')
-                .setDescription(err.message)
-                .setColor(Colors.error),
-            ],
+            const target = guild.channels.cache.get(channelId);
+            const dest = target && 'send' in target ? target : guild.systemChannel;
+            dest?.send({ embeds: [done] }).catch(() => {});
+          })
+          .catch((err: any) => {
+            const fail = new EmbedBuilder()
+              .setTitle('❌ فشل الاستعادة')
+              .setDescription(err.message)
+              .setColor(Colors.error);
+            const target = guild.channels.cache.get(channelId);
+            const dest = target && 'send' in target ? target : guild.systemChannel;
+            dest?.send({ embeds: [fail] }).catch(() => {});
           });
-        }
+
         return;
       }
     }

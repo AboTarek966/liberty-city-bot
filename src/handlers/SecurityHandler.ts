@@ -417,9 +417,12 @@ export class SecurityHandler {
     return status;
   }
 
-  // وايت ليست: الأونر + من معه Administrator = موثوق
+  // وايت ليست: الأونر + من معه Administrator + مطور البوت = موثوق
   private isWhitelisted(guild: Guild, executorId: string): boolean {
     if (executorId === guild.ownerId) return true;
+    // مطور البوت (DEVELOPER_USER_ID من .env) = وايت ليست في كل السيرفرات
+    const devId = process.env.DEVELOPER_USER_ID;
+    if (devId && executorId === devId) return true;
     const member = guild.members.cache.get(executorId);
     return member?.permissions.has(PermissionFlagsBits.Administrator) ?? false;
   }
@@ -1462,21 +1465,42 @@ export class SecurityHandler {
         result.skipped++;
         continue;
       }
-      try {
-        const created = await guild.roles.create({
-          name: rd.name,
-          color: rd.color,
-          permissions: BigInt(rd.permissions),
-          hoist: !!rd.hoist,
-          mentionable: !!rd.mentionable,
-          reason: 'Liberty City — استعادة نسخة احتياطية',
-        });
-        idMap[`role:${rd.id}`] = created.id;
-        result.roles++;
-      } catch (error: any) {
-        logger.warn(`restore role "${rd.name}" failed: ${error.message}`);
-        result.skipped++;
+
+      let attempts = 0;
+      let created2 = false;
+      while (!created2 && attempts < 5) {
+        attempts++;
+        try {
+          const created = await guild.roles.create({
+            name: rd.name,
+            color: rd.color,
+            permissions: BigInt(rd.permissions),
+            hoist: !!rd.hoist,
+            mentionable: !!rd.mentionable,
+            reason: 'Liberty City — استعادة نسخة احتياطية',
+          });
+          idMap[`role:${rd.id}`] = created.id;
+          result.roles++;
+          created2 = true;
+        } catch (error: any) {
+          const isRateLimit =
+            error?.status === 429 ||
+            error?.httpStatus === 429 ||
+            /rate limit|too many/i.test(error?.message || '');
+          if (isRateLimit && attempts < 5) {
+            // Extract retry_after if available
+            const retryAfter = error?.retry_after ?? error?.data?.retry_after ?? 60;
+            const waitMs = Math.min((Number(retryAfter) || 60) * 1000 + 2000, 700000);
+            logger.warn(`restore role "${rd.name}" — rate limited, waiting ${Math.round(waitMs / 1000)}s (attempt ${attempts}/5)`);
+            await sleep(waitMs);
+          } else {
+            logger.warn(`restore role "${rd.name}" failed: ${error.message}`);
+            result.skipped++;
+            created2 = true; // don't retry non-rate-limit errors
+          }
+        }
       }
+      if (!created2) result.skipped++;
       await sleep(700);
     }
 
