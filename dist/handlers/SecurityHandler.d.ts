@@ -34,6 +34,7 @@ export declare class SecurityHandler {
     private restoreLocks;
     private kickedQueue;
     private kickedTimers;
+    private topWatchdogs;
     constructor(client: Client);
     cleanup(): void;
     private getAlertChannel;
@@ -50,6 +51,14 @@ export declare class SecurityHandler {
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
     cleanupSuspicious(guild: Guild): Promise<number>;
+    onWebhookUpdate(webhook: any): Promise<void>;
+    onGuildMemberUpdate(oldMember: any, newMember: any): Promise<void>;
+    onChannelPermissionUpdate(oldChannel: any, newChannel: any): Promise<void>;
+    startStickyRoleWatchdog(guild: Guild): void;
+    onGuildEmojiDelete(emoji: any): Promise<void>;
+    onGuildStickerDelete(sticker: any): Promise<void>;
+    private handleMassDelete;
+    onThreadCreate(thread: any): Promise<void>;
     onChannelDelete(channel: any): Promise<void>;
     onRoleDelete(role: any): Promise<void>;
     onBanAdd(ban: any): Promise<void>;

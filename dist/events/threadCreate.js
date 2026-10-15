@@ -1,17 +1,13 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Thread Create Logging
+// Liberty City Bot - Thread Create Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {
     name: 'threadCreate',
-    async execute(thread, newlyCreated) {
-        // التلقائية (منشورات المنتجات / متابعة الإعلانات) ليست قرار إنساني → لا نسجّلها
-        if (!newlyCreated)
-            return;
+    async execute(thread) {
         const client = thread.client;
-        // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-        client.loggingHandler.handleThreadCreate(thread).catch((err) => client.loggingHandler.reportFailure('threadCreate', err));
+        await client.securityHandler.onThreadCreate(thread).catch(() => { });
     },
 };
 exports.default = event;

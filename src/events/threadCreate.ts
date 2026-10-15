@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Thread Create Logging
+// Liberty City Bot - Thread Create Protection
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
@@ -7,13 +7,9 @@ import { LibertyClient } from '../LibertyClient';
 
 const event: Event = {
   name: 'threadCreate',
-  async execute(thread: any, newlyCreated: boolean) {
-    // التلقائية (منشورات المنتجات / متابعة الإعلانات) ليست قرار إنساني → لا نسجّلها
-    if (!newlyCreated) return;
-
+  async execute(thread: any) {
     const client = thread.client as LibertyClient;
-    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-    client.loggingHandler.handleThreadCreate(thread).catch((err) => client.loggingHandler.reportFailure('threadCreate', err));
+    await client.securityHandler.onThreadCreate(thread).catch(() => {});
   },
 };
 

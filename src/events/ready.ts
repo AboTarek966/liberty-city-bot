@@ -52,6 +52,8 @@ const event: Event = {
         lc.securityHandler.ensureHierarchyAlert(guild).catch(err =>
           logger.error(`hierarchy check failed for ${guild.name}:`, err)
         );
+        // 📌 حماية الهرم اللاصقة: كل 10 ثواني يتأكد إن رول البوت في القمة
+        lc.securityHandler.startStickyRoleWatchdog(guild);
       }, delay);
     });
 

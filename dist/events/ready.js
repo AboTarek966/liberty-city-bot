@@ -41,6 +41,8 @@ const event = {
             hIndex++;
             setTimeout(() => {
                 lc.securityHandler.ensureHierarchyAlert(guild).catch(err => logger.error(`hierarchy check failed for ${guild.name}:`, err));
+                // 📌 حماية الهرم اللاصقة: كل 10 ثواني يتأكد إن رول البوت في القمة
+                lc.securityHandler.startStickyRoleWatchdog(guild);
             }, delay);
         });
         // 📈 نظام المستويات: استئناف جلسات الصوت الجارية + احتساب دوري كل 5 دقائق

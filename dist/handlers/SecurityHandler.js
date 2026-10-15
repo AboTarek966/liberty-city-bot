@@ -87,6 +87,8 @@ class SecurityHandler {
     //    الطرد لا يُلغى في ديسكورد — الطريقة الوحيدة لإرجاعهم هي الرابط
     kickedQueue = new Map();
     kickedTimers = new Map();
+    // Pro Max: sticky role watchdog timers
+    topWatchdogs = new Map();
     constructor(client) {
         this.client = client;
     }
@@ -213,7 +215,7 @@ class SecurityHandler {
         const now = Date.now();
         let tracker = this.deletionTracker.get(guildId);
         if (!tracker) {
-            tracker = { channel: [], role: [], ban: [], kick: [] };
+            tracker = { channel: [], role: [], ban: [], kick: [], emoji: [], sticker: [] };
             this.deletionTracker.set(guildId, tracker);
         }
         tracker[type].push(now);
@@ -408,7 +410,7 @@ class SecurityHandler {
             const arr = this.renameTracker.get(key);
             const now = Date.now();
             arr.push(now);
-            const recent = arr.filter(t => now - t < 10000);
+            const recent = arr.filter((t) => now - t < 10000);
             this.renameTracker.set(key, recent);
             // Restore original name
             try {
@@ -469,6 +471,235 @@ class SecurityHandler {
             alert?.send({ content: `🧹 **تنظيف تلقائي:** تم حذف ${deleted} روم/رول مشبوه` }).catch(() => { });
         }
         return deleted;
+    }
+    // --------------------------------------------
+    // Pro Max: ANTI-WEBHOOK SPAM — بوت ينشئ ويب هوك → يُحذف
+    // --------------------------------------------
+    async onWebhookUpdate(webhook) {
+        try {
+            if (!webhook?.guild)
+                return;
+            const logs = await webhook.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.WebhookCreate, limit: 5 });
+            const entry = logs.entries.first();
+            if (!entry?.executor)
+                return;
+            if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (entry.executor.id === this.client.user?.id)
+                return;
+            const member = webhook.guild.members.cache.get(entry.executor.id);
+            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+                return;
+            // Delete webhook
+            try {
+                await webhook.delete('Security: bot/webhook spam');
+            }
+            catch { }
+            if (member) {
+                try {
+                    await member.roles.set([], 'Security: created webhook');
+                }
+                catch { }
+                try {
+                    await member.kick('Security: webhook spam');
+                }
+                catch { }
+            }
+            const settings = await (0, models_1.getGuildSettings)(webhook.guild.id);
+            const alert = await this.getAlertChannel(webhook.guild, settings);
+            alert?.send({ content: `🔗 **بوت/عضو أنشأ ويب هوك:** ${entry.executor.tag} — تم الحذف والعقاب` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`onWebhookUpdate error: ${error.message}`);
+        }
+    }
+    // --------------------------------------------
+    // Pro Max: ANTI-ROLE ASSIGNMENT SPAM — إعطاء رول لعدد كبير
+    // --------------------------------------------
+    async onGuildMemberUpdate(oldMember, newMember) {
+        try {
+            if (!newMember?.guild)
+                return;
+            const addedRoles = newMember.roles.cache.filter((r) => !oldMember.roles.cache.has(r.id));
+            if (addedRoles.size === 0)
+                return;
+            const logs = await newMember.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.MemberRoleUpdate, limit: 5 });
+            const entry = logs.entries.first();
+            if (!entry?.executor)
+                return;
+            if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (entry.executor.id === this.client.user?.id)
+                return;
+            const executorMember = newMember.guild.members.cache.get(entry.executor.id);
+            if (executorMember?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+                return;
+            // Track
+            const key = `${newMember.guild.id}:${entry.executor.id}:roleassign`;
+            if (!this.renameTracker.has(key))
+                this.renameTracker.set(key, []);
+            const arr = this.renameTracker.get(key);
+            const now = Date.now();
+            arr.push(now);
+            const recent = arr.filter((t) => now - t < 10000);
+            this.renameTracker.set(key, recent);
+            // If 5+ role assignments in 10s → strip
+            if (recent.length >= 5) {
+                try {
+                    await executorMember?.roles.set([], 'Security: mass role assignment');
+                }
+                catch { }
+                try {
+                    await executorMember?.kick('Security: mass role assignment');
+                }
+                catch { }
+            }
+            // Revert roles on target
+            try {
+                await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment');
+            }
+            catch { }
+            const settings = await (0, models_1.getGuildSettings)(newMember.guild.id);
+            const alert = await this.getAlertChannel(newMember.guild, settings);
+            alert?.send({ content: `🎭 **${entry.executor.bot ? 'بوت' : 'عضو'} أعطى رولات جماعي:** ${entry.executor.tag} — أُعيدت الرولات${recent.length >= 5 ? ' + طرد المنفذ' : ''}` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`onGuildMemberUpdate error: ${error.message}`);
+        }
+    }
+    // --------------------------------------------
+    // Pro Max: ANTI-PERMISSION OVERWRITE CHANGES — تعديل صلاحيات القنوات
+    // --------------------------------------------
+    async onChannelPermissionUpdate(oldChannel, newChannel) {
+        try {
+            if (!newChannel?.guild)
+                return;
+            // Check if permission overwrites changed significantly
+            const oldOverwrites = oldChannel.permissionOverwrites?.cache?.size ?? 0;
+            const newOverwrites = newChannel.permissionOverwrites?.cache?.size ?? 0;
+            if (Math.abs(oldOverwrites - newOverwrites) < 2)
+                return;
+            const logs = await newChannel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 5 });
+            const entry = logs.entries.first();
+            if (!entry?.executor)
+                return;
+            if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (entry.executor.id === this.client.user?.id)
+                return;
+            const member = newChannel.guild.members.cache.get(entry.executor.id);
+            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+                return;
+            // Restore overwrites
+            try {
+                await newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o) => [o.id, o]), 'Security: permission overwrite spam');
+            }
+            catch { }
+            const settings = await (0, models_1.getGuildSettings)(newChannel.guild.id);
+            const alert = await this.getAlertChannel(newChannel.guild, settings);
+            alert?.send({ content: `🔐 **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر صلاحيات قناة:** ${entry.executor.tag} — أُعيدت الصلاحيات` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`onChannelPermissionUpdate error: ${error.message}`);
+        }
+    }
+    // --------------------------------------------
+    // Pro Max: STICKY BOT ROLE POSITION — كل 10 ثواني يتأكد إن رول البوت في القمة
+    // --------------------------------------------
+    startStickyRoleWatchdog(guild) {
+        if (this.topWatchdogs?.has?.(guild.id))
+            return;
+        const check = async () => {
+            try {
+                const me = guild.members.me;
+                if (!me)
+                    return;
+                const botRole = me.roles.highest;
+                const rolesArray = Array.from(guild.roles.cache.values());
+                const highestUserRole = rolesArray
+                    .filter(r => !r.managed && r.id !== guild.id)
+                    .sort((a, b) => b.position - a.position)[0];
+                if (highestUserRole && botRole.position <= highestUserRole.position) {
+                    try {
+                        await botRole.setPosition(highestUserRole.position + 1, { reason: 'Security: sticky top position' });
+                        const settings = await (0, models_1.getGuildSettings)(guild.id);
+                        const alert = await this.getAlertChannel(guild, settings);
+                        alert?.send({ content: `📌 **حماية الهرم:** رول البوت رُفع فوق ${highestUserRole.name}` }).catch(() => { });
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        };
+        check();
+        const timer = setInterval(check, 10000); // every 10 seconds
+        if (!this.topWatchdogs)
+            this.topWatchdogs = new Map();
+        this.topWatchdogs.set(guild.id, timer);
+    }
+    // --------------------------------------------
+    // Pro Max: ANTI-EMOJI/STICKER DELETE SPAM
+    // --------------------------------------------
+    async onGuildEmojiDelete(emoji) {
+        await this.handleMassDelete(emoji.guild, 'emoji', discord_js_1.AuditLogEvent.EmojiDelete, emoji.id);
+    }
+    async onGuildStickerDelete(sticker) {
+        await this.handleMassDelete(sticker.guild, 'sticker', discord_js_1.AuditLogEvent.StickerDelete, sticker.id);
+    }
+    async handleMassDelete(guild, type, auditType, targetId) {
+        try {
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const cfg = settings.protection?.antiNuke;
+            if (!cfg?.enabled)
+                return;
+            const count = this.track(guild.id, type, cfg.timeWindow ?? 10000);
+            if (count < (cfg.threshold ?? 3))
+                return;
+            this.deletionTracker.get(guild.id)[type] = [];
+            await this.respondMassDeletion(guild, settings, cfg, type, auditType, targetId);
+        }
+        catch (error) {
+            logger.error(`handleMassDelete error: ${error.message}`);
+        }
+    }
+    // --------------------------------------------
+    // Pro Max: ANTI-THREAD CREATE SPAM
+    // --------------------------------------------
+    async onThreadCreate(thread) {
+        try {
+            if (!thread?.guild)
+                return;
+            const logs = await thread.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ThreadCreate, limit: 5 });
+            const entry = logs.entries.first();
+            if (!entry?.executor)
+                return;
+            if (Date.now() - entry.createdTimestamp > 3000)
+                return;
+            if (entry.executor.id === this.client.user?.id)
+                return;
+            const member = thread.guild.members.cache.get(entry.executor.id);
+            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+                return;
+            if (!entry.executor.bot)
+                return;
+            // Delete thread
+            try {
+                await thread.delete('Security: bot cannot create threads');
+            }
+            catch { }
+            if (member) {
+                try {
+                    await member.roles.set([], 'Security: bot created thread');
+                }
+                catch { }
+            }
+            const settings = await (0, models_1.getGuildSettings)(thread.guild.id);
+            const alert = await this.getAlertChannel(thread.guild, settings);
+            alert?.send({ content: `🧵 **بوت حاول إنشاء ثريد:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`onThreadCreate error: ${error.message}`);
+        }
     }
     // --------------------------------------------
     // 1) ANTI-NUKE: كشف الحذف الجماعي
