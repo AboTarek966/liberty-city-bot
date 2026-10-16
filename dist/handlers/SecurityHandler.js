@@ -1241,8 +1241,10 @@ class SecurityHandler {
     }
     // إنشاء نسخة احتياطية (بنية القنوات + الرولات)
     async createBackup(guild) {
+        // نمط المشبوه — لا يُحفظ في النسخة الاحتياطية
+        const SUSPICIOUS = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123|vxl.?hak/i;
         const channels = guild.channels.cache
-            .filter(c => !c.isThread())
+            .filter(c => !c.isThread() && !SUSPICIOUS.test(c.name))
             .map(c => ({
             id: c.id,
             name: c.name,
@@ -1255,7 +1257,7 @@ class SecurityHandler {
         }))
             .sort((a, b) => a.position - b.position);
         const roles = guild.roles.cache
-            .filter(r => r.id !== guild.id && !r.managed)
+            .filter(r => r.id !== guild.id && !r.managed && !SUSPICIOUS.test(r.name))
             .sort((a, b) => b.position - a.position)
             .map(r => ({
             id: r.id,
@@ -1371,6 +1373,37 @@ class SecurityHandler {
             if (!created2)
                 result.skipped++;
             await sleep(700);
+        }
+        // 1.5) إعادة ترتيب الرولات حسب النسخة الاحتياطية
+        if (result.roles > 0) {
+            try {
+                await sleep(2000);
+                const curRoles = await guild.roles.fetch();
+                const nameToId = {};
+                for (const [, role] of curRoles) {
+                    if (role.managed || role.id === guild.id)
+                        continue;
+                    nameToId[role.name] = role.id;
+                }
+                // الترتيب: الأعلى position في النسخة = رقم position الأعلى في السيرفر
+                const backupSorted = [...(data.roles || [])].sort((a, b) => (b.position || 0) - (a.position || 0));
+                const positions = [];
+                let pos = backupSorted.length;
+                for (const rd of backupSorted) {
+                    const id = nameToId[rd.name];
+                    if (id) {
+                        positions.push({ role: id, position: pos });
+                        pos--;
+                    }
+                }
+                if (positions.length > 1) {
+                    await guild.roles.setPositions(positions);
+                    logger.info(`📐 Reordered ${positions.length} roles to match backup`);
+                }
+            }
+            catch (error) {
+                logger.warn(`Role reorder failed: ${error.message}`);
+            }
         }
         // 2) القنوات (الفئات أولاً ثم حسب الترتيب)
         const sortedChannels = [...(data.channels || [])].sort((a, b) => {
