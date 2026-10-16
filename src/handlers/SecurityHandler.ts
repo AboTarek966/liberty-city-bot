@@ -1068,10 +1068,15 @@ export class SecurityHandler {
 
     // ♻️ استعادة تلقائية للبنية — الحظر والطرد لا يُستعادان من النسخة
     //    (المطرودين نستعيدهم عبر رابط الدعوة — انظر scheduleKickedRecovery)
+    // 🔑 الاستعادة فقط عند هجوم حقيقي — لو الأونر/إدارة حذفوا بأرادتهم لا نستعيد
     if ((type === 'channel' || type === 'role') && cfg.autoRestore !== false) {
-      await this.runAutoRestore(guild, settings, type);
-      // 🧹 تنظيف تلقائي: حذف أي روم/رول مشبوه بعد الهكر
-      setTimeout(() => this.cleanupSuspicious(guild).catch(() => {}), 3000);
+      if (isWhitelisted) {
+        logger.info(`♻️ تخطّي الاستعادة التلقائية في ${guild.name} — المنفّذ وايت ليست (حذف يدوي مقصود)`);
+      } else {
+        await this.runAutoRestore(guild, settings, type);
+        // 🧹 تنظيف تلقائي: حذف أي روم/رول مشبوه بعد الهكر
+        setTimeout(() => this.cleanupSuspicious(guild).catch(() => {}), 3000);
+      }
     }
   }
 
