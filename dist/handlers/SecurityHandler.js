@@ -335,8 +335,7 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (this.isWhitelisted(channel.guild, entry.executor.id))
-                return; // الأونر والإدارة موثوقون
+            // ⚠️ مفيش وايت ليست — أي حد (أونر/إدارة/عضو) لو بيعمل تعديلات بسرعة يتراجع فوراً
             const member = channel.guild.members.cache.get(entry.executor.id);
             // 🤖 بوت → حذف فوري + سحب الصلاحيات
             if (entry.executor.bot) {
@@ -412,8 +411,7 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (this.isWhitelisted(role.guild, entry.executor.id))
-                return;
+            // ⚠️ مفيش وايت ليست — الرصد يشمل الأونر والإدارة أيضاً
             const member = role.guild.members.cache.get(entry.executor.id);
             // 🤖 بوت → حذف فوري
             if (entry.executor.bot) {
@@ -491,8 +489,7 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (this.isWhitelisted(newChannel.guild, entry.executor.id))
-                return;
+            // ⚠️ مفيش وايت ليست — أي حد بيعمل تعديلات بسرعة يتراجع + يتعاقب
             const member = newChannel.guild.members.cache.get(entry.executor.id);
             // Track rapid renames
             const key = `${newChannel.guild.id}:${entry.executor.id}:rename`;
@@ -503,13 +500,14 @@ class SecurityHandler {
             arr.push(now);
             const recent = arr.filter((t) => now - t < 10000);
             this.renameTracker.set(key, recent);
-            // Restore original name
-            try {
-                await newChannel.setName(oldChannel.name, 'Security: rapid rename detected');
+            // تعديل واحد عادي = عادي | 2+ تغييرات في 10 ثواني = هجوم
+            if (recent.length >= 2) {
+                try {
+                    await newChannel.setName(oldChannel.name, 'Security: rapid rename detected');
+                }
+                catch { }
             }
-            catch { }
-            // If 3+ renames in 10s → strip (ماعدا الأونر)
-            if (recent.length >= 3 && !this.isWhitelisted(newChannel.guild, entry.executor.id)) {
+            if (recent.length >= 3) {
                 if (member) {
                     try {
                         await member.roles.set([], 'Security: mass rename');
@@ -578,8 +576,7 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (this.isWhitelisted(webhook.guild, entry.executor.id))
-                return;
+            // ⚠️ مفيش وايت ليست
             const member = webhook.guild.members.cache.get(entry.executor.id);
             try {
                 await webhook.delete('Security: bot/webhook spam');
@@ -621,8 +618,7 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (this.isWhitelisted(newMember.guild, entry.executor.id))
-                return;
+            // ⚠️ مفيش وايت ليست — الرصد على السرعة بغض النظر عن مين
             const executorMember = newMember.guild.members.cache.get(entry.executor.id);
             // Track
             const key = `${newMember.guild.id}:${entry.executor.id}:roleassign`;
@@ -633,8 +629,13 @@ class SecurityHandler {
             arr.push(now);
             const recent = arr.filter((t) => now - t < 10000);
             this.renameTracker.set(key, recent);
-            // If 5+ role assignments in 10s → strip
-            if (recent.length >= 5 && !this.isWhitelisted(newMember.guild, entry.executor.id)) {
+            // إعطاء رول واحد = عادي | 5+ في 10 ثواني = هجوم
+            if (recent.length >= 5) {
+                // Revert roles on target
+                try {
+                    await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment');
+                }
+                catch { }
                 try {
                     await executorMember?.roles.set([], 'Security: mass role assignment');
                 }
@@ -642,13 +643,15 @@ class SecurityHandler {
                 try {
                     await executorMember?.kick('Security: mass role assignment');
                 }
-                catch { }
+                catch {
+                    try {
+                        await executorMember?.ban({ reason: 'Security: mass role assignment' });
+                    }
+                    catch { }
+                }
             }
-            // Revert roles on target
-            try {
-                await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment');
-            }
-            catch { }
+            if (recent.length < 5)
+                return;
             const settings = await (0, models_1.getGuildSettings)(newMember.guild.id);
             const alert = await this.getAlertChannel(newMember.guild, settings);
             alert?.send({ content: `🎭 **${entry.executor.bot ? 'بوت' : 'عضو'} أعطى رولات جماعي:** ${entry.executor.tag} — أُعيدت الرولات${recent.length >= 5 ? ' + طرد المنفذ' : ''}` }).catch(() => { });
@@ -675,21 +678,42 @@ class SecurityHandler {
                 return;
             if (Date.now() - entry.createdTimestamp > 3000)
                 return;
-            if (this.isWhitelisted(newChannel.guild, entry.executor.id))
-                return;
             if (entry.executor.id === this.client.user?.id)
                 return;
+            // ⚠️ مفيش وايت ليست — الرصد على السرعة
             const member = newChannel.guild.members.cache.get(entry.executor.id);
-            if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
-                return;
+            // تعديل واحد للصلاحيات = إعداد عادي | تعديلات سريعة متكررة = هجوم
+            const pkey = `${newChannel.guild.id}:${entry.executor.id}:perm`;
+            if (!this.renameTracker.has(pkey))
+                this.renameTracker.set(pkey, []);
+            const parr = this.renameTracker.get(pkey);
+            const pnow = Date.now();
+            parr.push(pnow);
+            const precent = parr.filter((t) => pnow - t < 10000);
+            this.renameTracker.set(pkey, precent);
             // Restore overwrites
             try {
                 await newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o) => [o.id, o]), 'Security: permission overwrite spam');
             }
             catch { }
+            if (precent.length >= 3) {
+                try {
+                    await member?.roles.set([], 'Security: permission overwrite spam');
+                }
+                catch { }
+                try {
+                    await member?.kick('Security: permission overwrite spam');
+                }
+                catch {
+                    try {
+                        await member?.ban({ reason: 'Security: permission overwrite spam' });
+                    }
+                    catch { }
+                }
+            }
             const settings = await (0, models_1.getGuildSettings)(newChannel.guild.id);
             const alert = await this.getAlertChannel(newChannel.guild, settings);
-            alert?.send({ content: `🔐 **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر صلاحيات قناة:** ${entry.executor.tag} — أُعيدت الصلاحيات` }).catch(() => { });
+            alert?.send({ content: `🔐 **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر صلاحيات قناة:** ${entry.executor.tag} — أُعيدت الصلاحيات${precent.length >= 3 ? ' + عقوبة على المنفّذ' : ''}` }).catch(() => { });
         }
         catch (error) {
             logger.error(`onChannelPermissionUpdate error: ${error.message}`);
@@ -768,8 +792,7 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (this.isWhitelisted(thread.guild, entry.executor.id))
-                return;
+            // ⚠️ مفيش وايت ليست — أي بوت أو أداة تهكير
             if (!entry.executor.bot)
                 return;
             const member = thread.guild.members.cache.get(entry.executor.id);
@@ -1060,16 +1083,11 @@ class SecurityHandler {
         };
         const executor = await this.findExecutor(guild, auditType, targetId);
         const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
-        // وايت ليست: الأونر والإدارة = لا يُعاقبون
+        // ⚠️ مفيش وايت ليست — أي حد (أونر/إدارة/عضو/بوت) يهاجم بالسرعة يتعرض للعقوبة
         const isWhitelisted = executor && this.isWhitelisted(guild, executor.id);
         let actionText;
         if (executor) {
-            if (isWhitelisted) {
-                actionText = '✅ **الأونر/إدارة — تم تجاهل العقوبة** (وايت ليست)';
-            }
-            else {
-                actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف مكثف (${labels[type].label})`);
-            }
+            actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف مكثف (${labels[type].label})`);
         }
         else {
             actionText = '⚠️ تعذّر تحديد المنفّذ من سجلات التدقيق';
@@ -1098,10 +1116,10 @@ class SecurityHandler {
         logger.warn(`🚨 Anti-Nuke: ${type} x${cfg.threshold} in ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
         // ♻️ استعادة تلقائية للبنية — الحظر والطرد لا يُستعادان من النسخة
         //    (المطرودين نستعيدهم عبر رابط الدعوة — انظر scheduleKickedRecovery)
-        // 🔑 الاستعادة فقط عند هجوم حقيقي — لو الأونر/إدارة حذفوا بأرادتهم لا نستعيد
+        // 🔑 الأونر لو حذف بإرادته (طلب منه) لا نستعيد — لكن الإدارة/الهاكر = استعادة + عقوبة
         if ((type === 'channel' || type === 'role') && cfg.autoRestore !== false) {
-            if (isWhitelisted) {
-                logger.info(`♻️ تخطّي الاستعادة التلقائية في ${guild.name} — المنفّذ وايت ليست (حذف يدوي مقصود)`);
+            if (executor && executor.id === guild.ownerId) {
+                logger.info(`♻️ تخطّي الاستعادة التلقائية في ${guild.name} — المنفّذ هو مالك السيرفر (حذف يدوي مقصود)`);
             }
             else {
                 await this.runAutoRestore(guild, settings, type);
