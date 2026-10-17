@@ -645,9 +645,15 @@ export class SecurityHandler {
         if (highestUserRole && botRole.position <= highestUserRole.position) {
           try {
             await botRole.setPosition(highestUserRole.position + 1, { reason: 'Security: sticky top position' });
-            const settings = await getGuildSettings(guild.id);
-            const alert = await this.getAlertChannel(guild, settings);
-            alert?.send({ content: `📌 **حماية الهرم:** رول البوت رُفع فوق ${highestUserRole.name}` }).catch(() => {});
+            // 🔕 صامت — التنبيه مرة واحدة كل ساعة بحد أقصى (مافيش سبام)
+            if (!(this as any).stickyAlertAt) (this as any).stickyAlertAt = new Map<string, number>();
+            const last = ((this as any).stickyAlertAt as Map<string, number>).get(guild.id) ?? 0;
+            if (Date.now() - last > 60 * 60 * 1000) {
+              ((this as any).stickyAlertAt as Map<string, number>).set(guild.id, Date.now());
+              const settings = await getGuildSettings(guild.id);
+              const alert = await this.getAlertChannel(guild, settings);
+              alert?.send({ content: `📌 **حماية الهرم:** رول البوت رُفع فوق ${highestUserRole.name}` }).catch(() => {});
+            }
           } catch {}
         }
       } catch {}
