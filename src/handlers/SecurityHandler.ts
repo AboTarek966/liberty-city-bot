@@ -439,13 +439,46 @@ export class SecurityHandler {
       if (Date.now() - entry.createdTimestamp > 3000) return;
       if (entry.executor.id === this.client.user?.id) return;
       if (this.isWhitelisted(channel.guild, entry.executor.id)) return; // الأونر والإدارة موثوقون
-      if (!entry.executor.bot) return; // البشر مسموح (ماعدا لو سبام)
       const member = channel.guild.members.cache.get(entry.executor.id);
-      try { await channel.delete('Security: bot cannot create channels'); } catch {}
-      if (member) { try { await member.roles.set([], 'Security: bot created channel'); } catch {} }
-      const settings = await getGuildSettings(channel.guild.id);
-      const alert = await this.getAlertChannel(channel.guild, settings);
-      alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => {});
+
+      // 🤖 بوت → حذف فوري + سحب الصلاحيات
+      if (entry.executor.bot) {
+        try { await channel.delete('Security: bot cannot create channels'); } catch {}
+        if (member) { try { await member.roles.set([], 'Security: bot created channel'); } catch {} }
+        const settings = await getGuildSettings(channel.guild.id);
+        const alert = await this.getAlertChannel(channel.guild, settings);
+        alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => {});
+        return;
+      }
+
+      // 🧑 إنسان (أداة تهكير بدون بوت) → رصد الإنشاء السريع
+      //    3+ قنوات في 10 ثواني = هجوم نيوك → حذف المنشأ + سحب الرولات + طرد + حظر
+      const key = `${channel.guild.id}:${entry.executor.id}:chcreate`;
+      if (!this.renameTracker.has(key)) this.renameTracker.set(key, []);
+      const arr = this.renameTracker.get(key)!;
+      const now = Date.now();
+      arr.push(now);
+      const recent = arr.filter((t: number) => now - t < 10000);
+      this.renameTracker.set(key, recent);
+
+      if (recent.length >= 3) {
+        // حذف كل القنوات اللي أنشأها خلال النافذة
+        for (const [, ch] of channel.guild.channels.cache) {
+          if ((ch as any).createdTimestamp && Date.now() - (ch as any).createdTimestamp < 10000) {
+            try { await ch.delete('Security: mass channel create by tool'); } catch {}
+          }
+        }
+        this.renameTracker.set(key, []);
+        try { await member?.roles.set([], 'Security: mass channel creation'); } catch {}
+        try { await member?.ban({ reason: 'Security: mass channel creation (anti-nuke tool)' }); } catch {
+          try { await member?.kick('Security: mass channel creation'); } catch {}
+        }
+        const settings = await getGuildSettings(channel.guild.id);
+        const alert = await this.getAlertChannel(channel.guild, settings);
+        alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ قنوات بسرعة (أداة تهكير)!**\nتم حذف القنوات + حظر المنفّذ` }).catch(() => {});
+        // استعادة تلقائية
+        setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => {}), 2000);
+      }
     } catch (error: any) {
       logger.error(`onChannelCreate error: ${error.message}`);
     }
@@ -460,13 +493,44 @@ export class SecurityHandler {
       if (Date.now() - entry.createdTimestamp > 3000) return;
       if (entry.executor.id === this.client.user?.id) return;
       if (this.isWhitelisted(role.guild, entry.executor.id)) return;
-      if (!entry.executor.bot) return;
       const member = role.guild.members.cache.get(entry.executor.id);
-      try { await role.delete('Security: bot cannot create roles'); } catch {}
-      if (member) { try { await member.roles.set([], 'Security: bot created role'); } catch {} }
-      const settings = await getGuildSettings(role.guild.id);
-      const alert = await this.getAlertChannel(role.guild, settings);
-      alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => {});
+
+      // 🤖 بوت → حذف فوري
+      if (entry.executor.bot) {
+        try { await role.delete('Security: bot cannot create roles'); } catch {}
+        if (member) { try { await member.roles.set([], 'Security: bot created role'); } catch {} }
+        const settings = await getGuildSettings(role.guild.id);
+        const alert = await this.getAlertChannel(role.guild, settings);
+        alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => {});
+        return;
+      }
+
+      // 🧑 إنسان → رصد الإنشاء السريع (3+ رولات في 10 ثواني)
+      const key = `${role.guild.id}:${entry.executor.id}:rolecreate`;
+      if (!this.renameTracker.has(key)) this.renameTracker.set(key, []);
+      const arr = this.renameTracker.get(key)!;
+      const now = Date.now();
+      arr.push(now);
+      const recent = arr.filter((t: number) => now - t < 10000);
+      this.renameTracker.set(key, recent);
+
+      if (recent.length >= 3) {
+        for (const [, r] of role.guild.roles.cache) {
+          if (r.id === role.guild.id || r.managed) continue;
+          if ((r as any).createdTimestamp && Date.now() - (r as any).createdTimestamp < 10000) {
+            try { await r.delete('Security: mass role create by tool'); } catch {}
+          }
+        }
+        this.renameTracker.set(key, []);
+        try { await member?.roles.set([], 'Security: mass role creation'); } catch {}
+        try { await member?.ban({ reason: 'Security: mass role creation (anti-nuke tool)' }); } catch {
+          try { await member?.kick('Security: mass role creation'); } catch {}
+        }
+        const settings = await getGuildSettings(role.guild.id);
+        const alert = await this.getAlertChannel(role.guild, settings);
+        alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ رولات بسرعة (أداة تهكير)!**\nتم حذف الرولات + حظر المنفّذ` }).catch(() => {});
+        setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => {}), 2000);
+      }
     } catch (error: any) {
       logger.error(`onRoleCreate error: ${error.message}`);
     }
