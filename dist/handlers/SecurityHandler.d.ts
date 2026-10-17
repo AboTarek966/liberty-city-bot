@@ -51,7 +51,6 @@ export declare class SecurityHandler {
     onChannelCreate(channel: any): Promise<void>;
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
-    lockdownGuild(guild: Guild): Promise<void>;
     cleanupSuspicious(guild: Guild): Promise<number>;
     onWebhookUpdate(webhook: any): Promise<void>;
     onGuildMemberUpdate(oldMember: any, newMember: any): Promise<void>;

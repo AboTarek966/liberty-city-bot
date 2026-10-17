@@ -370,7 +370,6 @@ class SecurityHandler {
                 const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
                 const alert = await this.getAlertChannel(channel.guild, settings);
                 alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ قنوات بسرعة!**\nتم الحذف + الحظر` }).catch(() => { });
-                this.lockdownGuild(channel.guild).catch(() => { });
                 setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => { }), 1500);
             }
         }
@@ -424,7 +423,6 @@ class SecurityHandler {
                 const settings = await (0, models_1.getGuildSettings)(role.guild.id);
                 const alert = await this.getAlertChannel(role.guild, settings);
                 alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ رولات بسرعة!**\nتم الحذف + الحظر` }).catch(() => { });
-                this.lockdownGuild(role.guild).catch(() => { });
                 setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => { }), 1500);
             }
         }
@@ -471,7 +469,6 @@ class SecurityHandler {
                     member?.kick('Security: mass channel rename').catch(() => { }),
                 ]);
                 this.renameTracker.set(key, []);
-                this.lockdownGuild(newChannel.guild).catch(() => { });
             }
             const settings = await (0, models_1.getGuildSettings)(newChannel.guild.id);
             const alert = await this.getAlertChannel(newChannel.guild, settings);
@@ -484,42 +481,6 @@ class SecurityHandler {
     // --------------------------------------------
     // 0c) AUTO-CLEAN: حذف تلقائي لأي روم/رول مشبوه بعد الهكر
     // --------------------------------------------
-    // 🚨 قفل طوارئ: سحب صلاحيات الخطر من @everyone + أي رول مشبوه حديث
-    //    يُستدعى فور كشف هجوم — الهاكر يفقد كل صلاحياته خلال ثوانٍ
-    async lockdownGuild(guild) {
-        try {
-            const DANGEROUS = [
-                discord_js_1.PermissionFlagsBits.Administrator,
-                discord_js_1.PermissionFlagsBits.ManageChannels,
-                discord_js_1.PermissionFlagsBits.ManageRoles,
-                discord_js_1.PermissionFlagsBits.ManageGuild,
-                discord_js_1.PermissionFlagsBits.BanMembers,
-                discord_js_1.PermissionFlagsBits.KickMembers,
-                discord_js_1.PermissionFlagsBits.ManageWebhooks,
-                discord_js_1.PermissionFlagsBits.MentionEveryone,
-            ];
-            // 1) سحب الصلاحيات من @everyone
-            const everyone = guild.roles.everyone;
-            if (everyone) {
-                const perms = everyone.permissions;
-                if (DANGEROUS.some(p => perms.has(p))) {
-                    await everyone.setPermissions(perms.bitfield & ~DANGEROUS.reduce((a, p) => a | p, 0n), 'Security: lockdown — نزع صلاحيات الخطر').catch(() => { });
-                }
-            }
-            // 2) حذف أي رول حديث (أقل من 60 ثانية) فيه صلاحيات خطرة
-            const recentRoles = Array.from(guild.roles.cache.values())
-                .filter((r) => r.id !== guild.id && !r.managed &&
-                r.createdTimestamp && Date.now() - r.createdTimestamp < 60000 &&
-                DANGEROUS.some(p => r.permissions.has(p)));
-            await Promise.allSettled(recentRoles.map(r => r.delete('Security: lockdown — رول مشبوه حديث').catch(() => { })));
-            const settings = await (0, models_1.getGuildSettings)(guild.id);
-            const alert = await this.getAlertChannel(guild, settings);
-            alert?.send({ content: `🔒 **وضع الطوارئ:** تم نزع صلاحيات الخطر من @everyone + حذف ${recentRoles.length} رول مشبوه` }).catch(() => { });
-        }
-        catch (error) {
-            logger.error(`lockdownGuild error: ${error.message}`);
-        }
-    }
     async cleanupSuspicious(guild) {
         let deleted = 0;
         const pattern = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123/i;
@@ -629,7 +590,6 @@ class SecurityHandler {
                     executorMember?.roles.set([], 'Security: mass role assignment').catch(() => { }),
                     executorMember?.kick('Security: mass role assignment').catch(() => { }),
                 ]);
-                this.lockdownGuild(newMember.guild).catch(() => { });
             }
             if (recent.length < 5)
                 return;
@@ -1103,8 +1063,6 @@ class SecurityHandler {
                 logger.info(`♻️ تخطّي الاستعادة التلقائية في ${guild.name} — المنفّذ هو مالك السيرفر (حذف يدوي مقصود)`);
             }
             else {
-                // 🔒 قفل طوارئ أولاً: نزع صلاحيات الخطر — الهاكر يتوقف فوراً
-                await this.lockdownGuild(guild).catch(() => { });
                 await this.runAutoRestore(guild, settings, type);
                 // 🧹 تنظيف تلقائي: حذف أي روم/رول مشبوه بعد الهكر
                 setTimeout(() => this.cleanupSuspicious(guild).catch(() => { }), 3000);
