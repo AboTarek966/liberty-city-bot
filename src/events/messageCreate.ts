@@ -902,8 +902,31 @@ async function runAliasCommand(
 
     // ---------- UTILITY ----------
     case 'purge': {
+      // 🧹 "م all" / "مسح الكل" → حذف كل رسائل الروم (بالكامل)
+      const firstArg = (args[0] || '').toLowerCase();
+      if (firstArg === 'all' || firstArg === 'الكل' || firstArg === 'كل') {
+        if (!('bulkDelete' in message.channel))
+          return respond(message, '❌ لا يمكن الحذف في هذا النوع من القنوات');
+        let total = 0;
+        for (let i = 0; i < 30; i++) {
+          const fetched = await (message.channel as any).messages.fetch({ limit: 100 });
+          if (fetched.size === 0) break;
+          const deleted = await (message.channel as any).bulkDelete(fetched, true);
+          total += deleted.size;
+          if (deleted.size < fetched.size) break; // الباقي أقدم من 14 يوم (غير قابل للحذف الجماعي)
+          await new Promise(r => setTimeout(r, 1200));
+        }
+        if (message.channel.isTextBased() && 'send' in message.channel) {
+          await message.channel
+            .send(`🧹 **تم حذف كل الرسائل — الإجمالي: ${total} رسالة**`)
+            .then(m => setTimeout(() => m.delete().catch(() => {}), 6000))
+            .catch(() => {});
+        }
+        return;
+      }
+
       const amount = parseInt(args[0], 10);
-      if (!amount || amount < 1 || amount > 100) return usage('<1-100> • مثال: 50');
+      if (!amount || amount < 1 || amount > 100) return usage('<1-100 | all> • مثال: 50 أو all');
       if (!('bulkDelete' in message.channel))
         return respond(message, '❌ لا يمكن الحذف في هذا النوع من القنوات');
 

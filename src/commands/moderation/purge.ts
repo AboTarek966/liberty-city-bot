@@ -19,9 +19,15 @@ const command: Command = {
       option
         .setName('amount')
         .setDescription('عدد الرسائل (1-100)')
-        .setRequired(true)
+        .setRequired(false)
         .setMinValue(1)
         .setMaxValue(100)
+    )
+    .addBooleanOption(option =>
+      option
+        .setName('all')
+        .setDescription('حذف كل رسائل القناة بالكامل')
+        .setRequired(false)
     )
     .addUserOption(option =>
       option
@@ -36,13 +42,42 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ManageMessages],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const amount = interaction.options.getInteger('amount', true);
+    const amount = interaction.options.getInteger('amount');
+    const purgeAll = interaction.options.getBoolean('all');
     const targetUser = interaction.options.getUser('user');
 
     await interaction.deferReply({ ephemeral: true });
 
+    const channel = interaction.channel;
+    if (!channel || !channel.isTextBased() || !('bulkDelete' in channel)) {
+      await interaction.editReply({
+        content: '❌ لا يمكن مسح الرسائل في هذه القناة',
+      });
+      return;
+    }
+
+    // 🧹 حذف كل الرسائل
+    if (purgeAll) {
+      let total = 0;
+      for (let i = 0; i < 30; i++) {
+        const fetched = await (channel as any).messages.fetch({ limit: 100 });
+        if (fetched.size === 0) break;
+        const deleted = await (channel as any).bulkDelete(fetched, true);
+        total += deleted.size;
+        if (deleted.size < fetched.size) break;
+        await new Promise(r => setTimeout(r, 1200));
+      }
+      await interaction.editReply({ content: `🧹 **تم حذف كل الرسائل — الإجمالي: ${total} رسالة**` });
+      return;
+    }
+
+    if (!amount) {
+      await interaction.editReply({ content: '❌ حدد عدد الرسائل أو فعّل خيار `all`' });
+      return;
+    }
+
     // Fetch messages
-    const messages = await interaction.channel!.messages.fetch({ limit: 100 });
+    const messages = await channel.messages.fetch({ limit: 100 });
 
     // Filter messages
     let messagesToDelete = Array.from(messages.values());
@@ -66,14 +101,7 @@ const command: Command = {
     }
 
     // Delete messages
-    const channel = interaction.channel;
-    if (!channel || !channel.isTextBased() || !('bulkDelete' in channel)) {
-      await interaction.editReply({
-        content: '❌ لا يمكن مسح الرسائل في هذه القناة',
-      });
-      return;
-    }
-    const deleted = await channel.bulkDelete(messagesToDelete, true);
+    const deleted = await (channel as any).bulkDelete(messagesToDelete, true);
 
     await interaction.editReply({ content: `🗑️ تم مسح **${deleted.size}** رسالة` + (targetUser ? ` من ${targetUser}` : '') });
   },
