@@ -327,72 +327,51 @@ class SecurityHandler {
         try {
             if (!channel?.guild)
                 return;
-            const logs = await channel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelCreate, limit: 5 });
+            const logs = await channel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelCreate, limit: 3 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 3000)
+            if (Date.now() - entry.createdTimestamp > 2000)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            // ⚠️ مفيش وايت ليست — أي حد (أونر/إدارة/عضو) لو بيعمل تعديلات بسرعة يتراجع فوراً
             const member = channel.guild.members.cache.get(entry.executor.id);
-            // 🤖 بوت → حذف فوري + سحب الصلاحيات
+            // 🤖 بوت → حذف فوري + حظر (الأقوى)
             if (entry.executor.bot) {
-                try {
-                    await channel.delete('Security: bot cannot create channels');
-                }
-                catch { }
-                if (member) {
-                    try {
-                        await member.roles.set([], 'Security: bot created channel');
-                    }
-                    catch { }
-                }
+                await Promise.allSettled([
+                    channel.delete('Security: bot cannot create channels').catch(() => { }),
+                    member?.roles.set([], 'Security: bot created channel').catch(() => { }),
+                    member?.ban({ reason: 'Security: bot created channel (anti-nuke)' }).catch(() => { }),
+                ]);
                 const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
                 const alert = await this.getAlertChannel(channel.guild, settings);
-                alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => { });
+                alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف والحظر` }).catch(() => { });
                 return;
             }
-            // 🧑 إنسان (أداة تهكير بدون بوت) → رصد الإنشاء السريع
-            //    3+ قنوات في 10 ثواني = هجوم نيوك → حذف المنشأ + سحب الرولات + طرد + حظر
+            // 🧑 إنسان → رصد الإنشاء السريع (2+ في 8 ثواني = هجوم)
             const key = `${channel.guild.id}:${entry.executor.id}:chcreate`;
             if (!this.renameTracker.has(key))
                 this.renameTracker.set(key, []);
             const arr = this.renameTracker.get(key);
             const now = Date.now();
             arr.push(now);
-            const recent = arr.filter((t) => now - t < 10000);
+            const recent = arr.filter((t) => now - t < 8000);
             this.renameTracker.set(key, recent);
-            if (recent.length >= 3) {
-                // حذف كل القنوات اللي أنشأها خلال النافذة
-                for (const [, ch] of channel.guild.channels.cache) {
-                    if (ch.createdTimestamp && Date.now() - ch.createdTimestamp < 10000) {
-                        try {
-                            await ch.delete('Security: mass channel create by tool');
-                        }
-                        catch { }
-                    }
-                }
+            if (recent.length >= 2) {
+                // حذف كل القنوات اللي أنشأها خلال النافذة + حظر فوري
+                const recentChannels = Array.from(channel.guild.channels.cache.values())
+                    .filter((ch) => ch.createdTimestamp && Date.now() - ch.createdTimestamp < 8000);
+                await Promise.allSettled([
+                    ...recentChannels.map(ch => ch.delete('Security: mass channel create').catch(() => { })),
+                    member?.roles.set([], 'Security: mass channel creation').catch(() => { }),
+                    member?.ban({ reason: 'Security: mass channel creation (anti-nuke tool)' }).catch(() => { }),
+                ]);
                 this.renameTracker.set(key, []);
-                try {
-                    await member?.roles.set([], 'Security: mass channel creation');
-                }
-                catch { }
-                try {
-                    await member?.ban({ reason: 'Security: mass channel creation (anti-nuke tool)' });
-                }
-                catch {
-                    try {
-                        await member?.kick('Security: mass channel creation');
-                    }
-                    catch { }
-                }
                 const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
                 const alert = await this.getAlertChannel(channel.guild, settings);
-                alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ قنوات بسرعة (أداة تهكير)!**\nتم حذف القنوات + حظر المنفّذ` }).catch(() => { });
-                // استعادة تلقائية
-                setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => { }), 2000);
+                alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ قنوات بسرعة!**\nتم الحذف + الحظر` }).catch(() => { });
+                this.lockdownGuild(channel.guild).catch(() => { });
+                setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => { }), 1500);
             }
         }
         catch (error) {
@@ -403,71 +382,50 @@ class SecurityHandler {
         try {
             if (!role?.guild || role.managed)
                 return;
-            const logs = await role.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.RoleCreate, limit: 5 });
+            const logs = await role.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.RoleCreate, limit: 3 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 3000)
+            if (Date.now() - entry.createdTimestamp > 2000)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            // ⚠️ مفيش وايت ليست — الرصد يشمل الأونر والإدارة أيضاً
             const member = role.guild.members.cache.get(entry.executor.id);
-            // 🤖 بوت → حذف فوري
+            // 🤖 بوت → حذف فوري + حظر
             if (entry.executor.bot) {
-                try {
-                    await role.delete('Security: bot cannot create roles');
-                }
-                catch { }
-                if (member) {
-                    try {
-                        await member.roles.set([], 'Security: bot created role');
-                    }
-                    catch { }
-                }
+                await Promise.allSettled([
+                    role.delete('Security: bot cannot create roles').catch(() => { }),
+                    member?.roles.set([], 'Security: bot created role').catch(() => { }),
+                    member?.ban({ reason: 'Security: bot created role (anti-nuke)' }).catch(() => { }),
+                ]);
                 const settings = await (0, models_1.getGuildSettings)(role.guild.id);
                 const alert = await this.getAlertChannel(role.guild, settings);
-                alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف وسحب الصلاحيات` }).catch(() => { });
+                alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف والحظر` }).catch(() => { });
                 return;
             }
-            // 🧑 إنسان → رصد الإنشاء السريع (3+ رولات في 10 ثواني)
+            // 🧑 إنسان → رصد الإنشاء السريع (2+ في 8 ثواني)
             const key = `${role.guild.id}:${entry.executor.id}:rolecreate`;
             if (!this.renameTracker.has(key))
                 this.renameTracker.set(key, []);
             const arr = this.renameTracker.get(key);
             const now = Date.now();
             arr.push(now);
-            const recent = arr.filter((t) => now - t < 10000);
+            const recent = arr.filter((t) => now - t < 8000);
             this.renameTracker.set(key, recent);
-            if (recent.length >= 3) {
-                for (const [, r] of role.guild.roles.cache) {
-                    if (r.id === role.guild.id || r.managed)
-                        continue;
-                    if (r.createdTimestamp && Date.now() - r.createdTimestamp < 10000) {
-                        try {
-                            await r.delete('Security: mass role create by tool');
-                        }
-                        catch { }
-                    }
-                }
+            if (recent.length >= 2) {
+                const recentRoles = Array.from(role.guild.roles.cache.values())
+                    .filter((r) => r.id !== role.guild.id && !r.managed && r.createdTimestamp && Date.now() - r.createdTimestamp < 8000);
+                await Promise.allSettled([
+                    ...recentRoles.map(r => r.delete('Security: mass role create').catch(() => { })),
+                    member?.roles.set([], 'Security: mass role creation').catch(() => { }),
+                    member?.ban({ reason: 'Security: mass role creation (anti-nuke tool)' }).catch(() => { }),
+                ]);
                 this.renameTracker.set(key, []);
-                try {
-                    await member?.roles.set([], 'Security: mass role creation');
-                }
-                catch { }
-                try {
-                    await member?.ban({ reason: 'Security: mass role creation (anti-nuke tool)' });
-                }
-                catch {
-                    try {
-                        await member?.kick('Security: mass role creation');
-                    }
-                    catch { }
-                }
                 const settings = await (0, models_1.getGuildSettings)(role.guild.id);
                 const alert = await this.getAlertChannel(role.guild, settings);
-                alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ رولات بسرعة (أداة تهكير)!**\nتم حذف الرولات + حظر المنفّذ` }).catch(() => { });
-                setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => { }), 2000);
+                alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ رولات بسرعة!**\nتم الحذف + الحظر` }).catch(() => { });
+                this.lockdownGuild(role.guild).catch(() => { });
+                setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => { }), 1500);
             }
         }
         catch (error) {
@@ -508,17 +466,12 @@ class SecurityHandler {
                 catch { }
             }
             if (recent.length >= 3) {
-                if (member) {
-                    try {
-                        await member.roles.set([], 'Security: mass rename');
-                    }
-                    catch { }
-                    try {
-                        await member.kick('Security: mass channel rename');
-                    }
-                    catch { }
-                }
+                await Promise.allSettled([
+                    member?.roles.set([], 'Security: mass rename').catch(() => { }),
+                    member?.kick('Security: mass channel rename').catch(() => { }),
+                ]);
                 this.renameTracker.set(key, []);
+                this.lockdownGuild(newChannel.guild).catch(() => { });
             }
             const settings = await (0, models_1.getGuildSettings)(newChannel.guild.id);
             const alert = await this.getAlertChannel(newChannel.guild, settings);
@@ -531,6 +484,42 @@ class SecurityHandler {
     // --------------------------------------------
     // 0c) AUTO-CLEAN: حذف تلقائي لأي روم/رول مشبوه بعد الهكر
     // --------------------------------------------
+    // 🚨 قفل طوارئ: سحب صلاحيات الخطر من @everyone + أي رول مشبوه حديث
+    //    يُستدعى فور كشف هجوم — الهاكر يفقد كل صلاحياته خلال ثوانٍ
+    async lockdownGuild(guild) {
+        try {
+            const DANGEROUS = [
+                discord_js_1.PermissionFlagsBits.Administrator,
+                discord_js_1.PermissionFlagsBits.ManageChannels,
+                discord_js_1.PermissionFlagsBits.ManageRoles,
+                discord_js_1.PermissionFlagsBits.ManageGuild,
+                discord_js_1.PermissionFlagsBits.BanMembers,
+                discord_js_1.PermissionFlagsBits.KickMembers,
+                discord_js_1.PermissionFlagsBits.ManageWebhooks,
+                discord_js_1.PermissionFlagsBits.MentionEveryone,
+            ];
+            // 1) سحب الصلاحيات من @everyone
+            const everyone = guild.roles.everyone;
+            if (everyone) {
+                const perms = everyone.permissions;
+                if (DANGEROUS.some(p => perms.has(p))) {
+                    await everyone.setPermissions(perms.bitfield & ~DANGEROUS.reduce((a, p) => a | p, 0n), 'Security: lockdown — نزع صلاحيات الخطر').catch(() => { });
+                }
+            }
+            // 2) حذف أي رول حديث (أقل من 60 ثانية) فيه صلاحيات خطرة
+            const recentRoles = Array.from(guild.roles.cache.values())
+                .filter((r) => r.id !== guild.id && !r.managed &&
+                r.createdTimestamp && Date.now() - r.createdTimestamp < 60000 &&
+                DANGEROUS.some(p => r.permissions.has(p)));
+            await Promise.allSettled(recentRoles.map(r => r.delete('Security: lockdown — رول مشبوه حديث').catch(() => { })));
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const alert = await this.getAlertChannel(guild, settings);
+            alert?.send({ content: `🔒 **وضع الطوارئ:** تم نزع صلاحيات الخطر من @everyone + حذف ${recentRoles.length} رول مشبوه` }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`lockdownGuild error: ${error.message}`);
+        }
+    }
     async cleanupSuspicious(guild) {
         let deleted = 0;
         const pattern = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123/i;
@@ -636,19 +625,11 @@ class SecurityHandler {
                     await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment');
                 }
                 catch { }
-                try {
-                    await executorMember?.roles.set([], 'Security: mass role assignment');
-                }
-                catch { }
-                try {
-                    await executorMember?.kick('Security: mass role assignment');
-                }
-                catch {
-                    try {
-                        await executorMember?.ban({ reason: 'Security: mass role assignment' });
-                    }
-                    catch { }
-                }
+                await Promise.allSettled([
+                    executorMember?.roles.set([], 'Security: mass role assignment').catch(() => { }),
+                    executorMember?.kick('Security: mass role assignment').catch(() => { }),
+                ]);
+                this.lockdownGuild(newMember.guild).catch(() => { });
             }
             if (recent.length < 5)
                 return;
@@ -1122,6 +1103,8 @@ class SecurityHandler {
                 logger.info(`♻️ تخطّي الاستعادة التلقائية في ${guild.name} — المنفّذ هو مالك السيرفر (حذف يدوي مقصود)`);
             }
             else {
+                // 🔒 قفل طوارئ أولاً: نزع صلاحيات الخطر — الهاكر يتوقف فوراً
+                await this.lockdownGuild(guild).catch(() => { });
                 await this.runAutoRestore(guild, settings, type);
                 // 🧹 تنظيف تلقائي: حذف أي روم/رول مشبوه بعد الهكر
                 setTimeout(() => this.cleanupSuspicious(guild).catch(() => { }), 3000);
