@@ -248,61 +248,15 @@ class SecurityHandler {
                 return status;
             }
             this.hierarchyState.set(guild.id, status.ok);
-            const settings = await (0, models_1.getGuildSettings)(guild.id);
-            const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
-            if (!channel)
-                return status;
-            // ✅ شُفّت المشكلة — نؤكد للّي صلّحها
+            // 🔕 صامت تماماً — لا رسائل تلقائية في السيرفر
+            //    (الفحص اليدوي فقط عبر /protection hierarchy)
             if (status.ok) {
-                await channel
-                    .send({
-                    embeds: [
-                        new discord_js_1.EmbedBuilder()
-                            .setTitle('✅ إصلاح التسلّم — البوت الآن أعلى رتبة')
-                            .setDescription(`**${status.botRoleName}** أصبحت أعلى رتبة في السيرفر — الحماية تعمل بالكامل الآن: مضاد النيوك يطرد ويحظر، والاستعادة التلقائية تعمل.`)
-                            .setColor(embeds_1.Colors.success)
-                            .setFooter({ text: 'Liberty City — Hierarchy Guard' })
-                            .setTimestamp(),
-                    ],
-                })
-                    .catch(() => { });
-                logger.info(`✅ Hierarchy fixed in ${guild.name}`);
-                return status;
+                logger.info(`✅ Hierarchy fixed in ${guild.name} — البوت الآن أعلى رتبة`);
             }
-            // ❌ مشكلة جديدة → تنبيه عالي الخطورة مع الخطوات
-            const lines = status.offenders.length
-                ? status.offenders.join('\n')
-                : '— (رول غير مُدار أعلى البوت)';
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🚨 فحص التسلّم — البوت ليس أعلى رتبة!')
-                .setDescription('**هذه أخطر ثغرة في حماية السيرفر.**\n' +
-                'لو أي أحد فوق البوت، **كل العقوبات تفشل بصمت**: مضاد النيوك ما يقدر يطرد ولا يحظر المخالف، والاستعادة التلقائية قد تتعطّل — والهجوم ينجح بلا مقاومة.')
-                .setColor(embeds_1.Colors.error)
-                .addFields({
-                name: '📌 أعلى رتبة للبوت',
-                value: `${status.botRoleName} — الموقع \`#${status.botPosition}\``,
-                inline: true,
-            }, {
-                name: `⛔ الرولات فوق البوت (${status.offenderCount})`,
-                value: lines,
-                inline: false,
-            }, {
-                name: '🎯 الخطر الحالي',
-                value: status.dangerous
-                    ? '⚠️ **رول فوق البوت يحمل صلاحيات خطيرة** (أدمنستريتر/إدارة/حظر) — أي صاحبه لا يُمسّ.'
-                    : 'الرولات فوق البوت أدنى خطر، لكنها تمنع معاقبة أصحابها.',
-                inline: false,
-            }, {
-                name: '✅ الخطوتين للاصلاح',
-                value: '**1.** افتح Server Settings ← Roles\n' +
-                    `**2.** اسحب رول البوت (‎${status.botRoleName}‎) **لأعلى القائمة** — يبقى الأول مباشرة تحت @everyone\n\n` +
-                    '_ملاحظة: من يملك المالك (⭐) يبقى فوق الجميع تلقائياً._',
-                inline: false,
-            })
-                .setFooter({ text: 'Liberty City — Hierarchy Guard' })
-                .setTimestamp();
-            await channel.send({ embeds: [embed], content: `<@${guild.ownerId}>` }).catch(() => { });
-            logger.warn(`🚨 Hierarchy: bot NOT top in ${guild.name} | bot=#${status.botPosition} | offenders=${status.offenderCount}`);
+            else {
+                logger.warn(`🚨 Hierarchy: bot NOT top in ${guild.name} | bot=#${status.botPosition} | offenders=${status.offenderCount}`);
+            }
+            return status;
         }
         catch (error) {
             logger.error(`ensureHierarchyAlert error: ${error.message}`);
