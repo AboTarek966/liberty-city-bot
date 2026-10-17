@@ -141,6 +141,16 @@ const handler: ButtonHandler = {
       await client.securityHandler?.syncAutoBackup(interaction.guild, !!nowEnabled).catch(() => {});
     }
 
+    // 🔍 مزامنة مؤقت الفحص الدوري فور تبديلته
+    if (section === 'protection' && field === 'autoScan') {
+      const client = interaction.client as LibertyClient;
+      if (!(settings.protection as any).autoScan) {
+        (settings.protection as any).autoScan = { enabled: true, interval: 6 };
+        await settings.save();
+      }
+      await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => {});
+    }
+
     if ((section as string) === 'welcome' && field === 'card') {
       // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
       await sendWelcomeCardPanel(interaction, settings);

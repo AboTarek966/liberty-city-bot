@@ -79,6 +79,11 @@ export interface IGuildSettings extends Document {
             interval: number;
             keep: number;
         };
+        /** 🔍 فحص دوري كل N ساعات — يمسح رومات/رولات الهاكر ويرجّع الناقص من النسخة */
+        autoScan?: {
+            enabled: boolean;
+            interval: number;
+        };
         /** فلتر الروابط الاحتيالية (صيد النيترو والمشاريع المزيفة) */
         scamFilter: {
             enabled: boolean;

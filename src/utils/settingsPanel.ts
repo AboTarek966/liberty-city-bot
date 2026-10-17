@@ -379,7 +379,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     p.antiRaid.enabled, p.antiSpam.enabled, p.antiLink.enabled,
     p.antiInvite.enabled, p.antiMention.enabled, p.antiCaps.enabled, p.antiEmoji.enabled,
     p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
-    p.scamFilter?.enabled,
+    p.scamFilter?.enabled, p.autoScan?.enabled,
   ].filter(Boolean).length;
 
   // 🛡️ حالة تسلّم البوت — أهم مؤشر: بدونه كل العقوبات فشل
@@ -392,7 +392,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     'protection',
     guild,
     `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-    `**المحميات المفعّلة: ${active}/12**\n\n` +
+    `**المحميات المفعّلة: ${active}/13**\n\n` +
     `${hierarchyLine}\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
@@ -407,6 +407,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.antiBot?.enabled)} **مضاد البوتات** — يطرد البوتات غير المصرح بها\n` +
     `> ${on(p.antiAdmin?.enabled)} **مراقبة الصلاحيات** — تنبيه فوري عند منح أدمن\n` +
     `> ${on(p.autoBackup?.enabled)} **نسخ احتياطي تلقائي** — يحفظ بنية السيرفر ويستعيدها\n` +
+    `> ${on(p.autoScan?.enabled)} **فحص دوري (كل ${p.autoScan?.interval ?? 6} ساعات)** — يمسح رومات/رولات الهاكر ويرجّع الناقص تلقائياً\n` +
     `> ${on(p.scamFilter?.enabled)} **فلتر الاحتيال** — يحذف روابط الصيد والمشاريع المزيفة\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
@@ -437,6 +438,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
 
   const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled),
+    toggleBtn('protection', 'autoScan', 'فحص دوري', '🔍', !!p.autoScan?.enabled),
     toggleBtn(
       'protection',
       'lockdown',

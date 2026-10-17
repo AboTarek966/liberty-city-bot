@@ -203,6 +203,10 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             interval: { type: Number, default: 6 },
             keep: { type: Number, default: 5 },
         },
+        autoScan: {
+            enabled: { type: Boolean, default: true },
+            interval: { type: Number, default: 6 },
+        },
         scamFilter: {
             enabled: { type: Boolean, default: true },
         },

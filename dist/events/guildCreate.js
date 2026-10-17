@@ -25,6 +25,7 @@ const guildCreateEvent = {
         try {
             await client.securityHandler.ensureHierarchyAlert(guild);
             await client.securityHandler.syncAutoBackup(guild, true);
+            await client.securityHandler.syncAutoScan(guild);
         }
         catch (error) {
             logger.warn(`Security setup failed in ${guild.id}:`, error);

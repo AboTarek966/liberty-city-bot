@@ -135,6 +135,9 @@ export class SecurityHandler {
   // مؤقتات النسخ الاحتياطي التلقائي
   private backupTimers: Map<string, NodeJS.Timeout> = new Map();
 
+  // 🔍 مؤقتات الفحص الدوري (كشف هاكر كل N ساعات)
+  private scanTimers: Map<string, NodeJS.Timeout> = new Map();
+
   // آخر حالة تسلّم مُبلَّغ عنها لكل سيرفر (ننبّه فقط عند تغيّر الحالة)
   private hierarchyState: Map<string, boolean> = new Map();
 
@@ -160,6 +163,8 @@ export class SecurityHandler {
   cleanup(): void {
     for (const timer of this.backupTimers.values()) clearInterval(timer);
     this.backupTimers.clear();
+    for (const timer of this.scanTimers.values()) clearInterval(timer);
+    this.scanTimers.clear();
     for (const timer of this.restoreTimers.values()) clearTimeout(timer);
     this.restoreTimers.clear();
     this.restoreLocks.clear();
@@ -1373,6 +1378,104 @@ export class SecurityHandler {
       logger.info(`💾 Auto-backup scheduled: ${guild.name} (كل ${hours} ساعة)`);
     } catch (error: any) {
       logger.error(`syncAutoBackup error (${guild.name}): ${error.message}`);
+    }
+  }
+
+  // --------------------------------------------
+  // 4b) AUTO-SCAN: فحص دوري كل N ساعات — كشف هاكر وإصلاح تلقائي
+  // --------------------------------------------
+  // (Re)جدولة مؤقت الفحص — استدعها عند ready وعند تبديل المفتاح في الإعدادات
+  async syncAutoScan(guild: Guild): Promise<void> {
+    try {
+      const existing = this.scanTimers.get(guild.id);
+      if (existing) {
+        clearInterval(existing);
+        this.scanTimers.delete(guild.id);
+      }
+
+      const settings = await getGuildSettings(guild.id);
+      const cfg = settings.protection?.autoScan;
+      if (!cfg?.enabled) return;
+
+      const hours = Math.min(72, Math.max(1, cfg.interval ?? 6));
+      const timer = setInterval(() => {
+        this.runPeriodicScan(guild).catch(err =>
+          logger.error(`Periodic scan failed (${guild.name}): ${err.message}`)
+        );
+      }, hours * 3600 * 1000);
+      this.scanTimers.set(guild.id, timer);
+
+      logger.info(`🔍 Auto-scan scheduled: ${guild.name} (كل ${hours} ساعة)`);
+    } catch (error: any) {
+      logger.error(`syncAutoScan error (${guild.name}): ${error.message}`);
+    }
+  }
+
+  // 🔍 تنفيذ الفحص الدوري — يمسح رومات/رولات الهاكر ويرجّع الناقص
+  async runPeriodicScan(guild: Guild): Promise<void> {
+    try {
+      const settings = await getGuildSettings(guild.id);
+      const cfg = settings.protection?.autoScan;
+      if (!cfg?.enabled) return;
+
+      // 1️⃣ حذف أي روم/رول مشبوه (نمط الهاكر)
+      const suspiciousDeleted = await this.cleanupSuspicious(guild);
+
+      // 2️⃣ مقارنة بالآخر نسخة احتياطية — ناقص = مهجم
+      const doc = await BackupConfig.findOne({ guildId: guild.id }).lean() as any;
+      const backup = doc?.backups?.length ? doc.backups[doc.backups.length - 1] : null;
+      if (!backup?.data) return; // مافيش نسخة → مافيش مقارنة
+
+      const curChannels = new Set(
+        Array.from(guild.channels.cache.values()).map((c: any) => `${c.name}:${c.type}`)
+      );
+      const curRoles = new Set(
+        Array.from(guild.roles.cache.values()).map((r: any) => r.name)
+      );
+
+      const missingChannels = ((backup.data.channels || []) as any[]).filter(
+        (cd: any) =>
+          RESTORABLE_CHANNEL_TYPES.includes(cd.type) &&
+          !cd.name?.includes('category-') &&
+          !curChannels.has(`${cd.name}:${cd.type}`)
+      );
+      const missingRoles = ((backup.data.roles || []) as any[]).filter(
+        (rd: any) => !curRoles.has(rd.name)
+      );
+
+      const clean = suspiciousDeleted === 0 && missingChannels.length === 0 && missingRoles.length === 0;
+
+      // ✅ السيرفر سليم → صامت تماماً (مافيش رسائل)
+      if (clean) {
+        logger.info(`🔍 Periodic scan OK: ${guild.name} — لا تغييرات`);
+        return;
+      }
+
+      // 3️⃣ فيه اختراق → استعادة كاملة من النسخة
+      const result = await this.restoreBackup(guild);
+
+      const channel = await this.getAlertChannel(
+        guild,
+        settings,
+        settings?.protection?.antiNuke?.logChannel
+      );
+      if (channel) {
+        await channel
+          .send({
+            content:
+              `🔍 **فحص دوري (كل ${cfg.interval ?? 6} ساعات) — اكتُشف اختراق!**\n` +
+              `🧹 مسحت **${suspiciousDeleted}** روم/رول هاك\n` +
+              `♻️ رجّعت **${result.channels}** قناة و **${result.roles}** رول` +
+              (result.skipped ? ` (تخطّيت ${result.skipped} موجود)` : ''),
+          })
+          .catch(() => {});
+      }
+
+      logger.warn(
+        `🔍 Periodic scan ${guild.name}: suspicious=${suspiciousDeleted} restored=${result.channels}ch/${result.roles}ro`
+      );
+    } catch (error: any) {
+      logger.error(`runPeriodicScan error (${guild.name}): ${error.message}`);
     }
   }
 

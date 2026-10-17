@@ -29,6 +29,7 @@ export declare class SecurityHandler {
     private deletionTracker;
     private renameTracker;
     private backupTimers;
+    private scanTimers;
     private hierarchyState;
     private restoreTimers;
     private restoreLocks;
@@ -88,6 +89,8 @@ export declare class SecurityHandler {
     private announceBotDemotion;
     onRoleUpdate(oldRole: Role, newRole: Role): Promise<void>;
     syncAutoBackup(guild: Guild, forceNow?: boolean): Promise<void>;
+    syncAutoScan(guild: Guild): Promise<void>;
+    runPeriodicScan(guild: Guild): Promise<void>;
     createBackup(guild: Guild): Promise<{
         channels: number;
         roles: number;

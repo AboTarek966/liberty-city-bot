@@ -133,6 +133,15 @@ const handler = {
             const nowEnabled = settings.protection.autoBackup?.enabled;
             await client.securityHandler?.syncAutoBackup(interaction.guild, !!nowEnabled).catch(() => { });
         }
+        // 🔍 مزامنة مؤقت الفحص الدوري فور تبديلته
+        if (section === 'protection' && field === 'autoScan') {
+            const client = interaction.client;
+            if (!settings.protection.autoScan) {
+                settings.protection.autoScan = { enabled: true, interval: 6 };
+                await settings.save();
+            }
+            await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => { });
+        }
         if (section === 'welcome' && field === 'card') {
             // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
             await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);

@@ -39,6 +39,10 @@ const event: Event = {
         lc.securityHandler.syncAutoBackup(guild).catch(err =>
           logger.error(`syncAutoBackup failed for ${guild.name}:`, err)
         );
+        // 🔍 الفحص الدوري — كشف رومات/رولات الهاكر وإصلاحها كل N ساعات
+        lc.securityHandler.syncAutoScan(guild).catch(err =>
+          logger.error(`syncAutoScan failed for ${guild.name}:`, err)
+        );
       }, delay);
     });
 

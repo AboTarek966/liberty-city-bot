@@ -98,6 +98,11 @@ export interface IGuildSettings extends Document {
       interval: number;
       keep: number;
     };
+    /** 🔍 فحص دوري كل N ساعات — يمسح رومات/رولات الهاكر ويرجّع الناقص من النسخة */
+    autoScan?: {
+      enabled: boolean;
+      interval: number;
+    };
     /** فلتر الروابط الاحتيالية (صيد النيترو والمشاريع المزيفة) */
     scamFilter: {
       enabled: boolean;
@@ -703,6 +708,10 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       enabled: { type: Boolean, default: true },
       interval: { type: Number, default: 6 },
       keep: { type: Number, default: 5 },
+    },
+    autoScan: {
+      enabled: { type: Boolean, default: true },
+      interval: { type: Number, default: 6 },
     },
     scamFilter: {
       enabled: { type: Boolean, default: true },
