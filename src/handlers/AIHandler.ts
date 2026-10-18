@@ -11,10 +11,12 @@ import {
   Role,
   ChannelType,
 } from 'discord.js';
+import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
 import { AIConfig, AIResponseRule, getGuildSettings } from '../models';
 import { config } from '../config';
 import { webSearch, formatSearchResults, formatSearchResultsForContext, searchYouTube, searchTrend, searchNews, searchAcademic, searchTechnical, SearchResult, webSearchEnhanced } from '../utils/webSearch';
+import { executeAITool, getToolsDescription, getAllToolNames } from './AITools';
 
 const logger = createLogger('AIHandler');
 
@@ -352,7 +354,7 @@ export class AIHandler {
       }
 
       // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userContext, history, stream, searchContext, media);
+      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media);
       this.cooldowns.set(cooldownKey, now);
 
       // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
@@ -585,6 +587,7 @@ export class AIHandler {
     aiConfig: any,
     userRoles: string[],
     guildId: string,
+    userId: string,
     userContext?: AIUserContext,
     history: HistoryMessage[] = [],
     stream?: AIStreamHandlers,
@@ -646,6 +649,35 @@ export class AIHandler {
 
     let response = await callProviders(effectiveMessage, true);
 
+    // 🔧 حلقة استدعاء أدوات العمل (Function Calling) — الـ AI ينفذ إجراءات Discord
+    // نمرر السياق الكامل: السيرفر، المنفذ، العميل
+    for (let actionRound = 0; actionRound < 3; actionRound++) {
+      if (!response || response.fallback) break;
+
+      const actionCall = this.extractActionCall(response.content);
+      if (!actionCall) break;
+
+      const guild = this.client.guilds.cache.get(guildId);
+      // نستخدم الـ userId الأصلي (مُمرّر للـ generateAIResponse)
+      const executor = guild?.members.cache.get(userId);
+      
+      if (guild && executor) {
+        const toolContext = {
+          guild,
+          executor,
+          client: this.client as LibertyClient,
+        };
+        
+        const toolResult = await executeAITool(actionCall.tool, actionCall.args, toolContext);
+        
+        // نضيف النتيجة للسياق ونعيد التوليد
+        const followUpMsg = `${effectiveMessage}\n\n=== نتيجة تنفيذ \`${actionCall.tool}\` ===\n${toolResult.message}\n===\nأكمل إجابتك اعتماداً على هذه النتيجة.`;
+        response = await callProviders(followUpMsg, false);
+      } else {
+        break;
+      }
+    }
+
     // 🔁 حلقة البحث الذاتي: لو النموذج طلب معلومة إضافية عبر [[SEARCH:...]] أو [[FETCH:...]]
     //    ننفّذ الأداة مرة واحدة ثم نعيد التوليد بالنتيجة (جولة واحدة فقط — لا نُبطئ الرد)
     for (let round = 0; round < 1; round++) {
@@ -695,6 +727,21 @@ export class AIHandler {
       args,
       label: type === 'SEARCH' ? 'نتائج بحث ويب إضافية' : 'محتوى صفحة ويب',
     };
+  }
+
+  /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
+  private extractActionCall(text: string): { tool: string; args: any } | null {
+    const m = /```json\s*(\{[\s\S]*?\})\s*```/i.exec(text || '');
+    if (!m) return null;
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (parsed.tool && typeof parsed.tool === 'string') {
+        return { tool: parsed.tool, args: parsed.args || {} };
+      }
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
@@ -936,6 +983,9 @@ export class AIHandler {
     prompt += `\n- لا تستخدمها للأسئلة الشخصية، الآراء، الرياضيات، الشفرات، أو أي شيء تستطيع الإجابة عنه بنفسك.`;
     prompt += `\n- بعد التنفيذ ستصلك النتيجة فوراً وتُجب بالكامل — لا تعتذر ولا تقل "سأبحث".`;
     prompt += `\n- لا تذكر أبداً أنك استخدمت أداة؛ قدّم المعلومة كأنها من معرفتك مع الإشارة للمصدر عند الحاجة.`;
+
+    // 🛠️ قدرات التنفيذ (Function Calling) — تقدر تعمل حاجات فعلياً في السيرفر
+    prompt += getToolsDescription();
 
     // ---------------- سياق السيرفر (معلومات عامة اختيارية) ----------------
     const guild = this.client.guilds.cache.get(guildId);

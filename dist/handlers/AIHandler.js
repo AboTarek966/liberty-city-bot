@@ -42,6 +42,7 @@ const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const config_1 = require("../config");
 const webSearch_1 = require("../utils/webSearch");
+const AITools_1 = require("./AITools");
 const logger = (0, helpers_1.createLogger)('AIHandler');
 class AIHandler {
     client;
@@ -317,7 +318,7 @@ class AIHandler {
                 }
             }
             // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userContext, history, stream, searchContext, media);
+            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media);
             this.cooldowns.set(cooldownKey, now);
             // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
             //   تتم قبل الحفظ — حتى تتذكّر الذاكرة الرد الفعلي الذي رآه المستخدم
@@ -510,7 +511,7 @@ class AIHandler {
     // --------------------------------------------
     // Generate AI Response
     // --------------------------------------------
-    async generateAIResponse(message, aiConfig, userRoles, guildId, userContext, history = [], stream, searchContext = '', media) {
+    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media) {
         // Check for role-specific personality
         let personality = aiConfig.customPersonality;
         for (const roleId of userRoles) {
@@ -571,6 +572,32 @@ class AIHandler {
             return null;
         };
         let response = await callProviders(effectiveMessage, true);
+        // 🔧 حلقة استدعاء أدوات العمل (Function Calling) — الـ AI ينفذ إجراءات Discord
+        // نمرر السياق الكامل: السيرفر، المنفذ، العميل
+        for (let actionRound = 0; actionRound < 3; actionRound++) {
+            if (!response || response.fallback)
+                break;
+            const actionCall = this.extractActionCall(response.content);
+            if (!actionCall)
+                break;
+            const guild = this.client.guilds.cache.get(guildId);
+            // نستخدم الـ userId الأصلي (مُمرّر للـ generateAIResponse)
+            const executor = guild?.members.cache.get(userId);
+            if (guild && executor) {
+                const toolContext = {
+                    guild,
+                    executor,
+                    client: this.client,
+                };
+                const toolResult = await (0, AITools_1.executeAITool)(actionCall.tool, actionCall.args, toolContext);
+                // نضيف النتيجة للسياق ونعيد التوليد
+                const followUpMsg = `${effectiveMessage}\n\n=== نتيجة تنفيذ \`${actionCall.tool}\` ===\n${toolResult.message}\n===\nأكمل إجابتك اعتماداً على هذه النتيجة.`;
+                response = await callProviders(followUpMsg, false);
+            }
+            else {
+                break;
+            }
+        }
         // 🔁 حلقة البحث الذاتي: لو النموذج طلب معلومة إضافية عبر [[SEARCH:...]] أو [[FETCH:...]]
         //    ننفّذ الأداة مرة واحدة ثم نعيد التوليد بالنتيجة (جولة واحدة فقط — لا نُبطئ الرد)
         for (let round = 0; round < 1; round++) {
@@ -618,6 +645,22 @@ class AIHandler {
             args,
             label: type === 'SEARCH' ? 'نتائج بحث ويب إضافية' : 'محتوى صفحة ويب',
         };
+    }
+    /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
+    extractActionCall(text) {
+        const m = /```json\s*(\{[\s\S]*?\})\s*```/i.exec(text || '');
+        if (!m)
+            return null;
+        try {
+            const parsed = JSON.parse(m[1]);
+            if (parsed.tool && typeof parsed.tool === 'string') {
+                return { tool: parsed.tool, args: parsed.args || {} };
+            }
+        }
+        catch {
+            return null;
+        }
+        return null;
     }
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     async runResearchTool(tool) {
@@ -843,6 +886,8 @@ class AIHandler {
         prompt += `\n- لا تستخدمها للأسئلة الشخصية، الآراء، الرياضيات، الشفرات، أو أي شيء تستطيع الإجابة عنه بنفسك.`;
         prompt += `\n- بعد التنفيذ ستصلك النتيجة فوراً وتُجب بالكامل — لا تعتذر ولا تقل "سأبحث".`;
         prompt += `\n- لا تذكر أبداً أنك استخدمت أداة؛ قدّم المعلومة كأنها من معرفتك مع الإشارة للمصدر عند الحاجة.`;
+        // 🛠️ قدرات التنفيذ (Function Calling) — تقدر تعمل حاجات فعلياً في السيرفر
+        prompt += (0, AITools_1.getToolsDescription)();
         // ---------------- سياق السيرفر (معلومات عامة اختيارية) ----------------
         const guild = this.client.guilds.cache.get(guildId);
         if (guild) {
