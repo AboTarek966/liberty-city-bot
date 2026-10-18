@@ -286,49 +286,35 @@ class SecurityHandler {
         try {
             if (!channel?.guild)
                 return;
-            const logs = await channel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelCreate, limit: 3 });
+            // 🚀 أسرع fetch: limit=1 فقط
+            const logs = await channel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelCreate, limit: 1 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 2000)
-                return;
+            if (Date.now() - entry.createdTimestamp > 1500)
+                return; // نافذة أضيق = أسرع رد
             if (entry.executor.id === this.client.user?.id)
                 return;
             const member = channel.guild.members.cache.get(entry.executor.id);
-            // 🤖 بوت → حذف فوري + حظر (الأقوى)
+            // 🤖 بوت → حذف + حظر فوري (ما نستنىش)
             if (entry.executor.bot) {
-                await Promise.allSettled([
-                    channel.delete('Security: bot cannot create channels').catch(() => { }),
-                    member?.roles.set([], 'Security: bot created channel').catch(() => { }),
-                    member?.ban({ reason: 'Security: bot created channel (anti-nuke)' }).catch(() => { }),
-                ]);
-                const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
-                const alert = await this.getAlertChannel(channel.guild, settings);
-                alert?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف والحظر` }).catch(() => { });
+                // إطلاق فوري — ما نأوايتهمش
+                channel.delete('Security: bot cannot create channels').catch(() => { });
+                member?.roles.set([], 'Security: bot created channel').catch(() => { });
+                member?.ban({ reason: 'Security: bot created channel (anti-nuke)' }).catch(() => { });
+                // التنبيه في الخلفية
+                (0, models_1.getGuildSettings)(channel.guild.id).then(s => this.getAlertChannel(channel.guild, s))
+                    .then(a => a?.send({ content: `🚫 **بوت حاول إنشاء قناة:** ${entry.executor.tag} — تم الحذف والحظر` }).catch(() => { }));
                 return;
             }
-            // 🧑 إنسان → رصد الإنشاء السريع (1 في 5 ثواني = هجوم فوري)
-            const key = `${channel.guild.id}:${entry.executor.id}:chcreate`;
-            if (!this.renameTracker.has(key))
-                this.renameTracker.set(key, []);
-            const arr = this.renameTracker.get(key);
-            const now = Date.now();
-            arr.push(now);
-            const recent = arr.filter((t) => now - t < 5000);
-            this.renameTracker.set(key, recent);
-            if (recent.length >= 1) {
-                // حذف القناة فوراً + حظر فوري
-                await Promise.allSettled([
-                    channel.delete('Security: rapid channel create').catch(() => { }),
-                    member?.roles.set([], 'Security: rapid channel creation').catch(() => { }),
-                    member?.ban({ reason: 'Security: rapid channel creation (anti-nuke)' }).catch(() => { }),
-                ]);
-                this.renameTracker.set(key, []);
-                const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
-                const alert = await this.getAlertChannel(channel.guild, settings);
-                alert?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ قناة!**\nتم الحذف + الحظر` }).catch(() => { });
-                setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => { }), 1000);
-            }
+            // 🧑 إنسان → قناة واحدة = هجوم فوري (مفيش عتبة، مفيش تأخير)
+            // 🔥 حذف القناة فوراً — البان/السحب في التوازي
+            channel.delete('Security: rapid channel create').catch(() => { });
+            member?.roles.set([], 'Security: rapid channel creation').catch(() => { });
+            member?.ban({ reason: 'Security: rapid channel creation (anti-nuke)' }).catch(() => { });
+            // تنبيه في الخلفية
+            (0, models_1.getGuildSettings)(channel.guild.id).then(s => this.getAlertChannel(channel.guild, s))
+                .then(a => a?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ قناة!**\nتم الحذف + الحظر` }).catch(() => { }));
         }
         catch (error) {
             logger.error(`onChannelCreate error: ${error.message}`);
@@ -338,104 +324,64 @@ class SecurityHandler {
         try {
             if (!role?.guild || role.managed)
                 return;
-            const logs = await role.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.RoleCreate, limit: 3 });
+            const logs = await role.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.RoleCreate, limit: 1 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 2000)
+            if (Date.now() - entry.createdTimestamp > 1500)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
             const member = role.guild.members.cache.get(entry.executor.id);
-            // 🤖 بوت → حذف فوري + حظر
             if (entry.executor.bot) {
-                await Promise.allSettled([
-                    role.delete('Security: bot cannot create roles').catch(() => { }),
-                    member?.roles.set([], 'Security: bot created role').catch(() => { }),
-                    member?.ban({ reason: 'Security: bot created role (anti-nuke)' }).catch(() => { }),
-                ]);
-                const settings = await (0, models_1.getGuildSettings)(role.guild.id);
-                const alert = await this.getAlertChannel(role.guild, settings);
-                alert?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف والحظر` }).catch(() => { });
+                role.delete('Security: bot cannot create roles').catch(() => { });
+                member?.roles.set([], 'Security: bot created role').catch(() => { });
+                member?.ban({ reason: 'Security: bot created role (anti-nuke)' }).catch(() => { });
+                (0, models_1.getGuildSettings)(role.guild.id).then(s => this.getAlertChannel(role.guild, s))
+                    .then(a => a?.send({ content: `🚫 **بوت حاول إنشاء رول:** ${entry.executor.tag} — تم الحذف والحظر` }).catch(() => { }));
                 return;
             }
-            // 🧑 إنسان → رصد الإنشاء السريع (1 في 5 ثواني = هجوم فوري)
-            const key = `${role.guild.id}:${entry.executor.id}:rolecreate`;
-            if (!this.renameTracker.has(key))
-                this.renameTracker.set(key, []);
-            const arr = this.renameTracker.get(key);
-            const now = Date.now();
-            arr.push(now);
-            const recent = arr.filter((t) => now - t < 5000);
-            this.renameTracker.set(key, recent);
-            if (recent.length >= 1) {
-                // حذف الرول فوراً + حظر فوري
-                await Promise.allSettled([
-                    role.delete('Security: rapid role create').catch(() => { }),
-                    member?.roles.set([], 'Security: rapid role creation').catch(() => { }),
-                    member?.ban({ reason: 'Security: rapid role creation (anti-nuke)' }).catch(() => { }),
-                ]);
-                this.renameTracker.set(key, []);
-                const settings = await (0, models_1.getGuildSettings)(role.guild.id);
-                const alert = await this.getAlertChannel(role.guild, settings);
-                alert?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ رول!**\nتم الحذف + الحظر` }).catch(() => { });
-                setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => { }), 1000);
-            }
+            // 🧑 إنسان → رول واحد = هجوم فوري
+            role.delete('Security: rapid role create').catch(() => { });
+            member?.roles.set([], 'Security: rapid role creation').catch(() => { });
+            member?.ban({ reason: 'Security: rapid role creation (anti-nuke)' }).catch(() => { });
+            (0, models_1.getGuildSettings)(role.guild.id).then(s => this.getAlertChannel(role.guild, s))
+                .then(a => a?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ رول!**\nتم الحذف + الحظر` }).catch(() => { }));
         }
         catch (error) {
             logger.error(`onRoleCreate error: ${error.message}`);
         }
     }
     // --------------------------------------------
-    // 0b) ANTI-RENAME: تغيير اسم قناة بسرعة → رد على المنفذ (ماعدا الأونر والإدارة)
+    // 0b) ANTI-RENAME: تغيير اسم قناة → إرجاع فوري + عقوبة
     // --------------------------------------------
     async onChannelUpdate(oldChannel, newChannel) {
         try {
             if (!newChannel?.guild || oldChannel.name === newChannel.name)
                 return;
-            const logs = await newChannel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 5 });
+            const logs = await newChannel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 1 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 3000)
+            if (Date.now() - entry.createdTimestamp > 1500)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            // ⚠️ مفيش وايت ليست — أي حد بيعمل تعديلات بسرعة يتراجع + يتعاقب
             const member = newChannel.guild.members.cache.get(entry.executor.id);
-            // Track rapid renames
-            const key = `${newChannel.guild.id}:${entry.executor.id}:rename`;
-            if (!this.renameTracker.has(key))
-                this.renameTracker.set(key, []);
-            const arr = this.renameTracker.get(key);
-            const now = Date.now();
-            arr.push(now);
-            const recent = arr.filter((t) => now - t < 10000);
-            this.renameTracker.set(key, recent);
-            // تعديل واحد عادي = عادي | 2+ تغييرات في 10 ثواني = هجوم
-            if (recent.length >= 2) {
-                try {
-                    await newChannel.setName(oldChannel.name, 'Security: rapid rename detected');
-                }
-                catch { }
-            }
-            if (recent.length >= 3) {
-                await Promise.allSettled([
-                    member?.roles.set([], 'Security: mass rename').catch(() => { }),
-                    member?.kick('Security: mass channel rename').catch(() => { }),
-                ]);
-                this.renameTracker.set(key, []);
-            }
-            const settings = await (0, models_1.getGuildSettings)(newChannel.guild.id);
-            const alert = await this.getAlertChannel(newChannel.guild, settings);
-            alert?.send({ content: `✏️ **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر اسم قناة بسرعة:** ${entry.executor.tag} — تمت إعادة الاسم${recent.length >= 3 ? ' + طرد المنفذ' : ''}` }).catch(() => { });
+            // إرجاع الاسم فوراً
+            newChannel.setName(oldChannel.name, 'Security: rename reverted').catch(() => { });
+            // سحب الرولات + طرد في التوازي (من أول مرة)
+            member?.roles.set([], 'Security: rapid rename').catch(() => { });
+            member?.kick('Security: rapid channel rename').catch(() => { });
+            (0, models_1.getGuildSettings)(newChannel.guild.id).then(s => this.getAlertChannel(newChannel.guild, s))
+                .then(a => a?.send({ content: `✏️ **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر اسم قناة:** ${entry.executor.tag} — أُعيد الاسم + عقوبة` }).catch(() => { }));
         }
         catch (error) {
             logger.error(`onChannelUpdate error: ${error.message}`);
         }
     }
     // --------------------------------------------
-    // 0c) AUTO-CLEAN: حذف تلقائي لأي روم/رول مشبوه بعد الهكر
+    // 0c) ANTI-PERMISSION: تعديل صلاحيات → إرجاع فوري + عقوبة
     // --------------------------------------------
     async cleanupSuspicious(guild) {
         let deleted = 0;
@@ -468,46 +414,33 @@ class SecurityHandler {
         return deleted;
     }
     // --------------------------------------------
-    // Pro Max: ANTI-WEBHOOK SPAM — بوت ينشئ ويب هوك → يُحذف (ماعدا الأونر)
+    // Pro Max: ANTI-WEBHOOK SPAM — ويب هوك → حذف فوري + عقوبة
     // --------------------------------------------
     async onWebhookUpdate(webhook) {
         try {
             if (!webhook?.guild)
                 return;
-            const logs = await webhook.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.WebhookCreate, limit: 5 });
+            const logs = await webhook.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.WebhookCreate, limit: 1 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 3000)
+            if (Date.now() - entry.createdTimestamp > 1500)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            // ⚠️ مفيش وايت ليست
             const member = webhook.guild.members.cache.get(entry.executor.id);
-            try {
-                await webhook.delete('Security: bot/webhook spam');
-            }
-            catch { }
-            if (member) {
-                try {
-                    await member.roles.set([], 'Security: created webhook');
-                }
-                catch { }
-                try {
-                    await member.kick('Security: webhook spam');
-                }
-                catch { }
-            }
-            const settings = await (0, models_1.getGuildSettings)(webhook.guild.id);
-            const alert = await this.getAlertChannel(webhook.guild, settings);
-            alert?.send({ content: `🔗 **بوت/عضو أنشأ ويب هوك:** ${entry.executor.tag} — تم الحذف والعقاب` }).catch(() => { });
+            webhook.delete('Security: webhook spam').catch(() => { });
+            member?.roles.set([], 'Security: created webhook').catch(() => { });
+            member?.kick('Security: webhook spam').catch(() => member?.ban({ reason: 'Security: webhook spam' }).catch(() => { }));
+            (0, models_1.getGuildSettings)(webhook.guild.id).then(s => this.getAlertChannel(webhook.guild, s))
+                .then(a => a?.send({ content: `🔗 **${entry.executor.bot ? 'بوت' : 'عضو'} أنشأ ويب هوك:** ${entry.executor.tag} — تم الحذف + عقوبة` }).catch(() => { }));
         }
         catch (error) {
             logger.error(`onWebhookUpdate error: ${error.message}`);
         }
     }
     // --------------------------------------------
-    // Pro Max: ANTI-ROLE ASSIGNMENT SPAM — إعطاء رول لعدد كبير (ماعدا الأونر)
+    // Pro Max: ANTI-ROLE ASSIGNMENT — إعطاء رولات → إرجاع فوري + عقوبة
     // --------------------------------------------
     async onGuildMemberUpdate(oldMember, newMember) {
         try {
@@ -516,101 +449,53 @@ class SecurityHandler {
             const addedRoles = newMember.roles.cache.filter((r) => !oldMember.roles.cache.has(r.id));
             if (addedRoles.size === 0)
                 return;
-            const logs = await newMember.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.MemberRoleUpdate, limit: 5 });
+            const logs = await newMember.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.MemberRoleUpdate, limit: 1 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 3000)
+            if (Date.now() - entry.createdTimestamp > 1500)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            // ⚠️ مفيش وايت ليست — الرصد على السرعة بغض النظر عن مين
             const executorMember = newMember.guild.members.cache.get(entry.executor.id);
-            // Track
-            const key = `${newMember.guild.id}:${entry.executor.id}:roleassign`;
-            if (!this.renameTracker.has(key))
-                this.renameTracker.set(key, []);
-            const arr = this.renameTracker.get(key);
-            const now = Date.now();
-            arr.push(now);
-            const recent = arr.filter((t) => now - t < 10000);
-            this.renameTracker.set(key, recent);
-            // إعطاء رول واحد = عادي | 5+ في 10 ثواني = هجوم
-            if (recent.length >= 5) {
-                // Revert roles on target
-                try {
-                    await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment');
-                }
-                catch { }
-                await Promise.allSettled([
-                    executorMember?.roles.set([], 'Security: mass role assignment').catch(() => { }),
-                    executorMember?.kick('Security: mass role assignment').catch(() => { }),
-                ]);
-            }
-            if (recent.length < 5)
-                return;
-            const settings = await (0, models_1.getGuildSettings)(newMember.guild.id);
-            const alert = await this.getAlertChannel(newMember.guild, settings);
-            alert?.send({ content: `🎭 **${entry.executor.bot ? 'بوت' : 'عضو'} أعطى رولات جماعي:** ${entry.executor.tag} — أُعيدت الرولات${recent.length >= 5 ? ' + طرد المنفذ' : ''}` }).catch(() => { });
+            // إرجاع الرولات فوراً + عقوبة المنفّذ
+            newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment').catch(() => { });
+            executorMember?.roles.set([], 'Security: role assignment spam').catch(() => { });
+            executorMember?.kick('Security: role assignment spam').catch(() => executorMember?.ban({ reason: 'Security: role assignment spam' }).catch(() => { }));
+            (0, models_1.getGuildSettings)(newMember.guild.id).then(s => this.getAlertChannel(newMember.guild, s))
+                .then(a => a?.send({ content: `🎭 **${entry.executor.bot ? 'بوت' : 'عضو'} أعطى رول:** ${entry.executor.tag} — أُعيدت الرولات + عقوبة` }).catch(() => { }));
         }
         catch (error) {
             logger.error(`onGuildMemberUpdate error: ${error.message}`);
         }
     }
     // --------------------------------------------
-    // Pro Max: ANTI-PERMISSION OVERWRITE CHANGES — تعديل صلاحيات القنوات (ماعدا الأونر)
+    // Pro Max: ANTI-PERMISSION OVERWRITE CHANGES — تعديل صلاحيات → إرجاع فوري + عقوبة
     // --------------------------------------------
     async onChannelPermissionUpdate(oldChannel, newChannel) {
         try {
             if (!newChannel?.guild)
                 return;
-            // Check if permission overwrites changed significantly
             const oldOverwrites = oldChannel.permissionOverwrites?.cache?.size ?? 0;
             const newOverwrites = newChannel.permissionOverwrites?.cache?.size ?? 0;
-            if (Math.abs(oldOverwrites - newOverwrites) < 2)
-                return;
-            const logs = await newChannel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 5 });
+            if (Math.abs(oldOverwrites - newOverwrites) < 1)
+                return; // أي تغيير = رد
+            const logs = await newChannel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 1 });
             const entry = logs.entries.first();
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 3000)
+            if (Date.now() - entry.createdTimestamp > 1500)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            // ⚠️ مفيش وايت ليست — الرصد على السرعة
             const member = newChannel.guild.members.cache.get(entry.executor.id);
-            // تعديل واحد للصلاحيات = إعداد عادي | تعديلات سريعة متكررة = هجوم
-            const pkey = `${newChannel.guild.id}:${entry.executor.id}:perm`;
-            if (!this.renameTracker.has(pkey))
-                this.renameTracker.set(pkey, []);
-            const parr = this.renameTracker.get(pkey);
-            const pnow = Date.now();
-            parr.push(pnow);
-            const precent = parr.filter((t) => pnow - t < 10000);
-            this.renameTracker.set(pkey, precent);
-            // Restore overwrites
-            try {
-                await newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o) => [o.id, o]), 'Security: permission overwrite spam');
-            }
-            catch { }
-            if (precent.length >= 3) {
-                try {
-                    await member?.roles.set([], 'Security: permission overwrite spam');
-                }
-                catch { }
-                try {
-                    await member?.kick('Security: permission overwrite spam');
-                }
-                catch {
-                    try {
-                        await member?.ban({ reason: 'Security: permission overwrite spam' });
-                    }
-                    catch { }
-                }
-            }
-            const settings = await (0, models_1.getGuildSettings)(newChannel.guild.id);
-            const alert = await this.getAlertChannel(newChannel.guild, settings);
-            alert?.send({ content: `🔐 **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر صلاحيات قناة:** ${entry.executor.tag} — أُعيدت الصلاحيات${precent.length >= 3 ? ' + عقوبة على المنفّذ' : ''}` }).catch(() => { });
+            // إرجاع الصلاحيات فوراً
+            newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o) => [o.id, o]), 'Security: perm overwrite reverted').catch(() => { });
+            // عقوبة فورية
+            member?.roles.set([], 'Security: perm overwrite spam').catch(() => { });
+            member?.kick('Security: perm overwrite spam').catch(() => member?.ban({ reason: 'Security: perm overwrite spam' }).catch(() => { }));
+            (0, models_1.getGuildSettings)(newChannel.guild.id).then(s => this.getAlertChannel(newChannel.guild, s))
+                .then(a => a?.send({ content: `🔐 **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر صلاحيات قناة:** ${entry.executor.tag} — أُعيدت الصلاحيات + عقوبة` }).catch(() => { }));
         }
         catch (error) {
             logger.error(`onChannelPermissionUpdate error: ${error.message}`);
