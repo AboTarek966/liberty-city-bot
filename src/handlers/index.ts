@@ -16,3 +16,4 @@ export { LevelingHandler, RankCardData, LevelUpResult } from './LevelingHandler'
 export { AntiAltHandler } from './AntiAltHandler';
 export { InviteTrackerHandler } from './InviteTrackerHandler';
 export { MessageScannerHandler } from './MessageScannerHandler';
+export { AIAutoModHandler, AutoModConfig } from './AIAutoMod';

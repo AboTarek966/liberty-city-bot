@@ -26,6 +26,7 @@ import {
   AntiAltHandler,
   InviteTrackerHandler,
   MessageScannerHandler,
+  AIAutoModHandler,
 } from './handlers';
 import mongoose from 'mongoose';
 
@@ -50,6 +51,7 @@ export class LibertyClient extends Client {
   public antiAltHandler: AntiAltHandler;
   public inviteTrackerHandler: InviteTrackerHandler;
   public messageScannerHandler: MessageScannerHandler;
+  public aiAutoModHandler: AIAutoModHandler;
 
   // Cooldowns
   public cooldowns: Collection<string, Collection<string, number>> = new Collection();
@@ -99,6 +101,7 @@ export class LibertyClient extends Client {
     this.antiAltHandler = new AntiAltHandler(this);
     this.inviteTrackerHandler = new InviteTrackerHandler(this);
     this.messageScannerHandler = new MessageScannerHandler(config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
+    this.aiAutoModHandler = new AIAutoModHandler(this);
   }
 
   // --------------------------------------------

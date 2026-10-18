@@ -109,12 +109,13 @@ const event = {
         }
         // ======== سيرفرات فقط: الحماية، AFK، Aliases، أوامر مخصصة، اقتصاد، AI، Leveling ========
         if (!isDM) {
-            // Protection checks + فلتر الاحتيال + Message Scanner بالتوازي (كلاهما فحوصات أمان تسبق كل شيء)
+            // Protection checks + فلتر الاحتيال + Message Scanner + AI Auto-Mod بالتوازي (كلاهما فحوصات أمان تسبق كل شيء)
             try {
                 const results = await Promise.allSettled([
                     client.protectionHandler.checkMessage(message),
                     (0, scamFilter_1.handleScamFilter)(message, client),
                     client.messageScannerHandler.scanMessage(message),
+                    client.aiAutoModHandler.scanMessage(message),
                 ]);
                 const scamResult = results[1];
                 const blocked = scamResult.status === 'fulfilled' ? scamResult.value : false;

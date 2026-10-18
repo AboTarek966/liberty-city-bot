@@ -151,6 +151,13 @@ const handler = {
             }
             await client.inviteTrackerHandler?.cacheGuildInvites(interaction.guild).catch(() => { });
         }
+        // 🤖 AI Auto-Mod: لا يحتاج تهيئة خاصة، الإعدادات تُحفظ مباشرة
+        if (section === 'protection' && field === 'aiAutoMod') {
+            if (!settings.protection.aiAutoMod) {
+                settings.protection.aiAutoMod = { enabled: true };
+                await settings.save();
+            }
+        }
         if (section === 'welcome' && field === 'card') {
             // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
             await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);

@@ -121,6 +121,37 @@ export interface IGuildSettings extends Document {
             whitelistDomains: string[];
             logChannel?: string;
         };
+        /** 🤖 AI Auto-Moderation — يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال/تهديد/تسريب */
+        aiAutoMod?: {
+            enabled: boolean;
+            categories: {
+                spam: boolean;
+                toxicity: boolean;
+                nsfw: boolean;
+                scam: boolean;
+                threat: boolean;
+                pii: boolean;
+                raid: boolean;
+                selfharm: boolean;
+            };
+            sensitivity: number;
+            actions: {
+                spam: 'delete' | 'warn' | 'mute' | 'ban';
+                toxicity: 'delete' | 'warn' | 'mute' | 'ban';
+                nsfw: 'delete' | 'warn' | 'mute' | 'ban';
+                scam: 'delete' | 'warn' | 'mute' | 'ban';
+                threat: 'delete' | 'warn' | 'mute' | 'ban';
+                pii: 'delete' | 'warn' | 'mute' | 'ban';
+                raid: 'delete' | 'warn' | 'mute' | 'ban';
+                selfharm: 'delete' | 'warn' | 'mute' | 'ban' | 'resources';
+            };
+            muteDuration: number;
+            ignoredChannels: string[];
+            ignoredRoles: string[];
+            logChannel?: string;
+            escalation: boolean;
+            maxWarningsBeforeEscalation: number;
+        };
     };
     tickets: {
         categoryId?: string;

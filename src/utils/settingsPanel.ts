@@ -381,6 +381,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
     p.scamFilter?.enabled, p.autoScan?.enabled,
     p.antiAlt?.enabled, p.inviteTracker?.enabled, p.messageScanner?.enabled,
+    p.aiAutoMod?.enabled,
   ].filter(Boolean).length;
 
   // 🛡️ حالة تسلّم البوت — أهم مؤشر: بدونه كل العقوبات فشل
@@ -393,7 +394,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     'protection',
     guild,
     `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-    `**المحميات المفعّلة: ${active}/16**\n\n` +
+    `**المحميات المفعّلة: ${active}/17**\n\n` +
     `${hierarchyLine}\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
@@ -414,6 +415,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.antiAlt?.enabled)} **🕵️ Anti-Alt** — يكشف الحسابات البديلة (جديدة/نفس النمط)\n` +
     `> ${on(p.inviteTracker?.enabled)} **📨 Invite Tracker** — يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين\n` +
     `> ${on(p.messageScanner?.enabled)} **🔍 Message Scanner** — يفحص روابط/ملفات بـ VirusTotal\n` +
+    `> ${on(p.aiAutoMod?.enabled)} **🤖 AI Auto-Mod** — يقرأ كل رسالة، يقرر بنفسه: سبام/سم/إباحي/احتيال/تهديد/تسريب\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n\n` +
@@ -458,6 +460,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled),
     toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled),
     toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled),
+    toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled),
   );
 
   // Row 6: Jail channel selection

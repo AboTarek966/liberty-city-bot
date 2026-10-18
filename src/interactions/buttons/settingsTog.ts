@@ -161,6 +161,14 @@ const handler: ButtonHandler = {
       await client.inviteTrackerHandler?.cacheGuildInvites(interaction.guild).catch(() => {});
     }
 
+    // 🤖 AI Auto-Mod: لا يحتاج تهيئة خاصة، الإعدادات تُحفظ مباشرة
+    if (section === 'protection' && field === 'aiAutoMod') {
+      if (!(settings.protection as any).aiAutoMod) {
+        (settings.protection as any).aiAutoMod = { enabled: true };
+        await settings.save();
+      }
+    }
+
     if ((section as string) === 'welcome' && field === 'card') {
       // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
       await sendWelcomeCardPanel(interaction, settings);

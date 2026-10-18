@@ -140,6 +140,37 @@ export interface IGuildSettings extends Document {
       whitelistDomains: string[];
       logChannel?: string;
     };
+    /** 🤖 AI Auto-Moderation — يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال/تهديد/تسريب */
+    aiAutoMod?: {
+      enabled: boolean;
+      categories: {
+        spam: boolean;
+        toxicity: boolean;
+        nsfw: boolean;
+        scam: boolean;
+        threat: boolean;
+        pii: boolean;
+        raid: boolean;
+        selfharm: boolean;
+      };
+      sensitivity: number;
+      actions: {
+        spam: 'delete' | 'warn' | 'mute' | 'ban';
+        toxicity: 'delete' | 'warn' | 'mute' | 'ban';
+        nsfw: 'delete' | 'warn' | 'mute' | 'ban';
+        scam: 'delete' | 'warn' | 'mute' | 'ban';
+        threat: 'delete' | 'warn' | 'mute' | 'ban';
+        pii: 'delete' | 'warn' | 'mute' | 'ban';
+        raid: 'delete' | 'warn' | 'mute' | 'ban';
+        selfharm: 'delete' | 'warn' | 'mute' | 'ban' | 'resources';
+      };
+      muteDuration: number;
+      ignoredChannels: string[];
+      ignoredRoles: string[];
+      logChannel?: string;
+      escalation: boolean;
+      maxWarningsBeforeEscalation: number;
+    };
   };
   
   // Tickets
@@ -775,6 +806,36 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       action: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'delete' },
       whitelistDomains: [{ type: String }],
       logChannel: { type: String },
+    },
+    aiAutoMod: {
+      enabled: { type: Boolean, default: false },
+      categories: {
+        spam: { type: Boolean, default: true },
+        toxicity: { type: Boolean, default: true },
+        nsfw: { type: Boolean, default: true },
+        scam: { type: Boolean, default: true },
+        threat: { type: Boolean, default: true },
+        pii: { type: Boolean, default: true },
+        raid: { type: Boolean, default: true },
+        selfharm: { type: Boolean, default: true },
+      },
+      sensitivity: { type: Number, default: 7 },
+      actions: {
+        spam: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'delete' },
+        toxicity: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'warn' },
+        nsfw: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'delete' },
+        scam: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'ban' },
+        threat: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'ban' },
+        pii: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'delete' },
+        raid: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'mute' },
+        selfharm: { type: String, enum: ['delete', 'warn', 'mute', 'ban', 'resources'], default: 'resources' },
+      },
+      muteDuration: { type: Number, default: 10 },
+      ignoredChannels: [{ type: String }],
+      ignoredRoles: [{ type: String }],
+      logChannel: { type: String },
+      escalation: { type: Boolean, default: true },
+      maxWarningsBeforeEscalation: { type: Number, default: 3 },
     },
   },
   
