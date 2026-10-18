@@ -529,30 +529,6 @@ export class SecurityHandler {
       if (entry.executor.id === this.client.user?.id) return;
       const executorMember = newMember.guild.members.cache.get(entry.executor.id);
 
-      // 🛡️ حماية خاصة: إذا كان الهدف هو البوت نفسه
-      const botMember = newMember.guild.members.me;
-      if (botMember && newMember.id === botMember.id) {
-        // محاولة إعطاء رول للبوت — إرجاع فوري + منشن الإدارة العليا
-        const settings = await getGuildSettings(newMember.guild.id);
-        const adminRoles = settings.tickets?.adminRoleIds?.map((r: string) => `<@&${r}>`).join('، ') || 'الإدارة العليا';
-        
-        newMember.roles.remove(addedRoles, 'Security: bot cannot receive roles').catch(() => {});
-        
-        const alert = await this.getAlertChannel(newMember.guild, settings);
-        alert?.send({
-          content: `🛡️ **محاولة إعطاء رول للبوت!**\n` +
-            `👤 **المنفّذ:** ${entry.executor.tag}\n` +
-            `🎭 **الرولات:** ${addedRoles.map((r: any) => `<@&${r.id}>`).join('، ')}\n` +
-            `⚡ **تم إلغاء الرول فوراً**\n` +
-            `📢 **إبلاغ الإدارة:** ${adminRoles}`
-        }).catch(() => {});
-        
-        // عقوبة المنفّذ
-        executorMember?.roles.set([], 'Security: attempted to give role to bot').catch(() => {});
-        executorMember?.kick('Security: attempted to give role to bot').catch(() => executorMember?.ban({ reason: 'Security: attempted to give role to bot' }).catch(() => {}));
-        return;
-      }
-
       // إرجاع الرولات فوراً + عقوبة المنفّذ
       newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment').catch(() => {});
       executorMember?.roles.set([], 'Security: role assignment spam').catch(() => {});
