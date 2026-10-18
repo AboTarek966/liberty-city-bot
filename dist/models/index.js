@@ -211,7 +211,6 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             enabled: { type: Boolean, default: true },
         },
         lockdown: { type: Boolean, default: false },
-        ironWall: { type: Boolean, default: false },
     },
     tickets: {
         categoryId: { type: String },

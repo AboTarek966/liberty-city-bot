@@ -394,29 +394,27 @@ export class SecurityHandler {
         return;
       }
 
-      // 🧑 إنسان → رصد الإنشاء السريع (2+ في 8 ثواني = هجوم)
+      // 🧑 إنسان → رصد الإنشاء السريع (1 في 5 ثواني = هجوم فوري)
       const key = `${channel.guild.id}:${entry.executor.id}:chcreate`;
       if (!this.renameTracker.has(key)) this.renameTracker.set(key, []);
       const arr = this.renameTracker.get(key)!;
       const now = Date.now();
       arr.push(now);
-      const recent = arr.filter((t: number) => now - t < 8000);
+      const recent = arr.filter((t: number) => now - t < 5000);
       this.renameTracker.set(key, recent);
 
-      if (recent.length >= 2) {
-        // حذف كل القنوات اللي أنشأها خلال النافذة + حظر فوري
-        const recentChannels = (Array.from(channel.guild.channels.cache.values()) as any[])
-          .filter((ch: any) => ch.createdTimestamp && Date.now() - ch.createdTimestamp < 8000);
+      if (recent.length >= 1) {
+        // حذف القناة فوراً + حظر فوري
         await Promise.allSettled([
-          ...recentChannels.map(ch => ch.delete('Security: mass channel create').catch(() => {})),
-          member?.roles.set([], 'Security: mass channel creation').catch(() => {}),
-          member?.ban({ reason: 'Security: mass channel creation (anti-nuke tool)' }).catch(() => {}),
+          channel.delete('Security: rapid channel create').catch(() => {}),
+          member?.roles.set([], 'Security: rapid channel creation').catch(() => {}),
+          member?.ban({ reason: 'Security: rapid channel creation (anti-nuke)' }).catch(() => {}),
         ]);
         this.renameTracker.set(key, []);
         const settings = await getGuildSettings(channel.guild.id);
         const alert = await this.getAlertChannel(channel.guild, settings);
-        alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ قنوات بسرعة!**\nتم الحذف + الحظر` }).catch(() => {});
-        setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => {}), 1500);
+        alert?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ قناة!**\nتم الحذف + الحظر` }).catch(() => {});
+        setTimeout(() => this.runAutoRestore(channel.guild, settings, 'channel').catch(() => {}), 1000);
       }
     } catch (error: any) {
       logger.error(`onChannelCreate error: ${error.message}`);
@@ -446,28 +444,27 @@ export class SecurityHandler {
         return;
       }
 
-      // 🧑 إنسان → رصد الإنشاء السريع (2+ في 8 ثواني)
+      // 🧑 إنسان → رصد الإنشاء السريع (1 في 5 ثواني = هجوم فوري)
       const key = `${role.guild.id}:${entry.executor.id}:rolecreate`;
       if (!this.renameTracker.has(key)) this.renameTracker.set(key, []);
       const arr = this.renameTracker.get(key)!;
       const now = Date.now();
       arr.push(now);
-      const recent = arr.filter((t: number) => now - t < 8000);
+      const recent = arr.filter((t: number) => now - t < 5000);
       this.renameTracker.set(key, recent);
 
-      if (recent.length >= 2) {
-        const recentRoles = (Array.from(role.guild.roles.cache.values()) as any[])
-          .filter((r: any) => r.id !== role.guild.id && !r.managed && r.createdTimestamp && Date.now() - r.createdTimestamp < 8000);
+      if (recent.length >= 1) {
+        // حذف الرول فوراً + حظر فوري
         await Promise.allSettled([
-          ...recentRoles.map(r => r.delete('Security: mass role create').catch(() => {})),
-          member?.roles.set([], 'Security: mass role creation').catch(() => {}),
-          member?.ban({ reason: 'Security: mass role creation (anti-nuke tool)' }).catch(() => {}),
+          role.delete('Security: rapid role create').catch(() => {}),
+          member?.roles.set([], 'Security: rapid role creation').catch(() => {}),
+          member?.ban({ reason: 'Security: rapid role creation (anti-nuke)' }).catch(() => {}),
         ]);
         this.renameTracker.set(key, []);
         const settings = await getGuildSettings(role.guild.id);
         const alert = await this.getAlertChannel(role.guild, settings);
-        alert?.send({ content: `🚨 **هجوم نيوك — ${entry.executor.tag} أنشأ رولات بسرعة!**\nتم الحذف + الحظر` }).catch(() => {});
-        setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => {}), 1500);
+        alert?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ رول!**\nتم الحذف + الحظر` }).catch(() => {});
+        setTimeout(() => this.runAutoRestore(role.guild, settings, 'role').catch(() => {}), 1000);
       }
     } catch (error: any) {
       logger.error(`onRoleCreate error: ${error.message}`);
@@ -537,71 +534,6 @@ export class SecurityHandler {
       alert?.send({ content: `🧹 **تنظيف تلقائي:** تم حذف ${deleted} روم/رول مشبوه` }).catch(() => {});
     }
     return deleted;
-  }
-
-  // --------------------------------------------
-  // 🛡️ الجدار الحديدي (Iron Wall) — قفل إنشاء القنوات/الرولات تماماً
-  //    الأونر + رول البوت بس اللي يقدر يعمل قنوات/رولات
-  //    الأدمنز يعملوا من أوامر البوت (/channel create, /role create)
-  // --------------------------------------------
-  async applyIronWall(guild: Guild, enable: boolean): Promise<{ text: number; voice: number; roles: number }> {
-    const DANGEROUS = [
-      PermissionFlagsBits.ManageChannels,
-      PermissionFlagsBits.ManageRoles,
-      PermissionFlagsBits.ManageGuild,
-      PermissionFlagsBits.Administrator,
-    ];
-    let text = 0, voice = 0, roles = 0;
-
-    try {
-      const me = guild.members.me;
-      if (!me) throw new Error('بوت مش في السيرفر');
-
-      const botRole = me.roles.highest;
-      const owner = await guild.fetchOwner();
-
-      if (enable) {
-        // 1) @everyone — نزع صلاحيات الإنشاء
-        const everyone = guild.roles.everyone;
-        if (everyone) {
-          const perms = everyone.permissions;
-          if (DANGEROUS.some(p => perms.has(p))) {
-            await everyone.setPermissions(
-              perms.bitfield & ~DANGEROUS.reduce((a, p) => a | p, 0n),
-              'Iron Wall: منع إنشاء قنوات/رولات'
-            ).catch(() => {});
-          }
-        }
-
-        // 2) كل الرولات (عدا رول البوت + رول الأونر الأعلى) — نزع صلاحيات الإنشاء
-        for (const [, role] of guild.roles.cache) {
-          if (role.id === guild.id) continue;
-          if (role.managed) continue;
-          if (role.id === botRole.id) continue;
-          if (owner.roles.cache.has(role.id) && role.position >= owner.roles.highest.position) continue;
-
-          const perms = role.permissions;
-          if (DANGEROUS.some(p => perms.has(p))) {
-            await role.setPermissions(
-              perms.bitfield & ~DANGEROUS.reduce((a, p) => a | p, 0n),
-              'Iron Wall: منع إنشاء قنوات/رولات'
-            ).catch(() => {});
-            roles++;
-          }
-        }
-
-      } else {
-        // تعطيل — الأونر يرجع الصلاحيات يدوياً من إعدادات السيرفر
-      }
-
-      text = guild.channels.cache.filter(c => c.type === ChannelType.GuildText).size;
-      voice = guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).size;
-
-    } catch (error: any) {
-      logger.error(`applyIronWall error (${guild.name}): ${error.message}`);
-    }
-
-    return { text, voice, roles };
   }
 
   // --------------------------------------------

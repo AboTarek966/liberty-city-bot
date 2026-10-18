@@ -142,24 +142,6 @@ const handler = {
             }
             await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => { });
         }
-        // 🛡️ تفعيل/تعطيل الجدار الحديدي فوراً
-        if (section === 'protection' && field === 'ironWall') {
-            const client = interaction.client;
-            const newState = !!settings.protection.ironWall;
-            if (newState) {
-                await interaction.followUp({
-                    content: '🛡️ **جاري تفعيل الجدار الحديدي...** (يمنع إنشاء قنوات/رولات للجميع عدا الأونر + البوت)',
-                    ephemeral: true,
-                });
-            }
-            const result = await client.securityHandler?.applyIronWall(interaction.guild, newState).catch(() => ({ text: 0, voice: 0, roles: 0 }));
-            await interaction.followUp({
-                content: newState
-                    ? `🛡️ **تم تفعيل الجدار الحديدي** — أُزيلت صلاحيات الإنشاء من ${result?.roles ?? 0} رول\n⚠️ **الأونر + البوت بس** يقدر يعمل قنوات/رولات\n💡 الأدمنز: استخدموا \`/channel create\` و \`/role create\``
-                    : `🔓 **تم تعطيل الجدار الحديدي** — الأونر يرجع الصلاحيات يدوياً من إعدادات السيرفر`,
-                ephemeral: true,
-            });
-        }
         if (section === 'welcome' && field === 'card') {
             // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
             await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);

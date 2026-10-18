@@ -53,11 +53,6 @@ export declare class SecurityHandler {
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
     cleanupSuspicious(guild: Guild): Promise<number>;
-    applyIronWall(guild: Guild, enable: boolean): Promise<{
-        text: number;
-        voice: number;
-        roles: number;
-    }>;
     onWebhookUpdate(webhook: any): Promise<void>;
     onGuildMemberUpdate(oldMember: any, newMember: any): Promise<void>;
     onChannelPermissionUpdate(oldChannel: any, newChannel: any): Promise<void>;
