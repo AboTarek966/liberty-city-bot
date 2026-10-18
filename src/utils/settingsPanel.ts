@@ -909,6 +909,35 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:tickets:advanced', 'إعدادات متقدمة', ButtonStyle.Secondary, '⚙️'),
   );
 
+  // 🤖 AI Ticket Assistant settings
+  const aiTicket = s.aiTicketAssistant;
+  const rowAITicket = aiTicket ? new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn(
+      'settings_tog:tickets:aienabled',
+      `🤖 AI Assistant: ${aiTicket.enabled ? '🟢' : '🔴'}`,
+      aiTicket.enabled ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🤖'
+    ),
+    btn(
+      'settings_tog:tickets:aiclaim',
+      `استلام تلقائي: ${aiTicket.autoClaim ? '🟢' : '🔴'}`,
+      aiTicket.autoClaim ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '⚡'
+    ),
+    btn(
+      'settings_tog:tickets:aianalyze',
+      `تحليل عند الإنشاء: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`,
+      aiTicket.analyzeOnCreate ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🔍'
+    ),
+    btn(
+      'settings_tog:tickets:aiadminroles',
+      `موافقة للرولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`,
+      aiTicket.requireAdminApprovalForRoles ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🎭'
+    ),
+  ) : null;
+
   // 🔒 خيارات القفل ورسالة الترحيب
   const rowLock = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn(
@@ -928,7 +957,7 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
-  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowLock] };
+  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket, rowLock].filter((c): c is ActionRowBuilder<ButtonBuilder> => !!c) };
 }
 
 // --------------------------------------------

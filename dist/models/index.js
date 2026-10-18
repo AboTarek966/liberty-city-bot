@@ -269,6 +269,18 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             escalation: { type: Boolean, default: true },
             maxWarningsBeforeEscalation: { type: Number, default: 3 },
         },
+        aiTicketAssistant: {
+            enabled: { type: Boolean, default: false },
+            autoClaim: { type: Boolean, default: false },
+            analyzeOnCreate: { type: Boolean, default: true },
+            requireAdminApprovalForRoles: { type: Boolean, default: true },
+            requireAdminApprovalForPermissions: { type: Boolean, default: true },
+            requireAdminApprovalForBans: { type: Boolean, default: true },
+            maxAutoActionsPerTicket: { type: Number, default: 3 },
+            confidenceThreshold: { type: Number, default: 70 },
+            notifyAdminsOnFailure: { type: Boolean, default: true },
+            logChannel: { type: String },
+        },
     },
     tickets: {
         categoryId: { type: String },

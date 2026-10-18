@@ -3,7 +3,7 @@
 // Liberty City Bot - Handlers Index
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
+exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
 var CommandHandler_1 = require("./CommandHandler");
 Object.defineProperty(exports, "CommandHandler", { enumerable: true, get: function () { return CommandHandler_1.CommandHandler; } });
 var EventHandler_1 = require("./EventHandler");
@@ -36,4 +36,6 @@ var MessageScannerHandler_1 = require("./MessageScannerHandler");
 Object.defineProperty(exports, "MessageScannerHandler", { enumerable: true, get: function () { return MessageScannerHandler_1.MessageScannerHandler; } });
 var AIAutoMod_1 = require("./AIAutoMod");
 Object.defineProperty(exports, "AIAutoModHandler", { enumerable: true, get: function () { return AIAutoMod_1.AIAutoModHandler; } });
+var AITicketAssistant_1 = require("./AITicketAssistant");
+Object.defineProperty(exports, "AITicketAssistant", { enumerable: true, get: function () { return AITicketAssistant_1.AITicketAssistant; } });
 //# sourceMappingURL=index.js.map

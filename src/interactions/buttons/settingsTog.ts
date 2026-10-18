@@ -118,6 +118,38 @@ const handler: ButtonHandler = {
           settings.tickets.welcomeEnabled = !settings.tickets.welcomeEnabled;
           break;
         }
+        // 🤖 AI Ticket Assistant toggles
+        const s = settings as any;
+        if (field === 'aienabled') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: false, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+          s.aiTicketAssistant.enabled = !s.aiTicketAssistant.enabled;
+          break;
+        }
+        if (field === 'aiclaim') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+          s.aiTicketAssistant.autoClaim = !s.aiTicketAssistant.autoClaim;
+          break;
+        }
+        if (field === 'aianalyze') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+          s.aiTicketAssistant.analyzeOnCreate = !s.aiTicketAssistant.analyzeOnCreate;
+          break;
+        }
+        if (field === 'aiadminroles') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+          s.aiTicketAssistant.requireAdminApprovalForRoles = !s.aiTicketAssistant.requireAdminApprovalForRoles;
+          break;
+        }
+        if (field === 'aiadminperms') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true };
+          s.aiTicketAssistant.requireAdminApprovalForPermissions = !s.aiTicketAssistant.requireAdminApprovalForPermissions;
+          break;
+        }
+        if (field === 'aiadminbans') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true };
+          s.aiTicketAssistant.requireAdminApprovalForBans = !s.aiTicketAssistant.requireAdminApprovalForBans;
+          break;
+        }
         await interaction.editReply({ content: '❌ إعداد غير معروف' });
         return;
       }

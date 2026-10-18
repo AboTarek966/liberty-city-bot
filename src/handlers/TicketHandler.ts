@@ -3,7 +3,6 @@
 // ============================================
 
 import {
-  Client,
   Guild,
   GuildMember,
   TextChannel,
@@ -22,6 +21,7 @@ import { createLogger } from '../utils/helpers';
 import { getGuildSettings, Ticket, ITicket, ITicketLockSnapshot, Ticket as TicketModel } from '../models';
 import { ticketEmbed, ticketTranscriptEmbed, createEmbed, Colors } from '../utils/embeds';
 import { generateId, generateNumericId } from '../utils/helpers';
+import { LibertyClient } from '../LibertyClient';
 
 const logger = createLogger('TicketHandler');
 
@@ -127,14 +127,14 @@ export function canReopenTicket(args: ReopenAccessArgs): boolean {
 // Ticket Handler Class
 // --------------------------------------------
 export class TicketHandler {
-  private client: Client;
+  private client: LibertyClient;
   private activeTickets: Collection<string, ITicket> = new Collection();
   private callCooldowns: Collection<string, number> = new Collection();
 
   /** ⚡ طابور إرسال سجلات التذاكر لكل سيرفر — ترتيب تام + لا يعطّل مسار التذكرة */
   private ticketLogQueues: Map<string, Promise<void>> = new Map();
 
-  constructor(client: Client) {
+  constructor(client: LibertyClient) {
     this.client = client;
   }
 
@@ -414,6 +414,16 @@ export class TicketHandler {
       });
     }
 
+    // 🤖 AI Ticket Assistant — تحليل التذكرة ومحاولة الحل تلقائياً
+    const aiTicketConfig = (settings as any).aiTicketAssistant;
+    if (aiTicketConfig?.enabled && aiTicketConfig.analyzeOnCreate) {
+      setTimeout(() => {
+        this.client.aiTicketAssistant?.onTicketCreated(ticket, channel).catch((err: any) =>
+          logger.error(`AI Ticket Assistant error: ${err.message}`)
+        );
+      }, 2000); // انتظار بسيط ليستقر الكاش
+    }
+
     this.logTicketEvent(guild, 'create', ticket, user.user);
 
     logger.info(`Created ticket ${ticketId} for ${user.user.tag}`);
@@ -527,7 +537,7 @@ export class TicketHandler {
   // الساعات من الإعدادات: autoCloseHours (0 = المعطّل)
   // يُستدعى من حدّ دوري كل 15 دقيقة في حدث ready
   // --------------------------------------------
-  async sweepInactiveTickets(client: Client): Promise<void> {
+  async sweepInactiveTickets(client: any): Promise<void> {
     for (const guild of client.guilds.cache.values()) {
       try {
         const settings = await getGuildSettings(guild.id);

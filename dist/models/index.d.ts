@@ -152,6 +152,19 @@ export interface IGuildSettings extends Document {
             escalation: boolean;
             maxWarningsBeforeEscalation: number;
         };
+        /** 🤖 AI Ticket Assistant — يستلم التذكرة، يحلل، يحل، يطلب موافقة أدمن للإجراءات الحساسة */
+        aiTicketAssistant?: {
+            enabled: boolean;
+            autoClaim: boolean;
+            analyzeOnCreate: boolean;
+            requireAdminApprovalForRoles: boolean;
+            requireAdminApprovalForPermissions: boolean;
+            requireAdminApprovalForBans: boolean;
+            maxAutoActionsPerTicket: number;
+            confidenceThreshold: number;
+            notifyAdminsOnFailure: boolean;
+            logChannel?: string;
+        };
     };
     tickets: {
         categoryId?: string;

@@ -305,6 +305,13 @@ class TicketHandler {
                 components: this.buildTicketControls(false),
             });
         }
+        // 🤖 AI Ticket Assistant — تحليل التذكرة ومحاولة الحل تلقائياً
+        const aiTicketConfig = settings.aiTicketAssistant;
+        if (aiTicketConfig?.enabled && aiTicketConfig.analyzeOnCreate) {
+            setTimeout(() => {
+                this.client.aiTicketAssistant?.onTicketCreated(ticket, channel).catch((err) => logger.error(`AI Ticket Assistant error: ${err.message}`));
+            }, 2000); // انتظار بسيط ليستقر الكاش
+        }
         this.logTicketEvent(guild, 'create', ticket, user.user);
         logger.info(`Created ticket ${ticketId} for ${user.user.tag}`);
         return ticket;

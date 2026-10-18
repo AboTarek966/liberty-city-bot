@@ -1,5 +1,5 @@
 import { Client, Collection } from 'discord.js';
-import { CommandHandler, EventHandler, InteractionHandler, AIHandler, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler } from './handlers';
+import { CommandHandler, EventHandler, InteractionHandler, AIHandler, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant } from './handlers';
 export declare class LibertyClient extends Client {
     commandHandler: CommandHandler;
     eventHandler: EventHandler;
@@ -16,6 +16,7 @@ export declare class LibertyClient extends Client {
     inviteTrackerHandler: InviteTrackerHandler;
     messageScannerHandler: MessageScannerHandler;
     aiAutoModHandler: AIAutoModHandler;
+    aiTicketAssistant: AITicketAssistant;
     cooldowns: Collection<string, Collection<string, number>>;
     guildSettingsCache: Collection<string, any>;
     constructor();

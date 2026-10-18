@@ -171,6 +171,19 @@ export interface IGuildSettings extends Document {
       escalation: boolean;
       maxWarningsBeforeEscalation: number;
     };
+    /** 🤖 AI Ticket Assistant — يستلم التذكرة، يحلل، يحل، يطلب موافقة أدمن للإجراءات الحساسة */
+    aiTicketAssistant?: {
+      enabled: boolean;
+      autoClaim: boolean;
+      analyzeOnCreate: boolean;
+      requireAdminApprovalForRoles: boolean;
+      requireAdminApprovalForPermissions: boolean;
+      requireAdminApprovalForBans: boolean;
+      maxAutoActionsPerTicket: number;
+      confidenceThreshold: number;
+      notifyAdminsOnFailure: boolean;
+      logChannel?: string;
+    };
   };
   
   // Tickets
@@ -836,6 +849,18 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       logChannel: { type: String },
       escalation: { type: Boolean, default: true },
       maxWarningsBeforeEscalation: { type: Number, default: 3 },
+    },
+    aiTicketAssistant: {
+      enabled: { type: Boolean, default: false },
+      autoClaim: { type: Boolean, default: false },
+      analyzeOnCreate: { type: Boolean, default: true },
+      requireAdminApprovalForRoles: { type: Boolean, default: true },
+      requireAdminApprovalForPermissions: { type: Boolean, default: true },
+      requireAdminApprovalForBans: { type: Boolean, default: true },
+      maxAutoActionsPerTicket: { type: Number, default: 3 },
+      confidenceThreshold: { type: Number, default: 70 },
+      notifyAdminsOnFailure: { type: Boolean, default: true },
+      logChannel: { type: String },
     },
   },
   
