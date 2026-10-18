@@ -20,6 +20,10 @@ const event = {
             member.client.securityHandler
                 .onMemberKick(member)
                 .catch(err => logger.warn(`onMemberKick failed: ${err?.message ?? err}`));
+            // 📨 Invite Tracker — تحديث إحصائيات المغادرة
+            member.client.inviteTrackerHandler
+                .onMemberLeave(member)
+                .catch(err => logger.warn(`inviteTracker onMemberLeave failed: ${err?.message ?? err}`));
             // Leave message
             const leaveResult = await handleLeave(member);
             if (leaveResult !== 'sent' && leaveResult !== 'disabled') {

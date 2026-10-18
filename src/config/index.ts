@@ -269,6 +269,7 @@ export const config = {
     weather: process.env.WEATHER_API_KEY,
     youtube: process.env.YOUTUBE_API_KEY,
     tenor: process.env.TENOR_API_KEY,
+    virustotal: process.env.VIRUSTOTAL_API_KEY,
   },
 };
 

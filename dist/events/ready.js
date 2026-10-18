@@ -47,6 +47,15 @@ const event = {
                 lc.securityHandler.startStickyRoleWatchdog(guild);
             }, delay);
         });
+        // 📨 تهيئة كاش الدعوات لكل السيرفرات
+        let iIndex = 0;
+        client.guilds.cache.forEach(guild => {
+            const delay = 35000 + iIndex * 5000;
+            iIndex++;
+            setTimeout(() => {
+                lc.inviteTrackerHandler.cacheGuildInvites(guild).catch(err => logger.error(`invite cache failed for ${guild.name}:`, err));
+            }, delay);
+        });
         // 📈 نظام المستويات: استئناف جلسات الصوت الجارية + احتساب دوري كل 5 دقائق
         client.guilds.cache.forEach(guild => {
             guild.voiceStates.cache.forEach(vs => {

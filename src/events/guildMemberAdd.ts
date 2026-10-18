@@ -40,6 +40,12 @@ const event: Event = {
       const botKicked = await client.securityHandler.onMemberJoin(member);
       if (botKicked) return;
 
+      // 🕵️ Anti-Alt Detection — كشف الحسابات البديلة
+      await client.antiAltHandler.onMemberJoin(member);
+
+      // 📨 Invite Tracker — تتبع الدعوة المستخدمة
+      await client.inviteTrackerHandler.onMemberJoin(member);
+
       // Auto-Role
       await handleAutoRole(member);
 

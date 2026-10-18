@@ -9,4 +9,7 @@ export { LoggingHandler, LOG_EVENTS, LogEventType } from './LoggingHandler';
 export { ActivityTracker, ActivityStats } from './ActivityTracker';
 export { SecurityHandler } from './SecurityHandler';
 export { LevelingHandler, RankCardData, LevelUpResult } from './LevelingHandler';
+export { AntiAltHandler } from './AntiAltHandler';
+export { InviteTrackerHandler } from './InviteTrackerHandler';
+export { MessageScannerHandler } from './MessageScannerHandler';
 //# sourceMappingURL=index.d.ts.map

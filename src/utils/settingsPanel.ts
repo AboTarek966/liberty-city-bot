@@ -380,6 +380,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     p.antiInvite.enabled, p.antiMention.enabled, p.antiCaps.enabled, p.antiEmoji.enabled,
     p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
     p.scamFilter?.enabled, p.autoScan?.enabled,
+    p.antiAlt?.enabled, p.inviteTracker?.enabled, p.messageScanner?.enabled,
   ].filter(Boolean).length;
 
   // 🛡️ حالة تسلّم البوت — أهم مؤشر: بدونه كل العقوبات فشل
@@ -392,7 +393,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     'protection',
     guild,
     `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-    `**المحميات المفعّلة: ${active}/13**\n\n` +
+    `**المحميات المفعّلة: ${active}/16**\n\n` +
     `${hierarchyLine}\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
@@ -409,6 +410,10 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.autoBackup?.enabled)} **نسخ احتياطي تلقائي** — يحفظ بنية السيرفر ويستعيدها\n` +
     `> ${on(p.autoScan?.enabled)} **فحص دوري (كل ${p.autoScan?.interval ?? 6} ساعات)** — يمسح رومات/رولات الهاكر ويرجّع الناقص تلقائياً\n` +
     `> ${on(p.scamFilter?.enabled)} **فلتر الاحتيال** — يحذف روابط الصيد والمشاريع المزيفة\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `> ${on(p.antiAlt?.enabled)} **🕵️ Anti-Alt** — يكشف الحسابات البديلة (جديدة/نفس النمط)\n` +
+    `> ${on(p.inviteTracker?.enabled)} **📨 Invite Tracker** — يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين\n` +
+    `> ${on(p.messageScanner?.enabled)} **🔍 Message Scanner** — يفحص روابط/ملفات بـ VirusTotal\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n\n` +
@@ -449,7 +454,13 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
   );
 
-  // Row 5: Jail channel selection
+  const row5 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled),
+    toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled),
+    toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled),
+  );
+
+  // Row 6: Jail channel selection
   const jailChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
     new ChannelSelectMenuBuilder()
       .setCustomId('settings_sel:jail:channel')
@@ -466,7 +477,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       )
   );
 
-  return { embeds: [embed], components: [row1, row2, row3, row4, jailChannelSelect] };
+  return { embeds: [embed], components: [row1, row2, row3, row4, row5, jailChannelSelect] };
 }
 
 // --------------------------------------------

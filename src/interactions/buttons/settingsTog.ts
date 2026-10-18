@@ -151,6 +151,16 @@ const handler: ButtonHandler = {
       await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => {});
     }
 
+    // 📨 تحديث كاش الدعوات عند تفعيل/تعطيل Invite Tracker
+    if (section === 'protection' && field === 'inviteTracker') {
+      const client = interaction.client as LibertyClient;
+      if (!(settings.protection as any).inviteTracker) {
+        (settings.protection as any).inviteTracker = { enabled: true };
+        await settings.save();
+      }
+      await client.inviteTrackerHandler?.cacheGuildInvites(interaction.guild).catch(() => {});
+    }
+
     if ((section as string) === 'welcome' && field === 'card') {
       // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
       await sendWelcomeCardPanel(interaction, settings);

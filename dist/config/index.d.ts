@@ -165,6 +165,7 @@ export declare const config: {
         weather: string | undefined;
         youtube: string | undefined;
         tenor: string | undefined;
+        virustotal: string | undefined;
     };
 };
 export declare function validateConfig(): void;

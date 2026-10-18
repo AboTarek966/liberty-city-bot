@@ -314,6 +314,7 @@ function buildProtection(guild, s) {
         p.antiInvite.enabled, p.antiMention.enabled, p.antiCaps.enabled, p.antiEmoji.enabled,
         p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
         p.scamFilter?.enabled, p.autoScan?.enabled,
+        p.antiAlt?.enabled, p.inviteTracker?.enabled, p.messageScanner?.enabled,
     ].filter(Boolean).length;
     // 🛡️ حالة تسلّم البوت — أهم مؤشر: بدونه كل العقوبات فشل
     const hs = (0, SecurityHandler_1.computeHierarchy)(guild);
@@ -321,7 +322,7 @@ function buildProtection(guild, s) {
         ? `> ✅ **تسلّم البوت** — أعلى رتبة (‎${hs.botRoleName}‎ \`#${hs.botPosition}\`)، الحماية تعمل بالكامل`
         : `> 🚨 **${hs.offenderCount} رول فوق البوت** — مضاد النيوك والاستعادة **ستفشل**! ارفع رول البوت ← \`/protection hierarchy\``;
     const embed = categoryEmbed('protection', guild, `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-        `**المحميات المفعّلة: ${active}/13**\n\n` +
+        `**المحميات المفعّلة: ${active}/16**\n\n` +
         `${hierarchyLine}\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
@@ -339,6 +340,10 @@ function buildProtection(guild, s) {
         `> ${on(p.autoScan?.enabled)} **فحص دوري (كل ${p.autoScan?.interval ?? 6} ساعات)** — يمسح رومات/رولات الهاكر ويرجّع الناقص تلقائياً\n` +
         `> ${on(p.scamFilter?.enabled)} **فلتر الاحتيال** — يحذف روابط الصيد والمشاريع المزيفة\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `> ${on(p.antiAlt?.enabled)} **🕵️ Anti-Alt** — يكشف الحسابات البديلة (جديدة/نفس النمط)\n` +
+        `> ${on(p.inviteTracker?.enabled)} **📨 Invite Tracker** — يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين\n` +
+        `> ${on(p.messageScanner?.enabled)} **🔍 Message Scanner** — يفحص روابط/ملفات بـ VirusTotal\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
         `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n\n` +
         `⚙️ *إعدادات متقدمة (العتاد، الأدوار، الاستعادة):* \`/protection\` • \`/backup\``);
@@ -346,7 +351,8 @@ function buildProtection(guild, s) {
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiMention', 'منشنز', '📣', p.antiMention.enabled), toggleBtn('protection', 'antiCaps', 'كابس', '🔠', p.antiCaps.enabled), toggleBtn('protection', 'antiEmoji', 'إيموجي', '😀', p.antiEmoji.enabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled));
     const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled), toggleBtn('protection', 'autoScan', 'فحص دوري', '🔍', !!p.autoScan?.enabled), toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'));
-    // Row 5: Jail channel selection
+    const row5 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled), toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled), toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled));
+    // Row 6: Jail channel selection
     const jailChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:jail:channel')
         .setPlaceholder('🔒 اختر روم السجن (الذي يبقى العضو المسجون قادراً على رؤيته)')
@@ -358,7 +364,7 @@ function buildProtection(guild, s) {
         guild.channels.cache.get(s.jail.channelId)?.type === discord_js_1.ChannelType.GuildText
         ? [s.jail.channelId]
         : []));
-    return { embeds: [embed], components: [row1, row2, row3, row4, jailChannelSelect] };
+    return { embeds: [embed], components: [row1, row2, row3, row4, row5, jailChannelSelect] };
 }
 // --------------------------------------------
 // Verification — نظام التوثيق بالزر (لوحة فرعية)

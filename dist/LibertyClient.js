@@ -62,6 +62,9 @@ class LibertyClient extends discord_js_1.Client {
     activityTracker;
     securityHandler;
     levelingHandler;
+    antiAltHandler;
+    inviteTrackerHandler;
+    messageScannerHandler;
     // Cooldowns
     cooldowns = new discord_js_1.Collection();
     // Cache
@@ -104,6 +107,9 @@ class LibertyClient extends discord_js_1.Client {
         this.activityTracker = new handlers_1.ActivityTracker(this);
         this.securityHandler = new handlers_1.SecurityHandler(this);
         this.levelingHandler = new handlers_1.LevelingHandler(this);
+        this.antiAltHandler = new handlers_1.AntiAltHandler(this);
+        this.inviteTrackerHandler = new handlers_1.InviteTrackerHandler(this);
+        this.messageScannerHandler = new handlers_1.MessageScannerHandler(config_1.config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
     }
     // --------------------------------------------
     // Initialize Bot

@@ -23,6 +23,9 @@ import {
   ActivityTracker,
   SecurityHandler,
   LevelingHandler,
+  AntiAltHandler,
+  InviteTrackerHandler,
+  MessageScannerHandler,
 } from './handlers';
 import mongoose from 'mongoose';
 
@@ -44,6 +47,9 @@ export class LibertyClient extends Client {
   public activityTracker: ActivityTracker;
   public securityHandler: SecurityHandler;
   public levelingHandler: LevelingHandler;
+  public antiAltHandler: AntiAltHandler;
+  public inviteTrackerHandler: InviteTrackerHandler;
+  public messageScannerHandler: MessageScannerHandler;
 
   // Cooldowns
   public cooldowns: Collection<string, Collection<string, number>> = new Collection();
@@ -90,6 +96,9 @@ export class LibertyClient extends Client {
     this.activityTracker = new ActivityTracker(this);
     this.securityHandler = new SecurityHandler(this);
     this.levelingHandler = new LevelingHandler(this);
+    this.antiAltHandler = new AntiAltHandler(this);
+    this.inviteTrackerHandler = new InviteTrackerHandler(this);
+    this.messageScannerHandler = new MessageScannerHandler(config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
   }
 
   // --------------------------------------------

@@ -109,6 +109,37 @@ export interface IGuildSettings extends Document {
     };
     /** وضع الطوارئ — يقفل الكتابة والدخول في جميع القنوات */
     lockdown: boolean;
+    /** 🕵️ Anti-Alt Detection — يكشف الحسابات البديلة */
+    antiAlt?: {
+      enabled: boolean;
+      action: 'kick' | 'ban' | 'quarantine' | 'log';
+      maxAccountsPerIP: number;
+      checkCreationDays: number;
+      quarantineRoleId?: string;
+      logChannel?: string;
+    };
+    /** 📨 Invite Tracker — يتتبع الدعوات ويكشف المشبوهة */
+    inviteTracker?: {
+      enabled: boolean;
+      trackJoins: boolean;
+      trackLeaves: boolean;
+      suspiciousInviteAction: 'delete' | 'warn' | 'kick' | 'ban';
+      minInviteAgeHours: number;
+      maxUsesPerInvite: number;
+      logChannel?: string;
+      rewardRoleId?: string;
+      rewardInvites: number;
+    };
+    /** 🔍 Message Scanners — يفحص الرسائل (روابط/ملفات) عبر VirusTotal */
+    messageScanner?: {
+      enabled: boolean;
+      scanLinks: boolean;
+      scanAttachments: boolean;
+      virusTotalApiKey?: string;
+      action: 'delete' | 'warn' | 'mute' | 'ban';
+      whitelistDomains: string[];
+      logChannel?: string;
+    };
   };
   
   // Tickets
@@ -717,6 +748,34 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       enabled: { type: Boolean, default: true },
     },
     lockdown: { type: Boolean, default: false },
+    antiAlt: {
+      enabled: { type: Boolean, default: false },
+      action: { type: String, enum: ['kick', 'ban', 'quarantine', 'log'], default: 'quarantine' },
+      maxAccountsPerIP: { type: Number, default: 3 },
+      checkCreationDays: { type: Number, default: 30 },
+      quarantineRoleId: { type: String },
+      logChannel: { type: String },
+    },
+    inviteTracker: {
+      enabled: { type: Boolean, default: true },
+      trackJoins: { type: Boolean, default: true },
+      trackLeaves: { type: Boolean, default: true },
+      suspiciousInviteAction: { type: String, enum: ['delete', 'warn', 'kick', 'ban'], default: 'warn' },
+      minInviteAgeHours: { type: Number, default: 24 },
+      maxUsesPerInvite: { type: Number, default: 100 },
+      logChannel: { type: String },
+      rewardRoleId: { type: String },
+      rewardInvites: { type: Number, default: 5 },
+    },
+    messageScanner: {
+      enabled: { type: Boolean, default: false },
+      scanLinks: { type: Boolean, default: true },
+      scanAttachments: { type: Boolean, default: true },
+      virusTotalApiKey: { type: String },
+      action: { type: String, enum: ['delete', 'warn', 'mute', 'ban'], default: 'delete' },
+      whitelistDomains: [{ type: String }],
+      logChannel: { type: String },
+    },
   },
   
   tickets: {

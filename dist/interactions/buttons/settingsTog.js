@@ -142,6 +142,15 @@ const handler = {
             }
             await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => { });
         }
+        // 📨 تحديث كاش الدعوات عند تفعيل/تعطيل Invite Tracker
+        if (section === 'protection' && field === 'inviteTracker') {
+            const client = interaction.client;
+            if (!settings.protection.inviteTracker) {
+                settings.protection.inviteTracker = { enabled: true };
+                await settings.save();
+            }
+            await client.inviteTrackerHandler?.cacheGuildInvites(interaction.guild).catch(() => { });
+        }
         if (section === 'welcome' && field === 'card') {
             // 🎴 تفعيل/تعطيل البطاقة → أرسل المحرر مع صورة حية
             await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);

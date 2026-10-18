@@ -90,6 +90,37 @@ export interface IGuildSettings extends Document {
         };
         /** وضع الطوارئ — يقفل الكتابة والدخول في جميع القنوات */
         lockdown: boolean;
+        /** 🕵️ Anti-Alt Detection — يكشف الحسابات البديلة */
+        antiAlt?: {
+            enabled: boolean;
+            action: 'kick' | 'ban' | 'quarantine' | 'log';
+            maxAccountsPerIP: number;
+            checkCreationDays: number;
+            quarantineRoleId?: string;
+            logChannel?: string;
+        };
+        /** 📨 Invite Tracker — يتتبع الدعوات ويكشف المشبوهة */
+        inviteTracker?: {
+            enabled: boolean;
+            trackJoins: boolean;
+            trackLeaves: boolean;
+            suspiciousInviteAction: 'delete' | 'warn' | 'kick' | 'ban';
+            minInviteAgeHours: number;
+            maxUsesPerInvite: number;
+            logChannel?: string;
+            rewardRoleId?: string;
+            rewardInvites: number;
+        };
+        /** 🔍 Message Scanners — يفحص الرسائل (روابط/ملفات) عبر VirusTotal */
+        messageScanner?: {
+            enabled: boolean;
+            scanLinks: boolean;
+            scanAttachments: boolean;
+            virusTotalApiKey?: string;
+            action: 'delete' | 'warn' | 'mute' | 'ban';
+            whitelistDomains: string[];
+            logChannel?: string;
+        };
     };
     tickets: {
         categoryId?: string;
