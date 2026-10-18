@@ -176,6 +176,12 @@ export interface IGuildSettings extends Document {
             maxLength: number;
             logChannel?: string;
         };
+        /** 👑 Whitelist — مستخدمين موثوقين مستثنين من الحماية */
+        whitelist?: {
+            enabled: boolean;
+            userIds: string[];
+            logChannel?: string;
+        };
     };
     tickets: {
         categoryId?: string;

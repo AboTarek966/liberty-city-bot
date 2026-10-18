@@ -291,6 +291,11 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             maxLength: { type: Number, default: 2000 },
             logChannel: { type: String },
         },
+        whitelist: {
+            enabled: { type: Boolean, default: false },
+            userIds: [{ type: String }],
+            logChannel: { type: String },
+        },
     },
     tickets: {
         categoryId: { type: String },

@@ -358,14 +358,21 @@ export class SecurityHandler {
     return status;
   }
 
-  // وايت ليست: الأونر + من معه Administrator + مطور البوت = موثوق
-  private isWhitelisted(guild: Guild, executorId: string): boolean {
+  // وايت ليست: الأونر + من معه Administrator + مطور البوت + القائمة البيضاء المخصصة = موثوق
+  private async isWhitelisted(guild: Guild, executorId: string): Promise<boolean> {
     if (executorId === guild.ownerId) return true;
     // مطور البوت (DEVELOPER_USER_ID من .env) = وايت ليست في كل السيرفرات
     const devId = process.env.DEVELOPER_USER_ID;
     if (devId && executorId === devId) return true;
     const member = guild.members.cache.get(executorId);
-    return member?.permissions.has(PermissionFlagsBits.Administrator) ?? false;
+    if (member?.permissions.has(PermissionFlagsBits.Administrator)) return true;
+
+    // القائمة البيضاء المخصصة
+    const settings = await getGuildSettings(guild.id);
+    const wl = settings.protection?.whitelist;
+    if (wl?.enabled && wl?.userIds?.includes(executorId)) return true;
+
+    return false;
   }
 
   // --------------------------------------------

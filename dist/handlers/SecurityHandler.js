@@ -268,8 +268,8 @@ class SecurityHandler {
         }
         return status;
     }
-    // وايت ليست: الأونر + من معه Administrator + مطور البوت = موثوق
-    isWhitelisted(guild, executorId) {
+    // وايت ليست: الأونر + من معه Administrator + مطور البوت + القائمة البيضاء المخصصة = موثوق
+    async isWhitelisted(guild, executorId) {
         if (executorId === guild.ownerId)
             return true;
         // مطور البوت (DEVELOPER_USER_ID من .env) = وايت ليست في كل السيرفرات
@@ -277,7 +277,14 @@ class SecurityHandler {
         if (devId && executorId === devId)
             return true;
         const member = guild.members.cache.get(executorId);
-        return member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ?? false;
+        if (member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator))
+            return true;
+        // القائمة البيضاء المخصصة
+        const settings = await (0, models_1.getGuildSettings)(guild.id);
+        const wl = settings.protection?.whitelist;
+        if (wl?.enabled && wl?.userIds?.includes(executorId))
+            return true;
+        return false;
     }
     // --------------------------------------------
     // 0) ANTI-CREATE: أي بوت ينشئ قناة/رول → يُحذف فوراً (ماعدا الأونر والإدارة)

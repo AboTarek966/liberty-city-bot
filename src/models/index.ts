@@ -195,6 +195,12 @@ export interface IGuildSettings extends Document {
       maxLength: number;
       logChannel?: string;
     };
+    /** 👑 Whitelist — مستخدمين موثوقين مستثنين من الحماية */
+    whitelist?: {
+      enabled: boolean;
+      userIds: string[];
+      logChannel?: string;
+    };
   };
   
   // Tickets
@@ -881,6 +887,11 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       ignoredRoles: [{ type: String }],
       showOriginal: { type: Boolean, default: true },
       maxLength: { type: Number, default: 2000 },
+      logChannel: { type: String },
+    },
+    whitelist: {
+      enabled: { type: Boolean, default: false },
+      userIds: [{ type: String }],
       logChannel: { type: String },
     },
   },
