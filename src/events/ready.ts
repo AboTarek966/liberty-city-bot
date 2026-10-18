@@ -95,6 +95,15 @@ const event: Event = {
         logger.error('Ticket inactivity sweep error:', err)
       );
     }, 15 * 60 * 1000);
+
+    // 🏦 فائدة البنك: تطبيق يومي (كل 24 ساعة)
+    setInterval(() => {
+      client.guilds.cache.forEach(guild => {
+        lc.economyHandler.applyBankInterest(guild).catch(err =>
+          logger.error(`Bank interest error for ${guild.name}:`, err)
+        );
+      });
+    }, 24 * 60 * 60 * 1000);
   },
 };
 

@@ -70,6 +70,7 @@ class LibertyClient extends discord_js_1.Client {
     aiAutoModHandler;
     aiTicketAssistant;
     aiTranslator;
+    economyHandler;
     // Express server for Dashboard API
     expressApp;
     // Cooldowns
@@ -123,6 +124,7 @@ class LibertyClient extends discord_js_1.Client {
         this.aiAutoModHandler = new handlers_1.AIAutoModHandler(this);
         this.aiTicketAssistant = new handlers_1.AITicketAssistant(this);
         this.aiTranslator = new handlers_1.AITranslator(this);
+        this.economyHandler = new handlers_1.EconomyHandler(this);
     }
     setupExpress() {
         this.expressApp.use((0, cors_1.default)({

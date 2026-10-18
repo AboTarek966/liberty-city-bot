@@ -3,7 +3,7 @@
 // Liberty City Bot - Handlers Index
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
+exports.EconomyHandler = exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
 var CommandHandler_1 = require("./CommandHandler");
 Object.defineProperty(exports, "CommandHandler", { enumerable: true, get: function () { return CommandHandler_1.CommandHandler; } });
 var EventHandler_1 = require("./EventHandler");
@@ -40,4 +40,6 @@ var AITicketAssistant_1 = require("./AITicketAssistant");
 Object.defineProperty(exports, "AITicketAssistant", { enumerable: true, get: function () { return AITicketAssistant_1.AITicketAssistant; } });
 var AITranslator_1 = require("./AITranslator");
 Object.defineProperty(exports, "AITranslator", { enumerable: true, get: function () { return AITranslator_1.AITranslator; } });
+var EconomyHandler_1 = require("./EconomyHandler");
+Object.defineProperty(exports, "EconomyHandler", { enumerable: true, get: function () { return EconomyHandler_1.EconomyHandler; } });
 //# sourceMappingURL=index.js.map

@@ -311,6 +311,31 @@ export interface IGuildSettings extends Document {
     robCooldown: number;
     slotsEnabled: boolean;
     blackjackEnabled: boolean;
+    // Bank system
+    bankEnabled: boolean;
+    bankInterestRate: number; // daily interest %
+    bankMaxDeposit: number;
+    // Shop system
+    shopEnabled: boolean;
+    shopItems: IShopItem[];
+    // Transfers
+    transferEnabled: boolean;
+    transferTax: number; // %
+    transferCooldown: number; // ms
+    // Voice rewards
+    voiceRewardsEnabled: boolean;
+    voiceRewardPerMinute: number;
+    voiceRewardInterval: number; // ms
+    // Daily/Weekly rewards
+    weeklyAmount: number;
+    monthlyAmount: number;
+    // Gambling
+    coinflipEnabled: boolean;
+    diceEnabled: boolean;
+    // Inventory
+    inventoryEnabled: boolean;
+    // Leaderboard
+    leaderboardEnabled: boolean;
   };
   
   leveling: {
@@ -995,6 +1020,31 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     robCooldown: { type: Number, default: 3600000 },
     slotsEnabled: { type: Boolean, default: true },
     blackjackEnabled: { type: Boolean, default: true },
+    // Bank system
+    bankEnabled: { type: Boolean, default: true },
+    bankInterestRate: { type: Number, default: 0.5 },
+    bankMaxDeposit: { type: Number, default: 1000000 },
+    // Shop system
+    shopEnabled: { type: Boolean, default: true },
+    shopItems: [{ type: 'Mixed' }],
+    // Transfers
+    transferEnabled: { type: Boolean, default: true },
+    transferTax: { type: Number, default: 5 },
+    transferCooldown: { type: Number, default: 3600000 },
+    // Voice rewards
+    voiceRewardsEnabled: { type: Boolean, default: true },
+    voiceRewardPerMinute: { type: Number, default: 5 },
+    voiceRewardInterval: { type: Number, default: 60000 },
+    // Daily/Weekly/Monthly rewards
+    weeklyAmount: { type: Number, default: 2000 },
+    monthlyAmount: { type: Number, default: 10000 },
+    // Gambling
+    coinflipEnabled: { type: Boolean, default: true },
+    diceEnabled: { type: Boolean, default: true },
+    // Inventory
+    inventoryEnabled: { type: Boolean, default: true },
+    // Leaderboard
+    leaderboardEnabled: { type: Boolean, default: true },
   },
   
   leveling: {

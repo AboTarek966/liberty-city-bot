@@ -284,6 +284,23 @@ export interface IGuildSettings extends Document {
         robCooldown: number;
         slotsEnabled: boolean;
         blackjackEnabled: boolean;
+        bankEnabled: boolean;
+        bankInterestRate: number;
+        bankMaxDeposit: number;
+        shopEnabled: boolean;
+        shopItems: IShopItem[];
+        transferEnabled: boolean;
+        transferTax: number;
+        transferCooldown: number;
+        voiceRewardsEnabled: boolean;
+        voiceRewardPerMinute: number;
+        voiceRewardInterval: number;
+        weeklyAmount: number;
+        monthlyAmount: number;
+        coinflipEnabled: boolean;
+        diceEnabled: boolean;
+        inventoryEnabled: boolean;
+        leaderboardEnabled: boolean;
     };
     leveling: {
         enabled: boolean;
