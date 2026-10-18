@@ -291,6 +291,16 @@ async function handleAddRole(interaction: ChatInputCommandInteraction): Promise<
 
   const settings = await getGuildSettings(interaction.guildId!);
 
+  // 🛡️ حماية: منع إضافة رول البوت نفسه لفريق التذاكر
+  if (role.id === interaction.guild!.members.me!.roles.highest.id) {
+    const adminRoles = settings.tickets.adminRoleIds?.map(r => `<@&${r}>`).join('، ') || 'الإدارة العليا';
+    await interaction.editReply({
+      content: `🛡️ **محاولة ممنوعة:** لا يمكن إضافة رول البوت لفريق التذاكر\n` +
+        `تم إبلاغ الإدارة: ${adminRoles}`,
+    });
+    return;
+  }
+
   if (settings.tickets.supportRoleIds.includes(role.id)) {
     await interaction.editReply({ content: '⚠️ هذا الرول موجود بالفعل في فريق التذاكر' });
     return;
