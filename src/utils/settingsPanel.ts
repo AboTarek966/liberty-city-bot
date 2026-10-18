@@ -26,6 +26,7 @@ import { computeHierarchy } from '../handlers/SecurityHandler';
 import { getPendingWarnRoles, pendingDiffers } from './pendingWarnRoles';
 import { Colors } from './embeds';
 import { renderWelcomeCard, CARD_DEFAULTS } from './welcomeCard';
+import { SUPPORTED_LANGUAGES } from '../handlers/AITranslator';
 
 export type SettingsCategory =
   | 'home'
@@ -33,6 +34,7 @@ export type SettingsCategory =
   | 'protection'
   | 'tickets'
   | 'ai'
+  | 'aiTranslator'
   | 'welcome'
   | 'leave'
   | 'logging'
@@ -170,6 +172,7 @@ export const ICONS: Record<SettingsCategory, string> = {
   protection: '🛡️',
   tickets: '🎫',
   ai: '🤖',
+  aiTranslator: '🌐',
   welcome: '👋',
   leave: '📤',
   logging: '📋',
@@ -185,6 +188,7 @@ export const TITLES: Record<SettingsCategory, string> = {
   protection: 'نظام الحماية',
   tickets: 'نظام التذاكر',
   ai: 'الذكاء الاصطناعي',
+  aiTranslator: 'مترجم الذكاء الاصطناعي',
   welcome: 'رسائل الترحيب',
   leave: 'رسائل المغادرة',
   logging: 'نظام السجلات',
@@ -200,6 +204,7 @@ export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
   protection: 0x57f287,
   tickets: 0xfee75c,
   ai: 0x9b59b6,
+  aiTranslator: 0x3498db,
   welcome: 0x2ecc71,
   leave: 0xe74c3c,
   logging: 0x3498db,
@@ -1046,14 +1051,19 @@ export function buildTicketAdvancedPanel(guild: Guild, s: any): BuiltPanel {
 // --------------------------------------------
 function buildAI(guild: Guild, s: any): BuiltPanel {
   const ai = s.ai;
+  const translator = s.aiTranslator;
+  const tEnabled = translator?.enabled ?? false;
+  const tDefault = translator?.defaultTargetLang ?? 'ar';
+
   const embed = categoryEmbed(
     'ai',
     guild,
     `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +
-    `> ⚡ **الحالة:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
+    `> ⚡ **الذكاء الاصطناعي:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
     `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
     `> 🧠 **المزود:** Groq (مجاني — gpt-oss-120b)\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n\n` +
     `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
     `🎭 استخدم زر *تعديل الشخصية* لتعريف شخصية البوت`
   );
@@ -1063,6 +1073,12 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
     new ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(ButtonStyle.Danger).setEmoji('⏪'),
     new ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(ButtonStyle.Success).setEmoji('⏩'),
     btn('settings_btn:ai:personality', 'الشخصية', ButtonStyle.Primary, '🎭'),
+    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('aiTranslator', 'enabled', '🌐 Translator', '🌐', tEnabled),
+    btn('settings_btn:translator:settings', 'إعدادات الترجمة', ButtonStyle.Primary, '⚙️'),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
@@ -1077,7 +1093,7 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
       ])
   );
 
-  return { embeds: [embed], components: [row1, langSelect] };
+  return { embeds: [embed], components: [row1, row2, langSelect] };
 }
 
 // --------------------------------------------

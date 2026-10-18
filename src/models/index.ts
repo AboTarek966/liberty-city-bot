@@ -184,6 +184,17 @@ export interface IGuildSettings extends Document {
       notifyAdminsOnFailure: boolean;
       logChannel?: string;
     };
+    /** 🌐 AI Translator — ترجمة فورية مع كشف اللغة التلقائي */
+    aiTranslator?: {
+      enabled: boolean;
+      defaultTargetLang: string;
+      autoTranslateChannels: string[];
+      ignoredChannels: string[];
+      ignoredRoles: string[];
+      showOriginal: boolean;
+      maxLength: number;
+      logChannel?: string;
+    };
   };
   
   // Tickets
@@ -860,6 +871,16 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       maxAutoActionsPerTicket: { type: Number, default: 3 },
       confidenceThreshold: { type: Number, default: 70 },
       notifyAdminsOnFailure: { type: Boolean, default: true },
+      logChannel: { type: String },
+    },
+    aiTranslator: {
+      enabled: { type: Boolean, default: false },
+      defaultTargetLang: { type: String, default: 'ar' },
+      autoTranslateChannels: [{ type: String }],
+      ignoredChannels: [{ type: String }],
+      ignoredRoles: [{ type: String }],
+      showOriginal: { type: Boolean, default: true },
+      maxLength: { type: Number, default: 2000 },
       logChannel: { type: String },
     },
   },

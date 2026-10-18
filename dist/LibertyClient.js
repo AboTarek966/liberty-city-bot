@@ -67,6 +67,7 @@ class LibertyClient extends discord_js_1.Client {
     messageScannerHandler;
     aiAutoModHandler;
     aiTicketAssistant;
+    aiTranslator;
     // Cooldowns
     cooldowns = new discord_js_1.Collection();
     // Cache
@@ -114,6 +115,7 @@ class LibertyClient extends discord_js_1.Client {
         this.messageScannerHandler = new handlers_1.MessageScannerHandler(config_1.config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
         this.aiAutoModHandler = new handlers_1.AIAutoModHandler(this);
         this.aiTicketAssistant = new handlers_1.AITicketAssistant(this);
+        this.aiTranslator = new handlers_1.AITranslator(this);
     }
     // --------------------------------------------
     // Initialize Bot

@@ -1,5 +1,5 @@
 import { ActionRowBuilder, EmbedBuilder, Guild, ChatInputCommandInteraction, ModalBuilder } from 'discord.js';
-export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'commands';
+export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'commands';
 type PanelComponent = ActionRowBuilder<any>;
 export interface BuiltPanel {
     embeds: EmbedBuilder[];

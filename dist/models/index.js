@@ -281,6 +281,16 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             notifyAdminsOnFailure: { type: Boolean, default: true },
             logChannel: { type: String },
         },
+        aiTranslator: {
+            enabled: { type: Boolean, default: false },
+            defaultTargetLang: { type: String, default: 'ar' },
+            autoTranslateChannels: [{ type: String }],
+            ignoredChannels: [{ type: String }],
+            ignoredRoles: [{ type: String }],
+            showOriginal: { type: Boolean, default: true },
+            maxLength: { type: Number, default: 2000 },
+            logChannel: { type: String },
+        },
     },
     tickets: {
         categoryId: { type: String },

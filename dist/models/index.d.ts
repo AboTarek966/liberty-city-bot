@@ -165,6 +165,17 @@ export interface IGuildSettings extends Document {
             notifyAdminsOnFailure: boolean;
             logChannel?: string;
         };
+        /** 🌐 AI Translator — ترجمة فورية مع كشف اللغة التلقائي */
+        aiTranslator?: {
+            enabled: boolean;
+            defaultTargetLang: string;
+            autoTranslateChannels: string[];
+            ignoredChannels: string[];
+            ignoredRoles: string[];
+            showOriginal: boolean;
+            maxLength: number;
+            logChannel?: string;
+        };
     };
     tickets: {
         categoryId?: string;

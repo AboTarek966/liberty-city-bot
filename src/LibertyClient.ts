@@ -28,6 +28,7 @@ import {
   MessageScannerHandler,
   AIAutoModHandler,
   AITicketAssistant,
+  AITranslator,
 } from './handlers';
 import mongoose from 'mongoose';
 
@@ -54,6 +55,7 @@ export class LibertyClient extends Client {
   public messageScannerHandler: MessageScannerHandler;
   public aiAutoModHandler: AIAutoModHandler;
   public aiTicketAssistant: AITicketAssistant;
+  public aiTranslator: AITranslator;
 
   // Cooldowns
   public cooldowns: Collection<string, Collection<string, number>> = new Collection();
@@ -105,6 +107,7 @@ export class LibertyClient extends Client {
     this.messageScannerHandler = new MessageScannerHandler(config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
     this.aiAutoModHandler = new AIAutoModHandler(this);
     this.aiTicketAssistant = new AITicketAssistant(this);
+    this.aiTranslator = new AITranslator(this);
   }
 
   // --------------------------------------------

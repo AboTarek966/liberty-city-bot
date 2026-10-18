@@ -68,6 +68,7 @@ const SecurityHandler_1 = require("../handlers/SecurityHandler");
 const pendingWarnRoles_1 = require("./pendingWarnRoles");
 const embeds_1 = require("./embeds");
 const welcomeCard_1 = require("./welcomeCard");
+const AITranslator_1 = require("../handlers/AITranslator");
 // --------------------------------------------
 // Password Session Store (جلسات التحقق من كلمة المرور)
 // --------------------------------------------
@@ -170,6 +171,7 @@ exports.ICONS = {
     protection: '🛡️',
     tickets: '🎫',
     ai: '🤖',
+    aiTranslator: '🌐',
     welcome: '👋',
     leave: '📤',
     logging: '📋',
@@ -184,6 +186,7 @@ exports.TITLES = {
     protection: 'نظام الحماية',
     tickets: 'نظام التذاكر',
     ai: 'الذكاء الاصطناعي',
+    aiTranslator: 'مترجم الذكاء الاصطناعي',
     welcome: 'رسائل الترحيب',
     leave: 'رسائل المغادرة',
     logging: 'نظام السجلات',
@@ -198,6 +201,7 @@ exports.CATEGORY_COLORS = {
     protection: 0x57f287,
     tickets: 0xfee75c,
     ai: 0x9b59b6,
+    aiTranslator: 0x3498db,
     welcome: 0x2ecc71,
     leave: 0xe74c3c,
     logging: 0x3498db,
@@ -735,14 +739,19 @@ function buildTicketAdvancedPanel(guild, s) {
 // --------------------------------------------
 function buildAI(guild, s) {
     const ai = s.ai;
+    const translator = s.aiTranslator;
+    const tEnabled = translator?.enabled ?? false;
+    const tDefault = translator?.defaultTargetLang ?? 'ar';
     const embed = categoryEmbed('ai', guild, `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +
-        `> ⚡ **الحالة:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> ⚡ **الذكاء الاصطناعي:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
         `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
         `> 🧠 **المزود:** Groq (مجاني — gpt-oss-120b)\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n\n` +
         `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
         `🎭 استخدم زر *تعديل الشخصية* لتعريف شخصية البوت`);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('ai', 'enabled', 'الذكاء', '⚡', ai.enabled), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(discord_js_1.ButtonStyle.Danger).setEmoji('⏪'), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(discord_js_1.ButtonStyle.Success).setEmoji('⏩'), btn('settings_btn:ai:personality', 'الشخصية', discord_js_1.ButtonStyle.Primary, '🎭'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('aiTranslator', 'enabled', '🌐 Translator', '🌐', tEnabled), btn('settings_btn:translator:settings', 'إعدادات الترجمة', discord_js_1.ButtonStyle.Primary, '⚙️'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const langSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()
         .setCustomId('settings_sel:ai:lang')
         .setPlaceholder('💬 اختر لغة ردود الذكاء الاصطناعي')
@@ -751,7 +760,7 @@ function buildAI(guild, s) {
         { label: '🇺🇸 English', value: 'en', description: 'Reply in English' },
         { label: '🌐 كلاهما', value: 'both', description: 'يتبع لغة المستخدم' },
     ]));
-    return { embeds: [embed], components: [row1, langSelect] };
+    return { embeds: [embed], components: [row1, row2, langSelect] };
 }
 // --------------------------------------------
 // Welcome

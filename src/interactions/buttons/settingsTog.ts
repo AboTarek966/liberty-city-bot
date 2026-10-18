@@ -183,6 +183,13 @@ const handler: ButtonHandler = {
       await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => {});
     }
 
+    // 🌐 AI Translator toggle
+    if (section === 'aiTranslator' && field === 'enabled') {
+      const s = settings as any;
+      if (!s.aiTranslator) s.aiTranslator = { enabled: false, defaultTargetLang: 'ar' };
+      // لا يحتاج مزامنة خاصة
+    }
+
     // 📨 تحديث كاش الدعوات عند تفعيل/تعطيل Invite Tracker
     if (section === 'protection' && field === 'inviteTracker') {
       const client = interaction.client as LibertyClient;
