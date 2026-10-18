@@ -45,6 +45,8 @@ const config_1 = require("./config");
 const helpers_1 = require("./utils/helpers");
 const handlers_1 = require("./handlers");
 const mongoose_1 = __importDefault(require("mongoose"));
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
 const logger = (0, helpers_1.createLogger)('LibertyCity');
 // --------------------------------------------
 // Liberty Client Class
@@ -68,6 +70,8 @@ class LibertyClient extends discord_js_1.Client {
     aiAutoModHandler;
     aiTicketAssistant;
     aiTranslator;
+    // Express server for Dashboard API
+    expressApp;
     // Cooldowns
     cooldowns = new discord_js_1.Collection();
     // Cache
@@ -98,6 +102,9 @@ class LibertyClient extends discord_js_1.Client {
                 repliedUser: false,
             },
         });
+        // Initialize Express app
+        this.expressApp = (0, express_1.default)();
+        this.setupExpress();
         // Initialize handlers
         this.commandHandler = new handlers_1.CommandHandler(this);
         this.eventHandler = new handlers_1.EventHandler(this);
@@ -116,6 +123,100 @@ class LibertyClient extends discord_js_1.Client {
         this.aiAutoModHandler = new handlers_1.AIAutoModHandler(this);
         this.aiTicketAssistant = new handlers_1.AITicketAssistant(this);
         this.aiTranslator = new handlers_1.AITranslator(this);
+    }
+    setupExpress() {
+        this.expressApp.use((0, cors_1.default)({
+            origin: process.env.DASHBOARD_URL || 'http://localhost:3001',
+            credentials: true,
+        }));
+        this.expressApp.use(express_1.default.json());
+        // Health check
+        this.expressApp.get('/health', (req, res) => {
+            res.json({ status: 'ok', timestamp: new Date().toISOString() });
+        });
+        // API Routes
+        this.setupApiRoutes();
+    }
+    setupApiRoutes() {
+        const router = express_1.default.Router();
+        // Guild settings
+        router.get('/guilds/:guildId/settings', async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const settings = await this.getGuildSettings(guildId);
+                res.json(settings);
+            }
+            catch (error) {
+                logger.error('Failed to get guild settings:', error);
+                res.status(500).json({ error: 'Failed to get settings' });
+            }
+        });
+        router.patch('/guilds/:guildId/settings', async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const updates = req.body;
+                const settings = await this.updateGuildSettings(guildId, updates);
+                res.json(settings);
+            }
+            catch (error) {
+                logger.error('Failed to update guild settings:', error);
+                res.status(500).json({ error: 'Failed to update settings' });
+            }
+        });
+        // Guild stats
+        router.get('/guilds/:guildId/stats', async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const stats = await this.getGuildStats(guildId);
+                res.json(stats);
+            }
+            catch (error) {
+                logger.error('Failed to get guild stats:', error);
+                res.status(500).json({ error: 'Failed to get stats' });
+            }
+        });
+        // Dashboard stats
+        router.get('/dashboard/stats', async (req, res) => {
+            try {
+                const stats = await this.getDashboardStats();
+                res.json(stats);
+            }
+            catch (error) {
+                logger.error('Failed to get dashboard stats:', error);
+                res.status(500).json({ error: 'Failed to get stats' });
+            }
+        });
+        this.expressApp.use('/api', router);
+    }
+    async getGuildSettings(guildId) {
+        const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
+        const settings = await getGuildSettings(guildId);
+        return settings.toObject();
+    }
+    async updateGuildSettings(guildId, updates) {
+        const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
+        const settings = await getGuildSettings(guildId);
+        Object.assign(settings, updates);
+        await settings.save();
+        return settings.toObject();
+    }
+    async getGuildStats(guildId) {
+        const guild = this.guilds.cache.get(guildId);
+        if (!guild)
+            return { error: 'Guild not found' };
+        return {
+            memberCount: guild.memberCount,
+            channelCount: guild.channels.cache.size,
+            roleCount: guild.roles.cache.size,
+            onlineCount: guild.members.cache.filter(m => m.presence?.status !== 'offline').size,
+        };
+    }
+    async getDashboardStats() {
+        return {
+            totalGuilds: this.guilds.cache.size,
+            totalUsers: this.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0),
+            totalChannels: this.guilds.cache.reduce((acc, g) => acc + g.channels.cache.size, 0),
+        };
     }
     // --------------------------------------------
     // Initialize Bot

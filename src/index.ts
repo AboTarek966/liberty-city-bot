@@ -88,25 +88,10 @@ async function main(): Promise<void> {
     logger.info(`🏠 Serving ${client.guilds.cache.size} guilds`);
     logger.info(`👥 Serving ${client.users.cache.size} users`);
 
-    // 🌐 خادم HTTP للتحقق من الحالة (مطلوب للاستضافة السحابية المجانية)
-    const http = await import('http');
+    // Start Express server for Dashboard API (replaces simple HTTP server)
     const PORT = parseInt(process.env.PORT || '3000', 10);
-    const healthServer = http.createServer((req: any, res: any) => {
-      if (req.url === '/health' || req.url === '/') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          status: 'online',
-          bot: client.user?.tag || 'Liberty City',
-          guilds: client.guilds.cache.size,
-          uptime: process.uptime(),
-        }));
-      } else {
-        res.writeHead(404);
-        res.end('Not Found');
-      }
-    });
-    healthServer.listen(PORT, () => {
-      logger.info(`🌐 Health check server running on port ${PORT}`);
+    client.expressApp.listen(PORT, () => {
+      logger.info(`🌐 Express server (Dashboard API) running on port ${PORT}`);
     });
   } catch (error) {
     logger.error('❌ Failed to start bot:', error);
