@@ -471,6 +471,62 @@ class SecurityHandler {
         return deleted;
     }
     // --------------------------------------------
+    // 🛡️ الجدار الحديدي (Iron Wall) — قفل إنشاء القنوات/الرولات تماماً
+    //    الأونر + رول البوت بس اللي يقدر يعمل قنوات/رولات
+    //    الأدمنز يعملوا من أوامر البوت (/channel create, /role create)
+    // --------------------------------------------
+    async applyIronWall(guild, enable) {
+        const DANGEROUS = [
+            discord_js_1.PermissionFlagsBits.ManageChannels,
+            discord_js_1.PermissionFlagsBits.ManageRoles,
+            discord_js_1.PermissionFlagsBits.ManageGuild,
+            discord_js_1.PermissionFlagsBits.Administrator,
+        ];
+        let text = 0, voice = 0, roles = 0;
+        try {
+            const me = guild.members.me;
+            if (!me)
+                throw new Error('بوت مش في السيرفر');
+            const botRole = me.roles.highest;
+            const owner = await guild.fetchOwner();
+            if (enable) {
+                // 1) @everyone — نزع صلاحيات الإنشاء
+                const everyone = guild.roles.everyone;
+                if (everyone) {
+                    const perms = everyone.permissions;
+                    if (DANGEROUS.some(p => perms.has(p))) {
+                        await everyone.setPermissions(perms.bitfield & ~DANGEROUS.reduce((a, p) => a | p, 0n), 'Iron Wall: منع إنشاء قنوات/رولات').catch(() => { });
+                    }
+                }
+                // 2) كل الرولات (عدا رول البوت + رول الأونر الأعلى) — نزع صلاحيات الإنشاء
+                for (const [, role] of guild.roles.cache) {
+                    if (role.id === guild.id)
+                        continue;
+                    if (role.managed)
+                        continue;
+                    if (role.id === botRole.id)
+                        continue;
+                    if (owner.roles.cache.has(role.id) && role.position >= owner.roles.highest.position)
+                        continue;
+                    const perms = role.permissions;
+                    if (DANGEROUS.some(p => perms.has(p))) {
+                        await role.setPermissions(perms.bitfield & ~DANGEROUS.reduce((a, p) => a | p, 0n), 'Iron Wall: منع إنشاء قنوات/رولات').catch(() => { });
+                        roles++;
+                    }
+                }
+            }
+            else {
+                // تعطيل — الأونر يرجع الصلاحيات يدوياً من إعدادات السيرفر
+            }
+            text = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText).size;
+            voice = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildVoice).size;
+        }
+        catch (error) {
+            logger.error(`applyIronWall error (${guild.name}): ${error.message}`);
+        }
+        return { text, voice, roles };
+    }
+    // --------------------------------------------
     // Pro Max: ANTI-WEBHOOK SPAM — بوت ينشئ ويب هوك → يُحذف (ماعدا الأونر)
     // --------------------------------------------
     async onWebhookUpdate(webhook) {

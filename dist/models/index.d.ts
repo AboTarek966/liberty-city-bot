@@ -90,6 +90,8 @@ export interface IGuildSettings extends Document {
         };
         /** وضع الطوارئ — يقفل الكتابة والدخول في جميع القنوات */
         lockdown: boolean;
+        /** 🛡️ الجدار الحديدي — يمنع إنشاء قنوات/رولات نهائياً (عدا الأونر + البوت) */
+        ironWall?: boolean;
     };
     tickets: {
         categoryId?: string;

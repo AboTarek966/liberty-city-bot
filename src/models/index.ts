@@ -109,6 +109,8 @@ export interface IGuildSettings extends Document {
     };
     /** وضع الطوارئ — يقفل الكتابة والدخول في جميع القنوات */
     lockdown: boolean;
+    /** 🛡️ الجدار الحديدي — يمنع إنشاء قنوات/رولات نهائياً (عدا الأونر + البوت) */
+    ironWall?: boolean;
   };
   
   // Tickets
@@ -717,6 +719,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       enabled: { type: Boolean, default: true },
     },
     lockdown: { type: Boolean, default: false },
+    ironWall: { type: Boolean, default: false },
   },
   
   tickets: {
