@@ -253,6 +253,9 @@ const handler: SelectMenuHandler = {
         if (!settings.jail) (settings as any).jail = {};
         (settings.jail as any).channelId = values[0] || null;
         break;
+      case 'protection:logChannel':
+        (settings.protection as any).logChannel = values[0] || null;
+        break;
       case 'logging:split': {
         // 🔀 اختيار مجموعة → عرض قائمة قنوات لتعيين روم مخصص
         const group = LOG_SPLIT_GROUPS.find((g) => g.id === values[0]);

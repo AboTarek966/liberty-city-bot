@@ -113,10 +113,11 @@ class SecurityHandler {
     // --------------------------------------------
     // Helpers
     // --------------------------------------------
-    // قناة تنبيهات الأمن: مخصصة → سجلات → نظام → أول قناة قابلة للإرسال
+    // قناة تنبيهات الأمن: مخصصة → حماية عامة → أنتينوك → سجلات → نظام → أول قناة قابلة للإرسال
     async getAlertChannel(guild, settings, specific) {
         const candidates = [
             specific,
+            settings?.protection?.logChannel,
             settings?.protection?.antiNuke?.logChannel,
             settings?.logging?.channelId,
         ];

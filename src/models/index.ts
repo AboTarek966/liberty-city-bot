@@ -25,6 +25,8 @@ export interface IGuildSettings extends Document {
   
   // Protection
   protection: {
+    /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
+    logChannel?: string;
     antiRaid: {
       enabled: boolean;
       threshold: number;
@@ -753,6 +755,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
   
   protection: {
+    logChannel: { type: String },
     antiRaid: {
       enabled: { type: Boolean, default: true },
       threshold: { type: Number, default: 5 },

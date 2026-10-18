@@ -212,6 +212,9 @@ const handler = {
                     settings.jail = {};
                 settings.jail.channelId = values[0] || null;
                 break;
+            case 'protection:logChannel':
+                settings.protection.logChannel = values[0] || null;
+                break;
             case 'logging:split': {
                 // 🔀 اختيار مجموعة → عرض قائمة قنوات لتعيين روم مخصص
                 const group = settingsPanel_1.LOG_SPLIT_GROUPS.find((g) => g.id === values[0]);

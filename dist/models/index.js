@@ -130,6 +130,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     timezone: { type: String, default: 'Asia/Riyadh' },
     settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
     protection: {
+        logChannel: { type: String },
         antiRaid: {
             enabled: { type: Boolean, default: true },
             threshold: { type: Number, default: 5 },

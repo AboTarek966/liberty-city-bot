@@ -349,6 +349,7 @@ function buildProtection(guild, s) {
         `> ${on(p.inviteTracker?.enabled)} **📨 Invite Tracker** — يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين\n` +
         `> ${on(p.messageScanner?.enabled)} **🔍 Message Scanner** — يفحص روابط/ملفات بـ VirusTotal\n` +
         `> ${on(p.aiAutoMod?.enabled)} **🤖 AI Auto-Mod** — يقرأ كل رسالة، يقرر بنفسه: سبام/سم/إباحي/احتيال/تهديد/تسريب\n` +
+        `> ${on(p.logChannel)} **📢 قناة تنبيهات الحماية** — ${p.logChannel ? `<#${p.logChannel}>` : 'غير محددة'} (كافتراضي للتنبيهات)\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
         `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n\n` +
@@ -358,19 +359,30 @@ function buildProtection(guild, s) {
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled));
     const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled), toggleBtn('protection', 'autoScan', 'فحص دوري', '🔍', !!p.autoScan?.enabled), toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'));
     const row5 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled), toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled), toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled), toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled));
-    // Row 6: Jail channel selection
+    const row6 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled), toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled), toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled), toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled));
+    // Row 7: Protection log channel selection
+    const protectionLogChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:protection:logChannel')
+        .setPlaceholder('📢 اختر قناة تنبيهات الحماية (كافتراضي للتنبيهات)')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText)
+        .setMinValues(0)
+        .setMaxValues(1)
+        .setDefaultChannels(p.logChannel &&
+        guild.channels.cache.get(p.logChannel)?.type === discord_js_1.ChannelType.GuildText
+        ? [p.logChannel]
+        : []));
+    // Row 7: Jail channel selection
     const jailChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:jail:channel')
         .setPlaceholder('🔒 اختر روم السجن (الذي يبقى العضو المسجون قادراً على رؤيته)')
         .setChannelTypes(discord_js_1.ChannelType.GuildText)
         .setMinValues(0)
         .setMaxValues(1)
-        // ✅ عرض القناة المحفوظة حالياً كاختيار افتراضي (وإن حُذفت القناة تتجاهل)
         .setDefaultChannels(s.jail?.channelId &&
         guild.channels.cache.get(s.jail.channelId)?.type === discord_js_1.ChannelType.GuildText
         ? [s.jail.channelId]
         : []));
-    return { embeds: [embed], components: [row1, row2, row3, row4, row5, jailChannelSelect] };
+    return { embeds: [embed], components: [row1, row2, row3, row4, row5, row6, protectionLogChannelSelect, jailChannelSelect] };
 }
 // --------------------------------------------
 // Verification — نظام التوثيق بالزر (لوحة فرعية)

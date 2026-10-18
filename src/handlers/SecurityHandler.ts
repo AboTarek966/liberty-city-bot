@@ -177,10 +177,11 @@ export class SecurityHandler {
   // Helpers
   // --------------------------------------------
 
-  // قناة تنبيهات الأمن: مخصصة → سجلات → نظام → أول قناة قابلة للإرسال
+  // قناة تنبيهات الأمن: مخصصة → حماية عامة → أنتينوك → سجلات → نظام → أول قناة قابلة للإرسال
   private async getAlertChannel(guild: Guild, settings: any, specific?: string): Promise<TextChannel | null> {
     const candidates = [
       specific,
+      settings?.protection?.logChannel,
       settings?.protection?.antiNuke?.logChannel,
       settings?.logging?.channelId,
     ];

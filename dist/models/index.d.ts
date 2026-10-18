@@ -6,6 +6,8 @@ export interface IGuildSettings extends Document {
     timezone: string;
     settingsPassword?: string;
     protection: {
+        /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
+        logChannel?: string;
         antiRaid: {
             enabled: boolean;
             threshold: number;

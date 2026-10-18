@@ -421,6 +421,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.inviteTracker?.enabled)} **📨 Invite Tracker** — يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين\n` +
     `> ${on(p.messageScanner?.enabled)} **🔍 Message Scanner** — يفحص روابط/ملفات بـ VirusTotal\n` +
     `> ${on(p.aiAutoMod?.enabled)} **🤖 AI Auto-Mod** — يقرأ كل رسالة، يقرر بنفسه: سبام/سم/إباحي/احتيال/تهديد/تسريب\n` +
+    `> ${on(p.logChannel)} **📢 قناة تنبيهات الحماية** — ${p.logChannel ? `<#${p.logChannel}>` : 'غير محددة'} (كافتراضي للتنبيهات)\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n\n` +
@@ -468,7 +469,30 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled),
   );
 
-  // Row 6: Jail channel selection
+  const row6 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled),
+    toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled),
+    toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled),
+    toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled),
+  );
+
+  // Row 7: Protection log channel selection
+  const protectionLogChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:protection:logChannel')
+      .setPlaceholder('📢 اختر قناة تنبيهات الحماية (كافتراضي للتنبيهات)')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+      .setDefaultChannels(
+        p.logChannel &&
+          guild.channels.cache.get(p.logChannel)?.type === ChannelType.GuildText
+          ? [p.logChannel]
+          : []
+      )
+  );
+
+  // Row 7: Jail channel selection
   const jailChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
     new ChannelSelectMenuBuilder()
       .setCustomId('settings_sel:jail:channel')
@@ -476,7 +500,6 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       .setChannelTypes(ChannelType.GuildText)
       .setMinValues(0)
       .setMaxValues(1)
-      // ✅ عرض القناة المحفوظة حالياً كاختيار افتراضي (وإن حُذفت القناة تتجاهل)
       .setDefaultChannels(
         s.jail?.channelId &&
           guild.channels.cache.get(s.jail.channelId)?.type === ChannelType.GuildText
@@ -485,7 +508,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       )
   );
 
-  return { embeds: [embed], components: [row1, row2, row3, row4, row5, jailChannelSelect] };
+  return { embeds: [embed], components: [row1, row2, row3, row4, row5, row6, protectionLogChannelSelect, jailChannelSelect] };
 }
 
 // --------------------------------------------
