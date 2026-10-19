@@ -668,8 +668,8 @@ function buildTickets(guild, s) {
         .setStyle(discord_js_1.ButtonStyle.Danger), new discord_js_1.ButtonBuilder()
         .setCustomId('settings_btn:tickets:inc')
         .setLabel('+')
-        .setStyle(discord_js_1.ButtonStyle.Success), btn('settings_tog:tickets:survey', `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`, t.surveyEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⭐'), btn('settings_btn:tickets:advanced', 'إعدادات متقدمة', discord_js_1.ButtonStyle.Secondary, '⚙️'));
-    // 🤖 AI Ticket Assistant settings
+        .setStyle(discord_js_1.ButtonStyle.Success), btn('settings_tog:tickets:survey', `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`, t.surveyEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⭐'), btn('settings_tog:tickets:lockclaim', `قفل: ${t.lockUntilClaim ? '🟢' : '🔴'}`, t.lockUntilClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔒'), btn('settings_tog:tickets:welcome', `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`, t.welcomeEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎫'));
+    // 🤖 AI Ticket Assistant settings (صف منفصل)
     const aiTicket = s.aiTicketAssistant || {
         enabled: false,
         autoClaim: false,
@@ -681,10 +681,8 @@ function buildTickets(guild, s) {
         confidenceThreshold: 70,
         notifyAdminsOnFailure: true
     };
-    const rowAITicket = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aienabled', `🤖 AI Assistant: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_tog:tickets:aiclaim', `استلام تلقائي: ${aiTicket.autoClaim ? '🟢' : '🔴'}`, aiTicket.autoClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⚡'), btn('settings_tog:tickets:aianalyze', `تحليل عند الإنشاء: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`, aiTicket.analyzeOnCreate ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔍'), btn('settings_tog:tickets:aiadminroles', `موافقة للرولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`, aiTicket.requireAdminApprovalForRoles ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎭'));
-    // 🔒 خيارات القفل ورسالة الترحيب
-    const rowLock = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:lockclaim', `قفل حتى الاستلام: ${t.lockUntilClaim ? '🟢' : '🔴'}`, t.lockUntilClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔒'), btn('settings_tog:tickets:welcome', `رسالة الترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`, t.welcomeEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_btn:tickets:panel', 'محتوى اللوحة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:tickets:types', 'أنواع التذاكر', discord_js_1.ButtonStyle.Primary, '🏷️'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
-    return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket, rowLock].filter((c) => !!c) };
+    const rowAITicket = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aienabled', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_tog:tickets:aiclaim', `استلام: ${aiTicket.autoClaim ? '🟢' : '🔴'}`, aiTicket.autoClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⚡'), btn('settings_tog:tickets:aianalyze', `تحليل: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`, aiTicket.analyzeOnCreate ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔍'), btn('settings_tog:tickets:aiadminroles', `رولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`, aiTicket.requireAdminApprovalForRoles ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎭'), btn('settings_btn:tickets:types', 'أنواع التذاكر', discord_js_1.ButtonStyle.Primary, '🏷️'));
+    return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket] };
 }
 // --------------------------------------------
 // Tickets — نقل/إنشاء لوحة التذاكر (لوحة فرعية)

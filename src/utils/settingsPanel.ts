@@ -898,10 +898,21 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
       t.surveyEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
       '⭐'
     ),
-    btn('settings_btn:tickets:advanced', 'إعدادات متقدمة', ButtonStyle.Secondary, '⚙️'),
+    btn(
+      'settings_tog:tickets:lockclaim',
+      `قفل: ${t.lockUntilClaim ? '🟢' : '🔴'}`,
+      t.lockUntilClaim ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🔒'
+    ),
+    btn(
+      'settings_tog:tickets:welcome',
+      `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`,
+      t.welcomeEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🎫'
+    ),
   );
 
-  // 🤖 AI Ticket Assistant settings
+  // 🤖 AI Ticket Assistant settings (صف منفصل)
   const aiTicket = s.aiTicketAssistant || {
     enabled: false,
     autoClaim: false,
@@ -916,50 +927,32 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
   const rowAITicket = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn(
       'settings_tog:tickets:aienabled',
-      `🤖 AI Assistant: ${aiTicket.enabled ? '🟢' : '🔴'}`,
+      `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`,
       aiTicket.enabled ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🤖'
     ),
     btn(
       'settings_tog:tickets:aiclaim',
-      `استلام تلقائي: ${aiTicket.autoClaim ? '🟢' : '🔴'}`,
+      `استلام: ${aiTicket.autoClaim ? '🟢' : '🔴'}`,
       aiTicket.autoClaim ? ButtonStyle.Success : ButtonStyle.Secondary,
       '⚡'
     ),
     btn(
       'settings_tog:tickets:aianalyze',
-      `تحليل عند الإنشاء: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`,
+      `تحليل: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`,
       aiTicket.analyzeOnCreate ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🔍'
     ),
     btn(
       'settings_tog:tickets:aiadminroles',
-      `موافقة للرولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`,
+      `رولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`,
       aiTicket.requireAdminApprovalForRoles ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🎭'
     ),
-  );
-
-  // 🔒 خيارات القفل ورسالة الترحيب
-  const rowLock = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    btn(
-      'settings_tog:tickets:lockclaim',
-      `قفل حتى الاستلام: ${t.lockUntilClaim ? '🟢' : '🔴'}`,
-      t.lockUntilClaim ? ButtonStyle.Success : ButtonStyle.Secondary,
-      '🔒'
-    ),
-    btn(
-      'settings_tog:tickets:welcome',
-      `رسالة الترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`,
-      t.welcomeEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
-      '🎫'
-    ),
-    btn('settings_btn:tickets:panel', 'محتوى اللوحة', ButtonStyle.Primary, '📝'),
     btn('settings_btn:tickets:types', 'أنواع التذاكر', ButtonStyle.Primary, '🏷️'),
-    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
-  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket, rowLock].filter((c): c is ActionRowBuilder<ButtonBuilder> => !!c) };
+  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket] };
 }
 
 // --------------------------------------------
