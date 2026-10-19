@@ -93,7 +93,51 @@ const command: Command = {
               { name: '🔓 إلغاء سجن (إفراج)', value: 'unjail' },
               { name: '📊 تذاكري المستلمة', value: 'ticket_mystats' },
               { name: '🏆 أعلى المستلمين (توب 10)', value: 'ticket_top' },
-              { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' }
+              { name: '💤 AFK (وضع عدم الوجود)', value: 'afk' },
+              // ----- ألعاب (25+) -----
+              { name: '🎱 8ball', value: '8ball' },
+              { name: '🔀 اختر', value: 'choose' },
+              { name: '🎲 نرد', value: 'dice' },
+              { name: '🪙 عملة', value: 'flip' },
+              { name: '😂 نكتة', value: 'joke' },
+              { name: '📊 تصويت', value: 'poll' },
+              { name: '💯 تقييم', value: 'rate' },
+              { name: '🎰 سلوتس', value: 'slots' },
+              { name: '🃏 بلاك جاك', value: 'blackjack' },
+              { name: '💣 قنبلة', value: 'bomb' },
+              { name: '🎳 بولينغ', value: 'bowling' },
+              { name: '🐉 تنين', value: 'dragon' },
+              { name: '⚔️ مبارزة', value: 'duel' },
+              { name: '🎣 صيد', value: 'fish' },
+              { name: '🎯 سهام', value: 'darts' },
+              { name: '🔼 أعلى/أقل', value: 'highlow' },
+              { name: '🏁 سباق', value: 'race' },
+              { name: '🎯 روليت', value: 'roulette' },
+              { name: '✂️ RPS', value: 'rps' },
+              { name: '💪 قوة', value: 'power' },
+              { name: '🧩 لغز', value: 'riddle' },
+              { name: '🎰 سلوتس2', value: 'slots' },
+              { name: '💰 كنز', value: 'treasure' },
+              { name: '🧱 شد حبل', value: 'tug' },
+              { name: '🎡 عجلة', value: 'wheel' },
+              { name: '❌⭕ XO', value: 'xo' },
+              { name: '🎮 ألعاب', value: 'games' },
+              { name: '🎮 لعبة', value: 'game' },
+              // ----- موسيقى -----
+              { name: '🎵 موسيقى', value: 'music' },
+              // ----- حماية -----
+              { name: '🛡️ حماية', value: 'protection' },
+              { name: '🛑 لوكداون', value: 'lockdown' },
+              { name: '🔒 سجن', value: 'jail' },
+              { name: '🔓 إفراج', value: 'unjail' },
+              // ----- أوامر أخرى -----
+              { name: '📊 نشاط', value: 'activity' },
+              { name: '🏆 توب', value: 'top' },
+              { name: '🏆 توب تذاكر', value: 'ticket_top' },
+              { name: '📊 تذكرة ستات', value: 'ticket_mystats' },
+              { name: '💤 AFK', value: 'afk' },
+              { name: '🎫 تذاكر', value: 'ticket' },
+              { name: '🤖 AI', value: 'ai' }
             )
         )
     )
