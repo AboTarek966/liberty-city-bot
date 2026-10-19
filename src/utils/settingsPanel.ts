@@ -902,8 +902,18 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
   );
 
   // 🤖 AI Ticket Assistant settings
-  const aiTicket = s.aiTicketAssistant;
-  const rowAITicket = aiTicket ? new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const aiTicket = s.aiTicketAssistant || {
+    enabled: false,
+    autoClaim: false,
+    analyzeOnCreate: true,
+    requireAdminApprovalForRoles: true,
+    requireAdminApprovalForPermissions: true,
+    requireAdminApprovalForBans: true,
+    maxAutoActionsPerTicket: 3,
+    confidenceThreshold: 70,
+    notifyAdminsOnFailure: true
+  };
+  const rowAITicket = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn(
       'settings_tog:tickets:aienabled',
       `🤖 AI Assistant: ${aiTicket.enabled ? '🟢' : '🔴'}`,
@@ -928,7 +938,7 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
       aiTicket.requireAdminApprovalForRoles ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🎭'
     ),
-  ) : null;
+  );
 
   // 🔒 خيارات القفل ورسالة الترحيب
   const rowLock = new ActionRowBuilder<ButtonBuilder>().addComponents(
