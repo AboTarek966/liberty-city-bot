@@ -1060,7 +1060,6 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
     new ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(ButtonStyle.Danger).setEmoji('⏪'),
     new ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(ButtonStyle.Success).setEmoji('⏩'),
     btn('settings_btn:ai:personality', 'الشخصية', ButtonStyle.Primary, '🎭'),
-    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
