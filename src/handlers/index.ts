@@ -20,3 +20,4 @@ export { AIAutoModHandler, AutoModConfig } from './AIAutoMod';
 export { AITicketAssistant, TicketAnalysis, RequiredAction, AdminApprovalRequest } from './AITicketAssistant';
 export { AITranslator, TranslationResult, TranslatorConfig } from './AITranslator';
 export { EconomyHandler, EconomyConfig } from './EconomyHandler';
+export { GameHandler, GameSession, GamePlayer, GameConfig } from './GameHandler';

@@ -17,6 +17,12 @@ const handler: SelectMenuHandler = {
     await roleSelect.deferReply({ ephemeral: true });
 
     try {
+      // 🔒 للمالك فقط
+      if (roleSelect.user.id !== roleSelect.guild.ownerId) {
+        await roleSelect.editReply({ content: '❌ هذا الاختيار للمالك فقط' });
+        return;
+      }
+
       // بدون فحص ManageRoles — الفحص يكون حسب التسلسل الهرمي فقط داخل addRoles
       const byMember = await roleSelect.guild.members.fetch(roleSelect.user.id);
 
@@ -52,7 +58,7 @@ const handler: SelectMenuHandler = {
 
       await roleSelect.editReply({ content: result.simpleMsg });
     } catch (error: any) {
-      await roleSelect.editReply({ content: `❌ حدث خطأ: ${error.message}` }).catch(() => {});
+      await roleSelect.editReply({ content: `❌ حدث خطأ: ${error instanceof Error ? error.message : String(error)}` }).catch(() => {});
     }
   },
 };

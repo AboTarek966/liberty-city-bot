@@ -112,6 +112,11 @@ const handler = {
                     .catch(() => { });
                 return;
             }
+            // 🔒 للمالك فقط
+            if (executor.id !== guild.ownerId) {
+                await interaction.followUp({ content: '❌ هذه اللوحة للمالك فقط', ephemeral: true }).catch(() => { });
+                return;
+            }
             const isOwner = executor.id === guild.ownerId;
             const botTop = guild.members.me?.roles.highest.position ?? 0;
             const execTop = executor.roles.highest.position;

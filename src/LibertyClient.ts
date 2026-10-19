@@ -30,6 +30,7 @@ import {
   AITicketAssistant,
   AITranslator,
   EconomyHandler,
+  GameHandler,
 } from './handlers';
 import mongoose from 'mongoose';
 import express, { Express, Request, Response } from 'express';
@@ -60,6 +61,7 @@ export class LibertyClient extends Client {
   public aiTicketAssistant: AITicketAssistant;
   public aiTranslator: AITranslator;
   public economyHandler: EconomyHandler;
+  public gameHandler: GameHandler;
 
   // Express server for Dashboard API
   public expressApp: Express;
@@ -120,6 +122,7 @@ export class LibertyClient extends Client {
     this.aiTicketAssistant = new AITicketAssistant(this);
     this.aiTranslator = new AITranslator(this);
     this.economyHandler = new EconomyHandler(this);
+    this.gameHandler = new GameHandler(this);
   }
 
   private setupExpress(): void {

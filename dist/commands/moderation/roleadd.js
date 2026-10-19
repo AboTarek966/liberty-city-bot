@@ -42,8 +42,8 @@ const rolePicker_1 = require("../../utils/rolePicker");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('roleadd')
-        .setDescription('إضافة رول لعضو')
-        // 🔓 بدون صلاحية مطلوبة — أي إداري يمكنه إعطاء رولات أقل من رتبته (فحص الهرمية)
+        .setDescription('إضافة رول لعضو (للمالك فقط)')
+        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator)
         .addUserOption(o => o.setName('user').setDescription('العضو المراد إضافة الرول له').setRequired(true))
         .addRoleOption(o => o
         .setName('role')
@@ -55,12 +55,16 @@ const command = {
         .addRoleOption(o => o.setName('role5').setDescription('رول إضافي 5').setRequired(false))
         .addStringOption(o => o.setName('reason').setDescription('السبب').setRequired(false)),
     cooldown: 5,
-    // 🔓 بدون صلاحية مطلوبة — فحص الهرمية فقط
     async execute(interaction) {
         const client = interaction.client;
         const guild = interaction.guild;
         const member = interaction.options.getMember('user');
         const reason = interaction.options.getString('reason') || 'إضافة رول';
+        // 🔒 للمالك فقط (owner فقط)
+        if (interaction.user.id !== guild.ownerId) {
+            await interaction.reply({ content: '❌ هذا الأمر للمالك فقط', ephemeral: true });
+            return;
+        }
         // ✅ كل الرولات المحددة في نفس الأمر (role حتى role5)
         const requestedRoles = ['role', 'role2', 'role3', 'role4', 'role5']
             .map(n => interaction.options.getRole(n))
@@ -88,9 +92,11 @@ const command = {
                 });
                 return;
             }
+            // تأجيل الرد لتجنب مهلة الانتهاء
+            await interaction.deferReply({ ephemeral: false });
             const state = (0, rolePicker_1.createRolePickerState)(interaction.user.id, member.id, reason);
             const { content, components } = (0, rolePicker_1.buildRolePicker)(state, guild, executorMember);
-            await interaction.reply({ content, components });
+            await interaction.editReply({ content, components });
             return;
         }
         // --------------------------------------------

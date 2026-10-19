@@ -695,10 +695,21 @@ export class ModerationHandler {
 
     // ⚡ رقم الكيس بالتوازي مع إضافة الرولات
     const caseIdPromise = getNextCaseId(guild.id);
-    await target.roles.add(toAdd, `${reason} | بواسطة ${moderator.user.tag}`);
+    let addedRoles: Role[] = [];
+    try {
+      await target.roles.add(toAdd, `${reason} | بواسطة ${moderator.user.tag}`);
+      // تحقق من أن الرولات أضيفت فعلياً
+      const fetchedTarget = await guild.members.fetch(target.id);
+      const verifiedRoles = toAdd.map(id => guild.roles.cache.get(id)).filter(r => r && fetchedTarget.roles.cache.has(r.id)) as Role[];
+      if (verifiedRoles.length !== toAdd.length) {
+        logger.warn(`Role addition partially failed for ${target.id}: requested ${toAdd.length}, added ${verifiedRoles.length}`);
+      }
+      addedRoles = toAdd.map(id => guild.roles.cache.get(id)).filter(Boolean) as Role[];
+    } catch (error) {
+      logger.error(`Failed to add roles to ${target.id}: ${error}`);
+      throw new Error(`فشل إضافة الرولات: ${error instanceof Error ? error.message : String(error)}`);
+    }
     const caseId = await caseIdPromise;
-
-    const addedRoles = toAdd.map(id => guild.roles.cache.get(id)).filter(Boolean) as Role[];
     const embed = moderationEmbed({
       type: 'role_add',
       moderator: moderator.user,
