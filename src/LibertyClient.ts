@@ -295,48 +295,23 @@ export class LibertyClient extends Client {
 
   // --------------------------------------------
   // Register Slash Commands
-  // تسجيل الأوامر في كل السيرفرات التي يوجد فيها البوت
-  // (الإعدادات والأوامر متاحة في كل سيرفر بشكل مستقل)
+  // تسجيل الأوامر عالمياً مرة واحدة (وليس لكل سيرفر)
   // --------------------------------------------
   async registerCommands(): Promise<void> {
-    const guildIds = Array.from(this.guilds.cache.keys());
-
-    if (guildIds.length === 0) {
-      // لا يوجد سيرفرات — سجّل عالمياً كاحتياط
+    try {
       await this.commandHandler.registerCommands(
         config.discord.clientId,
         config.discord.token
       );
-      return;
+      logger.info('✅ Registered slash commands globally');
+    } catch (error) {
+      logger.error('Failed to register slash commands:', error);
+      throw error;
     }
-
-    let ok = 0;
-    for (const guildId of guildIds) {
-      try {
-        await this.commandHandler.registerCommands(
-          config.discord.clientId,
-          config.discord.token,
-          guildId
-        );
-        ok++;
-      } catch (error) {
-        logger.warn(`Failed to register commands for guild ${guildId}:`, error);
-      }
-    }
-    logger.info(`✅ Registered slash commands in ${ok}/${guildIds.length} server(s)`);
-  }
-
-  // تسجيل الأوامر في سيرفر واحد (يُستدعى عند انضمام سيرفر جديد)
-  async registerCommandsForGuild(guildId: string): Promise<void> {
-    await this.commandHandler.registerCommands(
-      config.discord.clientId,
-      config.discord.token,
-      guildId
-    );
   }
 
   // --------------------------------------------
-  // Set Bot Status
+// Set Bot Status
   // --------------------------------------------
   setStatus(): void {
     const activities = [

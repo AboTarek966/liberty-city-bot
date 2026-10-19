@@ -35,7 +35,6 @@ export declare class LibertyClient extends Client {
     private connectDatabase;
     private loadHandlers;
     registerCommands(): Promise<void>;
-    registerCommandsForGuild(guildId: string): Promise<void>;
     setStatus(): void;
     cleanup(): Promise<void>;
 }

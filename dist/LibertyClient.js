@@ -280,31 +280,17 @@ class LibertyClient extends discord_js_1.Client {
     }
     // --------------------------------------------
     // Register Slash Commands
-    // تسجيل الأوامر في كل السيرفرات التي يوجد فيها البوت
-    // (الإعدادات والأوامر متاحة في كل سيرفر بشكل مستقل)
+    // تسجيل الأوامر عالمياً مرة واحدة (وليس لكل سيرفر)
     // --------------------------------------------
     async registerCommands() {
-        const guildIds = Array.from(this.guilds.cache.keys());
-        if (guildIds.length === 0) {
-            // لا يوجد سيرفرات — سجّل عالمياً كاحتياط
+        try {
             await this.commandHandler.registerCommands(config_1.config.discord.clientId, config_1.config.discord.token);
-            return;
+            logger.info('✅ Registered slash commands globally');
         }
-        let ok = 0;
-        for (const guildId of guildIds) {
-            try {
-                await this.commandHandler.registerCommands(config_1.config.discord.clientId, config_1.config.discord.token, guildId);
-                ok++;
-            }
-            catch (error) {
-                logger.warn(`Failed to register commands for guild ${guildId}:`, error);
-            }
+        catch (error) {
+            logger.error('Failed to register slash commands:', error);
+            throw error;
         }
-        logger.info(`✅ Registered slash commands in ${ok}/${guildIds.length} server(s)`);
-    }
-    // تسجيل الأوامر في سيرفر واحد (يُستدعى عند انضمام سيرفر جديد)
-    async registerCommandsForGuild(guildId) {
-        await this.commandHandler.registerCommands(config_1.config.discord.clientId, config_1.config.discord.token, guildId);
     }
     // --------------------------------------------
     // Set Bot Status

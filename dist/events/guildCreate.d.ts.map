@@ -1,1 +1,1 @@
-{"version":3,"file":"guildCreate.d.ts","sourceRoot":"","sources":["../../src/events/guildCreate.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,KAAK,EAAE,MAAM,0BAA0B,CAAC;AAMjD,QAAA,MAAM,gBAAgB,EAAE,KAwBvB,CAAC;AAEF,eAAe,gBAAgB,CAAC"}
+{"version":3,"file":"guildCreate.d.ts","sourceRoot":"","sources":["../../src/events/guildCreate.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,KAAK,EAAE,MAAM,0BAA0B,CAAC;AAMjD,QAAA,MAAM,gBAAgB,EAAE,KAkBvB,CAAC;AAEF,eAAe,gBAAgB,CAAC"}
