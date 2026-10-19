@@ -20,10 +20,14 @@ const guildCreateEvent: Event = {
     // 🛡️ تأمين السيرفر الجديد فوراً:
     //    1) فحص التسلّم — البوت لازم أعلى رتبة وإلا كل الحماية معطّلة
     //    2) نسخة احتياطية أولى — تمهيداً للاستعادة التلقائية
+    //    3) بدء مراقبة الحذف الجماعي للرسائل (Snapshotter)
+    //    4) بدء مراقب رول البوت (Sticky Role Watchdog)
     try {
       await client.securityHandler.ensureHierarchyAlert(guild);
       await client.securityHandler.syncAutoBackup(guild, true);
       await client.securityHandler.syncAutoScan(guild);
+      client.securityHandler.startMessageSnapshotter(guild);
+      client.securityHandler.startStickyRoleWatchdog(guild);
     } catch (error) {
       logger.warn(`Security setup failed in ${guild.id}:`, error);
     }

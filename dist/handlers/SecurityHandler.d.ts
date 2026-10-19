@@ -27,6 +27,8 @@ export declare function computeHierarchy(guild: Guild): HierarchyStatus;
 export declare class SecurityHandler {
     private client;
     private deletionTracker;
+    private messageDeletionTracker;
+    private messageSnapshots;
     private renameTracker;
     private backupTimers;
     private scanTimers;
@@ -59,6 +61,13 @@ export declare class SecurityHandler {
     startStickyRoleWatchdog(guild: Guild): void;
     onGuildEmojiDelete(emoji: any): Promise<void>;
     onGuildStickerDelete(sticker: any): Promise<void>;
+    onMessageDeleteBulk(messages: any): Promise<void>;
+    private messageSnapshotInterval;
+    startMessageSnapshotter(guild: Guild): void;
+    private captureMessageSnapshots;
+    private getMessageDeletionTracker;
+    private getMessageSnapshot;
+    private setMessageSnapshot;
     private handleMassDelete;
     onThreadCreate(thread: any): Promise<void>;
     onChannelDelete(channel: any): Promise<void>;

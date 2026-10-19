@@ -1,16 +1,25 @@
 ﻿// ============================================
-// Liberty City Bot - Bulk Message Delete Logging
+// Liberty City Bot - Message Delete Bulk Event
+// كشف الحذف الجماعي للرسائل (Anti-Mass-Delete)
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
 import { LibertyClient } from '../LibertyClient';
+import { createLogger } from '../utils/helpers';
+
+const logger = createLogger('Event:MessageDeleteBulk');
 
 const event: Event = {
   name: 'messageDeleteBulk',
-  async execute(messages: any, channel: any) {
-    const client = (channel?.client ?? (Array.isArray(messages) ? messages[0]?.client : messages?.first?.()?.client)) as LibertyClient;
-    // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
-    client.loggingHandler.handleMessageDeleteBulk(messages, channel).catch((err) => client.loggingHandler.reportFailure('messageDeleteBulk', err));
+  async execute(messages: any) {
+    const client = messages.first()?.client as LibertyClient;
+    if (!client?.securityHandler) return;
+
+    try {
+      await client.securityHandler.onMessageDeleteBulk(messages);
+    } catch (error: any) {
+      logger.error(`messageDeleteBulk handler error: ${error.message}`);
+    }
   },
 };
 

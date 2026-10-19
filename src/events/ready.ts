@@ -58,6 +58,8 @@ const event: Event = {
         );
         // 📌 حماية الهرم اللاصقة: كل 10 ثواني يتأكد إن رول البوت في القمة
         lc.securityHandler.startStickyRoleWatchdog(guild);
+        // 📸 بدء مراقبة الحذف الجماعي للرسائل (Snapshotter)
+        lc.securityHandler.startMessageSnapshotter(guild);
       }, delay);
     });
 

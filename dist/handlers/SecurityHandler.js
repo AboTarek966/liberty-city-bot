@@ -73,6 +73,10 @@ class SecurityHandler {
     client;
     // تتبّع عمليات الحذف: guildId → { نوع → توقيتات }
     deletionTracker = new Map();
+    // 🔥 تتبّع حذف الرسائل الجماعي: guildId → channelId → timestamps
+    messageDeletionTracker = new Map();
+    // 📸 لقطات رسائل للاستعادة الفورية: guildId → channelId → MessageSnapshot
+    messageSnapshots = new Map();
     // تتبّع تغيير الأسماء السريع: key → توقيتات
     renameTracker = new Map();
     // مؤقتات النسخ الاحتياطي التلقائي
@@ -109,6 +113,27 @@ class SecurityHandler {
             clearTimeout(timer);
         this.kickedTimers.clear();
         this.kickedQueue.clear();
+        // Cleanup message snapshots (older than 1 hour)
+        for (const [guildId, channels] of this.messageSnapshots) {
+            for (const [channelId, snapshot] of channels) {
+                if (Date.now() - snapshot.at > 3600000) {
+                    channels.delete(channelId);
+                }
+            }
+            if (channels.size === 0)
+                this.messageSnapshots.delete(guildId);
+        }
+        // Cleanup message deletion trackers
+        for (const [guildId, tracker] of this.messageDeletionTracker) {
+            const now = Date.now();
+            for (const channelId of Object.keys(tracker)) {
+                tracker[channelId] = tracker[channelId].filter(t => now - t <= 60000);
+                if (tracker[channelId].length === 0)
+                    delete tracker[channelId];
+            }
+            if (Object.keys(tracker).length === 0)
+                this.messageDeletionTracker.delete(guildId);
+        }
     }
     // --------------------------------------------
     // Helpers
@@ -550,6 +575,150 @@ class SecurityHandler {
     }
     async onGuildStickerDelete(sticker) {
         await this.handleMassDelete(sticker.guild, 'sticker', discord_js_1.AuditLogEvent.StickerDelete, sticker.id);
+    }
+    // --------------------------------------------
+    // Pro Max: ANTI-MASS-MESSAGE-DELETE — كشف الحذف الجماعي للرسائل + استعادة فورية
+    // --------------------------------------------
+    async onMessageDeleteBulk(messages) {
+        try {
+            if (!messages?.size || !messages.first()?.guild)
+                return;
+            const guild = messages.first().guild;
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const cfg = settings.protection?.antiNuke;
+            if (!cfg?.enabled)
+                return;
+            const channel = messages.first().channel;
+            if (!channel || channel.type !== 0)
+                return; // فقط القنوات النصية
+            // تتبّع الحذف الجماعي
+            const tracker = this.getMessageDeletionTracker(guild.id);
+            const now = Date.now();
+            if (!tracker[channel.id])
+                tracker[channel.id] = [];
+            tracker[channel.id].push(now);
+            // نافذة 5 ثواني
+            tracker[channel.id] = tracker[channel.id].filter(t => now - t <= 5000);
+            const count = tracker[channel.id].length;
+            const threshold = Math.max(cfg.threshold ?? 3, 10); // عتبة أعلى للرسائل (10+ رسالة في 5 ثواني)
+            if (count < threshold)
+                return;
+            // تجاوز العتبة — هجوم حذف جماعي
+            tracker[channel.id] = [];
+            // معرفة المنفّذ
+            const executor = await this.findExecutor(guild, 'MessageDeleteBulk', channel.id);
+            const isWhitelisted = executor && this.isWhitelisted(guild, executor.id);
+            // 🔒 قفل القناة فوراً لمنع المزيد من الحذف
+            try {
+                await channel.permissionOverwrites.edit(guild.id, { SendMessages: false, AddReactions: false }, 'Security: mass message delete detected').catch(() => { });
+            }
+            catch { }
+            // استعادة الرسائل من اللقطة
+            let restored = 0;
+            const snapshot = this.getMessageSnapshot(guild.id, channel.id);
+            if (snapshot && snapshot.messages.length > 0) {
+                for (const msg of snapshot.messages.slice(-50)) { // آخر 50 رسالة
+                    try {
+                        if (msg.content || msg.attachments.length > 0 || msg.embeds.length > 0) {
+                            await channel.send({
+                                content: msg.content || '📎 مرفق/إمبد',
+                                files: msg.attachments.map((a) => ({ attachment: a.url, name: a.name })),
+                                embeds: msg.embeds,
+                            }).catch(() => { });
+                            restored++;
+                            await sleep(200);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            // عقوبة المنفّذ
+            let actionText = '⚠️ تعذّر تحديد المنفّذ';
+            if (executor) {
+                actionText = await this.punish(guild, executor, cfg.action ?? 'ban', `Liberty City Anti-Nuke: حذف جماعي للرسائل (${messages.size} رسالة)`);
+            }
+            // تنبيه
+            const embed = new discord_js_1.EmbedBuilder()
+                .setTitle('🚨 تحذير أمني — حذف جماعي للرسائل!')
+                .setDescription(`تم حذف **${messages.size} رسالة** في ${channel} خلال ثوانٍ — تم قفل القناة واستعادة ما أمكن.`)
+                .setColor(embeds_1.Colors.error)
+                .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)${isWhitelisted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء', value: actionText, inline: true }, { name: '📬 استعادة', value: `أعيد إرسال **${restored}** رسالة`, inline: true }, { name: '🛡️ مستوى تسلّم البوت', value: await this.hierarchyField(guild), inline: false })
+                .setFooter({ text: 'Liberty City Anti-Nuke' })
+                .setTimestamp();
+            const alert = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
+            if (alert) {
+                await alert.send({ embeds: [embed], content: executor ? `<@${guild.ownerId}>` : undefined }).catch(() => { });
+            }
+            logger.warn(`🚨 Anti-Nuke: Mass message delete in ${guild.name} (${channel.name}) | executor=${executor?.tag ?? 'unknown'}`);
+        }
+        catch (error) {
+            logger.error(`onMessageDeleteBulk error: ${error.message}`);
+        }
+    }
+    // لقطة رسائل دورية للاستعادة
+    messageSnapshotInterval = new Map();
+    startMessageSnapshotter(guild) {
+        if (this.messageSnapshotInterval.has(guild.id))
+            return;
+        const interval = setInterval(() => this.captureMessageSnapshots(guild), 30000); // كل 30 ثانية
+        this.messageSnapshotInterval.set(guild.id, interval);
+    }
+    async captureMessageSnapshots(guild) {
+        try {
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const cfg = settings.protection?.antiNuke;
+            if (!cfg?.enabled)
+                return;
+            for (const [, channel] of guild.channels.cache) {
+                if (channel.type !== 0)
+                    continue; // نصية فقط
+                const me = guild.members.me;
+                if (!me || !channel.permissionsFor(me)?.has('ReadMessageHistory'))
+                    continue;
+                const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+                if (!messages?.size)
+                    continue;
+                const snapshot = {
+                    channelId: channel.id,
+                    messages: messages.map(m => ({
+                        id: m.id,
+                        content: m.content,
+                        authorId: m.author.id,
+                        authorTag: m.author.tag,
+                        attachments: m.attachments.map(a => ({ url: a.url, name: a.name })),
+                        embeds: m.embeds,
+                        timestamp: m.createdTimestamp,
+                    })).reverse(), // الأقدم أولاً
+                    at: Date.now(),
+                };
+                this.setMessageSnapshot(guild.id, channel.id, snapshot);
+            }
+        }
+        catch (error) {
+            logger.warn(`captureMessageSnapshots failed in ${guild.name}: ${error.message}`);
+        }
+    }
+    getMessageDeletionTracker(guildId) {
+        let tracker = this.messageDeletionTracker.get(guildId);
+        if (!tracker) {
+            tracker = {};
+            this.messageDeletionTracker.set(guildId, tracker);
+        }
+        return tracker;
+    }
+    getMessageSnapshot(guildId, channelId) {
+        const channels = this.messageSnapshots.get(guildId);
+        if (!channels)
+            return null;
+        return channels.get(channelId) ?? null;
+    }
+    setMessageSnapshot(guildId, channelId, snapshot) {
+        let channels = this.messageSnapshots.get(guildId);
+        if (!channels) {
+            channels = new Map();
+            this.messageSnapshots.set(guildId, channels);
+        }
+        channels.set(channelId, snapshot);
     }
     async handleMassDelete(guild, type, auditType, targetId) {
         try {
