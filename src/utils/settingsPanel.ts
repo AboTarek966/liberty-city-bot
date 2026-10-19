@@ -469,12 +469,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled),
   );
 
-  const row6 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled),
-    toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled),
-    toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled),
-    toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled),
-  );
+  // Row 6: Protection log channel selection
 
   // Row 7: Protection log channel selection
   const protectionLogChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
@@ -508,7 +503,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       )
   );
 
-  return { embeds: [embed], components: [row1, row2, row3, row4, row5, row6, protectionLogChannelSelect, jailChannelSelect] };
+  return { embeds: [embed], components: [row1, row2, row3, row4, row5, protectionLogChannelSelect, jailChannelSelect] };
 }
 
 // --------------------------------------------

@@ -359,7 +359,7 @@ function buildProtection(guild, s) {
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled));
     const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled), toggleBtn('protection', 'autoScan', 'فحص دوري', '🔍', !!p.autoScan?.enabled), toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'));
     const row5 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled), toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled), toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled), toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled));
-    const row6 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled), toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled), toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled), toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled));
+    // Row 6: Protection log channel selection
     // Row 7: Protection log channel selection
     const protectionLogChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:protection:logChannel')
@@ -382,7 +382,7 @@ function buildProtection(guild, s) {
         guild.channels.cache.get(s.jail.channelId)?.type === discord_js_1.ChannelType.GuildText
         ? [s.jail.channelId]
         : []));
-    return { embeds: [embed], components: [row1, row2, row3, row4, row5, row6, protectionLogChannelSelect, jailChannelSelect] };
+    return { embeds: [embed], components: [row1, row2, row3, row4, row5, protectionLogChannelSelect, jailChannelSelect] };
 }
 // --------------------------------------------
 // Verification — نظام التوثيق بالزر (لوحة فرعية)
