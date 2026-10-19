@@ -282,31 +282,31 @@ class AIHandler {
                     // كشف نوع الاستعلام
                     if (/يوتيوب|youtube|فيديو|مقطع|شغل|ابحث|video/i.test(message)) {
                         searchType = 'youtube';
-                        results = await (0, webSearch_1.searchYouTube)(message, 3);
+                        results = await (0, webSearch_1.searchYouTube)(message, 5);
                     }
                     else if (/أخبار|خبر|عاجل|مستجد|news|breaking/i.test(message)) {
                         searchType = 'news';
-                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} أخبار`, 4);
+                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} أخبار`, 6);
                     }
                     else if (/دراسة|بحث علمي|علماء|أكاديمي|أوراق|paper|research/i.test(message)) {
                         searchType = 'academic';
-                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} site:scholar.google.com OR site:arxiv.org`, 3);
+                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} site:scholar.google.com OR site:arxiv.org`, 5);
                     }
                     else if (/كود|برمج|code|programming|api|library|framework|خطأ|error|bug|stackoverflow/i.test(message)) {
                         searchType = 'technical';
-                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} site:stackoverflow.com OR site:github.com`, 3);
+                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} site:stackoverflow.com OR site:github.com`, 5);
                     }
                     else if (/سعر|أسعار|كم سعر|بكم|price|دولار|بيتكوين|ذهب|نفط|عملة/i.test(message)) {
                         searchType = 'prices';
-                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} أسعار اليوم`, 4);
+                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} أسعار اليوم`, 6);
                     }
                     else if (/ترند|ترندات|ميمي|ميمز|فيرال|viral|trend|meme|تيك توك|tiktok/i.test(message)) {
                         searchType = 'trends';
-                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} ترند 2024 2025`, 4);
+                        results = await (0, webSearch_1.webSearchEnhanced)(`${message} ترند 2024 2025`, 5);
                     }
                     else {
                         // بحث عام محسّن
-                        results = await (0, webSearch_1.webSearchEnhanced)(message, 4);
+                        results = await (0, webSearch_1.webSearchEnhanced)(message, 6);
                     }
                     if (results.length > 0) {
                         searchContext += `\n\n=== نتائج بحث ويب حديثة (${searchType}) ===\n${(0, webSearch_1.formatSearchResultsForContext)(results)}\n---`;
@@ -574,7 +574,7 @@ class AIHandler {
         let response = await callProviders(effectiveMessage, true);
         // 🔧 حلقة استدعاء أدوات العمل (Function Calling) — الـ AI ينفذ إجراءات Discord
         // نمرر السياق الكامل: السيرفر، المنفذ، العميل
-        for (let actionRound = 0; actionRound < 3; actionRound++) {
+        for (let actionRound = 0; actionRound < 5; actionRound++) {
             if (!response || response.fallback)
                 break;
             const actionCall = this.extractActionCall(response.content);
@@ -599,8 +599,8 @@ class AIHandler {
             }
         }
         // 🔁 حلقة البحث الذاتي: لو النموذج طلب معلومة إضافية عبر [[SEARCH:...]] أو [[FETCH:...]]
-        //    ننفّذ الأداة مرة واحدة ثم نعيد التوليد بالنتيجة (جولة واحدة فقط — لا نُبطئ الرد)
-        for (let round = 0; round < 1; round++) {
+        //    ننفّذ الأداة ثم نعيد التوليد بالنتيجة (جولتين للبحث الأعمق)
+        for (let round = 0; round < 2; round++) {
             if (!response || response.fallback)
                 break;
             const tool = this.extractToolCall(response.content);
@@ -617,7 +617,7 @@ class AIHandler {
                 response = { ...round2, content: round2.content || cleaned };
             }
             else {
-                // فشلت الجولة الثانية → نُعيد الرد الأصلي منزوع العلامة
+                // فشلت الجولة → نُعيد الرد الأصلي منزوع العلامة
                 response = { ...response, content: cleaned };
             }
         }
@@ -706,8 +706,8 @@ class AIHandler {
             const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
             return session.messages
                 .filter((m) => m.role !== 'system' && new Date(m.timestamp).getTime() >= cutoff)
-                .slice(-40) // آخر40 رسالة =20 سؤالاً وجواباً ضمن سياق النموذج
-                .map((m) => ({ role: m.role, content: String(m.content).slice(0, 1200) }));
+                .slice(-60) // آخر60 رسالة =30 سؤالاً وجواباً ضمن سياق النموذج (زيادة من 40)
+                .map((m) => ({ role: m.role, content: String(m.content).slice(0, 1500) }));
         }
         catch (error) {
             logger.warn('Failed to load AI history:', error);
@@ -722,10 +722,10 @@ class AIHandler {
                 $push: {
                     messages: {
                         $each: [
-                            { role: 'user', content: userMessage.slice(0, 1500), timestamp: now },
-                            { role: 'assistant', content: botResponse.slice(0, 2000), timestamp: now },
+                            { role: 'user', content: userMessage.slice(0, 2000), timestamp: now },
+                            { role: 'assistant', content: botResponse.slice(0, 3000), timestamp: now },
                         ],
-                        $slice: -200, // نحتفظ بآخر200 رسالة كذاكرة طويلة المدى
+                        $slice: -300, // نحتفظ بآخر300 رسالة كذاكرة طويلة المدى (زيادة من 200)
                     },
                 },
                 $set: { lastActivity: now },
@@ -767,38 +767,38 @@ class AIHandler {
      */
     resolveProviderOrder(configured) {
         const available = [];
-        if (this.groq)
-            available.push('groq');
         if (this.geminiReady)
-            available.push('gemini');
+            available.push('gemini'); // الأقوى للرؤية + التفكير
         if (this.openrouter)
-            available.push('openrouter');
-        if (this.openai)
-            available.push('openai');
+            available.push('openrouter'); // بديل قوي للرؤية
         if (this.anthropic)
-            available.push('anthropic');
+            available.push('anthropic'); // تفكير عميق
+        if (this.openai)
+            available.push('openai'); // GPT-4o
+        if (this.groq)
+            available.push('groq'); // سريع لكن أقل دقة
         const pref = (configured || config_1.config.ai.provider || 'auto');
         let preferred;
         switch (pref) {
-            case 'groq':
-                preferred = ['groq'];
-                break;
             case 'gemini':
                 preferred = ['gemini'];
                 break;
             case 'openrouter':
                 preferred = ['openrouter'];
                 break;
-            case 'openai':
-                preferred = ['openai'];
-                break;
             case 'anthropic':
                 preferred = ['anthropic'];
                 break;
-            case 'both':
-                preferred = ['openai', 'anthropic'];
+            case 'openai':
+                preferred = ['openai'];
                 break;
-            default: preferred = ['groq', 'gemini', 'openrouter', 'openai', 'anthropic']; // auto
+            case 'groq':
+                preferred = ['groq'];
+                break;
+            case 'both':
+                preferred = ['gemini', 'openrouter', 'anthropic', 'openai'];
+                break;
+            default: preferred = ['gemini', 'openrouter', 'anthropic', 'openai', 'groq']; // auto: الأفضل أولاً
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));

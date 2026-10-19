@@ -18,7 +18,7 @@ export declare const config: {
         uri: string;
     };
     ai: {
-        provider: "auto" | "openai" | "anthropic" | "groq" | "gemini" | "both";
+        provider: "auto" | "openai" | "anthropic" | "groq" | "gemini" | "openrouter" | "both";
         openai: {
             apiKey: string;
             model: string;

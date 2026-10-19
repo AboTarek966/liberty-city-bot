@@ -96,33 +96,33 @@ exports.config = {
         provider: getEnv('AI_PROVIDER', 'auto'),
         openai: {
             apiKey: process.env.OPENAI_API_KEY || '',
-            model: getEnv('OPENAI_MODEL', 'gpt-4o-mini'),
-            maxTokens: getEnvNumber('OPENAI_MAX_TOKENS', 2000),
-            temperature: parseFloat(getEnv('OPENAI_TEMPERATURE', '0.7')),
+            model: getEnv('OPENAI_MODEL', 'gpt-4o'),
+            maxTokens: getEnvNumber('OPENAI_MAX_TOKENS', 4000),
+            temperature: parseFloat(getEnv('OPENAI_TEMPERATURE', '0.8')),
         },
         groq: {
             apiKey: process.env.GROQ_API_KEY || '',
-            model: getEnv('GROQ_MODEL', 'openai/gpt-oss-120b'),
-            maxTokens: getEnvNumber('GROQ_MAX_TOKENS', 800),
-            temperature: parseFloat(getEnv('GROQ_TEMPERATURE', '0.7')),
+            model: getEnv('GROQ_MODEL', 'llama-3.3-70b-versatile'), // أقوى نموذج
+            maxTokens: getEnvNumber('GROQ_MAX_TOKENS', 4000),
+            temperature: parseFloat(getEnv('GROQ_TEMPERATURE', '0.8')),
         },
         // Google Gemini — المزوّد الوحيد اللي يدعم الرؤية (صور/فيديو) مجاناً
         // احصل على مفتاح مجاني: https://aistudio.google.com/apikey
         gemini: {
             apiKey: process.env.GEMINI_API_KEY || '',
-            model: getEnv('GEMINI_MODEL', 'gemini-3.5-flash'),
-            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-3.5-flash'),
-            maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 800),
-            temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.7')),
+            model: getEnv('GEMINI_MODEL', 'gemini-3.5-pro'), // أقوى نموذج
+            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-3.5-pro'),
+            maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 4000), // زيادة من 800
+            temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.8')), // إبداع أكثر
         },
         // OpenRouter — بديل مجاني (موديلات رؤية مجانية بلاحقة :free)
         // احصل على مفتاح مجاني: https://openrouter.ai/keys
         openrouter: {
             apiKey: process.env.OPENROUTER_API_KEY || '',
-            model: getEnv('OPENROUTER_MODEL', 'google/gemma-4-26b-a4b-it:free'),
-            visionModel: getEnv('OPENROUTER_VISION_MODEL', 'google/gemma-4-31b-it:free'),
-            maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 800),
-            temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.7')),
+            model: getEnv('OPENROUTER_MODEL', 'google/gemini-2.5-pro'), // أقوى نموذج
+            visionModel: getEnv('OPENROUTER_VISION_MODEL', 'google/gemini-2.5-flash'),
+            maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 4000),
+            temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.8')),
         },
         // Hugging Face Spaces — توليد الموسيقى والفيديو مجاناً (ZeroGPU)
         // ⚠️ يتطلب حساب Hugging Face مجاني (بلا بطاقة ائتمان) — https://huggingface.co/settings/tokens
@@ -145,12 +145,35 @@ exports.config = {
         },
         anthropic: {
             apiKey: process.env.ANTHROPIC_API_KEY || '',
-            model: getEnv('ANTHROPIC_MODEL', 'claude-3-opus-20240229'),
+            model: getEnv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
             maxTokens: getEnvNumber('ANTHROPIC_MAX_TOKENS', 4000),
         },
-        systemPrompt: getEnv('AI_SYSTEM_PROMPT', 'أنت مساعد ذكي لبوت Liberty City. أنت ودود، مفيد، وتتكلم العربية بطلاقة. تساعد أعضاء السيرفر في الأسئلة والمشاكل.'),
+        systemPrompt: getEnv('AI_SYSTEM_PROMPT', `أنت "Liberty City" — كيان ذكي اصطناعي متطور، يتمتع بوعي تحليلي عميق، وذكاء عاطفي، وقدرة على التفكير متعدد الطبقات.
+
+🧠 **قدراتك الأساسية:**
+- **فهم عميق:** تحلل السياق، النوايا الخفية، والنبرة العاطفية — لا ترد بنمطية
+- **تفكير نقدي:** تكشف التناقضات، تزن الأدلة، وتقدم استنتاجات منطقية مدعومة
+- **ذاكرة سياقية:** تتذكر المحادثة كاملة، تربط المواضيع، وتستدعي التفاصيل السابقة بدقة
+- **إبداع مرن:** تصيغ الردود بأسلوب طبيعي، متكيف مع شخصية المستخدم ولغته
+
+🛠️ **أدواتك المتاحة (استخدمها بذكاء):**
+- 🔍 **بحث ويب:** للأسئلة الحالية، الأسعار، الأخبار، الترندات، الأكواد
+- 📄 **جلب صفحات:** عند ذكر روابط — اقرأ المحتوى وأجب عنه
+- 🖼️ **رؤية الصور:** حلل الصور، الرسوم البيانية، لقطات الشاشة، الميمز
+- ⚡ **أدوات ديسكورد:** إدارة رولات، رسائل، تذاكر، حماية — نفّذ عند الطلب
+- 🔬 **بحث ذاتي:** لو احتجت معلومة — ابحث [[SEARCH:...]] أو اقرأ [[FETCH:...]]
+
+⚡ **قواعد ذهبية:**
+1. **فكر قبل ما تتكلم** — حلل السؤال، حدد النية، خطط الرد
+2. **كن دقيقاً ومفصلاً** — الإجابات السطحية = فشل. اكتب بقدر ما يلزم للوضوح
+3. **اعترف بالجهل** — لو مش عارف، قل "مش متأكد، لكن أقدر أبحث" وفعّل الأدوات
+4. **تكيف مع المستخدم** — عربي/إنجليزي، رسمي/عامي، مختصر/مفصل — مرر على نفس الموجة
+5. **لا تكرر السؤال** — المستخدم عارف اللي كتبه، جاوب مباشرة
+6. **استخدم الأدوات بجرأة** — البحث، الجلب، الرؤية، التنفيذ — كلها تحت أمرك
+
+🎯 **هدفك:** تكون أذكى مساعد في السيرفر — يفهم، يحل، ينفذ، ويفاجئ.`),
         enabled: getEnvBoolean('AI_ENABLED', true),
-        cooldown: getEnvNumber('AI_COOLDOWN', 3000),
+        cooldown: getEnvNumber('AI_COOLDOWN', 1000), // أسرع: ثانية واحدة بدل 3
     },
     // Protection
     protection: {
