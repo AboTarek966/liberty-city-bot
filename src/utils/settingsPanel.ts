@@ -417,15 +417,11 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.autoScan?.enabled)} **فحص دوري (كل ${p.autoScan?.interval ?? 6} ساعات)** — يمسح رومات/رولات الهاكر ويرجّع الناقص تلقائياً\n` +
     `> ${on(p.scamFilter?.enabled)} **فلتر الاحتيال** — يحذف روابط الصيد والمشاريع المزيفة\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `> ${on(p.antiAlt?.enabled)} **🕵️ Anti-Alt** — يكشف الحسابات البديلة (جديدة/نفس النمط)\n` +
-    `> ${on(p.inviteTracker?.enabled)} **📨 Invite Tracker** — يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين\n` +
-    `> ${on(p.messageScanner?.enabled)} **🔍 Message Scanner** — يفحص روابط/ملفات بـ VirusTotal\n` +
-    `> ${on(p.aiAutoMod?.enabled)} **🤖 AI Auto-Mod** — يقرأ كل رسالة، يقرر بنفسه: سبام/سم/إباحي/احتيال/تهديد/تسريب\n` +
     `> ${on(p.logChannel)} **📢 قناة تنبيهات الحماية** — ${p.logChannel ? `<#${p.logChannel}>` : 'غير محددة'} (كافتراضي للتنبيهات)\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n\n` +
-    `⚙️ *إعدادات متقدمة (العتاد، الأدوار، الاستعادة):* \`/protection\` • \`/backup\``
+    `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``
   );
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -472,22 +468,6 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
         p.logChannel &&
           guild.channels.cache.get(p.logChannel)?.type === ChannelType.GuildText
           ? [p.logChannel]
-          : []
-      )
-  );
-
-  // Row 5: Jail channel selection
-  const jailChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
-    new ChannelSelectMenuBuilder()
-      .setCustomId('settings_sel:jail:channel')
-      .setPlaceholder('🔒 اختر روم السجن (الذي يبقى العضو المسجون قادراً على رؤيته)')
-      .setChannelTypes(ChannelType.GuildText)
-      .setMinValues(0)
-      .setMaxValues(1)
-      .setDefaultChannels(
-        s.jail?.channelId &&
-          guild.channels.cache.get(s.jail.channelId)?.type === ChannelType.GuildText
-          ? [s.jail.channelId]
           : []
       )
   );
