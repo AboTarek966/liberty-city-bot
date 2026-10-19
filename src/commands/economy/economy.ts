@@ -190,21 +190,6 @@ const economyCommand: Command = {
           option.setName('limit').setDescription('العدد').setRequired(false).setMinValue(1).setMaxValue(20)
         )
     )
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('daily')
-        .setDescription('استلام الجائزة اليومية')
-    )
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('weekly')
-        .setDescription('الجائزة الأسبوعية')
-    )
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('monthly')
-        .setDescription('الجائزة الشهرية')
-    )
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {

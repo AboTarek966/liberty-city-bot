@@ -88,15 +88,6 @@ const economyCommand = {
         .addStringOption(option => option.setName('type').setDescription('النوع').setRequired(false)
         .addChoices({ name: 'الرصيد', value: 'balance' }, { name: 'البنك', value: 'bank' }, { name: 'الإجمالي', value: 'total' }, { name: 'المستوى', value: 'level' }))
         .addIntegerOption(option => option.setName('limit').setDescription('العدد').setRequired(false).setMinValue(1).setMaxValue(20)))
-        .addSubcommand(subcommand => subcommand
-        .setName('daily')
-        .setDescription('استلام الجائزة اليومية'))
-        .addSubcommand(subcommand => subcommand
-        .setName('weekly')
-        .setDescription('الجائزة الأسبوعية'))
-        .addSubcommand(subcommand => subcommand
-        .setName('monthly')
-        .setDescription('الجائزة الشهرية'))
         .setDMPermission(false),
     async execute(interaction) {
         const client = interaction.client;

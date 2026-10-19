@@ -1,1 +1,1 @@
-{"version":3,"file":"economy.d.ts","sourceRoot":"","sources":["../../../src/commands/economy/economy.ts"],"names":[],"mappings":"AAgBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAQxD,QAAA,MAAM,cAAc,EAAE,OA6pBrB,CAAC;AAEF,eAAe,cAAc,CAAC"}
+{"version":3,"file":"economy.d.ts","sourceRoot":"","sources":["../../../src/commands/economy/economy.ts"],"names":[],"mappings":"AAgBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAQxD,QAAA,MAAM,cAAc,EAAE,OA8oBrB,CAAC;AAEF,eAAe,cAAc,CAAC"}
