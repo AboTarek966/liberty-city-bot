@@ -288,6 +288,24 @@ const handler: ModalHandler = {
         ).catch(() => {});
         break;
       }
+      case 'translator:settings': {
+        try {
+          const parsed = JSON.parse(value);
+          if (!settings.protection.aiTranslator) settings.protection.aiTranslator = { enabled: false, defaultTargetLang: 'ar', autoTranslateChannels: [], ignoredChannels: [], ignoredRoles: [], showOriginal: true, maxLength: 2000 };
+          settings.protection.aiTranslator.enabled = !!parsed.enabled;
+          settings.protection.aiTranslator.defaultTargetLang = parsed.defaultTargetLang || 'ar';
+          settings.protection.aiTranslator.autoTranslateChannels = Array.isArray(parsed.autoTranslateChannels) ? parsed.autoTranslateChannels.filter((c: string) => c.trim()) : [];
+          settings.protection.aiTranslator.ignoredChannels = Array.isArray(parsed.ignoredChannels) ? parsed.ignoredChannels.filter((c: string) => c.trim()) : [];
+          settings.protection.aiTranslator.ignoredRoles = Array.isArray(parsed.ignoredRoles) ? parsed.ignoredRoles.filter((r: string) => r.trim()) : [];
+          settings.protection.aiTranslator.showOriginal = !!parsed.showOriginal;
+          settings.protection.aiTranslator.maxLength = Number(parsed.maxLength) || 2000;
+          settings.protection.aiTranslator.logChannel = parsed.logChannel || undefined;
+        } catch (e) {
+          await interaction.editReply({ content: '❌ JSON غير صالح — راجع التنسيق' });
+          return;
+        }
+        break;
+      }
       case 'levels:msg': {
         const title = interaction.fields.getTextInputValue('title').trim();
         const message = interaction.fields.getTextInputValue('message').trim();

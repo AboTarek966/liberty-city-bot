@@ -61,6 +61,7 @@ const handler: ButtonHandler = {
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
       'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
       'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
+      'translator:settings',
     ]);
 
     // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
@@ -216,6 +217,7 @@ const handler: ButtonHandler = {
       'automod:words', 'ai:personality',
       'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
       'tickets:autotext', 'tickets:pimg', 'tickets:types',
+      'translator:settings',
     ];
     if (modalActions.includes(`${section}:${action}`)) {
       switch (`${section}:${action}`) {
@@ -237,6 +239,21 @@ const handler: ButtonHandler = {
             TextInputStyle.Paragraph,
             1000,
             aiConfig?.customPersonality || ''
+          );
+        }
+        case 'translator:settings': {
+          const prot = settings.protection;
+          if (!prot.aiTranslator) prot.aiTranslator = { enabled: false, defaultTargetLang: 'ar', autoTranslateChannels: [], ignoredChannels: [], ignoredRoles: [], showOriginal: true, maxLength: 2000 };
+          const t = prot.aiTranslator;
+          const channels = t.autoTranslateChannels?.map((c: string) => `<#${c}>`).join(', ') || 'لا شيء';
+          const ignoredCh = t.ignoredChannels?.map((c: string) => `<#${c}>`).join(', ') || 'لا شيء';
+          const ignoredRo = t.ignoredRoles?.map((r: string) => `<@&${r}>`).join(', ') || 'لا شيء';
+          return openModal(
+            '⚙️ إعدادات AI Translator',
+            `الحالة: ${t.enabled ? 'مفعّل ✅' : 'معطّل ❌'}\nاللغة الافتراضية: ${t.defaultTargetLang || 'ar'}\nقنوات الترجمة التلقائية: ${channels}\nقنوات مستثناة: ${ignoredCh}\nرولات مستثناة: ${ignoredRo}\nإظهار النص الأصلي: ${t.showOriginal ? 'نعم' : 'لا'}\nالحد الأقصى: ${t.maxLength || 2000} حرف\n\nاكتب الإعدادات كـ JSON:\n{"enabled":true,"defaultTargetLang":"ar","autoTranslateChannels":["123"],"ignoredChannels":[],"ignoredRoles":[],"showOriginal":true,"maxLength":2000}`,
+            TextInputStyle.Paragraph,
+            2000,
+            JSON.stringify(t, null, 2)
           );
         }
         case 'welcome:title':
