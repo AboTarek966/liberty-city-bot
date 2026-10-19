@@ -203,6 +203,16 @@ export interface IGuildSettings extends Document {
       userIds: string[];
       logChannel?: string;
     };
+    /** 📢 إعلانات جماعية (Broadcast) */
+    announcements?: {
+      history: Array<{
+        type: 'dm' | 'channel';
+        content: string;
+        at: Date;
+        sentBy: string;
+        sent?: boolean;
+      }>;
+    };
   };
   
   // Tickets
@@ -921,6 +931,15 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       enabled: { type: Boolean, default: false },
       userIds: [{ type: String }],
       logChannel: { type: String },
+    },
+    announcements: {
+      history: [{
+        type: { type: String, enum: ['dm', 'channel'] },
+        content: { type: String },
+        at: { type: Date, default: Date.now },
+        sentBy: { type: String },
+        sent: { type: Boolean, default: false },
+      }],
     },
   },
   

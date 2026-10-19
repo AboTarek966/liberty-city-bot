@@ -44,6 +44,7 @@ const handler = {
             'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
             'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
             'translator:settings',
+            'announce:dm', 'announce:channel', 'announce:preview',
         ]);
         // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
         if (!immediateKeys.has(key)) {
@@ -167,6 +168,7 @@ const handler = {
             'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
             'tickets:autotext', 'tickets:pimg', 'tickets:types',
             'translator:settings',
+            'announce:dm', 'announce:channel',
         ];
         if (modalActions.includes(`${section}:${action}`)) {
             switch (`${section}:${action}`) {
@@ -193,6 +195,12 @@ const handler = {
                     const ignoredCh = t.ignoredChannels?.map((c) => `<#${c}>`).join(', ') || 'لا شيء';
                     const ignoredRo = t.ignoredRoles?.map((r) => `<@&${r}>`).join(', ') || 'لا شيء';
                     return openModal('⚙️ إعدادات AI Translator', `الحالة: ${t.enabled ? 'مفعّل ✅' : 'معطّل ❌'}\nاللغة الافتراضية: ${t.defaultTargetLang || 'ar'}\nقنوات الترجمة التلقائية: ${channels}\nقنوات مستثناة: ${ignoredCh}\nرولات مستثناة: ${ignoredRo}\nإظهار النص الأصلي: ${t.showOriginal ? 'نعم' : 'لا'}\nالحد الأقصى: ${t.maxLength || 2000} حرف\n\nاكتب الإعدادات كـ JSON:\n{"enabled":true,"defaultTargetLang":"ar","autoTranslateChannels":["123"],"ignoredChannels":[],"ignoredRoles":[],"showOriginal":true,"maxLength":2000}`, discord_js_1.TextInputStyle.Paragraph, 2000, JSON.stringify(t, null, 2));
+                }
+                case 'announce:dm': {
+                    return openModal('📩 إعلان للخاص (DM) — اكتب الرسالة', 'الرسالة ستُرسل في خاص لجميع الأعضاء\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\nمرحباً {user}! أهلاً بك في {server} 🎉', discord_js_1.TextInputStyle.Paragraph, 2000, '');
+                }
+                case 'announce:channel': {
+                    return openModal('📢 إعلان لقناة — اكتب الرسالة واختر القناة', 'الرسالة ستُرسل في قناة محددة\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\n📢 تنبيه هام لـ {user} في {server}!\n\n[ستظهر قائمة قنوات بعد الإرسال]', discord_js_1.TextInputStyle.Paragraph, 2000, '');
                 }
                 case 'welcome:title':
                     return openModal('عنوان رسالة الترحيب', 'مثال: مرحباً بك في السيرفر!', discord_js_1.TextInputStyle.Short, 256, settings.welcome.embedTitle || '');
@@ -748,6 +756,32 @@ const handler = {
                 await settings.save();
                 const cPanel = (0, settingsPanel_1.buildCommands)(interaction.guild, settings);
                 await interaction.editReply({ embeds: cPanel.embeds, components: cPanel.components });
+                return;
+            }
+            case 'announce:dm': {
+                // سيتم التعامل معها في المودال
+                break;
+            }
+            case 'announce:channel': {
+                // سيتم التعامل معها في المودال مع اختيار القناة
+                break;
+            }
+            case 'announce:preview': {
+                await interaction.reply({ content: '👁️ ميزة المعاينة ستضاف قريباً', ephemeral: true });
+                return;
+            }
+            case 'announce:history': {
+                if (!settings.announcements?.history?.length) {
+                    await interaction.reply({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
+                    return;
+                }
+                const embed = new discord_js_1.EmbedBuilder()
+                    .setTitle('📜 سجل الإعلانات')
+                    .setColor(0xf39c12)
+                    .setDescription(settings.announcements.history.slice(-10).reverse().map((a, i) => `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('\n'))
+                    .setFooter({ text: `${interaction.guild.name} • Liberty City` })
+                    .setTimestamp();
+                await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
             default:

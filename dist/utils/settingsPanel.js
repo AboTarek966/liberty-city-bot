@@ -50,6 +50,7 @@ exports.buildVerificationPanel = buildVerificationPanel;
 exports.buildWarnRolesPanel = buildWarnRolesPanel;
 exports.getActivePanel = getActivePanel;
 exports.buildCommands = buildCommands;
+exports.buildAnnouncements = buildAnnouncements;
 exports.buildShop = buildShop;
 exports.buildTicketMovePanel = buildTicketMovePanel;
 exports.buildTicketAdvancedPanel = buildTicketAdvancedPanel;
@@ -179,6 +180,7 @@ exports.ICONS = {
     automod: '🔇',
     verification: '✅',
     commands: '📝',
+    announcements: '📢',
 };
 exports.TITLES = {
     home: 'لوحة التحكم',
@@ -194,6 +196,7 @@ exports.TITLES = {
     automod: 'الأوتو مود',
     verification: 'توثيق الأعضاء',
     commands: 'الأوامر المخصصة',
+    announcements: 'الإعلانات الجماعية',
 };
 exports.CATEGORY_COLORS = {
     home: 0x00d4ff,
@@ -209,6 +212,7 @@ exports.CATEGORY_COLORS = {
     automod: 0xe74c3c,
     verification: 0x57f287,
     commands: 0x3498db,
+    announcements: 0xf39c12,
 };
 function on(off) {
     return off ? '🟢' : '🔴';
@@ -254,6 +258,8 @@ async function buildPanel(category, guild, userId) {
             return buildAutoMod(guild, settings);
         case 'commands':
             return buildCommands(guild, settings);
+        case 'announcements':
+            return buildAnnouncements(guild, settings);
         default:
             return buildHome(guild, userId, settings);
     }
@@ -293,7 +299,7 @@ function buildHome(guild, userId, s) {
         .setTimestamp();
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:general', 'عام', discord_js_1.ButtonStyle.Primary, '🌐'), btn('settings_cat:protection', 'الحماية', discord_js_1.ButtonStyle.Success, '🛡️'), btn('settings_cat:tickets', 'التذاكر', discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_cat:ai', 'الذكاء', discord_js_1.ButtonStyle.Danger, '🤖'), btn('settings_cat:welcome', 'الترحيب', discord_js_1.ButtonStyle.Success, '👋'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:leave', 'المغادرة', discord_js_1.ButtonStyle.Danger, '📤'), btn('settings_cat:logging', 'السجلات', discord_js_1.ButtonStyle.Primary, '📋'), btn('settings_cat:levels', 'المستويات', discord_js_1.ButtonStyle.Secondary, '📈'), btn('settings_cat:automod', 'الأوتو مود', discord_js_1.ButtonStyle.Danger, '🔇'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Secondary, '🔄'));
-    const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
+    const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_cat:announcements', '📢 إعلانات', discord_js_1.ButtonStyle.Success, '📢'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
     return { embeds: [embed], components: [row1, row2, row3] };
 }
 // --------------------------------------------
@@ -579,7 +585,18 @@ function buildCommands(guild, s) {
     return { embeds: [embed], components: rows };
 }
 // --------------------------------------------
-// متجر السيرفر (شراء رولات بالرصيد)
+// إعلانات جماعية (Broadcast) — إرسال رسائل لجميع الأعضاء
+// --------------------------------------------
+function buildAnnouncements(guild, s) {
+    const announcements = s.announcements || { history: [] };
+    const recent = announcements.history?.slice(-5).reverse() || [];
+    const embed = categoryEmbed('announcements', guild, `إرسال رسالة جماعية لجميع أعضاء السيرفر — في الخاص (DM) أو في قناة محددة\n\n` +
+        `> **آخر الإعلانات:** ${recent.length ? recent.map((a, i) => `\n> ${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 50)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('') : 'لا يوجد إعلانات سابقة'}\n\n` +
+        `⚠️ **تنبيه:** الإرسال للخاص (DM) قد يفشل مع أعضاء أغلقوا الخاص — البوت يتجاهل الفشل ويكمل الباقي`);
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:dm', '📩 إرسال للخاص (DM)', discord_js_1.ButtonStyle.Success, '📩'), btn('settings_btn:announce:channel', '📢 إرسال لقناة', discord_js_1.ButtonStyle.Primary, '📢'), btn('settings_btn:announce:preview', '👁️ معاينة', discord_js_1.ButtonStyle.Secondary, '👁️'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:history', '📜 السجل', discord_js_1.ButtonStyle.Secondary, '📜'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    return { embeds: [embed], components: [row1, row2] };
+}
 // --------------------------------------------
 function buildShop(guild, s) {
     const items = s.shop?.items || [];

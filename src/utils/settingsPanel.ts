@@ -41,7 +41,8 @@ export type SettingsCategory =
   | 'levels'
   | 'automod'
   | 'verification'
-  | 'commands';
+  | 'commands'
+  | 'announcements';
 
 type PanelComponent = ActionRowBuilder<any>;
 
@@ -180,6 +181,7 @@ export const ICONS: Record<SettingsCategory, string> = {
   automod: '🔇',
   verification: '✅',
   commands: '📝',
+  announcements: '📢',
 };
 
 export const TITLES: Record<SettingsCategory, string> = {
@@ -196,6 +198,7 @@ export const TITLES: Record<SettingsCategory, string> = {
   automod: 'الأوتو مود',
   verification: 'توثيق الأعضاء',
   commands: 'الأوامر المخصصة',
+  announcements: 'الإعلانات الجماعية',
 };
 
 export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
@@ -212,6 +215,7 @@ export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
   automod: 0xe74c3c,
   verification: 0x57f287,
   commands: 0x3498db,
+  announcements: 0xf39c12,
 };
 
 function on(off?: boolean): string {
@@ -270,6 +274,8 @@ export async function buildPanel(
       return buildAutoMod(guild, settings);
     case 'commands':
       return buildCommands(guild, settings);
+    case 'announcements':
+      return buildAnnouncements(guild, settings);
     default:
       return buildHome(guild, userId, settings);
   }
@@ -344,6 +350,7 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
 
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:commands', 'أوامر مخصصة', ButtonStyle.Primary, '📝'),
+    btn('settings_cat:announcements', '📢 إعلانات', ButtonStyle.Success, '📢'),
     btn('settings_btn:general:shop', '🛍️ المتجر', ButtonStyle.Success, '🛍️'),
     btn('settings_btn:general:warnroles', '🎭 رولات التحذير', ButtonStyle.Secondary, '🎭'),
   );
@@ -765,7 +772,33 @@ export function buildCommands(guild: Guild, s: any): BuiltPanel {
 }
 
 // --------------------------------------------
-// متجر السيرفر (شراء رولات بالرصيد)
+// إعلانات جماعية (Broadcast) — إرسال رسائل لجميع الأعضاء
+// --------------------------------------------
+export function buildAnnouncements(guild: Guild, s: any): BuiltPanel {
+  const announcements = s.announcements || { history: [] };
+  const recent = announcements.history?.slice(-5).reverse() || [];
+
+  const embed = categoryEmbed(
+    'announcements',
+    guild,
+    `إرسال رسالة جماعية لجميع أعضاء السيرفر — في الخاص (DM) أو في قناة محددة\n\n` +
+      `> **آخر الإعلانات:** ${recent.length ? recent.map((a: any, i: number) => `\n> ${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 50)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('') : 'لا يوجد إعلانات سابقة'}\n\n` +
+      `⚠️ **تنبيه:** الإرسال للخاص (DM) قد يفشل مع أعضاء أغلقوا الخاص — البوت يتجاهل الفشل ويكمل الباقي`
+  );
+
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:announce:dm', '📩 إرسال للخاص (DM)', ButtonStyle.Success, '📩'),
+    btn('settings_btn:announce:channel', '📢 إرسال لقناة', ButtonStyle.Primary, '📢'),
+    btn('settings_btn:announce:preview', '👁️ معاينة', ButtonStyle.Secondary, '👁️'),
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:announce:history', '📜 السجل', ButtonStyle.Secondary, '📜'),
+    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
+}
 // --------------------------------------------
 export function buildShop(guild: Guild, s: any): BuiltPanel {
   const items = s.shop?.items || [];

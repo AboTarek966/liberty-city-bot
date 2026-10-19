@@ -297,6 +297,15 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             userIds: [{ type: String }],
             logChannel: { type: String },
         },
+        announcements: {
+            history: [{
+                    type: { type: String, enum: ['dm', 'channel'] },
+                    content: { type: String },
+                    at: { type: Date, default: Date.now },
+                    sentBy: { type: String },
+                    sent: { type: Boolean, default: false },
+                }],
+        },
     },
     tickets: {
         categoryId: { type: String },

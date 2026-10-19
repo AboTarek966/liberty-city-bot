@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const settingsPanel_1 = require("../../utils/settingsPanel");
 const models_1 = require("../../models");
+const helpers_1 = require("../../utils/helpers");
 const handler = {
     id: 'settings_modal',
     async execute(interaction) {
@@ -291,6 +292,79 @@ const handler = {
                     return;
                 }
                 break;
+            }
+            case 'announce:dm': {
+                const content = value.trim();
+                if (!content) {
+                    await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
+                    return;
+                }
+                if (!settings.announcements)
+                    settings.announcements = { history: [] };
+                settings.announcements.history.push({
+                    type: 'dm',
+                    content,
+                    at: new Date(),
+                    sentBy: interaction.user.id,
+                });
+                await settings.save();
+                // إرسال للجميع
+                const client = interaction.client;
+                const guild = interaction.guild;
+                const members = await guild.members.fetch().catch(() => null);
+                if (!members) {
+                    await interaction.editReply({ content: '❌ فشل جلب الأعضاء' });
+                    return;
+                }
+                await interaction.editReply({ content: `⏳ جاري الإرسال لـ ${members.size} عضو...` });
+                let sent = 0, failed = 0;
+                for (const [, member] of members) {
+                    if (member.user.bot)
+                        continue;
+                    try {
+                        const msg = content
+                            .replace(/\{user\}/g, member.toString())
+                            .replace(/\{server\}/g, guild.name)
+                            .replace(/\{count\}/g, guild.memberCount.toString());
+                        await member.send(msg).catch(() => { });
+                        sent++;
+                        await (0, helpers_1.sleep)(50); // تجنب rate limit
+                    }
+                    catch {
+                        failed++;
+                    }
+                }
+                await interaction.editReply({ content: `✅ تم الإرسال: ${sent} ✅ | ${failed} ❌` });
+                return;
+            }
+            case 'announce:channel': {
+                const content = value.trim();
+                if (!content) {
+                    await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
+                    return;
+                }
+                if (!settings.announcements)
+                    settings.announcements = { history: [] };
+                settings.announcements.history.push({
+                    type: 'channel',
+                    content,
+                    at: new Date(),
+                    sentBy: interaction.user.id,
+                });
+                await settings.save();
+                // اختيار القناة — نفتح list menus
+                const channelSelect = new discord_js_1.ChannelSelectMenuBuilder()
+                    .setCustomId('settings_sel:announce:channel')
+                    .setPlaceholder('📢 اختر القناة للإرسال')
+                    .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
+                    .setMinValues(1)
+                    .setMaxValues(1);
+                await interaction.reply({
+                    content: '📢 اختر القناة التي تريد الإرسال فيها:',
+                    components: [new discord_js_1.ActionRowBuilder().addComponents(channelSelect)],
+                    ephemeral: true,
+                });
+                return;
             }
             case 'levels:msg': {
                 const title = interaction.fields.getTextInputValue('title').trim();

@@ -2,11 +2,12 @@
 // Settings Panel - Modals (بادئة، رسائل، ترحيب، تذاكر، شخصية...)
 // ============================================
 
-import { ModalSubmitInteraction, PermissionFlagsBits } from 'discord.js';
+import { ModalSubmitInteraction, PermissionFlagsBits, ChannelSelectMenuBuilder, ChannelType, ActionRowBuilder, EmbedBuilder } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
+import { sleep } from '../../utils/helpers';
 
 const handler: ModalHandler = {
   id: 'settings_modal',
@@ -65,7 +66,7 @@ const handler: ModalHandler = {
     }
 
     const guildId = interaction.guild.id;
-    const settings = await getGuildSettings(guildId);
+    const settings = await getGuildSettings(guildId) as any;
     let panelEdited = false;
 
     // 🔐 كلمة المرور تُعالج هنا قبل السويتش (لأن customId = settings_modal:password بدون حقل ثانٍ)
@@ -305,6 +306,81 @@ const handler: ModalHandler = {
           return;
         }
         break;
+      }
+      case 'announce:dm': {
+        const content = value.trim();
+        if (!content) {
+          await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
+          return;
+        }
+        if (!settings.announcements) settings.announcements = { history: [] };
+        settings.announcements.history.push({
+          type: 'dm',
+          content,
+          at: new Date(),
+          sentBy: interaction.user.id,
+        });
+        await settings.save();
+
+        // إرسال للجميع
+        const client = interaction.client as LibertyClient;
+        const guild = interaction.guild!;
+        const members = await guild.members.fetch().catch(() => null);
+        if (!members) {
+          await interaction.editReply({ content: '❌ فشل جلب الأعضاء' });
+          return;
+        }
+
+        await interaction.editReply({ content: `⏳ جاري الإرسال لـ ${members.size} عضو...` });
+
+        let sent = 0, failed = 0;
+        for (const [, member] of members) {
+          if (member.user.bot) continue;
+          try {
+            const msg = content
+              .replace(/\{user\}/g, member.toString())
+              .replace(/\{server\}/g, guild.name)
+              .replace(/\{count\}/g, guild.memberCount.toString());
+            await member.send(msg).catch(() => {});
+            sent++;
+            await sleep(50); // تجنب rate limit
+          } catch {
+            failed++;
+          }
+        }
+
+        await interaction.editReply({ content: `✅ تم الإرسال: ${sent} ✅ | ${failed} ❌` });
+        return;
+      }
+      case 'announce:channel': {
+        const content = value.trim();
+        if (!content) {
+          await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
+          return;
+        }
+        if (!settings.announcements) settings.announcements = { history: [] };
+        settings.announcements.history.push({
+          type: 'channel',
+          content,
+          at: new Date(),
+          sentBy: interaction.user.id,
+        });
+        await settings.save();
+
+        // اختيار القناة — نفتح list menus
+        const channelSelect = new ChannelSelectMenuBuilder()
+          .setCustomId('settings_sel:announce:channel')
+          .setPlaceholder('📢 اختر القناة للإرسال')
+          .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+          .setMinValues(1)
+          .setMaxValues(1);
+
+        await interaction.reply({
+          content: '📢 اختر القناة التي تريد الإرسال فيها:',
+          components: [new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(channelSelect)],
+          ephemeral: true,
+        });
+        return;
       }
       case 'levels:msg': {
         const title = interaction.fields.getTextInputValue('title').trim();

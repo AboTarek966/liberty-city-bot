@@ -13,6 +13,7 @@ import {
   ButtonStyle,
   ChannelType,
   RoleSelectMenuBuilder,
+  EmbedBuilder,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
@@ -62,6 +63,7 @@ const handler: ButtonHandler = {
       'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
       'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
       'translator:settings',
+      'announce:dm', 'announce:channel', 'announce:preview',
     ]);
 
     // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
@@ -69,7 +71,7 @@ const handler: ButtonHandler = {
       await interaction.deferUpdate();
     }
 
-    const settings = await getGuildSettings(guildId);
+    const settings = await getGuildSettings(guildId) as any;
 
     // ---------- مودالات (تفتح مودال = رد فوري) ----------
     const openModal = async (
@@ -218,6 +220,7 @@ const handler: ButtonHandler = {
       'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
       'tickets:autotext', 'tickets:pimg', 'tickets:types',
       'translator:settings',
+      'announce:dm', 'announce:channel',
     ];
     if (modalActions.includes(`${section}:${action}`)) {
       switch (`${section}:${action}`) {
@@ -254,6 +257,24 @@ const handler: ButtonHandler = {
             TextInputStyle.Paragraph,
             2000,
             JSON.stringify(t, null, 2)
+          );
+        }
+        case 'announce:dm': {
+          return openModal(
+            '📩 إعلان للخاص (DM) — اكتب الرسالة',
+            'الرسالة ستُرسل في خاص لجميع الأعضاء\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\nمرحباً {user}! أهلاً بك في {server} 🎉',
+            TextInputStyle.Paragraph,
+            2000,
+            ''
+          );
+        }
+        case 'announce:channel': {
+          return openModal(
+            '📢 إعلان لقناة — اكتب الرسالة واختر القناة',
+            'الرسالة ستُرسل في قناة محددة\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\n📢 تنبيه هام لـ {user} في {server}!\n\n[ستظهر قائمة قنوات بعد الإرسال]',
+            TextInputStyle.Paragraph,
+            2000,
+            ''
           );
         }
         case 'welcome:title':
@@ -871,6 +892,36 @@ const handler: ButtonHandler = {
         await settings.save();
         const cPanel = buildCommands(interaction.guild!, settings);
         await interaction.editReply({ embeds: cPanel.embeds, components: cPanel.components as any });
+        return;
+      }
+      case 'announce:dm': {
+        // سيتم التعامل معها في المودال
+        break;
+      }
+      case 'announce:channel': {
+        // سيتم التعامل معها في المودال مع اختيار القناة
+        break;
+      }
+      case 'announce:preview': {
+        await interaction.reply({ content: '👁️ ميزة المعاينة ستضاف قريباً', ephemeral: true });
+        return;
+      }
+      case 'announce:history': {
+        if (!settings.announcements?.history?.length) {
+          await interaction.reply({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
+          return;
+        }
+        const embed = new EmbedBuilder()
+          .setTitle('📜 سجل الإعلانات')
+          .setColor(0xf39c12)
+          .setDescription(
+            settings.announcements.history.slice(-10).reverse().map((a: any, i: number) =>
+              `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`
+            ).join('\n')
+          )
+          .setFooter({ text: `${interaction.guild!.name} • Liberty City` })
+          .setTimestamp();
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
       default:

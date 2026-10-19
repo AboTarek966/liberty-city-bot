@@ -394,6 +394,32 @@ const handler = {
             default:
                 await interaction.editReply({ content: '❌ خيار غير معروف' });
                 return;
+            case 'announce:channel': {
+                const channelId = interaction.values[0];
+                const channel = interaction.guild.channels.cache.get(channelId);
+                if (!channel || channel.type !== 0) {
+                    await interaction.editReply({ content: '❌ قناة غير صالحة' });
+                    return;
+                }
+                // نحتاج محتوى الرسالة - نقرأه من settings.announcements.history آخر إدخال
+                const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
+                const lastAnnounce = settings.announcements?.history?.slice(-1).find((a) => a.type === 'channel' && !a.sent);
+                if (!lastAnnounce) {
+                    await interaction.editReply({ content: '❌ لا توجد رسالة معلقة للإرسال' });
+                    return;
+                }
+                const content = lastAnnounce.content;
+                try {
+                    await channel.send(content);
+                    lastAnnounce.sent = true;
+                    await settings.save();
+                    await interaction.editReply({ content: `✅ تم الإرسال في ${channel}` });
+                }
+                catch (error) {
+                    await interaction.editReply({ content: `❌ فشل الإرسال: ${error.message}` });
+                }
+                return;
+            }
         }
         await settings.save();
         if (section === 'logging') {

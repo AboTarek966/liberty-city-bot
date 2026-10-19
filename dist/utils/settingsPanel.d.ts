@@ -1,5 +1,5 @@
 import { ActionRowBuilder, EmbedBuilder, Guild, ChatInputCommandInteraction, ModalBuilder } from 'discord.js';
-export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'commands';
+export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'commands' | 'announcements';
 type PanelComponent = ActionRowBuilder<any>;
 export interface BuiltPanel {
     embeds: EmbedBuilder[];
@@ -37,6 +37,7 @@ export declare function buildVerificationPanel(guild: Guild, s: any): BuiltPanel
 export declare function buildWarnRolesPanel(guild: Guild, s: any): BuiltPanel;
 export declare function getActivePanel(settings: any): any;
 export declare function buildCommands(guild: Guild, s: any): BuiltPanel;
+export declare function buildAnnouncements(guild: Guild, s: any): BuiltPanel;
 export declare function buildShop(guild: Guild, s: any): BuiltPanel;
 export declare function buildTicketMovePanel(guild: Guild, s: any): BuiltPanel;
 export declare function buildTicketAdvancedPanel(guild: Guild, s: any): BuiltPanel;

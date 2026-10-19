@@ -77,7 +77,7 @@ const handler: SelectMenuHandler = {
         await interaction.reply({ content: '❌ عنصر غير معروف', ephemeral: true });
         return;
       }
-      const st = await getGuildSettings(interaction.guild.id);
+      const st = await getGuildSettings(interaction.guild.id) as any;
       const c = (st.welcome as any).card || {};
       const pos =
         element === 'avatar'
@@ -170,7 +170,7 @@ const handler: SelectMenuHandler = {
     const values = interaction.values;
     const guildId = interaction.guild.id;
 
-    const settings = await getGuildSettings(guildId);
+    const settings = await getGuildSettings(guildId) as any;
 
     switch (`${section}:${field}`) {
       case 'tickets:category':
@@ -436,6 +436,33 @@ const handler: SelectMenuHandler = {
       default:
         await interaction.editReply({ content: '❌ خيار غير معروف' });
         return;
+      case 'announce:channel': {
+        const channelId = interaction.values[0];
+        const channel = interaction.guild!.channels.cache.get(channelId);
+        if (!channel || channel.type !== 0) {
+          await interaction.editReply({ content: '❌ قناة غير صالحة' });
+          return;
+        }
+
+        // نحتاج محتوى الرسالة - نقرأه من settings.announcements.history آخر إدخال
+        const settings = await getGuildSettings(interaction.guildId!) as any;
+        const lastAnnounce = settings.announcements?.history?.slice(-1).find((a: any) => a.type === 'channel' && !a.sent);
+        if (!lastAnnounce) {
+          await interaction.editReply({ content: '❌ لا توجد رسالة معلقة للإرسال' });
+          return;
+        }
+
+        const content = lastAnnounce.content;
+        try {
+          await (channel as any).send(content);
+          lastAnnounce.sent = true;
+          await settings.save();
+          await interaction.editReply({ content: `✅ تم الإرسال في ${channel}` });
+        } catch (error: any) {
+          await interaction.editReply({ content: `❌ فشل الإرسال: ${error.message}` });
+        }
+        return;
+      }
     }
 
     await settings.save();

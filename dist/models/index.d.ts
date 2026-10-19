@@ -184,6 +184,16 @@ export interface IGuildSettings extends Document {
             userIds: string[];
             logChannel?: string;
         };
+        /** 📢 إعلانات جماعية (Broadcast) */
+        announcements?: {
+            history: Array<{
+                type: 'dm' | 'channel';
+                content: string;
+                at: Date;
+                sentBy: string;
+                sent?: boolean;
+            }>;
+        };
     };
     tickets: {
         categoryId?: string;
