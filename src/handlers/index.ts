@@ -21,3 +21,4 @@ export { AITicketAssistant, TicketAnalysis, RequiredAction, AdminApprovalRequest
 export { AITranslator, TranslationResult, TranslatorConfig } from './AITranslator';
 export { EconomyHandler, EconomyConfig } from './EconomyHandler';
 export { GameHandler, GameSession, GamePlayer, GameConfig } from './GameHandler';
+export { MusicHandler, Track, Queue } from './MusicHandler';

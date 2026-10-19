@@ -1,5 +1,5 @@
 import { Client, Collection } from 'discord.js';
-import { CommandHandler, EventHandler, InteractionHandler, AIHandler, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler } from './handlers';
+import { CommandHandler, EventHandler, InteractionHandler, AIHandler, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler } from './handlers';
 import { Express } from 'express';
 export declare class LibertyClient extends Client {
     commandHandler: CommandHandler;
@@ -21,6 +21,7 @@ export declare class LibertyClient extends Client {
     aiTranslator: AITranslator;
     economyHandler: EconomyHandler;
     gameHandler: GameHandler;
+    musicHandler: MusicHandler;
     expressApp: Express;
     cooldowns: Collection<string, Collection<string, number>>;
     guildSettingsCache: Collection<string, any>;

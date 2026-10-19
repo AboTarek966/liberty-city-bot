@@ -51,6 +51,7 @@ exports.buildWarnRolesPanel = buildWarnRolesPanel;
 exports.getActivePanel = getActivePanel;
 exports.buildCommands = buildCommands;
 exports.buildAnnouncements = buildAnnouncements;
+exports.buildMusic = buildMusic;
 exports.buildShop = buildShop;
 exports.buildTicketMovePanel = buildTicketMovePanel;
 exports.buildTicketAdvancedPanel = buildTicketAdvancedPanel;
@@ -181,6 +182,7 @@ exports.ICONS = {
     verification: '✅',
     commands: '📝',
     announcements: '📢',
+    music: '🎵',
 };
 exports.TITLES = {
     home: 'لوحة التحكم',
@@ -197,6 +199,7 @@ exports.TITLES = {
     verification: 'توثيق الأعضاء',
     commands: 'الأوامر المخصصة',
     announcements: 'الإعلانات الجماعية',
+    music: 'نظام الموسيقى',
 };
 exports.CATEGORY_COLORS = {
     home: 0x00d4ff,
@@ -213,6 +216,7 @@ exports.CATEGORY_COLORS = {
     verification: 0x57f287,
     commands: 0x3498db,
     announcements: 0xf39c12,
+    music: 0x1db954,
 };
 function on(off) {
     return off ? '🟢' : '🔴';
@@ -260,6 +264,8 @@ async function buildPanel(category, guild, userId) {
             return buildCommands(guild, settings);
         case 'announcements':
             return buildAnnouncements(guild, settings);
+        case 'music':
+            return buildMusic(guild, settings);
         default:
             return buildHome(guild, userId, settings);
     }
@@ -299,7 +305,7 @@ function buildHome(guild, userId, s) {
         .setTimestamp();
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:general', 'عام', discord_js_1.ButtonStyle.Primary, '🌐'), btn('settings_cat:protection', 'الحماية', discord_js_1.ButtonStyle.Success, '🛡️'), btn('settings_cat:tickets', 'التذاكر', discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_cat:ai', 'الذكاء', discord_js_1.ButtonStyle.Danger, '🤖'), btn('settings_cat:welcome', 'الترحيب', discord_js_1.ButtonStyle.Success, '👋'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:leave', 'المغادرة', discord_js_1.ButtonStyle.Danger, '📤'), btn('settings_cat:logging', 'السجلات', discord_js_1.ButtonStyle.Primary, '📋'), btn('settings_cat:levels', 'المستويات', discord_js_1.ButtonStyle.Secondary, '📈'), btn('settings_cat:automod', 'الأوتو مود', discord_js_1.ButtonStyle.Danger, '🔇'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Secondary, '🔄'));
-    const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_cat:announcements', '📢 إعلانات', discord_js_1.ButtonStyle.Success, '📢'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
+    const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_cat:announcements', '📢 إعلانات', discord_js_1.ButtonStyle.Success, '📢'), btn('settings_cat:music', '🎵 الموسيقى', discord_js_1.ButtonStyle.Success, '🎵'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
     return { embeds: [embed], components: [row1, row2, row3] };
 }
 // --------------------------------------------
@@ -595,6 +601,31 @@ function buildAnnouncements(guild, s) {
         `⚠️ **تنبيه:** الإرسال للخاص (DM) قد يفشل مع أعضاء أغلقوا الخاص — البوت يتجاهل الفشل ويكمل الباقي`);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:dm', '📩 إرسال للخاص (DM)', discord_js_1.ButtonStyle.Success, '📩'), btn('settings_btn:announce:channel', '📢 إرسال لقناة', discord_js_1.ButtonStyle.Primary, '📢'), btn('settings_btn:announce:preview', '👁️ معاينة', discord_js_1.ButtonStyle.Secondary, '👁️'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:history', '📜 السجل', discord_js_1.ButtonStyle.Secondary, '📜'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    return { embeds: [embed], components: [row1, row2] };
+}
+// --------------------------------------------
+// إعدادات الموسيقى
+// --------------------------------------------
+function buildMusic(guild, s) {
+    const music = s.music || {
+        enabled: true,
+        defaultVolume: 100,
+        maxQueueSize: 50,
+        allowDJ: true,
+        djRoleId: null,
+        autoplay: false,
+        restrictToChannels: [],
+    };
+    const embed = categoryEmbed('music', guild, `إعدادات نظام الموسيقى — تشغيل من يوتيوب، قوائم انتظار، تحكم كامل\n\n` +
+        `> **🎵 الحالة:** ${on(music.enabled)} ${music.enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> **🔊 الصوت الافتراضي:** \`${music.defaultVolume}%\`\n` +
+        `> **📋 الحد الأقصى للقائمة:** \`${music.maxQueueSize}\` أغنية\n` +
+        `> **🎧 وضع DJ:** ${on(music.allowDJ)} ${music.allowDJ ? 'مفعّل (يتطلب رول DJ)' : 'معطّل'}\n` +
+        `> **🔁 تشغيل تلقائي:** ${on(music.autoplay)} ${music.autoplay ? 'مفعّل' : 'معطّل'}\n` +
+        `> **🔒 قنوات مخصصة:** ${music.restrictToChannels?.length ? music.restrictToChannels.map((id) => `<#${id}>`).join(', ') : 'الكل مسموح'}\n\n` +
+        `💡 *الأوامر: \`/music play\`، \`/music queue\`، أزرار التحكم تظهر أثناء التشغيل*`);
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:music:enabled', `الموسيقى: ${music.enabled ? '🟢' : '🔴'}`, music.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Danger, '🎵'), btn('settings_tog:music:autoplay', `التشغيل التلقائي: ${music.autoplay ? '🟢' : '🔴'}`, music.autoplay ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔁'), btn('settings_tog:music:dj', `وضع DJ: ${music.allowDJ ? '🟢' : '🔴'}`, music.allowDJ ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎧'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:music:volume', `🔊 الصوت الافتراضي: ${music.defaultVolume}%`, discord_js_1.ButtonStyle.Primary, '🔊'), btn('settings_btn:music:queue_limit', `📋 حد القائمة: ${music.maxQueueSize}`, discord_js_1.ButtonStyle.Secondary, '📋'), btn('settings_btn:music:channels', `🔒 قنوات مخصصة: ${music.restrictToChannels?.length || 0}`, discord_js_1.ButtonStyle.Secondary, '🔒'));
     return { embeds: [embed], components: [row1, row2] };
 }
 // --------------------------------------------

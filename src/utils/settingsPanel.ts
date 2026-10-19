@@ -42,7 +42,8 @@ export type SettingsCategory =
   | 'automod'
   | 'verification'
   | 'commands'
-  | 'announcements';
+  | 'announcements'
+  | 'music';
 
 type PanelComponent = ActionRowBuilder<any>;
 
@@ -182,6 +183,7 @@ export const ICONS: Record<SettingsCategory, string> = {
   verification: '✅',
   commands: '📝',
   announcements: '📢',
+  music: '🎵',
 };
 
 export const TITLES: Record<SettingsCategory, string> = {
@@ -199,6 +201,7 @@ export const TITLES: Record<SettingsCategory, string> = {
   verification: 'توثيق الأعضاء',
   commands: 'الأوامر المخصصة',
   announcements: 'الإعلانات الجماعية',
+  music: 'نظام الموسيقى',
 };
 
 export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
@@ -216,6 +219,7 @@ export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
   verification: 0x57f287,
   commands: 0x3498db,
   announcements: 0xf39c12,
+  music: 0x1db954,
 };
 
 function on(off?: boolean): string {
@@ -276,6 +280,8 @@ export async function buildPanel(
       return buildCommands(guild, settings);
     case 'announcements':
       return buildAnnouncements(guild, settings);
+    case 'music':
+      return buildMusic(guild, settings);
     default:
       return buildHome(guild, userId, settings);
   }
@@ -351,6 +357,7 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
   const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:commands', 'أوامر مخصصة', ButtonStyle.Primary, '📝'),
     btn('settings_cat:announcements', '📢 إعلانات', ButtonStyle.Success, '📢'),
+    btn('settings_cat:music', '🎵 الموسيقى', ButtonStyle.Success, '🎵'),
     btn('settings_btn:general:shop', '🛍️ المتجر', ButtonStyle.Success, '🛍️'),
     btn('settings_btn:general:warnroles', '🎭 رولات التحذير', ButtonStyle.Secondary, '🎭'),
   );
@@ -795,6 +802,48 @@ export function buildAnnouncements(guild: Guild, s: any): BuiltPanel {
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_btn:announce:history', '📜 السجل', ButtonStyle.Secondary, '📜'),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
+}
+// --------------------------------------------
+// إعدادات الموسيقى
+// --------------------------------------------
+export function buildMusic(guild: Guild, s: any): BuiltPanel {
+  const music = s.music || { 
+    enabled: true, 
+    defaultVolume: 100, 
+    maxQueueSize: 50, 
+    allowDJ: true,
+    djRoleId: null,
+    autoplay: false,
+    restrictToChannels: [],
+  };
+
+  const embed = categoryEmbed(
+    'music',
+    guild,
+    `إعدادات نظام الموسيقى — تشغيل من يوتيوب، قوائم انتظار، تحكم كامل\n\n` +
+      `> **🎵 الحالة:** ${on(music.enabled)} ${music.enabled ? 'مفعّل' : 'معطّل'}\n` +
+      `> **🔊 الصوت الافتراضي:** \`${music.defaultVolume}%\`\n` +
+      `> **📋 الحد الأقصى للقائمة:** \`${music.maxQueueSize}\` أغنية\n` +
+      `> **🎧 وضع DJ:** ${on(music.allowDJ)} ${music.allowDJ ? 'مفعّل (يتطلب رول DJ)' : 'معطّل'}\n` +
+      `> **🔁 تشغيل تلقائي:** ${on(music.autoplay)} ${music.autoplay ? 'مفعّل' : 'معطّل'}\n` +
+      `> **🔒 قنوات مخصصة:** ${music.restrictToChannels?.length ? music.restrictToChannels.map((id: string) => `<#${id}>`).join(', ') : 'الكل مسموح'}\n\n` +
+      `💡 *الأوامر: \`/music play\`، \`/music queue\`، أزرار التحكم تظهر أثناء التشغيل*`
+  );
+
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_tog:music:enabled', `الموسيقى: ${music.enabled ? '🟢' : '🔴'}`, music.enabled ? ButtonStyle.Success : ButtonStyle.Danger, '🎵'),
+    btn('settings_tog:music:autoplay', `التشغيل التلقائي: ${music.autoplay ? '🟢' : '🔴'}`, music.autoplay ? ButtonStyle.Success : ButtonStyle.Secondary, '🔁'),
+    btn('settings_tog:music:dj', `وضع DJ: ${music.allowDJ ? '🟢' : '🔴'}`, music.allowDJ ? ButtonStyle.Success : ButtonStyle.Secondary, '🎧'),
+    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:music:volume', `🔊 الصوت الافتراضي: ${music.defaultVolume}%`, ButtonStyle.Primary, '🔊'),
+    btn('settings_btn:music:queue_limit', `📋 حد القائمة: ${music.maxQueueSize}`, ButtonStyle.Secondary, '📋'),
+    btn('settings_btn:music:channels', `🔒 قنوات مخصصة: ${music.restrictToChannels?.length || 0}`, ButtonStyle.Secondary, '🔒'),
   );
 
   return { embeds: [embed], components: [row1, row2] };
