@@ -450,8 +450,6 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
   );
 
   const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    toggleBtn('protection', 'scamFilter', 'فلتر احتيال', '🎣', !!p.scamFilter?.enabled),
-    toggleBtn('protection', 'autoScan', 'فحص دوري', '🔍', !!p.autoScan?.enabled),
     toggleBtn(
       'protection',
       'lockdown',
@@ -462,16 +460,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
   );
 
-  const row5 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    toggleBtn('protection', 'antiAlt', '🕵️ Anti-Alt', '🕵️', !!p.antiAlt?.enabled),
-    toggleBtn('protection', 'inviteTracker', '📨 Invite Tracker', '📨', !!p.inviteTracker?.enabled),
-    toggleBtn('protection', 'messageScanner', '🔍 Message Scanner', '🔍', !!p.messageScanner?.enabled),
-    toggleBtn('protection', 'aiAutoMod', '🤖 AI Auto-Mod', '🤖', !!p.aiAutoMod?.enabled),
-  );
-
-  // Row 6: Protection log channel selection
-
-  // Row 7: Protection log channel selection
+  // Row 5: Protection log channel selection
   const protectionLogChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
     new ChannelSelectMenuBuilder()
       .setCustomId('settings_sel:protection:logChannel')
@@ -487,7 +476,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       )
   );
 
-  // Row 7: Jail channel selection
+  // Row 5: Jail channel selection
   const jailChannelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
     new ChannelSelectMenuBuilder()
       .setCustomId('settings_sel:jail:channel')
@@ -503,7 +492,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       )
   );
 
-  return { embeds: [embed], components: [row1, row2, row3, row4, row5, protectionLogChannelSelect, jailChannelSelect] };
+  return { embeds: [embed], components: [row1, row2, row3, row4, protectionLogChannelSelect] };
 }
 
 // --------------------------------------------
