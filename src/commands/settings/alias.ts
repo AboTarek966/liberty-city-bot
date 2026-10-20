@@ -34,45 +34,38 @@ const command: Command = {
         .addStringOption(o =>
           o
             .setName('command')
-            .setDescription('🎯 اختر الأمر من القائمة')
+            .setDescription('🎯 أوامر الإدارة والعقوبات')
             .setRequired(false)
             .addChoices(
-              // ----- عقوبات (7) -----
+              // ----- عقوبات (15) -----
               { name: '🔨 حظر', value: 'ban' },
               { name: '👢 طرد', value: 'kick' },
-              { name: '⏱️ تايم أوت (كتم مؤقت)', value: 'timeout' },
-                            { name: '⚠️ تحذير', value: 'warn' },
-              { name: '🔇 كتم دائم (رول)', value: 'mute' },
-              { name: '🔊 فك الكتم', value: 'unmute' },
-              { name: '🗑️ مسح الرسائل', value: 'purge' },
-              // ----- أدوات (5) -----
+              { name: '⏱️ تايم أوت', value: 'timeout' },
+              { name: '⚠️ تحذير', value: 'warn' },
+              { name: '🔇 كتم', value: 'mute' },
+              { name: '🔊 فك كتم', value: 'unmute' },
+              { name: '🗑️ مسح', value: 'purge' },
+              { name: '🚫 إلغاء حظر', value: 'unban' },
+              { name: '🗑️ إلغاء تايم', value: 'untimeout' },
+              { name: '✅ إزالة تحذير', value: 'unwarn' },
+              { name: '🔒 سجن', value: 'jail' },
+              { name: '🔓 إفراج', value: 'unjail' },
+              { name: '⬆️ ترقية', value: 'promote' },
+              { name: '🚨 لوكداون', value: 'lockdown' },
+              { name: '🔕 كتم مؤقت', value: 'timeout' },
+              // ----- أدوات (6) -----
               { name: '🏓 بينج', value: 'ping' },
-              { name: '💬 رسالة نصية', value: 'say' },
-              { name: '🖼️ صورة الأفاتار', value: 'avatar' },
-              { name: '📝 إنشاء إمبد', value: 'embed' },
-              { name: '🏆 متصدرين (لوحة)', value: 'leaderboard' },
-              // ----- ترفيه ولعب (7) -----
-              { name: '🎱 كرة السحر 8ball', value: '8ball' },
-              { name: '🔀 اختيار عشوائي', value: 'choose' },
-              { name: '🎲 نرد', value: 'dice' },
-              { name: '🪙 رمية عملة', value: 'flip' },
-              { name: '😂 نكتة', value: 'joke' },
-              { name: '📊 تصويت', value: 'poll' },
-              { name: '💯 تقييم', value: 'rate' },
-              // ----- معلومات (4) -----
-              { name: '👤 معلومات عضو', value: 'userinfo' },
-              { name: '🏰 معلومات السيرفر', value: 'serverinfo' },
-              { name: '❓ مساعدة / قائمة الأوامر', value: 'help' },
-              { name: '📈 نشاط السيرفر', value: 'activity' },
-              // ----- تذاكر + ذكاء اصطناعي (2) -----
-              { name: '🎫 نظام التذاكر', value: 'ticket' },
-              { name: '🤖 ذكاء اصطناعي (شات)', value: 'ai' }
+              { name: '💬 say', value: 'say' },
+              { name: '🖼️ أفاتار', value: 'avatar' },
+              { name: '📝 إمبد', value: 'embed' },
+              { name: '🏆 توب', value: 'top' },
+              { name: '👤 يوزر إنفو', value: 'userinfo' },
             )
         )
         .addStringOption(o =>
           o
             .setName('extra')
-            .setDescription('📦 ألعاب (25 لعبة)')
+            .setDescription('🎮 ألعاب (25 لعبة)')
             .setRequired(false)
             .addChoices(
               { name: '🎱 8ball', value: '8ball' },
@@ -103,6 +96,78 @@ const command: Command = {
               { name: '❌⭕ XO', value: 'xo' },
               { name: '🎮 ألعاب', value: 'games' },
               { name: '🎮 لعبة', value: 'game' },
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('extra2')
+            .setDescription('🎵 موسيقى + حماية + أدوات + معلومات')
+            .setRequired(false)
+            .addChoices(
+              // ----- موسيقى (14) -----
+              { name: '🎵 موسيقى تشغيل', value: 'music' },
+              { name: '⏭️ تخطي', value: 'music' },
+              { name: '⏹️ إيقاف', value: 'music' },
+              { name: '⏸️ إيقاف مؤقت', value: 'music' },
+              { name: '▶️ استئناف', value: 'music' },
+              { name: '📋 قائمة الانتظار', value: 'music' },
+              { name: '🎵 التشغيل الحالي', value: 'music' },
+              { name: '🔊 صوت', value: 'music' },
+              { name: '🔁 تكرار', value: 'music' },
+              { name: '⏩ تقديم', value: 'music' },
+              { name: '🚪 مغادرة صوتية', value: 'music' },
+              { name: '🔀 خلط', value: 'music' },
+              { name: '🗑️ إزالة', value: 'music' },
+              { name: '🔀 خلط قائمة', value: 'music' },
+              // ----- حماية (4) -----
+              { name: '🛡️ حماية', value: 'protection' },
+              { name: '🛑 لوكداون', value: 'lockdown' },
+              { name: '🔒 سجن', value: 'jail' },
+              { name: '🔓 إفراج', value: 'unjail' },
+              // ----- معلومات (4) -----
+              { name: '🏰 سيرفر إنفو', value: 'serverinfo' },
+              { name: '👤 يوزر إنفو', value: 'userinfo' },
+              { name: '🏆 توب', value: 'top' },
+              { name: '📈 نشاط', value: 'activity' },
+              // ----- أدوات (6) -----
+              { name: '🏓 بينج', value: 'ping' },
+              { name: '💬 say', value: 'say' },
+              { name: '🖼️ أفاتار', value: 'avatar' },
+              { name: '📝 إمبد', value: 'embed' },
+              { name: '🕵️ سنايب', value: 'snipe' },
+              { name: '💾 باك أب', value: 'backup' },
+              // ----- تذاكر + AI (2) -----
+              { name: '🎫 تذاكر', value: 'ticket' },
+              { name: '🤖 AI', value: 'ai' },
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('extra3')
+            .setDescription('📦 أوامر إدارية + رولات + حماية متقدمة')
+            .setRequired(false)
+            .addChoices(
+              { name: '⚙️ إعدادات', value: 'settings' },
+              { name: '🛡️ حماية', value: 'protection' },
+              { name: '🕵️ سنايب', value: 'snipe' },
+              { name: '💾 باك أب', value: 'backup' },
+              { name: '⌨️ علياس', value: 'alias' },
+              { name: '🎭 رول منيو', value: 'rolemenu' },
+              { name: '➕ أوتو رول', value: 'autorole' },
+              { name: '➕ رول أدد', value: 'roleadd' },
+              { name: '➖ رول ريموف', value: 'roleremove' },
+              { name: '🔓 إلغاء تايم', value: 'untimeout' },
+              { name: '🔓 إلغاء حظر', value: 'unban' },
+              { name: '✅ إزالة تحذير', value: 'unwarn' },
+              { name: '⬆️ ترقية', value: 'promote' },
+              { name: '🚨 لوكداون', value: 'lockdown' },
+              { name: '🔒 سجن', value: 'jail' },
+              { name: '🔓 إفراج', value: 'unjail' },
+              { name: '📊 توب تذاكر', value: 'ticket_top' },
+              { name: '📊 تذكرة ستات', value: 'ticket_mystats' },
+              { name: '💤 AFK', value: 'afk' },
+              { name: '🎫 تذاكر', value: 'ticket' },
+              { name: '🤖 AI', value: 'ai' },
             )
         )
     )
@@ -140,17 +205,19 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
   let shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
   const choice = interaction.options.getString('command');
   const extra = interaction.options.getString('extra');
+  const extra2 = interaction.options.getString('extra2');
+  const extra3 = interaction.options.getString('extra3');
 
-  // 🎯 اختر من إحدى القائمتين (جميع أوامر البوت متاحة)
-  if (!choice && !extra) {
+  // 🎯 اختر من إحدى القوائم (جميع أوامر البوت متاحة)
+  if (!choice && !extra && !extra2) {
     await interaction.reply({
-      content: '❌ **اختر الأمر من القائمة** — جميع أوامر البوت متاحة في القائمتين (`command` و `extra`)',
+      content: '❌ **اختر الأمر من القائمة** — جميع أوامر البوت متاحة في القوائم',
       ephemeral: true,
     });
     return;
   }
 
-  const commandName = (choice || extra || '').toLowerCase().trim();
+  const commandName = (choice || extra || interaction.options.getString('extra2') || interaction.options.getString('extra3') || '').toLowerCase().trim();
 
   // Remove prefix if user typed it (e.g., "/ban" -> "ban")
   const cleanCommand = commandName.replace(/^\//, '');
@@ -209,203 +276,63 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
     alias: shortcut,
     command: cleanCommand,
     createdBy: interaction.user.id,
+    isBuiltinOverride: isBuiltinName,
+  }).catch(err => {
+    if (err.code === 11000) {
+      throw new Error('هذا الاختصار مستخدم بالفعل لأمر آخر');
+    }
+    throw err;
   });
-
-  // تحديث الذاكرة المؤقتة فوراً (سرعة فورية بدون انتظار انتهاء صلاحيتها)
-  invalidateAliasCache(interaction.guildId!);
-
-  // مثال استخدام جاهز حسب نوع العقوبة/الأمر
-  const usageExamples: Record<string, string> = {
-    ban: `\`${shortcut} @عضو [السبب]\``,
-    kick: `\`${shortcut} @عضو [السبب]\``,
-    timeout: `\`${shortcut} @عضو 10m [السبب]\` • المدة: ` + '`10m` `1h` `1d`',
-    promote: `\${shortcut} @عضو [@رول] [السبب]`,
-    warn: `\`${shortcut} @عضو [السبب]\``,
-    unwarn: `\`${shortcut} @عضو [السبب]\``,
-    mute: `\`${shortcut} @عضو [السبب]\``,
-    unmute: `\`${shortcut} @عضو [السبب]\``,
-    purge: `\`${shortcut} 50\``,
-    snipe: `\`${shortcut}\` أو \`${shortcut} 2\` (رسالة أقدم)`,
-    untimeout: `\`${shortcut} @عضو\``,
-    unban: `\`${shortcut} @عضو\``,
-    ping: `\`${shortcut}\``,
-    say: `\`${shortcut} نص الرسالة\``,
-    avatar: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
-    userinfo: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
-    serverinfo: `\`${shortcut}\``,
-    help: `\`${shortcut}\``,
-    activity: `\`${shortcut}\` أو \`${shortcut} @عضو\``,
-    leaderboard: `\`${shortcut}\``,
-    embed: `\`${shortcut}\` (يفتح نافذة الإنشاء)`,
-    dice: `\`${shortcut}\` أو \`${shortcut} 20\``,
-    flip: `\`${shortcut}\``,
-    joke: `\`${shortcut}\``,
-    choose: `\`${shortcut} خيار1 خيار2\``,
-    rate: `\`${shortcut} الموضوع\``,
-    '8ball': `\`${shortcut} هل سأنجح؟\``,
-    poll: `\`${shortcut} السؤال خيار1 خيار2\``,
-    ai: `\`${shortcut} سؤالك هنا\``,
-    ticket: `\`${shortcut} close\` • \`${shortcut} list\``,
-    ticket_mystats: `\`${shortcut}\``,
-    ticket_top: `\`${shortcut}\``,
-    settings: `\`${shortcut}\` (يفتح لوحة الإعدادات)`,
-    protection: `\`${shortcut}\` (يفتح أنظمة الحماية)`,
-    afk: `\`${shortcut} [السبب]\` — أو \`${shortcut}\` مرة أخرى للإلغاء`,
-    backup: `\`${shortcut} create\``,
-    rolemenu: `\`${shortcut} create\``,
-    autorole: `\`${shortcut} @رول\``,
-    roleadd: `${shortcut} @عضو @رول1 [@رول2 ...] [السبب]`,
-    roleremove: `${shortcut} @عضو @رول [السبب]`,
-    jail: `\`${shortcut} @عضو [السبب]\``,
-    unjail: `\`${shortcut} @عضو [السبب]\``
-  };
-  const example = usageExamples[cleanCommand] || `\`${shortcut}\``;
-
-  const embed = new EmbedBuilder()
-    .setTitle('✅ تمت إضافة الاختصار')
-    .setColor(Colors.success)
-    .addFields(
-      { name: 'الاختصار', value: `\`${shortcut}\``, inline: true },
-      { name: 'الأمر', value: `/${cleanCommand}`, inline: true },
-      { name: '🔎 جرّبه الآن في الشات', value: example, inline: false },
-    )
-    .setDescription(
-      `اكتب \`${shortcut}\` في الشات لتنفيذ \`/${cleanCommand}\`` +
-      (existingOther
-        ? `\n\n🔁 **الاختصار مرتبط أيضاً بـ \`/${existingOther.command}\`** — ` +
-          `سيُطبَّق **تبديل تلقائي** حسب حالة الهدف (مثال: عضو عنده تحذير ⇐ يشيله، ما عنده ⇐ يضيفه)`
-        : '') +
-      (isBuiltinName
-        ? shortcut === cleanCommand
-          ? `\n\n✅ **يعمل الآن مباشرة في الشات:** \`${example}\``
-          : `\n\nℹ️ **ملاحظة:** \`${shortcut}\` هو أيضاً اسم أمر سلاش — لا مشكلة، ` +
-            `لأن الشات يستخدم الاختصارات فقط والأوامر تعمل عبر الشرائح`
-        : '')
-    )
-    .setFooter({ text: 'Liberty City Aliases' });
-
-  await interaction.reply({ embeds: [embed] });
-}
-
-// --------------------------------------------
-// Remove Alias (يحذف كل الأوامر المرتبطة بهذا الاختصار)
-// --------------------------------------------
-async function handleRemove(interaction: ChatInputCommandInteraction): Promise<void> {
-  const shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
-
-  const result = await CommandAlias.deleteMany({
-    guildId: interaction.guildId!,
-    alias: shortcut,
-  });
-
-  if (!result.deletedCount) {
-    await interaction.reply({
-      content: `❌ الاختصار \`${shortcut}\` غير موجود`,
-      ephemeral: true,
-    });
-    return;
-  }
 
   invalidateAliasCache(interaction.guildId!);
 
   await interaction.reply({
-    content:
-      `✅ تم حذف الاختصار \`${shortcut}\`` +
-      (result.deletedCount > 1 ? ` (كل أوامره: **${result.deletedCount}**)` : ''),
+    content: `✅ تم إضافة الاختصار \`${shortcut}\` للأمر \`/${cleanCommand}\``,
     ephemeral: true,
   });
+}
+
+// --------------------------------------------
+// Remove Alias
+// --------------------------------------------
+async function handleRemove(interaction: ChatInputCommandInteraction): Promise<void> {
+  const shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
+
+  const deleted = await CommandAlias.findOneAndDelete({
+    guildId: interaction.guildId!,
+    alias: shortcut,
+  });
+
+  if (!deleted) {
+    await interaction.reply({ content: `❌ الاختصار \`${shortcut}\` غير موجود`, ephemeral: true });
+    return;
+  }
+
+  invalidateAliasCache(interaction.guildId!);
+  await interaction.reply({ content: `✅ تم حذف الاختصار \`${shortcut}\``, ephemeral: true });
 }
 
 // --------------------------------------------
 // List Aliases
 // --------------------------------------------
 async function handleList(interaction: ChatInputCommandInteraction): Promise<void> {
-  const aliases = await CommandAlias.find({ guildId: interaction.guildId! }).sort({ alias: 1 });
+  const aliases = await CommandAlias.find({ guildId: interaction.guildId! }).lean();
 
-  if (aliases.length === 0) {
-    await interaction.reply({
-      content: '📭 لا توجد اختصارات. أضف واحداً باستخدام `/alias add`',
-      ephemeral: true,
-    });
+  if (!aliases.length) {
+    await interaction.reply({ content: '📭 لا توجد اختصارات مضافة بعد', ephemeral: true });
     return;
   }
 
-  // أسماء ملونة للعقوبات المعروفة
-  const LABELS: Record<string, string> = {
-    ban: '🔨 حظر',
-    kick: '👢 طرد',
-    timeout: '⏱️ تايم أوت',
-        warn: '⚠️ تحذير',
-    unwarn: '✅ إزالة تحذير',
-    mute: '🔇 كتم',
-    unmute: '🔊 فك الكتم',
-    purge: '🗑️ مسح',
-    untimeout: '🔓 إلغاء تايم أوت',
-    unban: '🔓 إلغاء حظر',
-    snipe: '🕵️ سنايب',
-    ping: '🏓 بينج',
-    say: '💬 رسالة',
-    avatar: '🖼️ أفاتار',
-    userinfo: '👤 معلومات',
-    serverinfo: '🏰 معلومات السيرفر',
-    help: '❓ مساعدة',
-    activity: '📈 نشاط',
-    leaderboard: '🏆 متصدرين',
-    embed: '📝 إمبد',
-    dice: '🎲 نرد',
-    flip: '🪙 عملة',
-    joke: '😂 نكتة',
-    choose: '🔀 اختيار',
-    rate: '💯 تقييم',
-    '8ball': '🎱 كرة السحر',
-    poll: '📊 تصويت',
-    ai: '🤖 ذكاء اصطناعي',
-    ticket: '🎫 تذاكر',
-    ticket_mystats: '📊 تذاكري المستلمة',
-    ticket_top: '🏆 أعلى المستلمين',
-    settings: '⚙️ إعدادات',
-    protection: '🛡️ حماية',
-    backup: '💾 نسخة احتياطية',
-    alias: '⌨️ اختصارات',
-    rolemenu: '🎭 روليميو',
-    autorole: '➕ رول تلقائي',
-    roleadd: '➕ إضافة رول',
-    roleremove: '➖ إزالة رول',
-    afk: '💤 AFK',
-    jail: '🔒 سجن',
-    unjail: '🔓 إلغاء سجن',
-  };
-
-  // تجميع الاختصارات المكررة (نظام التبديل 🔁)
-  const grouped = new Map<string, string[]>();
-  for (const a of aliases) {
-    const list = grouped.get(a.alias) || [];
-    list.push(a.command);
-    grouped.set(a.alias, list);
-  }
-
-  const lines = [...grouped.entries()].slice(0, 30).map(([alias, cmds]) => {
-    const names = cmds
-      .map(c => (LABELS[c] ? `${LABELS[c]} \`/${c}\`` : `\`/${c}\``))
-      .join(' • ');
-    return `\`${alias}\`${cmds.length > 1 ? ' 🔁' : ''} → ${names}`;
-  });
+  const lines = aliases.map((a, i) => `${i + 1}. \`${a.alias}\` → \`/${a.command}\``).join('\n');
 
   const embed = new EmbedBuilder()
-    .setTitle(`⌨️ اختصارات الأوامر [${grouped.size}]`)
-    .setDescription(
-      lines.join('\n') +
-      (grouped.size < aliases.length ? `\n\n🔁 = نفس الاختصار مرتبط بأكثر من أمر (تبديل تلقائي حسب الحالة)` : '')
-    )
+    .setTitle('📋 قائمة الاختصارات')
+    .setDescription(lines)
     .setColor(Colors.primary)
-    .setFooter({ text: 'Liberty City Aliases' })
+    .setFooter({ text: `${aliases.length} اختصار` })
     .setTimestamp();
 
-  if (grouped.size > 30) {
-    embed.setFooter({ text: `Liberty City Aliases | عرض 30 من ${grouped.size}` });
-  }
-
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
 export default command;
