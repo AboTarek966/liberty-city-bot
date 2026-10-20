@@ -641,7 +641,19 @@ export class AIHandler {
           if (provider === 'openai') { if (passImages?.length) continue; return await this.generateOpenAI(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined); }
           if (provider === 'anthropic') { if (passImages?.length) continue; return await this.generateAnthropic(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined); }
         } catch (error: any) {
-          logger.warn(`AI provider "${provider}" failed: ${error?.message || error}`);
+          const errMsg = String(error?.message || error);
+          logger.warn(`AI provider "${provider}" failed: ${errMsg}`);
+          // 🔧 413 = الطلب أكبر من الحد (تاريخ محادثة طويل) → نعيد المحاولة بدون تاريخ
+          if (errMsg.includes('413') || errMsg.toLowerCase().includes('too large')) {
+            try {
+              logger.warn(`AI handler: retrying "${provider}" without history (413)`);
+              if (provider === 'gemini') return await this.generateGemini(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
+              if (provider === 'openrouter') return await this.generateOpenRouter(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
+              if (provider === 'groq') return await this.generateGroq(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined);
+            } catch (retryErr: any) {
+              logger.warn(`AI provider "${provider}" retry without history failed: ${retryErr?.message || retryErr}`);
+            }
+          }
         }
       }
       return null;
@@ -787,10 +799,22 @@ export class AIHandler {
 
       //7أيام (كانت30دقيقة — هذا سبب "نسيان" البوت للمحادثة القصيرة)
       const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      return session.messages
+      const msgs: HistoryMessage[] = session.messages
         .filter((m: any) => m.role !== 'system' && new Date(m.timestamp).getTime() >= cutoff)
-        .slice(-60) // آخر60 رسالة =30 سؤالاً وجواباً ضمن سياق النموذج (زيادة من 40)
+        .slice(-40) // آخر40 رسالة كحد أقصى للعدّ
         .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 1500) }));
+
+      // ⚖️ قصّ بالحجم: حدود Groq المجانية ≈ 8000 توكن للطلب الواحد —
+      // نبقي ≤ 8000 حرف من التاريخ حتى لا نتجاوز مع system + الرسالة الحالية
+      const trimmed: HistoryMessage[] = [];
+      let chars = 0;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const len = msgs[i].content.length + 8;
+        if (chars + len > 8000) break;
+        chars += len;
+        trimmed.unshift(msgs[i]);
+      }
+      return trimmed;
     } catch (error) {
       logger.warn('Failed to load AI history:', error);
       return [];
