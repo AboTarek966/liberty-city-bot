@@ -31,6 +31,8 @@ export declare class AITicketAssistant {
     private client;
     constructor(client: LibertyClient);
     onTicketCreated(ticket: any, channel: TextChannel): Promise<void>;
+    private claimTicket;
+    private sendAutoResponse;
     private analyzeTicket;
     private getDefaultAnalysis;
     private executeSolution;

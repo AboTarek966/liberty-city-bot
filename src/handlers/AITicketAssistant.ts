@@ -73,11 +73,25 @@ export class AITicketAssistant {
       const aiConfig = (settings as any).aiTicketAssistant;
       if (!aiConfig?.enabled) return;
 
+      // 🤖 Auto-claim the ticket if enabled
+      if (aiConfig.autoClaim) {
+        try {
+          await this.claimTicket(channel, ticket);
+        } catch (error: any) {
+          logger.warn(`Auto-claim failed: ${error.message}`);
+        }
+      }
+
       // قراءة الرسالة الأولى في التذكرة
       const messages = await channel.messages.fetch({ limit: 10 });
       const firstUserMessage = [...messages.values()].reverse().find(m => !m.author.bot && m.author.id !== this.client.user?.id);
       
       if (!firstUserMessage) return;
+
+      // 🤖 Auto-response immediately when ticket is created (if analyzeOnCreate is enabled)
+      if (aiConfig.analyzeOnCreate) {
+        await this.sendAutoResponse(channel, firstUserMessage);
+      }
 
       // تحليل المشكلة
       const analysis = await this.analyzeTicket(firstUserMessage, channel.guild);
@@ -87,6 +101,87 @@ export class AITicketAssistant {
 
     } catch (error: any) {
       logger.error(`AITicketAssistant onTicketCreated error: ${error.message}`);
+    }
+  }
+
+  // --------------------------------------------
+  // Auto-claim ticket
+  // --------------------------------------------
+  private async claimTicket(channel: TextChannel, ticket: any): Promise<void> {
+    try {
+      // Check if already claimed
+      if (ticket.claimedBy) {
+        logger.info(`Ticket ${ticket._id} already claimed`);
+        return;
+      }
+
+      // Update ticket in database
+      const { Ticket } = await import('../models');
+      await Ticket.findByIdAndUpdate(ticket._id, {
+        claimedBy: this.client.user?.id,
+        claimedAt: new Date(),
+        status: 'claimed',
+      });
+
+      // Send claim message
+      const embed = new EmbedBuilder()
+        .setTitle('🤖 AI Assistant — استلام التذكرة')
+        .setDescription('تم استلام التذكرة تلقائياً بواسطة الذكاء الاصطناعي. جاري تحليل المشكلة...')
+        .setColor(0x5865f2)
+        .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+        .setTimestamp();
+
+      await channel.send({ embeds: [embed] }).catch(() => {});
+      logger.info(`AI auto-claimed ticket in ${channel.guild.name}`);
+    } catch (error: any) {
+      logger.error(`Auto-claim error: ${error.message}`);
+    }
+  }
+
+  // --------------------------------------------
+  // Auto-response when ticket is created
+  // --------------------------------------------
+  private async sendAutoResponse(channel: TextChannel, firstMessage: any): Promise<void> {
+    try {
+      const guild = channel.guild;
+      const prompt = `أنت مساعد دعم ذكي في سيرفر Discord "${channel.guild.name}".
+  
+مستخدم فتح تذكرة وكتب:
+"${firstMessage.content}"
+
+رد رداً أولياً ودوداً باللغة العربية:
+- رحب به
+- أكد استلام التذكرة
+- قل إنك ستحلل المشكلة وترد بالحل
+- لا تبالغ في الوعود
+- كن مختصراً وودوداً
+
+ردك:`;
+
+      const response = await this.client.aiHandler.generateResponse(
+        'system-ticket-ai',
+        channel.guild.id,
+        channel.id,
+        prompt,
+        [],
+        false,
+        false,
+        { fromCommand: true }
+      );
+
+      if (response?.content) {
+        const embed = new EmbedBuilder()
+          .setTitle('🤖 AI Assistant — رد أولي')
+          .setDescription(response.content)
+          .setColor(0x5865f2)
+          .setFooter({ text: 'Liberty City AI • جاري تحليل المشكلة...' })
+          .setTimestamp();
+
+        await channel.send({ embeds: [embed] }).catch(() => {});
+        logger.info(`AI auto-response sent in ${channel.guild.name}`);
+      }
+    } catch (error: any) {
+      logger.warn(`Auto-response failed: ${error.message}`);
     }
   }
 
