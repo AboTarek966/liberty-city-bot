@@ -7,6 +7,10 @@ export interface Track {
     thumbnail: string;
     requestedBy: string;
     requestedById: string;
+    /** مصدر الأغنية — soundcloud يُشغَّل عبر ffmpeg، وyoutube عبر Innertube */
+    source?: 'youtube' | 'soundcloud';
+    /** رابط ترميز SoundCloud (HLS) لإعادة بناء البث عند التشغيل/البحث */
+    scTranscodingUrl?: string;
 }
 export interface Queue {
     tracks: Track[];
@@ -22,10 +26,15 @@ export declare class MusicHandler {
     private connections;
     private manualStops;
     private seekOffsets;
+    private ffprocs;
+    private lastPlayMs;
     constructor(client: LibertyClient);
     private getQueue;
     private getSettings;
     search(query: string): Promise<Track | null>;
+    private searchSoundCloud;
+    private searchSoundCloudUrl;
+    private searchYoutubeUrl;
     private searchInnertube;
     private innertubeSearchOnce;
     private innertubeStream;
@@ -36,6 +45,8 @@ export declare class MusicHandler {
     private getPlayer;
     private cleanup;
     private startCurrent;
+    private startSoundcloud;
+    private killFfmpeg;
     private onTrackEnd;
     private advance;
     play(member: GuildMember, query: string, textChannelId?: string): Promise<{

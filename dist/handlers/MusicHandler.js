@@ -1,7 +1,8 @@
 "use strict";
 // ============================================
 // Liberty City Bot - Music Handler
-// نظام موسيقى حقيقي: @discordjs/voice + ytdl (webm/opus — بدون ffmpeg)
+// نظام موسيقى حقيقي: SoundCloud (عبر ffmpeg) أساسي + يوتيوب Innertube احتياطي
+// SoundCloud يعمل من أي IP بما فيها سيرفرات الاستضافة المجانية التي يحجبها يوتيوب
 // البحث عبر youtube-sr، ودعم كامل: تشغيل/إيقاف/استئناف/تخطي/seek/صوت/تكرار
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -37,15 +38,12 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.musicHandler = exports.MusicHandler = void 0;
 const voice_1 = require("@discordjs/voice");
-const ytdl_core_1 = __importDefault(require("@distube/ytdl-core"));
 const youtube_sr_1 = require("youtube-sr");
 const stream_1 = require("stream");
+const child_process_1 = require("child_process");
 const helpers_1 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('MusicHandler');
 // --------------------------------------------
@@ -107,6 +105,77 @@ function extractVideoId(url) {
         url.match(/embed\/([\w-]{11})/);
     return m ? m[1] : null;
 }
+// --------------------------------------------
+// ffmpeg — لتحويل بث SoundCloud (AAC/HMP4) إلى PCM يفهمه Discord
+// الحزمة اختيارية: إن فشل تثبيتها نستخدم ffmpeg من نظام التشغيل
+// --------------------------------------------
+let FFMPEG_PATH = 'ffmpeg';
+try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const inst = require('@ffmpeg-installer/ffmpeg');
+    if (inst?.path && require('fs').existsSync(inst.path))
+        FFMPEG_PATH = inst.path;
+}
+catch {
+    /* الحزمة غير مثبتة — نعتمد على ffmpeg في PATH */
+}
+// --------------------------------------------
+// SoundCloud — مصدر أساسي للبث الصوتي
+// يعمل من أي عنوان IP (بخلاف يوتيوب الذي يحجب سيرفرات الاستضافة)
+// --------------------------------------------
+const SC_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+let scClientId = null;
+let scClientIdAt = 0;
+// يجلب client_id من صفحة SoundCloud (يتغيّر نادراً — نخزّنه 6 ساعات)
+async function scGetClientId() {
+    if (scClientId && Date.now() - scClientIdAt < 6 * 60 * 60 * 1000)
+        return scClientId;
+    const r = await fetch('https://soundcloud.com', {
+        headers: { 'User-Agent': SC_UA },
+        signal: AbortSignal.timeout(15000),
+    });
+    const html = await r.text();
+    const scripts = [...html.matchAll(/src="(https:\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g)].map((m) => m[1]);
+    for (const s of scripts.reverse().slice(0, 8)) {
+        const js = await fetch(s, { headers: { 'User-Agent': SC_UA }, signal: AbortSignal.timeout(15000) })
+            .then((x) => x.text())
+            .catch(() => '');
+        const m = js.match(/client_id[:=]"([a-zA-Z0-9]{32})"/);
+        if (m) {
+            scClientId = m[1];
+            scClientIdAt = Date.now();
+            logger.info(`SoundCloud client_id refreshed: ${scClientId}`);
+            return scClientId;
+        }
+    }
+    throw new Error('soundcloud client_id not found');
+}
+// بحث عن الأغاني — يرجع أول نتيجة قابلة للتشغيل
+async function scSearchTracks(query, limit = 6) {
+    const cid = await scGetClientId();
+    const r = await fetch(`https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(query)}&client_id=${cid}&limit=${limit}`, { headers: { 'User-Agent': SC_UA }, signal: AbortSignal.timeout(15000) });
+    if (!r.ok)
+        throw new Error(`soundcloud search HTTP ${r.status}`);
+    const d = await r.json();
+    return (d.collection || []).filter((t) => t.media?.transcodings?.length);
+}
+// يحوّل ترميز الأغنية إلى رابط بث موقّع (HLS m3u8) — يُستدعى وقت التشغيل
+// (روابط الـ transcodings تنتهي صلاحيتها سريعاً)
+async function scResolveStream(transcodingUrl) {
+    const cid = await scGetClientId();
+    const r = await fetch(`${transcodingUrl}?client_id=${cid}`, {
+        headers: { 'User-Agent': SC_UA },
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok)
+        return null;
+    const d = await r.json().catch(() => ({}));
+    return d?.url || null;
+}
+// يختار ترميز HLS المناسب (AAC في حاوية MP4 — لا يوجد progressive MP3)
+function scPickHls(transcodings) {
+    return (transcodings.find((x) => x.format?.protocol === 'hls' && (x.format?.mime_type || '').startsWith('audio/mp4')) || transcodings.find((x) => x.format?.protocol === 'hls') || null);
+}
 class MusicHandler {
     client;
     queues = new Map();
@@ -116,9 +185,13 @@ class MusicHandler {
     manualStops = new Map();
     // نقطة بداية البث الحالية (بالميلي ثانية) — لحساب الموضع الحالي ودعم تقديم/إرجاع
     seekOffsets = new Map();
+    // عمليات ffmpeg النشطة لكل سيرفر (لإيقافها عند التخطي/الإيقاف/المغادرة)
+    ffprocs = new Map();
+    // مدة التشغيل الفعلية عند آخر انتهاء (للكشف عن الفشل المبكر ومنع تكرار لا نهائي)
+    lastPlayMs = new Map();
     constructor(client) {
         this.client = client;
-        logger.info('MusicHandler initialized (real voice playback via @discordjs/voice)');
+        logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}`);
     }
     // --------------------------------------------
     // القائمة
@@ -150,26 +223,28 @@ class MusicHandler {
     // البحث
     // --------------------------------------------
     async search(query) {
+        // رابط يوتيوب مباشر → تفاصيل الفيديو
+        if (/^(https?:\/\/)/i.test(query) && extractVideoId(query)) {
+            const t = await this.searchYoutubeUrl(query).catch(() => null);
+            if (t)
+                return t;
+        }
+        // رابط SoundCloud مباشر → تفاصيل الأغنية
+        if (/soundcloud\.com\//i.test(query)) {
+            const t = await this.searchSoundCloudUrl(query).catch(() => null);
+            if (t)
+                return t;
+        }
+        // بحث بالاسم عبر SoundCloud أولاً — يعمل من أي IP (بخلاف يوتيوب الذي يحجب سيرفرات الاستضافة)
         try {
-            // رابط يوتيوب مباشر
-            if (ytdl_core_1.default.validateURL(query)) {
-                const info = await ytdl_core_1.default.getInfo(query);
-                const v = info.videoDetails;
-                return {
-                    title: v.title,
-                    url: v.video_url,
-                    duration: parseInt(v.lengthSeconds) || 0,
-                    thumbnail: v.thumbnails?.[v.thumbnails.length - 1]?.url || '',
-                    requestedBy: '',
-                    requestedById: '',
-                };
-            }
+            const sc = await this.searchSoundCloud(query);
+            if (sc)
+                return sc;
         }
         catch (error) {
-            logger.error(`Direct URL lookup failed: ${error.message}`);
-            // لا نوقف البحث — قد ينجح البحث بالاسم حتى لو فشل الوصول المباشر
+            logger.warn(`SoundCloud search failed for "${query}": ${error.message}`);
         }
-        // بحث نصي أولاً عبر youtube-sr
+        // بحث احتياطي عبر youtube-sr
         try {
             const video = await youtube_sr_1.YouTube.searchOne(query, 'video').catch(() => null);
             if (video?.url) {
@@ -180,6 +255,7 @@ class MusicHandler {
                     thumbnail: video.thumbnail?.url || '',
                     requestedBy: '',
                     requestedById: '',
+                    source: 'youtube',
                 };
             }
         }
@@ -194,6 +270,88 @@ class MusicHandler {
             logger.error(`Innertube search failed for "${query}": ${error.message}`);
             return null;
         }
+    }
+    // --------------------------------------------
+    // بحث SoundCloud (المصدر الأساسي — سريع ويعمل من الاستضافة)
+    // --------------------------------------------
+    async searchSoundCloud(query) {
+        // صيغ بديلة للعبارات العربية القصيرة/العامية (مثل: "جريئه اوي")
+        const variants = [query];
+        if (/[\u0600-\u06FF]/.test(query))
+            variants.push(normalizeArabic(query));
+        for (const variant of variants) {
+            const results = await scSearchTracks(variant).catch(() => []);
+            if (!results.length)
+                continue;
+            // نفضّل النتيجة المطابقة تماماً إن وُجدت، وإلا الأولى
+            const norm = normalizeArabic(variant).toLowerCase();
+            const pick = results.find((t) => normalizeArabic(String(t.title || '')).toLowerCase().includes(norm)) ||
+                results[0];
+            const hls = scPickHls(pick.media.transcodings);
+            if (!hls)
+                continue;
+            if (variant !== query)
+                logger.info(`SoundCloud: found via variant "${variant}"`);
+            return {
+                title: String(pick.title || query),
+                url: String(pick.permalink_url || ''),
+                duration: Math.floor((pick.duration || 0) / 1000),
+                thumbnail: pick.artwork_url || pick.user?.avatar_url || '',
+                requestedBy: '',
+                requestedById: '',
+                source: 'soundcloud',
+                scTranscodingUrl: hls.url,
+            };
+        }
+        logger.warn(`SoundCloud: no results for "${query}"`);
+        return null;
+    }
+    // تفاصيل أغنية SoundCloud من رابط مباشر (endpoint resolve)
+    async searchSoundCloudUrl(url) {
+        const cid = await scGetClientId();
+        const r = await fetch(`https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${cid}`, { headers: { 'User-Agent': SC_UA }, signal: AbortSignal.timeout(15000) });
+        if (!r.ok)
+            return null;
+        const t = await r.json().catch(() => null);
+        if (!t?.media?.transcodings?.length)
+            return null;
+        const hls = scPickHls(t.media.transcodings);
+        if (!hls)
+            return null;
+        return {
+            title: String(t.title || url),
+            url: String(t.permalink_url || url),
+            duration: Math.floor((t.duration || 0) / 1000),
+            thumbnail: t.artwork_url || t.user?.avatar_url || '',
+            requestedBy: '',
+            requestedById: '',
+            source: 'soundcloud',
+            scTranscodingUrl: hls.url,
+        };
+    }
+    // تفاصيل فيديو يوتيوب من رابط مباشر (عبر Innertube player — لا يحتاج ytdl)
+    async searchYoutubeUrl(url) {
+        const videoId = extractVideoId(url);
+        if (!videoId)
+            return null;
+        const d = await innertube('player', {
+            context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'ar', gl: 'EG' } },
+            videoId,
+            contentCheckOk: true,
+            racyCheckOk: true,
+        });
+        const vd = d?.videoDetails;
+        if (!vd)
+            return null;
+        return {
+            title: vd.title || url,
+            url,
+            duration: parseInt(vd.lengthSeconds) || 0,
+            thumbnail: vd.thumbnail?.thumbnails?.[vd.thumbnail.thumbnails.length - 1]?.url || '',
+            requestedBy: '',
+            requestedById: '',
+            source: 'youtube',
+        };
     }
     // --------------------------------------------
     // بحث احتياطي عبر YouTube Innertube API (ANDROID)
@@ -224,6 +382,7 @@ class MusicHandler {
                     thumbnail: video.thumbnail?.thumbnails?.[video.thumbnail.thumbnails.length - 1]?.url || '',
                     requestedBy: '',
                     requestedById: '',
+                    source: 'youtube',
                 };
             }
         }
@@ -378,6 +537,8 @@ class MusicHandler {
         player = (0, voice_1.createAudioPlayer)();
         player.on('stateChange', (oldState, newState) => {
             if (newState.status === voice_1.AudioPlayerStatus.Idle && oldState.status !== voice_1.AudioPlayerStatus.Idle) {
+                // نحفظ المدة المُشغَّلة فعلياً قبل أن يفقد المشغّل الـ resource
+                this.lastPlayMs.set(guildId, oldState.resource?.playbackDuration ?? 0);
                 this.onTrackEnd(guildId);
             }
         });
@@ -403,6 +564,8 @@ class MusicHandler {
         this.players.delete(guildId);
         this.manualStops.delete(guildId);
         this.seekOffsets.delete(guildId);
+        this.lastPlayMs.delete(guildId);
+        this.killFfmpeg(guildId);
     }
     // --------------------------------------------
     // بدء تشغيل الأغنية الحالية
@@ -416,19 +579,25 @@ class MusicHandler {
         const player = this.getPlayer(guildId);
         if (!connection)
             return false;
+        // ---- المصدر الأساسي: SoundCloud عبر ffmpeg (يعمل من الاستضافة) ----
+        if (track.source === 'soundcloud' && track.scTranscodingUrl) {
+            try {
+                const ok = await this.startSoundcloud(guildId, track, beginMs);
+                if (ok)
+                    return true;
+                logger.warn(`SoundCloud stream unavailable for "${track.title}", falling back to YouTube`);
+            }
+            catch (err) {
+                logger.error(`SoundCloud failed for "${track.title}": ${err.message}`);
+            }
+            // لا نستسلم — نجرب يوتيوب أسفله
+        }
+        // ---- احتياطي: يوتيوب عبر Innertube مباشرة (ytdl معطّل: يفشل دائماً ويبطئ 6 ثوانٍ) ----
         try {
-            const info = await ytdl_core_1.default.getInfo(track.url);
-            // ن prefer صيغة webm/opus حتى لا نحتاج ffmpeg
-            const format = ytdl_core_1.default.chooseFormat(info.formats, {
-                quality: 'highestaudio',
-                filter: (f) => f.container === 'webm' && f.hasAudio && !f.hasVideo,
-            }) ||
-                ytdl_core_1.default.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audio' });
-            const stream = ytdl_core_1.default.downloadFromInfo(info, {
-                format,
-                highWaterMark: 1 << 22,
-                ...(beginMs > 0 ? { begin: beginMs } : {}),
-            });
+            const videoId = extractVideoId(track.url);
+            const stream = videoId ? await this.innertubeStream(videoId, beginMs) : null;
+            if (!stream)
+                throw new Error('لا يوجد رابط بث (يوتيوب يحجب هذا العنوان)');
             const resource = (0, voice_1.createAudioResource)(stream, {
                 inputType: voice_1.StreamType.WebmOpus,
                 inlineVolume: true,
@@ -436,49 +605,112 @@ class MusicHandler {
             if (resource.volume) {
                 resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
             }
+            this.killFfmpeg(guildId); // أي ffmpeg سابق لا معنى له الآن
             connection.subscribe(player);
             player.play(resource);
             this.seekOffsets.set(guildId, beginMs);
             queue.isPlaying = true;
+            logger.info(`YouTube (innertube) stream started for "${track.title}"`);
             return true;
         }
-        catch (ytdlError) {
-            // فشل ytdl (غالباً حجب) → محاولة احتياطية عبر Innertube
-            logger.warn(`ytdl failed for "${track.title}", trying innertube: ${ytdlError.message}`);
+        catch (fallbackError) {
+            logger.error(`Failed to start "${track.title}" (${guildId}): ${fallbackError.message}`);
+            // آخر محاولة: يوتيوب محجوب من الاستضافة → ابحث بنفس العنوان في SoundCloud
+            if (track.source !== 'soundcloud') {
+                const scTrack = await this.searchSoundCloud(track.title).catch(() => null);
+                if (scTrack) {
+                    logger.info(`YouTube blocked — retrying "${track.title}" via SoundCloud`);
+                    queue.currentTrack = {
+                        ...scTrack,
+                        requestedBy: track.requestedBy,
+                        requestedById: track.requestedById,
+                    };
+                    try {
+                        if (await this.startSoundcloud(guildId, queue.currentTrack, beginMs))
+                            return true;
+                    }
+                    catch (e2) {
+                        logger.error(`SoundCloud retry failed: ${e2.message}`);
+                    }
+                }
+            }
+            queue.isPlaying = false;
+            // تخطي تلقائي للأغنية التالية عند فشل المصدر
+            const next = queue.tracks.shift() ?? null;
+            if (next) {
+                queue.currentTrack = next;
+                await this.startCurrent(guildId).catch(() => false);
+            }
+            else {
+                queue.currentTrack = null;
+                this.cleanup(guildId, true);
+            }
+            return false;
+        }
+    }
+    // --------------------------------------------
+    // تشغيل SoundCloud: رابط HLS → ffmpeg → PCM خام (48k stereo)
+    // --------------------------------------------
+    async startSoundcloud(guildId, track, beginMs) {
+        const queue = this.getQueue(guildId);
+        const connection = this.connections.get(guildId);
+        const player = this.getPlayer(guildId);
+        if (!connection)
+            return false;
+        // 1) احصل على رابط البث الموقّع (أول مرة، ثم مرة أخرى بمفتاح جديد عند الفشل)
+        let url = await scResolveStream(track.scTranscodingUrl).catch(() => null);
+        if (!url) {
+            scClientId = null; // أجبر تحديث المفتاح
+            url = await scResolveStream(track.scTranscodingUrl).catch(() => null);
+        }
+        if (!url)
+            throw new Error('تعذر جلب رابط البث من SoundCloud');
+        // 2) أوقف أي ffmpeg سابق
+        this.killFfmpeg(guildId);
+        // 3) شغّل ffmpeg: يقرأ HLS ويطوّيه إلى PCM خام يفهمه Discord
+        const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA];
+        if (beginMs > 0)
+            args.push('-ss', String(Math.floor(beginMs / 1000)));
+        args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
+        const proc = (0, child_process_1.spawn)(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        this.ffprocs.set(guildId, proc);
+        let stderrBuf = '';
+        proc.stderr?.on('data', (c) => {
+            stderrBuf = (stderrBuf + c.toString()).slice(-500);
+        });
+        proc.on('error', (err) => logger.error(`ffmpeg spawn error (${guildId}): ${err.message}`));
+        proc.on('close', (code) => {
+            this.ffprocs.delete(guildId);
+            if (code && code !== 0 && code !== 255) {
+                logger.warn(`ffmpeg exited with code ${code}: ${stderrBuf.slice(0, 200)}`);
+            }
+        });
+        // 4) مرّر الـ PCM للمشغّل (volume يعمل عبر inlineVolume)
+        const resource = (0, voice_1.createAudioResource)(proc.stdout, {
+            inputType: voice_1.StreamType.Raw,
+            inlineVolume: true,
+        });
+        if (resource.volume) {
+            resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
+        }
+        connection.subscribe(player);
+        player.play(resource);
+        this.seekOffsets.set(guildId, beginMs);
+        queue.isPlaying = true;
+        logger.info(`SoundCloud stream started for "${track.title}" (seek=${beginMs}ms)`);
+        return true;
+    }
+    // إيقاف ffmpeg النشط لهذا السيرفر (إن وُجد)
+    killFfmpeg(guildId) {
+        const proc = this.ffprocs.get(guildId);
+        if (proc) {
             try {
-                const videoId = extractVideoId(track.url);
-                const stream = videoId ? await this.innertubeStream(videoId, beginMs) : null;
-                if (!stream)
-                    throw new Error('لا يوجد رابط بث احتياطي');
-                const resource = (0, voice_1.createAudioResource)(stream, {
-                    inputType: voice_1.StreamType.WebmOpus,
-                    inlineVolume: true,
-                });
-                if (resource.volume) {
-                    resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
-                }
-                connection.subscribe(player);
-                player.play(resource);
-                this.seekOffsets.set(guildId, beginMs);
-                queue.isPlaying = true;
-                logger.info(`Innertube fallback stream started for "${track.title}"`);
-                return true;
+                proc.kill();
             }
-            catch (fallbackError) {
-                logger.error(`Failed to start "${track.title}" (${guildId}): ${ytdlError.message} | fallback: ${fallbackError.message}`);
-                queue.isPlaying = false;
-                // تخطي تلقائي للأغنية التالية عند فشل المصدر
-                const next = queue.tracks.shift() ?? null;
-                if (next) {
-                    queue.currentTrack = next;
-                    await this.startCurrent(guildId).catch(() => false);
-                }
-                else {
-                    queue.currentTrack = null;
-                    this.cleanup(guildId, true);
-                }
-                return false;
+            catch {
+                /* تجاهل */
             }
+            this.ffprocs.delete(guildId);
         }
     }
     // انتهاء الأغنية (طبيعياً أو عبر stop())
@@ -489,19 +721,23 @@ class MusicHandler {
             return; // التوقف اليدوي يتولاه المتوقف (skip/stop)
         }
         const queue = this.getQueue(guildId);
-        // تكرار الأغنية الحالية
-        if (queue.loop === 'track' && queue.currentTrack) {
+        // هل انتهت مبكراً جداً؟ (فشل بث — مثلاً ffmpeg أو يوتيوب رفضا المصدر)
+        const durMs = (queue.currentTrack?.duration || 0) * 1000;
+        const played = this.lastPlayMs.get(guildId) || 0;
+        const earlyFail = durMs > 10_000 && played < 4_000;
+        // تكرار الأغنية الحالية — لكن لا نكرّرها إن فشلت فوراً (حلقة لا نهائية)
+        if (queue.loop === 'track' && queue.currentTrack && !earlyFail) {
             this.startCurrent(guildId).catch(() => { });
             return;
         }
-        this.advance(guildId);
+        this.advance(guildId, earlyFail);
     }
     // الانتقال للأغنية التالية
-    advance(guildId) {
+    advance(guildId, earlyFail = false) {
         const queue = this.getQueue(guildId);
         const prev = queue.currentTrack;
-        // تكرار القائمة: نعيد الأغنية المنتهية للنهاية
-        if (queue.loop === 'queue' && prev)
+        // تكرار القائمة: نعيد الأغنية المنتهية للنهاية (إلا إن فشلت فوراً)
+        if (queue.loop === 'queue' && prev && !earlyFail)
             queue.tracks.push(prev);
         const next = queue.tracks.shift() ?? null;
         queue.currentTrack = next;
@@ -585,7 +821,7 @@ class MusicHandler {
         }
         const started = await this.startCurrent(guildId);
         if (!started) {
-            return { success: false, message: `❌ تعذر تشغيل **${track.title}** — يوتيوب يرفض المصدر الآن، جرّب أغنية أخرى` };
+            return { success: false, message: `❌ تعذر تشغيل **${track.title}** — جرّب أغنية أخرى` };
         }
         return { success: true, track, message: `🎵 **تشغيل الآن:** ${track.title}` };
     }
