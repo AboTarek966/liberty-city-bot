@@ -46,6 +46,13 @@ export class InviteTrackerHandler {
     this.client.on(Events.InviteDelete, invite => this.onInviteDelete(invite));
   }
 
+  // تنظيف كاش سيرفر عند مغادرة البوت (guildDelete)
+  clearGuild(guildId: string): void {
+    this.inviteCache.delete(guildId);
+    this.joinTracker.delete(guildId);
+    logger.info(`🧹 Cleared invite cache for ${guildId}`);
+  }
+
   // --------------------------------------------
   // تخزين دعوات السيرفر
   // --------------------------------------------

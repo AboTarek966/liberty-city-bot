@@ -186,6 +186,35 @@ export class SecurityHandler {
     this.client = client;
   }
 
+  // --------------------------------------------
+  // تنظيف كل موارد السيرفر — يُستدعى عند مغادرة البوت (guildDelete)
+  // حتى لا تبقى مؤقتات/كاش/بيانات تخص سيرفر البوت خرج منه
+  // --------------------------------------------
+  clearGuild(guildId: string): void {
+    const clearOne = (m: Map<string, NodeJS.Timeout>) => {
+      const t = m.get(guildId);
+      if (t) {
+        clearInterval(t);
+        clearTimeout(t);
+        m.delete(guildId);
+      }
+    };
+    clearOne(this.backupTimers);
+    clearOne(this.scanTimers);
+    clearOne(this.restoreTimers);
+    clearOne(this.kickedTimers);
+    clearOne(this.topWatchdogs);
+    clearOne(this.messageSnapshotInterval);
+    this.deletionTracker.delete(guildId);
+    this.messageDeletionTracker.delete(guildId);
+    this.messageSnapshots.delete(guildId);
+    this.renameTracker.delete(guildId);
+    this.hierarchyState.delete(guildId);
+    this.restoreLocks.delete(guildId);
+    this.kickedQueue.delete(guildId);
+    logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
+  }
+
   cleanup(): void {
     for (const timer of this.backupTimers.values()) clearInterval(timer);
     this.backupTimers.clear();

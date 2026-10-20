@@ -39,6 +39,7 @@ export declare class SecurityHandler {
     private kickedTimers;
     private topWatchdogs;
     constructor(client: Client);
+    clearGuild(guildId: string): void;
     cleanup(): void;
     private getAlertChannel;
     private findExecutor;

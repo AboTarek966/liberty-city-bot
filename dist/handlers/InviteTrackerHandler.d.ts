@@ -6,6 +6,7 @@ export declare class InviteTrackerHandler {
     private joinTracker;
     constructor(client: LibertyClient);
     private initializeTracking;
+    clearGuild(guildId: string): void;
     cacheGuildInvites(guild: Guild): Promise<void>;
     private onInviteCreate;
     private onInviteDelete;

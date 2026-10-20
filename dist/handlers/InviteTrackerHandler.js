@@ -24,6 +24,12 @@ class InviteTrackerHandler {
         this.client.on(discord_js_1.Events.InviteCreate, invite => this.onInviteCreate(invite));
         this.client.on(discord_js_1.Events.InviteDelete, invite => this.onInviteDelete(invite));
     }
+    // تنظيف كاش سيرفر عند مغادرة البوت (guildDelete)
+    clearGuild(guildId) {
+        this.inviteCache.delete(guildId);
+        this.joinTracker.delete(guildId);
+        logger.info(`🧹 Cleared invite cache for ${guildId}`);
+    }
     // --------------------------------------------
     // تخزين دعوات السيرفر
     // --------------------------------------------
