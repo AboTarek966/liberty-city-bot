@@ -332,6 +332,13 @@ const ALIAS_LABELS = {
     roleadd: '➕ إضافة رول', roleremove: '➖ إزالة رول', promote: '⬆️ ترقية',
     jail: '🔒 سجن', unjail: '🔓 إلغاء سجن', lockdown: '🚨 وضع الطوارئ', settings: '⚙️ إعدادات',
     afk: '💤 AFK', snipe: '🕵️ سنايب', ping: '🏓 بينج', speak: '🗣️ السماح بالكلام',
+    // 🎵 الموسيقى
+    music: '🎵 تشغيل موسيقى',
+    'music:play': '🎵 تشغيل أغنية', 'music:skip': '⏭️ تخطي', 'music:stop': '⏹️ إيقاف الموسيقى',
+    'music:pause': '⏸️ إيقاف مؤقت', 'music:resume': '▶️ استئناف', 'music:queue': '📋 قائمة الانتظار',
+    'music:nowplaying': '🎵 الأغنية الحالية', 'music:volume': '🔊 الصوت', 'music:loop': '🔁 التكرار',
+    'music:forward': '⏩ تقديم 10 ثوانٍ', 'music:back': '⏪ إرجاع 10 ثوانٍ',
+    'music:leave': '🚪 مغادرة الصوتية', 'music:shuffle': '🔀 خلط القائمة', 'music:remove': '🗑️ إزالة أغنية',
 };
 function cleanupAliasPick() {
     const now = Date.now();
@@ -523,7 +530,9 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
         await respond(message, { embeds: [embed] });
         return;
     }
-    const command = client.commandHandler.getCommand(commandName);
+    // 🎵 الاختصارات الفرعية (music:play) → نتحقق من الأمر الأساسي music
+    const command = client.commandHandler.getCommand(commandName) ||
+        client.commandHandler.getCommand(commandName.split(':')[0]);
     if (!command) {
         logger.warn(`Alias target command not found: "${commandName}"`);
         await respond(message, `❌ الأمر \`${commandName}\` غير موجود في البوت`);
@@ -554,11 +563,155 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
     // ✅ لا نحذف رسالة المستخدم — تبقى ظاهرة مع رد البوت
 }
 // --------------------------------------------
+// 🎵 منفّذ أوامر الموسيقى عبر الاختصارات (music:<فعل>)
+// مثال: `تشغيل Despacito` • `تقديم` • `صوت 50` • `تكرار قائمة`
+// --------------------------------------------
+async function runMusicAlias(message, client, commandName, args, shortcut, member, usage) {
+    const music = client.musicHandler;
+    const guildId = message.guild.id;
+    // القيمة القديمة 'music' بدون فرع = تشغيل (اختصارات أُنشئت قبل التصحيح)
+    const action = commandName.includes(':') ? commandName.split(':')[1] : 'play';
+    const fmt = (s) => {
+        const sec = Math.max(0, Math.floor(s));
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const ss = sec % 60;
+        return h > 0
+            ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+            : `${m}:${String(ss).padStart(2, '0')}`;
+    };
+    switch (action) {
+        case 'play': {
+            const query = args.join(' ').trim();
+            if (!query)
+                return usage('<اسم الأغنية أو رابط يوتيوب>');
+            const result = await music.play(member, query, message.channelId);
+            return respond(message, result.message);
+        }
+        case 'skip': {
+            if (!music.skip(guildId))
+                return respond(message, '❌ لا توجد أغنية للتخطي!');
+            return respond(message, '⏭️ تم التخطي!');
+        }
+        case 'stop': {
+            if (!music.stop(guildId))
+                return respond(message, '❌ لا توجد موسيقى تعمل!');
+            return respond(message, '⏹️ تم الإيقاف ومسح القائمة!');
+        }
+        case 'pause': {
+            if (!music.pause(guildId))
+                return respond(message, '❌ لا توجد موسيقى تعمل الآن!');
+            return respond(message, '⏸️ تم الإيقاف المؤقت');
+        }
+        case 'resume': {
+            if (!music.resume(guildId))
+                return respond(message, '❌ لا يوجد إيقاف مؤقت!');
+            return respond(message, '▶️ تم الاستئناف!');
+        }
+        case 'queue': {
+            const q = music.getQueueInfo(guildId);
+            if (!q || (!q.currentTrack && q.tracks.length === 0))
+                return respond(message, '📭 قائمة الانتظار فارغة!');
+            const lines = [];
+            if (q.currentTrack) {
+                lines.push(`🎵 **الآن:** ${q.currentTrack.title} — \`${fmt(music.getPosition(guildId))}/${fmt(q.currentTrack.duration)}\``);
+            }
+            q.tracks.slice(0, 10).forEach((t, i) => lines.push(`${i + 1}. ${t.title} — \`${fmt(t.duration)}\``));
+            if (q.tracks.length > 10)
+                lines.push(`… و ${q.tracks.length - 10} أغنية أخرى`);
+            return respond(message, `📋 **قائمة الانتظار** (${q.tracks.length}):\n${lines.join('\n')}`);
+        }
+        case 'nowplaying': {
+            const t = music.getCurrentTrack(guildId);
+            if (!t)
+                return respond(message, '❌ لا توجد أغنية قيد التشغيل!');
+            return respond(message, `🎵 **${t.title}**\n⏱️ \`${fmt(music.getPosition(guildId))} / ${fmt(t.duration)}\`\n👤 طلبها: ${t.requestedBy || '؟'}\n🔗 ${t.url}`);
+        }
+        case 'volume': {
+            const q = music.getQueueInfo(guildId);
+            const level = parseInt(args[0], 10);
+            if (isNaN(level)) {
+                return respond(message, `🔊 الصوت الحالي: **${q?.volume ?? 100}%** — لتغييره: \`${shortcut} صوت 50\``);
+            }
+            if (level < 0 || level > 200)
+                return respond(message, '❌ الصوت من 0 إلى 200');
+            music.setVolume(guildId, level);
+            return respond(message, `🔊 تم تعيين الصوت إلى **${level}%**`);
+        }
+        case 'loop': {
+            const raw = (args[0] || '').toLowerCase();
+            const map = {
+                'اغنية': 'track', 'الاغنية': 'track', 'track': 'track', 'أغنية': 'track',
+                'قائمة': 'queue', 'القائمة': 'queue', 'queue': 'queue',
+                'ايقاف': 'none', 'إيقاف': 'none', 'off': 'none', 'none': 'none', 'تعطيل': 'none',
+            };
+            const labels = { none: '❌ معطل', track: '🔁 تكرار الأغنية', queue: '🔂 تكرار القائمة' };
+            if (!raw) {
+                const cur = music.getQueueInfo(guildId)?.loop || 'none';
+                return respond(message, `🔁 التكرار الحالي: **${labels[cur]}** — التغيير: \`${shortcut} تكرار اغنية\``);
+            }
+            const mode = map[raw];
+            if (!mode)
+                return usage('تكرار اغنية|قائمة|ايقاف');
+            music.setLoop(guildId, mode);
+            return respond(message, `🔁 تم التعيين: **${labels[mode]}**`);
+        }
+        case 'forward':
+        case 'back': {
+            const q = music.getQueueInfo(guildId);
+            if (!q?.currentTrack)
+                return respond(message, '❌ لا توجد أغنية قيد التشغيل!');
+            const parsed = parseInt(args[0], 10);
+            const step = isNaN(parsed) ? 10 : Math.min(600, Math.max(1, parsed));
+            const pos = music.getPosition(guildId);
+            const target = action === 'forward' ? pos + step : Math.max(0, pos - step);
+            // تجاوز المدة للأمام → تخطي للأغنية التالية
+            if (action === 'forward' && target >= q.currentTrack.duration) {
+                if (music.skip(guildId))
+                    return respond(message, '⏭️ تجاوز مدة الأغنية — تم التخطي للأغنية التالية!');
+                return respond(message, '⏩ انتهى التشغيل');
+            }
+            const ok = await music.seek(guildId, target);
+            if (!ok)
+                return respond(message, '❌ فشل تعديل الموضع — حاول مجدداً');
+            const label = action === 'forward' ? `⏩ تقديم ${step} ثوانٍ` : `⏪ إرجاع ${step} ثوانٍ`;
+            return respond(message, `${label} — الآن عند **${fmt(target)}**`);
+        }
+        case 'leave': {
+            if (!music.isConnected(guildId))
+                return respond(message, '❌ البوت ليس في قناة صوتية!');
+            music.leave(guildId);
+            return respond(message, '👋 تم مغادرة القناة الصوتية!');
+        }
+        case 'shuffle': {
+            if (!music.shuffle(guildId))
+                return respond(message, '❌ القائمة فارغة أو فيها أغنية واحدة فقط!');
+            return respond(message, '🔀 تم خلط القائمة!');
+        }
+        case 'remove': {
+            const pos = parseInt(args[0], 10);
+            if (isNaN(pos))
+                return usage('<رقم الأغنية في القائمة>');
+            const removed = music.removeTrack(guildId, pos);
+            if (!removed)
+                return respond(message, '❌ رقم غير صحيح — شوف الرقم من القائمة');
+            return respond(message, `🗑️ تم حذف: **${removed.title}**`);
+        }
+        default:
+            return respond(message, `❌ أمر موسيقى غير معروف: \`${action}\``);
+    }
+}
+// --------------------------------------------
 // Message-based command executors (by command name)
 // --------------------------------------------
 async function runAliasCommand(message, client, commandName, args, shortcut, member) {
     const guild = message.guild;
     const usage = (syntax) => respond(message, `📋 **الاستخدام:** \`${shortcut} ${syntax}\``);
+    // 🎵 أوامر الموسيقى (music:play / music:skip ... والقيمة القديمة music = تشغيل)
+    if (commandName === 'music' || commandName.startsWith('music:')) {
+        await runMusicAlias(message, client, commandName, args, shortcut, member, usage);
+        return;
+    }
     switch (commandName) {
         // ---------- MODERATION ----------
         case 'ban': {

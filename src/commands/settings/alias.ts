@@ -100,20 +100,21 @@ const command: Command = {
             .setDescription('🎵 موسيقى + حماية + معلومات')
             .setRequired(false)
             .addChoices(
-              { name: '🎵 موسيقى تشغيل', value: 'music' },
-              { name: '⏭️ تخطي', value: 'music' },
-              { name: '⏹️ إيقاف', value: 'music' },
-              { name: '⏸️ إيقاف مؤقت', value: 'music' },
-              { name: '▶️ استئناف', value: 'music' },
-              { name: '📋 قائمة الانتظار', value: 'music' },
-              { name: '🎵 التشغيل الحالي', value: 'music' },
-              { name: '🔊 صوت', value: 'music' },
-              { name: '🔁 تكرار', value: 'music' },
-              { name: '⏩ تقديم', value: 'music' },
-              { name: '🚪 مغادرة صوتية', value: 'music' },
-              { name: '🔀 خلط', value: 'music' },
-              { name: '🗑️ إزالة', value: 'music' },
-              { name: '🔀 خلط قائمة', value: 'music' },
+              // 🎵 قيم فريدة لكل إجراء (music:<فعل>) — كانت كلها 'music' ولا تفرّق بينها
+              { name: '🎵 تشغيل أغنية', value: 'music:play' },
+              { name: '⏭️ تخطي', value: 'music:skip' },
+              { name: '⏹️ إيقاف الموسيقى', value: 'music:stop' },
+              { name: '⏸️ إيقاف مؤقت', value: 'music:pause' },
+              { name: '▶️ استئناف', value: 'music:resume' },
+              { name: '📋 قائمة الانتظار', value: 'music:queue' },
+              { name: '🎵 الأغنية الحالية', value: 'music:nowplaying' },
+              { name: '🔊 الصوت', value: 'music:volume' },
+              { name: '🔁 التكرار', value: 'music:loop' },
+              { name: '⏩ تقديم 10 ثوانٍ', value: 'music:forward' },
+              { name: '⏪ إرجاع 10 ثوانٍ', value: 'music:back' },
+              { name: '🚪 مغادرة الصوتية', value: 'music:leave' },
+              { name: '🔀 خلط القائمة', value: 'music:shuffle' },
+              { name: '🗑️ إزالة أغنية', value: 'music:remove' },
               { name: '🛡️ حماية', value: 'protection' },
               { name: '🛑 لوكداون', value: 'lockdown' },
               { name: '🔒 سجن', value: 'jail' },
@@ -224,6 +225,9 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
   // Remove prefix if user typed it (e.g., "/ban" -> "ban")
   const cleanCommand = commandName.replace(/^\//, '');
 
+  // 🎵 أوامر بفرعي مثل `music:play` → الأمر الأساسي للتحقق هو `music`
+  const baseCommand = cleanCommand.includes(':') ? cleanCommand.split(':')[0] : cleanCommand;
+
   // Validate shortcut: no spaces, reasonable length, not a reserved word
   if (shortcut.includes(' ') || shortcut.length > 15) {
     await interaction.reply({
@@ -237,10 +241,10 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
   if (shortcut.startsWith('/')) shortcut = shortcut.slice(1);
 
   // Check if command exists
-  const targetCommand = client.commandHandler.getCommand(cleanCommand);
+  const targetCommand = client.commandHandler.getCommand(baseCommand);
   if (!targetCommand) {
     await interaction.reply({
-      content: `❌ الأمر \`${cleanCommand}\` غير موجود. استخدم \`/help\` لعرض الأوامر`,
+      content: `❌ الأمر \`${baseCommand}\` غير موجود. استخدم \`/help\` لعرض الأوامر`,
       ephemeral: true,
     });
     return;
@@ -325,7 +329,9 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     return;
   }
 
-  const lines = aliases.map((a, i) => `${i + 1}. \`${a.alias}\` → \`/${a.command}\``).join('\n');
+  const lines = aliases
+    .map((a, i) => `${i + 1}. \`${a.alias}\` → \`/${String(a.command).replace(':', ' ')}\``)
+    .join('\n');
 
   const embed = new EmbedBuilder()
     .setTitle('📋 قائمة الاختصارات')

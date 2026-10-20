@@ -21,6 +21,7 @@ export declare class MusicHandler {
     private players;
     private connections;
     private manualStops;
+    private seekOffsets;
     constructor(client: LibertyClient);
     private getQueue;
     private getSettings;
@@ -42,6 +43,9 @@ export declare class MusicHandler {
     pause(guildId: string): boolean;
     resume(guildId: string): boolean;
     seek(guildId: string, seconds: number): Promise<boolean>;
+    getPosition(guildId: string): number;
+    forward(guildId: string, seconds?: number): Promise<number | null>;
+    back(guildId: string, seconds?: number): Promise<number | null>;
     setVolume(guildId: string, volume: number): boolean;
     setLoop(guildId: string, mode: 'none' | 'track' | 'queue'): boolean;
     shuffle(guildId: string): boolean;

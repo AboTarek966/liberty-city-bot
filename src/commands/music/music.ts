@@ -83,6 +83,22 @@ const musicCommand: Command = {
         )
     )
     .addSubcommand(sub =>
+      sub
+        .setName('forward')
+        .setDescription('⏩ تقديم الصوت ثوانٍ (افتراضي 10)')
+        .addIntegerOption(opt =>
+          opt.setName('seconds').setDescription('عدد الثواني (1-600)').setRequired(false).setMinValue(1).setMaxValue(600)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('back')
+        .setDescription('⏪ إرجاع الصوت ثوانٍ (افتراضي 10)')
+        .addIntegerOption(opt =>
+          opt.setName('seconds').setDescription('عدد الثواني (1-600)').setRequired(false).setMinValue(1).setMaxValue(600)
+        )
+    )
+    .addSubcommand(sub =>
       sub.setName('leave').setDescription('مغادرة القناة الصوتية')
     )
     .addSubcommand(sub =>
@@ -318,6 +334,38 @@ const musicCommand: Command = {
           }
           
           await interaction.editReply({ content: `⏩ تم الانتقال إلى **${formatDuration(seconds)}**` });
+          break;
+        }
+
+        case 'forward':
+        case 'back': {
+          const queue = music.getQueueInfo(guildId);
+          if (!queue?.currentTrack) {
+            await interaction.editReply({ content: '❌ لا توجد أغنية قيد التشغيل!' });
+            return;
+          }
+
+          const step = interaction.options.getInteger('seconds') ?? 10;
+          const pos = music.getPosition(guildId);
+          const target = subcommand === 'forward' ? pos + step : Math.max(0, pos - step);
+
+          // تجاوز مدة الأغنية للأمام → تخطي للأغنية التالية
+          if (subcommand === 'forward' && target >= queue.currentTrack!.duration) {
+            const skipped = music.skip(guildId);
+            await interaction.editReply({
+              content: skipped ? '⏭️ تجاوز مدة الأغنية — تم التخطي للأغنية التالية!' : '⏩ انتهى التشغيل',
+            });
+            return;
+          }
+
+          const ok = await music.seek(guildId, target);
+          if (!ok) {
+            await interaction.editReply({ content: '❌ فشل تعديل الموضع — حاول مرة أخرى' });
+            return;
+          }
+
+          const label = subcommand === 'forward' ? `⏩ تقديم ${step} ثوانٍ` : `⏪ إرجاع ${step} ثوانٍ`;
+          await interaction.editReply({ content: `${label} — الآن عند **${formatDuration(target)}**` });
           break;
         }
 

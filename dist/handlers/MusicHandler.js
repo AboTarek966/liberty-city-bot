@@ -54,6 +54,8 @@ class MusicHandler {
     connections = new Map();
     // عدّاد للتوقفات اليدوية (تخطي/إيقاف) حتى لا يتولى الـ Idle تقدُماً إضافياً
     manualStops = new Map();
+    // نقطة بداية البث الحالية (بالميلي ثانية) — لحساب الموضع الحالي ودعم تقديم/إرجاع
+    seekOffsets = new Map();
     constructor(client) {
         this.client = client;
         logger.info('MusicHandler initialized (real voice playback via @discordjs/voice)');
@@ -206,6 +208,7 @@ class MusicHandler {
         }
         this.players.delete(guildId);
         this.manualStops.delete(guildId);
+        this.seekOffsets.delete(guildId);
     }
     // --------------------------------------------
     // بدء تشغيل الأغنية الحالية
@@ -241,6 +244,7 @@ class MusicHandler {
             }
             connection.subscribe(player);
             player.play(resource);
+            this.seekOffsets.set(guildId, beginMs);
             queue.isPlaying = true;
             return true;
         }
@@ -423,6 +427,27 @@ class MusicHandler {
         if (!queue.currentTrack || !this.connections.has(guildId))
             return false;
         return this.startCurrent(guildId, Math.max(0, seconds) * 1000);
+    }
+    // ⏱️ الموضع الحالي بالثواني = نقطة البداية + زمن الصوت المنplayed فعلياً
+    // (playbackDuration لا يزيد أثناء الإيقاف المؤقت ⇒ دقيق بما يكفي)
+    getPosition(guildId) {
+        const player = this.players.get(guildId);
+        if (!player)
+            return 0;
+        const st = player.state;
+        if (st.status !== voice_1.AudioPlayerStatus.Playing && st.status !== voice_1.AudioPlayerStatus.Paused)
+            return 0;
+        const offset = this.seekOffsets.get(guildId) || 0;
+        return Math.floor((offset + st.resource.playbackDuration) / 1000);
+    }
+    // ⏩ تقديم / ⏪ إرجاع بعدد ثوانٍ (افتراضي 10)
+    async forward(guildId, seconds = 10) {
+        const target = this.getPosition(guildId) + Math.max(1, seconds);
+        return (await this.seek(guildId, target)) ? target : null;
+    }
+    async back(guildId, seconds = 10) {
+        const target = Math.max(0, this.getPosition(guildId) - Math.max(1, seconds));
+        return (await this.seek(guildId, target)) ? target : null;
     }
     setVolume(guildId, volume) {
         const queue = this.getQueue(guildId);

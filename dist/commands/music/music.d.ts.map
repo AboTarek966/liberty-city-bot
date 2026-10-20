@@ -1,1 +1,1 @@
-{"version":3,"file":"music.d.ts","sourceRoot":"","sources":["../../../src/commands/music/music.ts"],"names":[],"mappings":"AAcA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,YAAY,EAAE,OAkWnB,CAAC;AAcF,eAAe,YAAY,CAAC"}
+{"version":3,"file":"music.d.ts","sourceRoot":"","sources":["../../../src/commands/music/music.ts"],"names":[],"mappings":"AAcA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,YAAY,EAAE,OAkZnB,CAAC;AAcF,eAAe,YAAY,CAAC"}
