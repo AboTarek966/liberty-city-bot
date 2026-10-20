@@ -782,7 +782,7 @@ export function buildCommands(guild: Guild, s: any): BuiltPanel {
 // إعلانات جماعية (Broadcast) — إرسال رسائل لجميع الأعضاء
 // --------------------------------------------
 export function buildAnnouncements(guild: Guild, s: any): BuiltPanel {
-  const announcements = s.announcements || { history: [] };
+  const announcements = (s.protection?.announcements ?? s.announcements) || { history: [] };
   const recent = announcements.history?.slice(-5).reverse() || [];
 
   const embed = categoryEmbed(
@@ -995,7 +995,7 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
   );
 
   // 🤖 AI Ticket Assistant settings (صف منفصل)
-  const aiTicket = s.aiTicketAssistant || {
+  const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
     enabled: false,
     autoClaim: false,
     analyzeOnCreate: true,
@@ -1123,7 +1123,7 @@ export function buildTicketAdvancedPanel(guild: Guild, s: any): BuiltPanel {
 // --------------------------------------------
 function buildAI(guild: Guild, s: any): BuiltPanel {
   const ai = s.ai;
-  const translator = s.aiTranslator;
+  const translator = s.protection?.aiTranslator;
   const tEnabled = translator?.enabled ?? false;
   const tDefault = translator?.defaultTargetLang ?? 'ar';
 

@@ -155,7 +155,8 @@ export class AIAutoModHandler {
   }
 
   private getConfig(settings: any): AutoModConfig {
-    const aiMod = settings.aiAutoMod;
+    // الـ schema يحفظ aiAutoMod داخل protection (مع رجوع للجذر للتوافق مع بيانات قديمة)
+    const aiMod = settings?.protection?.aiAutoMod ?? settings?.aiAutoMod;
     if (!aiMod) return DEFAULT_CONFIG;
 
     return {
@@ -435,7 +436,10 @@ ${context}
   // --------------------------------------------
   async updateConfig(guildId: string, updates: Partial<AutoModConfig>): Promise<void> {
     const settings = await getGuildSettings(guildId);
-    (settings as any).aiAutoMod = { ...this.getConfig(settings), ...updates };
+    const merged = { ...this.getConfig(settings), ...updates };
+    const prot = (settings as any).protection;
+    if (prot) prot.aiAutoMod = merged;
+    else (settings as any).aiAutoMod = merged;
     await settings.save();
   }
 

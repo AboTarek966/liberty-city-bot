@@ -41,6 +41,7 @@ exports.AITranslator = exports.SUPPORTED_LANGUAGES = void 0;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const embeds_1 = require("../utils/embeds");
+const translateStore_1 = require("../utils/translateStore");
 const logger = (0, helpers_1.createLogger)('AITranslator');
 // اللغات المدعومة (رمز ISO + الاسم + الفлаг)
 exports.SUPPORTED_LANGUAGES = {
@@ -193,7 +194,7 @@ class AITranslator {
         const text = message.content.trim();
         if (!text)
             return null;
-        const config = this.getConfig(guildId);
+        const config = await this.getConfigForGuild(guildId || '').catch(() => this.getConfig(guildId));
         const lang = targetLang || config.defaultTargetLang;
         return this.translate(text, lang, 'auto', guildId);
     }
@@ -245,7 +246,9 @@ class AITranslator {
     async handleTranslateCommand(interaction, text, targetLang, sourceLang) {
         await interaction.deferReply({ ephemeral: false });
         const guildId = interaction.guild?.id;
-        const config = this.getConfig(guildId);
+        const config = guildId
+            ? await this.getConfigForGuild(guildId).catch(() => this.getConfig(guildId))
+            : this.getConfig(guildId);
         const lang = targetLang || config.defaultTargetLang;
         const srcLang = sourceLang || 'auto';
         const result = await this.translate(text, lang, srcLang, guildId);
@@ -266,13 +269,18 @@ class AITranslator {
         // أزرار للغات سريعة
         const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId(`translate:copy`).setLabel('📋 نسخ').setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId(`translate:retry:${lang}`).setLabel('🔄 إعادة').setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId(`translate:lang`).setLabel('🌐 تغيير اللغة').setStyle(discord_js_1.ButtonStyle.Success));
         await interaction.editReply({ embeds: [embed], components: [row] });
+        // حفظ النص الأصلي لأزرار (نسخ/إعادة/تغيير اللغة)
+        const sent = await interaction.fetchReply().catch(() => null);
+        if (sent) {
+            (0, translateStore_1.putTranslation)(sent.id, { text, sourceLang: result.sourceLang, targetLang: result.targetLang, translatedText: result.translatedText });
+        }
     }
     getConfig(guildId) {
         // سيتم جلب الإعدادات من قاعدة البيانات
         return DEFAULT_CONFIG;
     }
     getConfigFromSettings(settings) {
-        const t = settings.aiTranslator;
+        const t = settings?.protection?.aiTranslator || settings?.aiTranslator;
         if (!t)
             return DEFAULT_CONFIG;
         return {
@@ -296,7 +304,12 @@ class AITranslator {
     async updateConfig(guildId, updates) {
         const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../models')));
         const settings = await getGuildSettings(guildId);
-        settings.aiTranslator = { ...this.getConfigFromSettings(settings), ...updates };
+        const prot = settings.protection;
+        const merged = { ...this.getConfigFromSettings(settings), ...updates };
+        if (prot)
+            prot.aiTranslator = merged;
+        else
+            settings.aiTranslator = merged;
         await settings.save();
     }
     async getConfigForGuild(guildId) {

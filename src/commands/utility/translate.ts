@@ -15,6 +15,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { Colors } from '../../utils/embeds';
 import { SUPPORTED_LANGUAGES } from '../../handlers/AITranslator';
+import { putTranslation } from '../../utils/translateStore';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -112,6 +113,11 @@ const command: Command = {
     );
 
     await interaction.editReply({ embeds: [embed], components: [row] });
+    // حفظ النص الأصلي لأزرار (نسخ/إعادة/تغيير اللغة)
+    const sent = await interaction.fetchReply().catch(() => null);
+    if (sent) {
+      putTranslation(sent.id, { text, sourceLang: result.sourceLang, targetLang: result.targetLang, translatedText: result.translatedText });
+    }
   },
 };
 

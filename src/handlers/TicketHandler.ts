@@ -415,7 +415,7 @@ export class TicketHandler {
     }
 
     // 🤖 AI Ticket Assistant — تحليل التذكرة ومحاولة الحل تلقائياً
-    const aiTicketConfig = (settings as any).aiTicketAssistant;
+    const aiTicketConfig = (settings as any).protection?.aiTicketAssistant ?? (settings as any).aiTicketAssistant;
     if (aiTicketConfig?.enabled && aiTicketConfig.analyzeOnCreate) {
       setTimeout(() => {
         this.client.aiTicketAssistant?.onTicketCreated(ticket, channel).catch((err: any) =>

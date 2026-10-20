@@ -119,7 +119,13 @@ const handler: ButtonHandler = {
           break;
         }
         // 🤖 AI Ticket Assistant toggles
-        const s = settings as any;
+        // ملاحظة: الـ schema يحفظ aiTicketAssistant داخل protection (وليس الجذر)
+        const prot0 = (settings as any).protection;
+        if (!prot0) {
+          await interaction.editReply({ content: '❌ إعدادات الحماية غير مكتملة' });
+          return;
+        }
+        const s: any = prot0;
         if (field === 'aienabled') {
           if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: false, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
           s.aiTicketAssistant.enabled = !s.aiTicketAssistant.enabled;
@@ -153,6 +159,29 @@ const handler: ButtonHandler = {
         await interaction.editReply({ content: '❌ إعداد غير معروف' });
         return;
       }
+      case 'aiTranslator': {
+        // 🌐 تفعيل/تعطيل مترجم الذكاء الاصطناعي (مخزّن داخل protection في الـ schema)
+        const prot = settings.protection as any;
+        if (!prot.aiTranslator) {
+          prot.aiTranslator = { enabled: false, defaultTargetLang: 'ar', autoTranslateChannels: [], ignoredChannels: [], ignoredRoles: [], showOriginal: true, maxLength: 2000 };
+        }
+        prot.aiTranslator.enabled = !prot.aiTranslator.enabled;
+        break;
+      }
+      case 'music': {
+        // 🎵 تفعيل/تعطيل أوضاع الموسيقى
+        if (!settings.music) {
+          settings.music = { enabled: true, defaultVolume: 100, maxQueueSize: 50, allowDJ: false, autoplay: false, restrictToChannels: [] };
+        }
+        if (field === 'enabled') settings.music.enabled = !settings.music.enabled;
+        else if (field === 'autoplay') settings.music.autoplay = !settings.music.autoplay;
+        else if (field === 'dj') settings.music.allowDJ = !settings.music.allowDJ;
+        else {
+          await interaction.editReply({ content: '❌ إعداد غير معروف' });
+          return;
+        }
+        break;
+      }
       default:
         await interaction.editReply({ content: '❌ قسم غير معروف' });
         return;
@@ -181,13 +210,6 @@ const handler: ButtonHandler = {
         await settings.save();
       }
       await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => {});
-    }
-
-    // 🌐 AI Translator toggle
-    if (section === 'aiTranslator' && field === 'enabled') {
-      const s = settings as any;
-      if (!s.aiTranslator) s.aiTranslator = { enabled: false, defaultTargetLang: 'ar' };
-      // لا يحتاج مزامنة خاصة
     }
 
     // 📨 تحديث كاش الدعوات عند تفعيل/تعطيل Invite Tracker

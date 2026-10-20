@@ -256,6 +256,12 @@ const handler: SelectMenuHandler = {
       case 'protection:logChannel':
         (settings.protection as any).logChannel = values[0] || null;
         break;
+      case 'music:channels': {
+        // 🔒 قنوات مسموح فيها بالموسيقى (فارغة = الكل مسموح)
+        if (!settings.music) (settings as any).music = { enabled: true, defaultVolume: 100, maxQueueSize: 50, allowDJ: false, autoplay: false, restrictToChannels: [] };
+        (settings.music as any).restrictToChannels = values.slice(0, 10);
+        break;
+      }
       case 'logging:split': {
         // 🔀 اختيار مجموعة → عرض قائمة قنوات لتعيين روم مخصص
         const group = LOG_SPLIT_GROUPS.find((g) => g.id === values[0]);
@@ -444,9 +450,10 @@ const handler: SelectMenuHandler = {
           return;
         }
 
-        // نحتاج محتوى الرسالة - نقرأه من settings.announcements.history آخر إدخال
+        // نحتاج محتوى الرسالة - نقرأه من announcements (مخزّن داخل protection في الـ schema)
         const settings = await getGuildSettings(interaction.guildId!) as any;
-        const lastAnnounce = settings.announcements?.history?.slice(-1).find((a: any) => a.type === 'channel' && !a.sent);
+        const history = settings.protection?.announcements?.history || settings.announcements?.history || [];
+        const lastAnnounce = [...history].reverse().find((a: any) => a.type === 'channel' && !a.sent);
         if (!lastAnnounce) {
           await interaction.editReply({ content: '❌ لا توجد رسالة معلقة للإرسال' });
           return;

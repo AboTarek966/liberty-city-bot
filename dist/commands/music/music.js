@@ -57,7 +57,7 @@ const musicCommand = {
                         await interaction.editReply({ content: '❌ يجب أن تكون في قناة صوتية أولاً!' });
                         return;
                     }
-                    const result = await music.play(member, query);
+                    const result = await music.play(member, query, interaction.channelId);
                     if (!result.success) {
                         await interaction.editReply({ content: result.message });
                         return;

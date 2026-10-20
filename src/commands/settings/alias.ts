@@ -43,6 +43,7 @@ const command: Command = {
               { name: '⚠️ تحذير', value: 'warn' },
               { name: '🔇 كتم', value: 'mute' },
               { name: '🔊 فك كتم', value: 'unmute' },
+              { name: '🗣️ السماح بالكلام', value: 'speak' },
               { name: '🗑️ مسح', value: 'purge' },
               { name: '🚫 إلغاء حظر', value: 'unban' },
               { name: '🗑️ إلغاء تايم', value: 'untimeout' },
@@ -139,6 +140,7 @@ const command: Command = {
               { name: '🤖 AI', value: 'ai' },
               { name: '🎮 ألعاب', value: 'games' },
               { name: '🎮 لعبة', value: 'game' },
+              { name: '🗣️ السماح بالكلام', value: 'speak' },
             )
         )
         .addStringOption(o =>

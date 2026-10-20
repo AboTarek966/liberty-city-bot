@@ -89,7 +89,8 @@ class AIAutoModHandler {
         }
     }
     getConfig(settings) {
-        const aiMod = settings.aiAutoMod;
+        // الـ schema يحفظ aiAutoMod داخل protection (مع رجوع للجذر للتوافق مع بيانات قديمة)
+        const aiMod = settings?.protection?.aiAutoMod ?? settings?.aiAutoMod;
         if (!aiMod)
             return DEFAULT_CONFIG;
         return {
@@ -320,7 +321,12 @@ ${context}
     // --------------------------------------------
     async updateConfig(guildId, updates) {
         const settings = await (0, models_1.getGuildSettings)(guildId);
-        settings.aiAutoMod = { ...this.getConfig(settings), ...updates };
+        const merged = { ...this.getConfig(settings), ...updates };
+        const prot = settings.protection;
+        if (prot)
+            prot.aiAutoMod = merged;
+        else
+            settings.aiAutoMod = merged;
         await settings.save();
     }
     async getConfigForGuild(guildId) {

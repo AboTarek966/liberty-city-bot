@@ -594,7 +594,7 @@ function buildCommands(guild, s) {
 // إعلانات جماعية (Broadcast) — إرسال رسائل لجميع الأعضاء
 // --------------------------------------------
 function buildAnnouncements(guild, s) {
-    const announcements = s.announcements || { history: [] };
+    const announcements = (s.protection?.announcements ?? s.announcements) || { history: [] };
     const recent = announcements.history?.slice(-5).reverse() || [];
     const embed = categoryEmbed('announcements', guild, `إرسال رسالة جماعية لجميع أعضاء السيرفر — في الخاص (DM) أو في قناة محددة\n\n` +
         `> **آخر الإعلانات:** ${recent.length ? recent.map((a, i) => `\n> ${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 50)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('') : 'لا يوجد إعلانات سابقة'}\n\n` +
@@ -718,7 +718,7 @@ function buildTickets(guild, s) {
         .setLabel('+')
         .setStyle(discord_js_1.ButtonStyle.Success), btn('settings_tog:tickets:survey', `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`, t.surveyEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⭐'), btn('settings_tog:tickets:lockclaim', `قفل: ${t.lockUntilClaim ? '🟢' : '🔴'}`, t.lockUntilClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔒'), btn('settings_tog:tickets:welcome', `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`, t.welcomeEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎫'));
     // 🤖 AI Ticket Assistant settings (صف منفصل)
-    const aiTicket = s.aiTicketAssistant || {
+    const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
         enabled: false,
         autoClaim: false,
         analyzeOnCreate: true,
@@ -790,7 +790,7 @@ function buildTicketAdvancedPanel(guild, s) {
 // --------------------------------------------
 function buildAI(guild, s) {
     const ai = s.ai;
-    const translator = s.aiTranslator;
+    const translator = s.protection?.aiTranslator;
     const tEnabled = translator?.enabled ?? false;
     const tDefault = translator?.defaultTargetLang ?? 'ar';
     const embed = categoryEmbed('ai', guild, `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +

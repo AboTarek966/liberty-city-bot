@@ -21,6 +21,7 @@ import { LibertyClient } from '../LibertyClient';
 import { AIHandler } from './AIHandler';
 import { createLogger } from '../utils/helpers';
 import { Colors } from '../utils/embeds';
+import { putTranslation } from '../utils/translateStore';
 
 const logger = createLogger('AITranslator');
 
@@ -228,7 +229,7 @@ export class AITranslator {
     const text = message.content.trim();
     if (!text) return null;
 
-    const config = this.getConfig(guildId);
+    const config = await this.getConfigForGuild(guildId || '').catch(() => this.getConfig(guildId));
     const lang = targetLang || config.defaultTargetLang;
 
     return this.translate(text, lang, 'auto', guildId);
@@ -287,7 +288,9 @@ export class AITranslator {
     await interaction.deferReply({ ephemeral: false });
 
     const guildId = interaction.guild?.id;
-    const config = this.getConfig(guildId);
+    const config = guildId
+      ? await this.getConfigForGuild(guildId).catch(() => this.getConfig(guildId))
+      : this.getConfig(guildId);
     const lang = targetLang || config.defaultTargetLang;
     const srcLang = sourceLang || 'auto';
 
@@ -322,6 +325,12 @@ export class AITranslator {
     );
 
     await interaction.editReply({ embeds: [embed], components: [row] });
+
+    // حفظ النص الأصلي لأزرار (نسخ/إعادة/تغيير اللغة)
+    const sent = await interaction.fetchReply().catch(() => null);
+    if (sent) {
+      putTranslation(sent.id, { text, sourceLang: result.sourceLang, targetLang: result.targetLang, translatedText: result.translatedText });
+    }
   }
 
   private getConfig(guildId?: string): TranslatorConfig {
@@ -330,7 +339,7 @@ export class AITranslator {
   }
 
   private getConfigFromSettings(settings: any): TranslatorConfig {
-    const t = settings.aiTranslator;
+    const t = settings?.protection?.aiTranslator || settings?.aiTranslator;
     if (!t) return DEFAULT_CONFIG;
     return {
       enabled: t.enabled ?? false,
@@ -355,7 +364,10 @@ export class AITranslator {
   async updateConfig(guildId: string, updates: Partial<TranslatorConfig>): Promise<void> {
     const { getGuildSettings } = await import('../models');
     const settings = await getGuildSettings(guildId);
-    (settings as any).aiTranslator = { ...this.getConfigFromSettings(settings), ...updates };
+    const prot = (settings as any).protection;
+    const merged = { ...this.getConfigFromSettings(settings), ...updates };
+    if (prot) prot.aiTranslator = merged;
+    else (settings as any).aiTranslator = merged;
     await settings.save();
   }
 

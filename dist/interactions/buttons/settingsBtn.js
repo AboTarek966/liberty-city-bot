@@ -44,6 +44,7 @@ const handler = {
             'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
             'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
             'translator:settings',
+            'music:volume', 'music:queue_limit',
             'announce:dm', 'announce:channel', 'announce:preview',
         ]);
         // ⏱️ تأكيد التفاعل فوراً للمسارات العادية قبل أي استعلام بطيء (منع انتهاء مهلة الـ3 ثوانٍ — الخطأ 10062)
@@ -168,10 +169,19 @@ const handler = {
             'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
             'tickets:autotext', 'tickets:pimg', 'tickets:types',
             'translator:settings',
+            'music:volume', 'music:queue_limit',
             'announce:dm', 'announce:channel',
         ];
         if (modalActions.includes(`${section}:${action}`)) {
             switch (`${section}:${action}`) {
+                case 'music:volume': {
+                    const mv = settings.music?.defaultVolume ?? 100;
+                    return openModal('🔊 الصوت الافتراضي', 'من 0 إلى 200 (100 = طبيعي)', discord_js_1.TextInputStyle.Short, 3, String(mv));
+                }
+                case 'music:queue_limit': {
+                    const mq = settings.music?.maxQueueSize ?? 50;
+                    return openModal('📋 حد القائمة', 'أقصى عدد أغاني في قائمة الانتظار', discord_js_1.TextInputStyle.Short, 5, String(mq));
+                }
                 case 'general:prefix':
                     return openModal('تغيير بادئة الأوامر', 'مثال: lc! أو ! أو ?', discord_js_1.TextInputStyle.Short, 5);
                 case 'general:tz':
@@ -771,17 +781,32 @@ const handler = {
                 return;
             }
             case 'announce:history': {
-                if (!settings.announcements?.history?.length) {
+                const annHistory = settings.protection?.announcements?.history || settings.announcements?.history || [];
+                if (!annHistory.length) {
                     await interaction.reply({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
                     return;
                 }
                 const embed = new discord_js_1.EmbedBuilder()
                     .setTitle('📜 سجل الإعلانات')
                     .setColor(0xf39c12)
-                    .setDescription(settings.announcements.history.slice(-10).reverse().map((a, i) => `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('\n'))
+                    .setDescription(annHistory.slice(-10).reverse().map((a, i) => `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('\n'))
                     .setFooter({ text: `${interaction.guild.name} • Liberty City` })
                     .setTimestamp();
                 await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+            case 'music:channels': {
+                // 🔒 اختيار قنوات مسموح فيها بالموسيقى
+                const sel = new discord_js_1.ChannelSelectMenuBuilder()
+                    .setCustomId('settings_sel:music:channels')
+                    .setPlaceholder('اختر القنوات المسموح فيها بالموسيقى')
+                    .setChannelTypes(discord_js_1.ChannelType.GuildText)
+                    .setMinValues(0)
+                    .setMaxValues(10);
+                await interaction.followUp({
+                    components: [new discord_js_1.ActionRowBuilder().addComponents(sel)],
+                    ephemeral: true,
+                });
                 return;
             }
             default:

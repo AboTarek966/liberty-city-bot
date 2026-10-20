@@ -265,6 +265,32 @@ const handler = {
                 await interaction.followUp({ content: '✅ تم حفظ رسالة التوثيق', ephemeral: true });
                 return;
             }
+            case 'music:volume': {
+                const n = parseInt(value, 10);
+                if (isNaN(n) || n < 0 || n > 200) {
+                    await interaction.editReply({ content: '❌ أدخل رقماً بين 0 و 200' });
+                    return;
+                }
+                if (!settings.music)
+                    settings.music = { enabled: true, defaultVolume: 100, maxQueueSize: 50, allowDJ: false, autoplay: false, restrictToChannels: [] };
+                settings.music.defaultVolume = n;
+                await settings.save();
+                await interaction.editReply({ content: `✅ تم تعيين الصوت الافتراضي إلى **${n}%**` });
+                return;
+            }
+            case 'music:queue_limit': {
+                const n = parseInt(value, 10);
+                if (isNaN(n) || n < 1 || n > 200) {
+                    await interaction.editReply({ content: '❌ أدخل رقماً بين 1 و 200' });
+                    return;
+                }
+                if (!settings.music)
+                    settings.music = { enabled: true, defaultVolume: 100, maxQueueSize: 50, allowDJ: false, autoplay: false, restrictToChannels: [] };
+                settings.music.maxQueueSize = n;
+                await settings.save();
+                await interaction.editReply({ content: `✅ تم تعيين حد القائمة إلى **${n}** أغنية` });
+                return;
+            }
             case 'automod:words':
                 settings.automod.badWords = value.split(/\r?\n/).map(w => w.trim()).filter(w => w.length > 0);
                 break;
@@ -299,9 +325,10 @@ const handler = {
                     await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
                     return;
                 }
-                if (!settings.announcements)
-                    settings.announcements = { history: [] };
-                settings.announcements.history.push({
+                if (!settings.protection)
+                    settings.protection = {};
+                const ann = settings.protection.announcements || (settings.protection.announcements = { history: [] });
+                ann.history.push({
                     type: 'dm',
                     content,
                     at: new Date(),
@@ -343,9 +370,10 @@ const handler = {
                     await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
                     return;
                 }
-                if (!settings.announcements)
-                    settings.announcements = { history: [] };
-                settings.announcements.history.push({
+                if (!settings.protection)
+                    settings.protection = {};
+                const ann2 = settings.protection.announcements || (settings.protection.announcements = { history: [] });
+                ann2.history.push({
                     type: 'channel',
                     content,
                     at: new Date(),

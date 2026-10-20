@@ -11,6 +11,7 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuInteraction,
+  TextChannel,
 } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
 import { LibertyClient } from '../LibertyClient';
@@ -355,7 +356,7 @@ const ALIAS_LABELS: Record<string, string> = {
   untimeout: '🔓 إلغاء تايم أوت', unban: '🔓 إلغاء حظر', purge: '🗑️ مسح',
   roleadd: '➕ إضافة رول', roleremove: '➖ إزالة رول', promote: '⬆️ ترقية',
   jail: '🔒 سجن', unjail: '🔓 إلغاء سجن', lockdown: '🚨 وضع الطوارئ', settings: '⚙️ إعدادات',
-  afk: '💤 AFK', snipe: '🕵️ سنايب', ping: '🏓 بينج',
+  afk: '💤 AFK', snipe: '🕵️ سنايب', ping: '🏓 بينج', speak: '🗣️ السماح بالكلام',
 };
 
 function cleanupAliasPick(): void {
@@ -778,6 +779,63 @@ async function runAliasCommand(
         reason,
       });
       return respond(message, result.simpleMsg);
+    }
+
+    case 'speak': {
+      const userId = parseUserId(args[0]);
+      if (!userId) return usage('<@المستخدم> [السبب]');
+      const reason = args.slice(1).join(' ') || 'السماح بالكلام';
+
+      const target = await guild.members.fetch(userId).catch(() => null);
+      if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
+      if (target.user.bot) return respond(message, '❌ لا يمكن تطبيق الأمر على بوت');
+
+      const channel = message.channel as TextChannel;
+      const fixed: string[] = [];
+      const problems: string[] = [];
+
+      // 1) إزالة منع الكتابة من صلاحيات القناة
+      if (channel.permissionsFor(client.user!)?.has(PermissionFlagsBits.ManageChannels)) {
+        const overwrite = channel.permissionOverwrites?.cache.get(target.id);
+        if (overwrite?.deny.has(PermissionFlagsBits.SendMessages)) {
+          await channel.permissionOverwrites
+            .edit(target.id, {
+              ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
+              ReadMessageHistory: true, AddReactions: true,
+            }, { reason: `${reason} — بواسطة ${member.user.tag}` })
+            .then(() => fixed.push(`🔓 أُزيل منع الكتابة في <#${channel.id}>`))
+            .catch(() => problems.push(`⚠️ فشل تعديل صلاحيات <#${channel.id}>`));
+        }
+      } else {
+        problems.push('⚠️ لا أملك صلاحية إدارة القنوات هنا');
+      }
+
+      // 2) إزالة رول الكتم
+      const muteRoleData = await MuteRole.findOne({ guildId: guild.id }).catch(() => null);
+      if (muteRoleData && target.roles.cache.has(muteRoleData.roleId)) {
+        const muteRole = guild.roles.cache.get(muteRoleData.roleId);
+        if (muteRole && (guild.members.me?.roles.highest.position ?? 0) > muteRole.position) {
+          await target.roles.remove(muteRole, `${reason} — بواسطة ${member.user.tag}`)
+            .then(() => fixed.push('🔇 أُزيل رول الكتم'))
+            .catch(() => problems.push('⚠️ فشل إزالة رول الكتم'));
+        } else {
+          problems.push('⚠️ رول الكتم أعلى من رتبتي');
+        }
+      }
+
+      // 3) إلغاء تايم أوت
+      if (target.isCommunicationDisabled() && target.moderatable) {
+        await target.timeout(null, `${reason} — بواسطة ${member.user.tag}`)
+          .then(() => fixed.push('⏱️ أُلغي التايم أوت'))
+          .catch(() => problems.push('⚠️ فشل إلغاء التايم أوت'));
+      }
+
+      const lines = [
+        `🗣️ **السماح بالكلام:** <@${target.id}>`,
+        ...(fixed.length ? fixed : ['ℹ️ لا يوجد منع كتابة مطبّق في هذه القناة']),
+        ...problems,
+      ];
+      return respond(message, lines.join('\n'));
     }
 
     case 'unmute': {

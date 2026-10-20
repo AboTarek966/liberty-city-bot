@@ -195,6 +195,15 @@ export interface IGuildSettings extends Document {
             }>;
         };
     };
+    music?: {
+        enabled: boolean;
+        defaultVolume: number;
+        maxQueueSize: number;
+        allowDJ: boolean;
+        djRoleId?: string;
+        autoplay: boolean;
+        restrictToChannels: string[];
+    };
     tickets: {
         categoryId?: string;
         logChannelId?: string;

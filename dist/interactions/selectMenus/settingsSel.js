@@ -215,6 +215,13 @@ const handler = {
             case 'protection:logChannel':
                 settings.protection.logChannel = values[0] || null;
                 break;
+            case 'music:channels': {
+                // 🔒 قنوات مسموح فيها بالموسيقى (فارغة = الكل مسموح)
+                if (!settings.music)
+                    settings.music = { enabled: true, defaultVolume: 100, maxQueueSize: 50, allowDJ: false, autoplay: false, restrictToChannels: [] };
+                settings.music.restrictToChannels = values.slice(0, 10);
+                break;
+            }
             case 'logging:split': {
                 // 🔀 اختيار مجموعة → عرض قائمة قنوات لتعيين روم مخصص
                 const group = settingsPanel_1.LOG_SPLIT_GROUPS.find((g) => g.id === values[0]);
@@ -401,9 +408,10 @@ const handler = {
                     await interaction.editReply({ content: '❌ قناة غير صالحة' });
                     return;
                 }
-                // نحتاج محتوى الرسالة - نقرأه من settings.announcements.history آخر إدخال
+                // نحتاج محتوى الرسالة - نقرأه من announcements (مخزّن داخل protection في الـ schema)
                 const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
-                const lastAnnounce = settings.announcements?.history?.slice(-1).find((a) => a.type === 'channel' && !a.sent);
+                const history = settings.protection?.announcements?.history || settings.announcements?.history || [];
+                const lastAnnounce = [...history].reverse().find((a) => a.type === 'channel' && !a.sent);
                 if (!lastAnnounce) {
                     await interaction.editReply({ content: '❌ لا توجد رسالة معلقة للإرسال' });
                     return;

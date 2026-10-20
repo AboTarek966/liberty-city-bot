@@ -18,11 +18,21 @@ export interface Queue {
 export declare class MusicHandler {
     private client;
     private queues;
+    private players;
+    private connections;
+    private manualStops;
     constructor(client: LibertyClient);
     private getQueue;
+    private getSettings;
     search(query: string): Promise<Track | null>;
     addTrack(guildId: string, query: string, requestedBy: string, requestedById: string): Promise<Track | null>;
-    play(member: GuildMember, query: string): Promise<{
+    private connect;
+    private getPlayer;
+    private cleanup;
+    private startCurrent;
+    private onTrackEnd;
+    private advance;
+    play(member: GuildMember, query: string, textChannelId?: string): Promise<{
         success: boolean;
         track?: Track;
         message: string;

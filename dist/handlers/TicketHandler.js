@@ -306,7 +306,7 @@ class TicketHandler {
             });
         }
         // 🤖 AI Ticket Assistant — تحليل التذكرة ومحاولة الحل تلقائياً
-        const aiTicketConfig = settings.aiTicketAssistant;
+        const aiTicketConfig = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant;
         if (aiTicketConfig?.enabled && aiTicketConfig.analyzeOnCreate) {
             setTimeout(() => {
                 this.client.aiTicketAssistant?.onTicketCreated(ticket, channel).catch((err) => logger.error(`AI Ticket Assistant error: ${err.message}`));

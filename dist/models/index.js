@@ -307,6 +307,16 @@ const GuildSettingsSchema = new mongoose_1.Schema({
                 }],
         },
     },
+    // 🎵 نظام الموسيقى — top-level (تقرأه MusicHandler ولوحة الإعدادات)
+    music: {
+        enabled: { type: Boolean, default: true },
+        defaultVolume: { type: Number, default: 100 },
+        maxQueueSize: { type: Number, default: 50 },
+        allowDJ: { type: Boolean, default: false },
+        djRoleId: { type: String },
+        autoplay: { type: Boolean, default: false },
+        restrictToChannels: [{ type: String }],
+    },
     tickets: {
         categoryId: { type: String },
         logChannelId: { type: String },

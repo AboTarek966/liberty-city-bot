@@ -25,6 +25,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
+    "@discordjs/voice": "^0.19.2",
     "@distube/ytdl-core": "^4.16.12",
     "@napi-rs/canvas": "^1.0.11",
     "axios": "^1.6.7",
@@ -32,11 +33,14 @@
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
+    "libsodium-wrappers": "^0.8.4",
     "moment": "^2.30.1",
     "moment-duration-format": "^2.3.2",
     "mongoose": "^8.1.1",
     "ms": "^2.1.3",
-    "openai": "^4.28.0"
+    "openai": "^4.28.0",
+    "opusscript": "^0.0.8",
+    "youtube-sr": "^4.3.12"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

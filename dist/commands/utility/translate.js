@@ -37,6 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const translateStore_1 = require("../../utils/translateStore");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('translate')
@@ -86,6 +87,11 @@ const command = {
         // أزرار للغات سريعة
         const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`translate:copy:${interaction.id}`).setLabel('📋 نسخ').setStyle(ButtonStyle.Secondary), new ButtonBuilder().setCustomId(`translate:retry:${targetLang}`).setLabel('🔄 إعادة').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`translate:lang`).setLabel('🌐 تغيير اللغة').setStyle(ButtonStyle.Success));
         await interaction.editReply({ embeds: [embed], components: [row] });
+        // حفظ النص الأصلي لأزرار (نسخ/إعادة/تغيير اللغة)
+        const sent = await interaction.fetchReply().catch(() => null);
+        if (sent) {
+            (0, translateStore_1.putTranslation)(sent.id, { text, sourceLang: result.sourceLang, targetLang: result.targetLang, translatedText: result.translatedText });
+        }
     },
 };
 exports.default = command;

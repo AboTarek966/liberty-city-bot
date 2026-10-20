@@ -70,7 +70,8 @@ export class AITicketAssistant {
   async onTicketCreated(ticket: any, channel: TextChannel): Promise<void> {
     try {
       const settings = await getGuildSettings(channel.guild.id);
-      const aiConfig = (settings as any).aiTicketAssistant;
+      // الـ schema يحفظها داخل protection (مع رجوع للجذر للتوافق)
+      const aiConfig = (settings as any).protection?.aiTicketAssistant ?? (settings as any).aiTicketAssistant;
       if (!aiConfig?.enabled) return;
 
       // 🤖 Auto-claim the ticket if enabled
