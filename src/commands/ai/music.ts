@@ -20,7 +20,7 @@ const DIALECT_CHOICES = [
 
 const command: Command = {
   data: new SlashCommandBuilder()
-    .setName('music')
+    .setName('aimusic')
     .setDescription('توليد أغنية كاملة بكلمات وغناء (مجاني)')
     .addStringOption((opt) =>
       opt

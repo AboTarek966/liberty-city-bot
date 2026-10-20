@@ -18,7 +18,7 @@ const DIALECT_CHOICES = [
 ];
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
-        .setName('music')
+        .setName('aimusic')
         .setDescription('توليد أغنية كاملة بكلمات وغناء (مجاني)')
         .addStringOption((opt) => opt
         .setName('prompt')
