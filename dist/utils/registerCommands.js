@@ -60,18 +60,16 @@ async function registerCommands() {
         }
         // Initialize REST
         const rest = new discord_js_1.REST({ version: '10' }).setToken(config_1.config.discord.token);
-        // Register commands
+        // Register commands globally ONLY
+        // (never register guild-scoped commands: they duplicate alongside
+        //  the global ones of the same name and show twice in Discord)
+        logger.info(`Registering ${commands.length} global commands`);
+        await rest.put(discord_js_1.Routes.applicationCommands(config_1.config.discord.clientId), { body: commands });
+        logger.info('✅ Global commands registered successfully');
+        // Clean up any legacy guild-scoped commands so nothing shows twice
         if (config_1.config.discord.guildId) {
-            // Register to specific guild (for testing - instant)
-            logger.info(`Registering ${commands.length} guild commands to ${config_1.config.discord.guildId}`);
-            await rest.put(discord_js_1.Routes.applicationGuildCommands(config_1.config.discord.clientId, config_1.config.discord.guildId), { body: commands });
-            logger.info('✅ Guild commands registered successfully');
-        }
-        else {
-            // Register globally (takes up to 1 hour to propagate)
-            logger.info(`Registering ${commands.length} global commands`);
-            await rest.put(discord_js_1.Routes.applicationCommands(config_1.config.discord.clientId), { body: commands });
-            logger.info('✅ Global commands registered successfully');
+            await rest.put(discord_js_1.Routes.applicationGuildCommands(config_1.config.discord.clientId, config_1.config.discord.guildId), { body: [] });
+            logger.info(`🧹 Cleared legacy guild commands in ${config_1.config.discord.guildId}`);
         }
         logger.info('Command registration complete!');
         process.exit(0);

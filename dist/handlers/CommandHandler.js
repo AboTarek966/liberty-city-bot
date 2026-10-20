@@ -69,11 +69,16 @@ class CommandHandler {
             const rest = new discord_js_1.REST({ version: '10' }).setToken(token);
             logger.info(`Started refreshing ${commandsData.length} slash commands`);
             if (guildId) {
-                // Register to specific guild (for testing)
-                await rest.put(discord_js_1.Routes.applicationGuildCommands(clientId, guildId), {
+                // NOTE: guild-scoped commands are intentionally NOT used —
+                // they duplicate global commands with the same name (shown twice in Discord).
+                // Register globally instead, and clear any legacy guild commands.
+                await rest.put(discord_js_1.Routes.applicationCommands(clientId), {
                     body: commandsData,
                 });
-                logger.info(`Successfully registered guild commands for guild ${guildId}`);
+                await rest.put(discord_js_1.Routes.applicationGuildCommands(clientId, guildId), {
+                    body: [],
+                });
+                logger.info(`Successfully registered global commands (cleared legacy guild commands in ${guildId})`);
             }
             else {
                 // Register globally

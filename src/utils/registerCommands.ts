@@ -70,23 +70,23 @@ async function registerCommands(): Promise<void> {
     // Initialize REST
     const rest = new REST({ version: '10' }).setToken(config.discord.token);
 
-    // Register commands
+    // Register commands globally ONLY
+    // (never register guild-scoped commands: they duplicate alongside
+    //  the global ones of the same name and show twice in Discord)
+    logger.info(`Registering ${commands.length} global commands`);
+    await rest.put(
+      Routes.applicationCommands(config.discord.clientId),
+      { body: commands }
+    );
+    logger.info('✅ Global commands registered successfully');
+
+    // Clean up any legacy guild-scoped commands so nothing shows twice
     if (config.discord.guildId) {
-      // Register to specific guild (for testing - instant)
-      logger.info(`Registering ${commands.length} guild commands to ${config.discord.guildId}`);
       await rest.put(
         Routes.applicationGuildCommands(config.discord.clientId, config.discord.guildId),
-        { body: commands }
+        { body: [] }
       );
-      logger.info('✅ Guild commands registered successfully');
-    } else {
-      // Register globally (takes up to 1 hour to propagate)
-      logger.info(`Registering ${commands.length} global commands`);
-      await rest.put(
-        Routes.applicationCommands(config.discord.clientId),
-        { body: commands }
-      );
-      logger.info('✅ Global commands registered successfully');
+      logger.info(`🧹 Cleared legacy guild commands in ${config.discord.guildId}`);
     }
 
     logger.info('Command registration complete!');
