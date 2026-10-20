@@ -4,7 +4,7 @@
   "description": "Liberty City - بوت ديسكورد شامل ومتكامل مع حماية، تكتات، AI وإعدادات متقدمة",
   "main": "dist/index.js",
   "scripts": {
-    "build": "NODE_OPTIONS=--max-old-space-size=4096 tsc",
+    "build": "npx tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "watch": "nodemon --exec ts-node src/index.ts",

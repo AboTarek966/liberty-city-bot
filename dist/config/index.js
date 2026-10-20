@@ -110,10 +110,10 @@ exports.config = {
         // احصل على مفتاح مجاني: https://aistudio.google.com/apikey
         gemini: {
             apiKey: process.env.GEMINI_API_KEY || '',
-            model: getEnv('GEMINI_MODEL', 'gemini-3.5-pro'), // أقوى نموذج
-            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-3.5-pro'),
-            maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 4000), // زيادة من 800
-            temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.8')), // إبداع أكثر
+            model: getEnv('GEMINI_MODEL', 'gemini-1.5-pro'), // نموذج Pro الصحيح
+            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-1.5-flash'), // نموذج Vision الصحيح
+            maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 4000),
+            temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.8')),
         },
         // OpenRouter — بديل مجاني (موديلات رؤية مجانية بلاحقة :free)
         // احصل على مفتاح مجاني: https://openrouter.ai/keys
