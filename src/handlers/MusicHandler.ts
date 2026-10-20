@@ -19,6 +19,7 @@ import {
 } from '@discordjs/voice';
 import ytdl from '@distube/ytdl-core';
 import { YouTube } from 'youtube-sr';
+import { Readable, PassThrough } from 'stream';
 import { createLogger } from '../utils/helpers';
 import { LibertyClient } from '../LibertyClient';
 
@@ -246,9 +247,11 @@ export class MusicHandler {
   }
 
   // --------------------------------------------
-  // رابط بث صوتي مباشر عبر Innertube (احتياطي عندما يفشل ytdl)
+  // رابط بث صوتي مباشر عبر Innertube
+  // ⚠️ رابط googlevideo يرفض 403 بدون User-Agent صحيح،
+  // لذلك نجلب التدفّق بنفسنا ونمرّر الـ Stream لـ discordjs/voice
   // --------------------------------------------
-  private async innertubeStreamUrl(videoId: string): Promise<string | null> {
+  private async innertubeStream(videoId: string, beginMs = 0): Promise<Readable | null> {
     const d: any = await innertube('player', {
       context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'en', gl: 'US' } },
       videoId,
@@ -259,7 +262,72 @@ export class MusicHandler {
     const opus = formats.find(
       (f) => (f.mimeType || '').startsWith('audio/webm') && f.url
     );
-    return opus?.url || null;
+    if (!opus?.url || !opus.contentLength) return null;
+
+    const total = Number(opus.contentLength) || 0;
+    // googlevideo يرفض 403 بدون Range صريح، ويقطع الطلب إذا كبر النطاق
+    // → ننزّل البث على شكل مقاطع صغيرة متتالية
+    let start = 0;
+    if (beginMs > 0 && opus.bitrate) {
+      start = Math.floor((Number(opus.bitrate) / 8) * (beginMs / 1000));
+      if (total > 0 && start >= total) start = 0;
+    }
+
+    const stream = new PassThrough();
+    this.pumpChunks(opus.url, start, total, stream).catch((err) => {
+      stream.destroy(err);
+    });
+    return stream;
+  }
+
+  // سحب الملف على شكل مقاطع صغيرة (كل مقطع ~300KB) مع إعادة المحاولة عند 403
+  private async pumpChunks(
+    baseUrl: string,
+    start: number,
+    total: number,
+    out: PassThrough
+  ): Promise<void> {
+    const CHUNK = 300000; // أصغر من الحد الذي يقبله googlevideo
+    let pos = start;
+    while (total === 0 || pos < total) {
+      const end = total > 0 ? Math.min(pos + CHUNK - 1, total - 1) : pos + CHUNK - 1;
+      const res = await this.fetchChunk(baseUrl, pos, end);
+      if (!res || !res.body) throw new Error('تعذر جلب مقطع الصوت');
+      const reader = (res.body as any).getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!out.write(Buffer.from(value))) {
+          await new Promise((r) => out.once('drain', r));
+        }
+      }
+      const got = Number(res.headers.get('content-length')) || 0;
+      pos += got || (end - pos + 1);
+      if (total > 0 && pos >= total) break;
+      if (!got) break; // لا يمكن معرفة الطول → توقف
+    }
+    out.end();
+  }
+
+  // جلب مقطع واحد مع إعادة المحاولة عند 403 (روابط googlevideo قصيرة العمر)
+  private async fetchChunk(
+    url: string,
+    start: number,
+    end: number
+  ): Promise<Response | null> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': YT_UA,
+          Range: `bytes=${start}-${end}`,
+        },
+      });
+      if (res.ok || res.status === 206) return res;
+      if (res.status !== 403) return null;
+      // انتظر قليلاً ثم أعد المحاولة
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    }
+    return null;
   }
 
   // إضافة للمسار (مع فحص الحد الأقصى)
@@ -401,10 +469,10 @@ export class MusicHandler {
       logger.warn(`ytdl failed for "${track.title}", trying innertube: ${ytdlError.message}`);
       try {
         const videoId = extractVideoId(track.url);
-        const directUrl = videoId ? await this.innertubeStreamUrl(videoId) : null;
-        if (!directUrl) throw new Error('لا يوجد رابط بث احتياطي');
+        const stream = videoId ? await this.innertubeStream(videoId, beginMs) : null;
+        if (!stream) throw new Error('لا يوجد رابط بث احتياطي');
 
-        const resource = createAudioResource(directUrl, {
+        const resource = createAudioResource(stream, {
           inputType: StreamType.WebmOpus,
           inlineVolume: true,
         });

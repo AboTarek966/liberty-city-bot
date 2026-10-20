@@ -45,6 +45,7 @@ exports.musicHandler = exports.MusicHandler = void 0;
 const voice_1 = require("@discordjs/voice");
 const ytdl_core_1 = __importDefault(require("@distube/ytdl-core"));
 const youtube_sr_1 = require("youtube-sr");
+const stream_1 = require("stream");
 const helpers_1 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('MusicHandler');
 // --------------------------------------------
@@ -240,9 +241,11 @@ class MusicHandler {
         return results.find((x) => x && x.videoId) || null;
     }
     // --------------------------------------------
-    // رابط بث صوتي مباشر عبر Innertube (احتياطي عندما يفشل ytdl)
+    // رابط بث صوتي مباشر عبر Innertube
+    // ⚠️ رابط googlevideo يرفض 403 بدون User-Agent صحيح،
+    // لذلك نجلب التدفّق بنفسنا ونمرّر الـ Stream لـ discordjs/voice
     // --------------------------------------------
-    async innertubeStreamUrl(videoId) {
+    async innertubeStream(videoId, beginMs = 0) {
         const d = await innertube('player', {
             context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'en', gl: 'US' } },
             videoId,
@@ -251,7 +254,67 @@ class MusicHandler {
         });
         const formats = d?.streamingData?.adaptiveFormats || [];
         const opus = formats.find((f) => (f.mimeType || '').startsWith('audio/webm') && f.url);
-        return opus?.url || null;
+        if (!opus?.url || !opus.contentLength)
+            return null;
+        const total = Number(opus.contentLength) || 0;
+        // googlevideo يرفض 403 بدون Range صريح، ويقطع الطلب إذا كبر النطاق
+        // → ننزّل البث على شكل مقاطع صغيرة متتالية
+        let start = 0;
+        if (beginMs > 0 && opus.bitrate) {
+            start = Math.floor((Number(opus.bitrate) / 8) * (beginMs / 1000));
+            if (total > 0 && start >= total)
+                start = 0;
+        }
+        const stream = new stream_1.PassThrough();
+        this.pumpChunks(opus.url, start, total, stream).catch((err) => {
+            stream.destroy(err);
+        });
+        return stream;
+    }
+    // سحب الملف على شكل مقاطع صغيرة (كل مقطع ~300KB) مع إعادة المحاولة عند 403
+    async pumpChunks(baseUrl, start, total, out) {
+        const CHUNK = 300000; // أصغر من الحد الذي يقبله googlevideo
+        let pos = start;
+        while (total === 0 || pos < total) {
+            const end = total > 0 ? Math.min(pos + CHUNK - 1, total - 1) : pos + CHUNK - 1;
+            const res = await this.fetchChunk(baseUrl, pos, end);
+            if (!res || !res.body)
+                throw new Error('تعذر جلب مقطع الصوت');
+            const reader = res.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done)
+                    break;
+                if (!out.write(Buffer.from(value))) {
+                    await new Promise((r) => out.once('drain', r));
+                }
+            }
+            const got = Number(res.headers.get('content-length')) || 0;
+            pos += got || (end - pos + 1);
+            if (total > 0 && pos >= total)
+                break;
+            if (!got)
+                break; // لا يمكن معرفة الطول → توقف
+        }
+        out.end();
+    }
+    // جلب مقطع واحد مع إعادة المحاولة عند 403 (روابط googlevideo قصيرة العمر)
+    async fetchChunk(url, start, end) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const res = await fetch(url, {
+                headers: {
+                    'User-Agent': YT_UA,
+                    Range: `bytes=${start}-${end}`,
+                },
+            });
+            if (res.ok || res.status === 206)
+                return res;
+            if (res.status !== 403)
+                return null;
+            // انتظر قليلاً ثم أعد المحاولة
+            await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+        }
+        return null;
     }
     // إضافة للمسار (مع فحص الحد الأقصى)
     async addTrack(guildId, query, requestedBy, requestedById) {
@@ -384,10 +447,10 @@ class MusicHandler {
             logger.warn(`ytdl failed for "${track.title}", trying innertube: ${ytdlError.message}`);
             try {
                 const videoId = extractVideoId(track.url);
-                const directUrl = videoId ? await this.innertubeStreamUrl(videoId) : null;
-                if (!directUrl)
+                const stream = videoId ? await this.innertubeStream(videoId, beginMs) : null;
+                if (!stream)
                     throw new Error('لا يوجد رابط بث احتياطي');
-                const resource = (0, voice_1.createAudioResource)(directUrl, {
+                const resource = (0, voice_1.createAudioResource)(stream, {
                     inputType: voice_1.StreamType.WebmOpus,
                     inlineVolume: true,
                 });
