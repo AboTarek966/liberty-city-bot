@@ -27,6 +27,7 @@ export declare class MusicHandler {
     private getSettings;
     search(query: string): Promise<Track | null>;
     private searchInnertube;
+    private innertubeSearchOnce;
     private innertubeStreamUrl;
     addTrack(guildId: string, query: string, requestedBy: string, requestedById: string): Promise<Track | null>;
     private connect;

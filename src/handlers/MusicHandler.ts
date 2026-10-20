@@ -62,6 +62,20 @@ function parseClockDuration(text?: string): number {
   return parts.reduce((acc, p) => acc * 60 + p, 0);
 }
 
+// تطبيع الحروف العربية (أ/إ/آ→ا، ة→ه، ئ/ى→ي، حذف التشكيل)
+// يساعد يوتيوب على إيجاد النتائج مع اختلاف الكتابة
+function normalizeArabic(text: string): string {
+  return text
+    .replace(/[\u064B-\u0652\u0670]/g, '') // تشكيل
+    .replace(/[\u0623\u0625\u0622\u0671]/g, '\u0627') // أ إ آ ٱ → ا
+    .replace(/\u0649/g, '\u064A') // ى → ي
+    .replace(/\u0626/g, '\u064A') // ئ → ي
+    .replace(/\u0629/g, '\u0647') // ة → ه
+    .replace(/\u0640/g, '') // تطويل
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // معرّف الفيديو من أي صيغة رابط يوتيوب
 function extractVideoId(url: string): string | null {
   const m =
@@ -181,34 +195,54 @@ export class MusicHandler {
   }
 
   // --------------------------------------------
-  // بحث احتياطي عبر YouTube Innertube API (ANDOID)
+  // بحث احتياطي عبر YouTube Innertube API (ANDROID)
+  // ملاحظة: يوتيوب قد يرجع صفر نتائج لبعض العبارات القصيرة/العامية،
+  // لذلك نجرب عدة صيغ قبل أن نستسلم (اسم + أغنية، تطبيع الحروف العربية)
   // --------------------------------------------
   private async searchInnertube(query: string): Promise<Track | null> {
+    const variants: string[] = [query];
+    if (/[\u0600-\u06FF]/.test(query)) {
+      variants.push(`${query} اغنية`, normalizeArabic(query), `${normalizeArabic(query)} اغنية`);
+    } else {
+      variants.push(`${query} song`);
+    }
+
+    for (const variant of variants) {
+      const video = await this.innertubeSearchOnce(variant).catch(() => null);
+      if (video) {
+        if (variant !== query) {
+          logger.info(`Innertube: found via variant "${variant}"`);
+        }
+        const title =
+          video.title?.simpleText ||
+          video.title?.runs?.map((r: any) => r.text).join('') ||
+          query;
+
+        return {
+          title,
+          url: `https://www.youtube.com/watch?v=${video.videoId}`,
+          duration: parseClockDuration(video.lengthText?.simpleText),
+          thumbnail:
+            video.thumbnail?.thumbnails?.[video.thumbnail.thumbnails.length - 1]?.url || '',
+          requestedBy: '',
+          requestedById: '',
+        };
+      }
+    }
+
+    logger.warn(`Innertube: no results for "${query}" (tried ${variants.length} variants)`);
+    return null;
+  }
+
+  // عملية بحث واحدة — تُرجع أول فيديو أو null
+  private async innertubeSearchOnce(query: string): Promise<any | null> {
     const d: any = await innertube('search', {
       context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'ar', gl: 'EG' } },
       query,
     });
-
     const results: any[] = [];
     collectCompactVideos(d, results);
-    const v = results.find((x) => x && x.videoId);
-    if (!v) {
-      logger.warn(`Innertube: no results for "${query}"`);
-      return null;
-    }
-
-    const title =
-      v.title?.simpleText || v.title?.runs?.map((r: any) => r.text).join('') || query;
-
-    return {
-      title,
-      url: `https://www.youtube.com/watch?v=${v.videoId}`,
-      duration: parseClockDuration(v.lengthText?.simpleText),
-      thumbnail:
-        v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1]?.url || '',
-      requestedBy: '',
-      requestedById: '',
-    };
+    return results.find((x) => x && x.videoId) || null;
   }
 
   // --------------------------------------------
