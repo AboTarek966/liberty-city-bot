@@ -87,7 +87,6 @@ const command: Command = {
               { name: '✂️ RPS', value: 'rps' },
               { name: '💪 قوة', value: 'power' },
               { name: '🧩 لغز', value: 'riddle' },
-              { name: '🎰 سلوتس2', value: 'slots' },
               { name: '💰 كنز', value: 'treasure' },
               { name: '🧱 شد حبل', value: 'tug' },
               { name: '🎡 عجلة', value: 'wheel' },
