@@ -47,6 +47,52 @@ const ytdl_core_1 = __importDefault(require("@distube/ytdl-core"));
 const youtube_sr_1 = require("youtube-sr");
 const helpers_1 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('MusicHandler');
+// --------------------------------------------
+// YouTube Innertube API (احتياطي — لا يحتاج مفاتيح)
+// --------------------------------------------
+const YT_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const YT_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip';
+async function innertube(path, body) {
+    const res = await fetch(`https://www.youtube.com/youtubei/v1/${path}?key=${YT_KEY}&prettyPrint=false`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': YT_UA },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok)
+        throw new Error(`innertube ${path} HTTP ${res.status}`);
+    return res.json();
+}
+// يجمع كل compactVideoRenderer من شجرة الاستجابة
+function collectCompactVideos(node, out) {
+    if (!node || typeof node !== 'object')
+        return;
+    if (Array.isArray(node)) {
+        for (const item of node)
+            collectCompactVideos(item, out);
+        return;
+    }
+    if (node.compactVideoRenderer)
+        out.push(node.compactVideoRenderer);
+    for (const key of Object.keys(node))
+        collectCompactVideos(node[key], out);
+}
+// "3:45" أو "1:02:03" → ثوانٍ
+function parseClockDuration(text) {
+    if (!text)
+        return 0;
+    const parts = text.split(':').map((p) => parseInt(p, 10));
+    if (parts.some(isNaN))
+        return 0;
+    return parts.reduce((acc, p) => acc * 60 + p, 0);
+}
+// معرّف الفيديو من أي صيغة رابط يوتيوب
+function extractVideoId(url) {
+    const m = url.match(/[?&]v=([\w-]{11})/) ||
+        url.match(/youtu\.be\/([\w-]{11})/) ||
+        url.match(/shorts\/([\w-]{11})/) ||
+        url.match(/embed\/([\w-]{11})/);
+    return m ? m[1] : null;
+}
 class MusicHandler {
     client;
     queues = new Map();
@@ -104,23 +150,75 @@ class MusicHandler {
                     requestedById: '',
                 };
             }
-            // بحث نصي عبر youtube-sr
-            const video = await youtube_sr_1.YouTube.searchOne(query, 'video').catch(() => null);
-            if (!video?.url)
-                return null;
-            return {
-                title: video.title || query,
-                url: video.url,
-                duration: Math.floor((video.duration || 0) / 1000),
-                thumbnail: video.thumbnail?.url || '',
-                requestedBy: '',
-                requestedById: '',
-            };
         }
         catch (error) {
-            logger.error(`YouTube search error: ${error.message}`);
+            logger.error(`Direct URL lookup failed: ${error.message}`);
+            // لا نوقف البحث — قد ينجح البحث بالاسم حتى لو فشل الوصول المباشر
+        }
+        // بحث نصي أولاً عبر youtube-sr
+        try {
+            const video = await youtube_sr_1.YouTube.searchOne(query, 'video').catch(() => null);
+            if (video?.url) {
+                return {
+                    title: video.title || query,
+                    url: video.url,
+                    duration: Math.floor((video.duration || 0) / 1000),
+                    thumbnail: video.thumbnail?.url || '',
+                    requestedBy: '',
+                    requestedById: '',
+                };
+            }
+        }
+        catch (error) {
+            logger.warn(`youtube-sr search failed, trying innertube fallback: ${error.message}`);
+        }
+        // بحث احتياطي عبر YouTube Innertube (يعمل حتى لو حجب youtube-sr)
+        try {
+            return await this.searchInnertube(query);
+        }
+        catch (error) {
+            logger.error(`Innertube search failed for "${query}": ${error.message}`);
             return null;
         }
+    }
+    // --------------------------------------------
+    // بحث احتياطي عبر YouTube Innertube API (ANDOID)
+    // --------------------------------------------
+    async searchInnertube(query) {
+        const d = await innertube('search', {
+            context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'ar', gl: 'EG' } },
+            query,
+        });
+        const results = [];
+        collectCompactVideos(d, results);
+        const v = results.find((x) => x && x.videoId);
+        if (!v) {
+            logger.warn(`Innertube: no results for "${query}"`);
+            return null;
+        }
+        const title = v.title?.simpleText || v.title?.runs?.map((r) => r.text).join('') || query;
+        return {
+            title,
+            url: `https://www.youtube.com/watch?v=${v.videoId}`,
+            duration: parseClockDuration(v.lengthText?.simpleText),
+            thumbnail: v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1]?.url || '',
+            requestedBy: '',
+            requestedById: '',
+        };
+    }
+    // --------------------------------------------
+    // رابط بث صوتي مباشر عبر Innertube (احتياطي عندما يفشل ytdl)
+    // --------------------------------------------
+    async innertubeStreamUrl(videoId) {
+        const d = await innertube('player', {
+            context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'en', gl: 'US' } },
+            videoId,
+            contentCheckOk: true,
+            racyCheckOk: true,
+        });
+        const formats = d?.streamingData?.adaptiveFormats || [];
+        const opus = formats.find((f) => (f.mimeType || '').startsWith('audio/webm') && f.url);
+        return opus?.url || null;
     }
     // إضافة للمسار (مع فحص الحد الأقصى)
     async addTrack(guildId, query, requestedBy, requestedById) {
@@ -248,20 +346,43 @@ class MusicHandler {
             queue.isPlaying = true;
             return true;
         }
-        catch (error) {
-            logger.error(`Failed to start "${track.title}" (${guildId}): ${error.message}`);
-            queue.isPlaying = false;
-            // تخطي تلقائي للأغنية التالية عند فشل المصدر
-            const next = queue.tracks.shift() ?? null;
-            if (next) {
-                queue.currentTrack = next;
-                await this.startCurrent(guildId).catch(() => false);
+        catch (ytdlError) {
+            // فشل ytdl (غالباً حجب) → محاولة احتياطية عبر Innertube
+            logger.warn(`ytdl failed for "${track.title}", trying innertube: ${ytdlError.message}`);
+            try {
+                const videoId = extractVideoId(track.url);
+                const directUrl = videoId ? await this.innertubeStreamUrl(videoId) : null;
+                if (!directUrl)
+                    throw new Error('لا يوجد رابط بث احتياطي');
+                const resource = (0, voice_1.createAudioResource)(directUrl, {
+                    inputType: voice_1.StreamType.WebmOpus,
+                    inlineVolume: true,
+                });
+                if (resource.volume) {
+                    resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
+                }
+                connection.subscribe(player);
+                player.play(resource);
+                this.seekOffsets.set(guildId, beginMs);
+                queue.isPlaying = true;
+                logger.info(`Innertube fallback stream started for "${track.title}"`);
+                return true;
             }
-            else {
-                queue.currentTrack = null;
-                this.cleanup(guildId, true);
+            catch (fallbackError) {
+                logger.error(`Failed to start "${track.title}" (${guildId}): ${ytdlError.message} | fallback: ${fallbackError.message}`);
+                queue.isPlaying = false;
+                // تخطي تلقائي للأغنية التالية عند فشل المصدر
+                const next = queue.tracks.shift() ?? null;
+                if (next) {
+                    queue.currentTrack = next;
+                    await this.startCurrent(guildId).catch(() => false);
+                }
+                else {
+                    queue.currentTrack = null;
+                    this.cleanup(guildId, true);
+                }
+                return false;
             }
-            return false;
         }
     }
     // انتهاء الأغنية (طبيعياً أو عبر stop())

@@ -24,6 +24,54 @@ import { LibertyClient } from '../LibertyClient';
 
 const logger = createLogger('MusicHandler');
 
+// --------------------------------------------
+// YouTube Innertube API (احتياطي — لا يحتاج مفاتيح)
+// --------------------------------------------
+const YT_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const YT_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip';
+
+async function innertube(path: string, body: any): Promise<any> {
+  const res = await fetch(
+    `https://www.youtube.com/youtubei/v1/${path}?key=${YT_KEY}&prettyPrint=false`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': YT_UA },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) throw new Error(`innertube ${path} HTTP ${res.status}`);
+  return res.json();
+}
+
+// يجمع كل compactVideoRenderer من شجرة الاستجابة
+function collectCompactVideos(node: any, out: any[]): void {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const item of node) collectCompactVideos(item, out);
+    return;
+  }
+  if (node.compactVideoRenderer) out.push(node.compactVideoRenderer);
+  for (const key of Object.keys(node)) collectCompactVideos(node[key], out);
+}
+
+// "3:45" أو "1:02:03" → ثوانٍ
+function parseClockDuration(text?: string): number {
+  if (!text) return 0;
+  const parts = text.split(':').map((p) => parseInt(p, 10));
+  if (parts.some(isNaN)) return 0;
+  return parts.reduce((acc, p) => acc * 60 + p, 0);
+}
+
+// معرّف الفيديو من أي صيغة رابط يوتيوب
+function extractVideoId(url: string): string | null {
+  const m =
+    url.match(/[?&]v=([\w-]{11})/) ||
+    url.match(/youtu\.be\/([\w-]{11})/) ||
+    url.match(/shorts\/([\w-]{11})/) ||
+    url.match(/embed\/([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
 export interface Track {
   title: string;
   url: string;
@@ -101,23 +149,83 @@ export class MusicHandler {
           requestedById: '',
         };
       }
-
-      // بحث نصي عبر youtube-sr
-      const video = await YouTube.searchOne(query, 'video').catch(() => null);
-      if (!video?.url) return null;
-
-      return {
-        title: video.title || query,
-        url: video.url,
-        duration: Math.floor((video.duration || 0) / 1000),
-        thumbnail: (video.thumbnail as any)?.url || '',
-        requestedBy: '',
-        requestedById: '',
-      };
     } catch (error: any) {
-      logger.error(`YouTube search error: ${error.message}`);
+      logger.error(`Direct URL lookup failed: ${error.message}`);
+      // لا نوقف البحث — قد ينجح البحث بالاسم حتى لو فشل الوصول المباشر
+    }
+
+    // بحث نصي أولاً عبر youtube-sr
+    try {
+      const video = await YouTube.searchOne(query, 'video').catch(() => null);
+      if (video?.url) {
+        return {
+          title: video.title || query,
+          url: video.url,
+          duration: Math.floor((video.duration || 0) / 1000),
+          thumbnail: (video.thumbnail as any)?.url || '',
+          requestedBy: '',
+          requestedById: '',
+        };
+      }
+    } catch (error: any) {
+      logger.warn(`youtube-sr search failed, trying innertube fallback: ${error.message}`);
+    }
+
+    // بحث احتياطي عبر YouTube Innertube (يعمل حتى لو حجب youtube-sr)
+    try {
+      return await this.searchInnertube(query);
+    } catch (error: any) {
+      logger.error(`Innertube search failed for "${query}": ${error.message}`);
       return null;
     }
+  }
+
+  // --------------------------------------------
+  // بحث احتياطي عبر YouTube Innertube API (ANDOID)
+  // --------------------------------------------
+  private async searchInnertube(query: string): Promise<Track | null> {
+    const d: any = await innertube('search', {
+      context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'ar', gl: 'EG' } },
+      query,
+    });
+
+    const results: any[] = [];
+    collectCompactVideos(d, results);
+    const v = results.find((x) => x && x.videoId);
+    if (!v) {
+      logger.warn(`Innertube: no results for "${query}"`);
+      return null;
+    }
+
+    const title =
+      v.title?.simpleText || v.title?.runs?.map((r: any) => r.text).join('') || query;
+
+    return {
+      title,
+      url: `https://www.youtube.com/watch?v=${v.videoId}`,
+      duration: parseClockDuration(v.lengthText?.simpleText),
+      thumbnail:
+        v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1]?.url || '',
+      requestedBy: '',
+      requestedById: '',
+    };
+  }
+
+  // --------------------------------------------
+  // رابط بث صوتي مباشر عبر Innertube (احتياطي عندما يفشل ytdl)
+  // --------------------------------------------
+  private async innertubeStreamUrl(videoId: string): Promise<string | null> {
+    const d: any = await innertube('player', {
+      context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', hl: 'en', gl: 'US' } },
+      videoId,
+      contentCheckOk: true,
+      racyCheckOk: true,
+    });
+    const formats: any[] = d?.streamingData?.adaptiveFormats || [];
+    const opus = formats.find(
+      (f) => (f.mimeType || '').startsWith('audio/webm') && f.url
+    );
+    return opus?.url || null;
   }
 
   // إضافة للمسار (مع فحص الحد الأقصى)
@@ -254,20 +362,45 @@ export class MusicHandler {
       this.seekOffsets.set(guildId, beginMs);
       queue.isPlaying = true;
       return true;
-    } catch (error: any) {
-      logger.error(`Failed to start "${track.title}" (${guildId}): ${error.message}`);
-      queue.isPlaying = false;
+    } catch (ytdlError: any) {
+      // فشل ytdl (غالباً حجب) → محاولة احتياطية عبر Innertube
+      logger.warn(`ytdl failed for "${track.title}", trying innertube: ${ytdlError.message}`);
+      try {
+        const videoId = extractVideoId(track.url);
+        const directUrl = videoId ? await this.innertubeStreamUrl(videoId) : null;
+        if (!directUrl) throw new Error('لا يوجد رابط بث احتياطي');
 
-      // تخطي تلقائي للأغنية التالية عند فشل المصدر
-      const next = queue.tracks.shift() ?? null;
-      if (next) {
-        queue.currentTrack = next;
-        await this.startCurrent(guildId).catch(() => false);
-      } else {
-        queue.currentTrack = null;
-        this.cleanup(guildId, true);
+        const resource = createAudioResource(directUrl, {
+          inputType: StreamType.WebmOpus,
+          inlineVolume: true,
+        });
+        if (resource.volume) {
+          resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
+        }
+
+        connection.subscribe(player);
+        player.play(resource);
+        this.seekOffsets.set(guildId, beginMs);
+        queue.isPlaying = true;
+        logger.info(`Innertube fallback stream started for "${track.title}"`);
+        return true;
+      } catch (fallbackError: any) {
+        logger.error(
+          `Failed to start "${track.title}" (${guildId}): ${ytdlError.message} | fallback: ${fallbackError.message}`
+        );
+        queue.isPlaying = false;
+
+        // تخطي تلقائي للأغنية التالية عند فشل المصدر
+        const next = queue.tracks.shift() ?? null;
+        if (next) {
+          queue.currentTrack = next;
+          await this.startCurrent(guildId).catch(() => false);
+        } else {
+          queue.currentTrack = null;
+          this.cleanup(guildId, true);
+        }
+        return false;
       }
-      return false;
     }
   }
 
