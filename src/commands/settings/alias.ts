@@ -37,7 +37,6 @@ const command: Command = {
             .setDescription('🎯 أوامر الإدارة والعقوبات')
             .setRequired(false)
             .addChoices(
-              // ----- عقوبات (15) -----
               { name: '🔨 حظر', value: 'ban' },
               { name: '👢 طرد', value: 'kick' },
               { name: '⏱️ تايم أوت', value: 'timeout' },
@@ -53,7 +52,6 @@ const command: Command = {
               { name: '⬆️ ترقية', value: 'promote' },
               { name: '🚨 لوكداون', value: 'lockdown' },
               { name: '🔕 كتم مؤقت', value: 'timeout' },
-              // ----- أدوات (6) -----
               { name: '🏓 بينج', value: 'ping' },
               { name: '💬 say', value: 'say' },
               { name: '🖼️ أفاتار', value: 'avatar' },
@@ -101,10 +99,9 @@ const command: Command = {
         .addStringOption(o =>
           o
             .setName('extra2')
-            .setDescription('🎵 موسيقى + حماية + أدوات + معلومات')
+            .setDescription('🎵 موسيقى + حماية + معلومات')
             .setRequired(false)
             .addChoices(
-              // ----- موسيقى (14) -----
               { name: '🎵 موسيقى تشغيل', value: 'music' },
               { name: '⏭️ تخطي', value: 'music' },
               { name: '⏹️ إيقاف', value: 'music' },
@@ -119,24 +116,28 @@ const command: Command = {
               { name: '🔀 خلط', value: 'music' },
               { name: '🗑️ إزالة', value: 'music' },
               { name: '🔀 خلط قائمة', value: 'music' },
-              // ----- حماية (4) -----
               { name: '🛡️ حماية', value: 'protection' },
               { name: '🛑 لوكداون', value: 'lockdown' },
               { name: '🔒 سجن', value: 'jail' },
               { name: '🔓 إفراج', value: 'unjail' },
-              // ----- معلومات (4) -----
               { name: '🏰 سيرفر إنفو', value: 'serverinfo' },
               { name: '👤 يوزر إنفو', value: 'userinfo' },
               { name: '🏆 توب', value: 'top' },
               { name: '📈 نشاط', value: 'activity' },
-              // ----- أدوات (6) -----
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('extra2b')
+            .setDescription('🛠️ أدوات + تذاكر + AI')
+            .setRequired(false)
+            .addChoices(
               { name: '🏓 بينج', value: 'ping' },
               { name: '💬 say', value: 'say' },
               { name: '🖼️ أفاتار', value: 'avatar' },
               { name: '📝 إمبد', value: 'embed' },
               { name: '🕵️ سنايب', value: 'snipe' },
               { name: '💾 باك أب', value: 'backup' },
-              // ----- تذاكر + AI (2) -----
               { name: '🎫 تذاكر', value: 'ticket' },
               { name: '🤖 AI', value: 'ai' },
             )
@@ -209,7 +210,7 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
   const extra3 = interaction.options.getString('extra3');
 
   // 🎯 اختر من إحدى القوائم (جميع أوامر البوت متاحة)
-  if (!choice && !extra && !extra2) {
+  if (!choice && !extra && !extra2 && !interaction.options.getString('extra3')) {
     await interaction.reply({
       content: '❌ **اختر الأمر من القائمة** — جميع أوامر البوت متاحة في القوائم',
       ephemeral: true,

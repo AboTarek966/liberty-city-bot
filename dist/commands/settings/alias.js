@@ -25,11 +25,7 @@ const command = {
         .setName('command')
         .setDescription('🎯 أوامر الإدارة والعقوبات')
         .setRequired(false)
-        .addChoices(
-    // ----- عقوبات (15) -----
-    { name: '🔨 حظر', value: 'ban' }, { name: '👢 طرد', value: 'kick' }, { name: '⏱️ تايم أوت', value: 'timeout' }, { name: '⚠️ تحذير', value: 'warn' }, { name: '🔇 كتم', value: 'mute' }, { name: '🔊 فك كتم', value: 'unmute' }, { name: '🗑️ مسح', value: 'purge' }, { name: '🚫 إلغاء حظر', value: 'unban' }, { name: '🗑️ إلغاء تايم', value: 'untimeout' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إفراج', value: 'unjail' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 لوكداون', value: 'lockdown' }, { name: '🔕 كتم مؤقت', value: 'timeout' }, 
-    // ----- أدوات (6) -----
-    { name: '🏓 بينج', value: 'ping' }, { name: '💬 say', value: 'say' }, { name: '🖼️ أفاتار', value: 'avatar' }, { name: '📝 إمبد', value: 'embed' }, { name: '🏆 توب', value: 'top' }, { name: '👤 يوزر إنفو', value: 'userinfo' }))
+        .addChoices({ name: '🔨 حظر', value: 'ban' }, { name: '👢 طرد', value: 'kick' }, { name: '⏱️ تايم أوت', value: 'timeout' }, { name: '⚠️ تحذير', value: 'warn' }, { name: '🔇 كتم', value: 'mute' }, { name: '🔊 فك كتم', value: 'unmute' }, { name: '🗑️ مسح', value: 'purge' }, { name: '🚫 إلغاء حظر', value: 'unban' }, { name: '🗑️ إلغاء تايم', value: 'untimeout' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إفراج', value: 'unjail' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 لوكداون', value: 'lockdown' }, { name: '🔕 كتم مؤقت', value: 'timeout' }, { name: '🏓 بينج', value: 'ping' }, { name: '💬 say', value: 'say' }, { name: '🖼️ أفاتار', value: 'avatar' }, { name: '📝 إمبد', value: 'embed' }, { name: '🏆 توب', value: 'top' }, { name: '👤 يوزر إنفو', value: 'userinfo' }))
         .addStringOption(o => o
         .setName('extra')
         .setDescription('🎮 ألعاب (25 لعبة)')
@@ -37,19 +33,14 @@ const command = {
         .addChoices({ name: '🎱 8ball', value: '8ball' }, { name: '🔀 اختر', value: 'choose' }, { name: '🎲 نرد', value: 'dice' }, { name: '🪙 عملة', value: 'flip' }, { name: '😂 نكتة', value: 'joke' }, { name: '📊 تصويت', value: 'poll' }, { name: '💯 تقييم', value: 'rate' }, { name: '🎰 سلوتس', value: 'slots' }, { name: '🃏 بلاك جاك', value: 'blackjack' }, { name: '💣 قنبلة', value: 'bomb' }, { name: '🎳 بولينغ', value: 'bowling' }, { name: '🐉 تنين', value: 'dragon' }, { name: '⚔️ مبارزة', value: 'duel' }, { name: '🎣 صيد', value: 'fish' }, { name: '🎯 سهام', value: 'darts' }, { name: '🔼 أعلى/أقل', value: 'highlow' }, { name: '🏁 سباق', value: 'race' }, { name: '🎯 روليت', value: 'roulette' }, { name: '✂️ RPS', value: 'rps' }, { name: '💪 قوة', value: 'power' }, { name: '🧩 لغز', value: 'riddle' }, { name: '🎰 سلوتس2', value: 'slots' }, { name: '💰 كنز', value: 'treasure' }, { name: '🧱 شد حبل', value: 'tug' }, { name: '🎡 عجلة', value: 'wheel' }, { name: '❌⭕ XO', value: 'xo' }, { name: '🎮 ألعاب', value: 'games' }, { name: '🎮 لعبة', value: 'game' }))
         .addStringOption(o => o
         .setName('extra2')
-        .setDescription('🎵 موسيقى + حماية + أدوات + معلومات')
+        .setDescription('🎵 موسيقى + حماية + معلومات')
         .setRequired(false)
-        .addChoices(
-    // ----- موسيقى (14) -----
-    { name: '🎵 موسيقى تشغيل', value: 'music' }, { name: '⏭️ تخطي', value: 'music' }, { name: '⏹️ إيقاف', value: 'music' }, { name: '⏸️ إيقاف مؤقت', value: 'music' }, { name: '▶️ استئناف', value: 'music' }, { name: '📋 قائمة الانتظار', value: 'music' }, { name: '🎵 التشغيل الحالي', value: 'music' }, { name: '🔊 صوت', value: 'music' }, { name: '🔁 تكرار', value: 'music' }, { name: '⏩ تقديم', value: 'music' }, { name: '🚪 مغادرة صوتية', value: 'music' }, { name: '🔀 خلط', value: 'music' }, { name: '🗑️ إزالة', value: 'music' }, { name: '🔀 خلط قائمة', value: 'music' }, 
-    // ----- حماية (4) -----
-    { name: '🛡️ حماية', value: 'protection' }, { name: '🛑 لوكداون', value: 'lockdown' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إفراج', value: 'unjail' }, 
-    // ----- معلومات (4) -----
-    { name: '🏰 سيرفر إنفو', value: 'serverinfo' }, { name: '👤 يوزر إنفو', value: 'userinfo' }, { name: '🏆 توب', value: 'top' }, { name: '📈 نشاط', value: 'activity' }, 
-    // ----- أدوات (6) -----
-    { name: '🏓 بينج', value: 'ping' }, { name: '💬 say', value: 'say' }, { name: '🖼️ أفاتار', value: 'avatar' }, { name: '📝 إمبد', value: 'embed' }, { name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, 
-    // ----- تذاكر + AI (2) -----
-    { name: '🎫 تذاكر', value: 'ticket' }, { name: '🤖 AI', value: 'ai' }))
+        .addChoices({ name: '🎵 موسيقى تشغيل', value: 'music' }, { name: '⏭️ تخطي', value: 'music' }, { name: '⏹️ إيقاف', value: 'music' }, { name: '⏸️ إيقاف مؤقت', value: 'music' }, { name: '▶️ استئناف', value: 'music' }, { name: '📋 قائمة الانتظار', value: 'music' }, { name: '🎵 التشغيل الحالي', value: 'music' }, { name: '🔊 صوت', value: 'music' }, { name: '🔁 تكرار', value: 'music' }, { name: '⏩ تقديم', value: 'music' }, { name: '🚪 مغادرة صوتية', value: 'music' }, { name: '🔀 خلط', value: 'music' }, { name: '🗑️ إزالة', value: 'music' }, { name: '🔀 خلط قائمة', value: 'music' }, { name: '🛡️ حماية', value: 'protection' }, { name: '🛑 لوكداون', value: 'lockdown' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إفراج', value: 'unjail' }, { name: '🏰 سيرفر إنفو', value: 'serverinfo' }, { name: '👤 يوزر إنفو', value: 'userinfo' }, { name: '🏆 توب', value: 'top' }, { name: '📈 نشاط', value: 'activity' }))
+        .addStringOption(o => o
+        .setName('extra2b')
+        .setDescription('🛠️ أدوات + تذاكر + AI')
+        .setRequired(false)
+        .addChoices({ name: '🏓 بينج', value: 'ping' }, { name: '💬 say', value: 'say' }, { name: '🖼️ أفاتار', value: 'avatar' }, { name: '📝 إمبد', value: 'embed' }, { name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, { name: '🎫 تذاكر', value: 'ticket' }, { name: '🤖 AI', value: 'ai' }))
         .addStringOption(o => o
         .setName('extra3')
         .setDescription('📦 أوامر إدارية + رولات + حماية متقدمة')
@@ -86,7 +77,7 @@ async function handleAdd(interaction, client) {
     const extra2 = interaction.options.getString('extra2');
     const extra3 = interaction.options.getString('extra3');
     // 🎯 اختر من إحدى القوائم (جميع أوامر البوت متاحة)
-    if (!choice && !extra && !extra2) {
+    if (!choice && !extra && !extra2 && !interaction.options.getString('extra3')) {
         await interaction.reply({
             content: '❌ **اختر الأمر من القائمة** — جميع أوامر البوت متاحة في القوائم',
             ephemeral: true,
