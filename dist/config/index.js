@@ -110,8 +110,8 @@ exports.config = {
         // احصل على مفتاح مجاني: https://aistudio.google.com/apikey
         gemini: {
             apiKey: process.env.GEMINI_API_KEY || '',
-            model: getEnv('GEMINI_MODEL', 'gemini-1.5-pro'), // نموذج Pro الصحيح
-            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-1.5-flash'), // نموذج Vision الصحيح
+            model: getEnv('GEMINI_MODEL', 'gemini-1.5-pro-latest'), // نموذج Pro الصحيح
+            visionModel: getEnv('GEMINI_VISION_MODEL', 'gemini-1.5-flash-latest'), // نموذج Vision الصحيح
             maxTokens: getEnvNumber('GEMINI_MAX_TOKENS', 4000),
             temperature: parseFloat(getEnv('GEMINI_TEMPERATURE', '0.8')),
         },
