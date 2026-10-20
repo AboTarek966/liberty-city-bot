@@ -91,8 +91,6 @@ const command: Command = {
               { name: '🧱 شد حبل', value: 'tug' },
               { name: '🎡 عجلة', value: 'wheel' },
               { name: '❌⭕ XO', value: 'xo' },
-              { name: '🎮 ألعاب', value: 'games' },
-              { name: '🎮 لعبة', value: 'game' },
             )
         )
         .addStringOption(o =>
@@ -139,6 +137,8 @@ const command: Command = {
               { name: '💾 باك أب', value: 'backup' },
               { name: '🎫 تذاكر', value: 'ticket' },
               { name: '🤖 AI', value: 'ai' },
+              { name: '🎮 ألعاب', value: 'games' },
+              { name: '🎮 لعبة', value: 'game' },
             )
         )
         .addStringOption(o =>
