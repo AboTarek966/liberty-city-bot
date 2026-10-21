@@ -7,7 +7,6 @@ import { createLogger } from './utils/helpers';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import * as cp from 'child_process';
 
 const logger = createLogger('Main');
 
@@ -134,9 +133,9 @@ async function main(): Promise<void> {
   } catch { /* تجاهل */ }
 
   // 🔬 تتبّع spawn/spawnSync: يسجّل أول استدعاء لكل مسار استدعاء مع الـstack —
-  // يكشف من يفتح عمليات (وجه التسرّب الأكبر في ملف V8: spawn = 6% من وقت المعالج)
+  // ⚠️ لازم require() الحقيقي: import * as cp يبني نسخة جديدة (__importStar) فتعديلها لا يصل للحزم
   try {
-    const cpMod = cp as unknown as Record<string, any>;
+    const cpMod = require('child_process') as Record<string, any>;
     const seen = new Set<string>();
     const wrap = (name: string, orig: (...a: any[]) => any) =>
       function (this: unknown, ...args: any[]) {

@@ -302,10 +302,11 @@ export class MusicHandler {
     } else {
       logger.warn('⚠️ Audio pipeline: PCM → opusscript PURE-JS (HIGH CPU! ffmpeg lacks libopus)');
     }
-    // اختبار ذاتي بعد الإقلاع: يثبت أن ffmpeg يستطيع جلب بث SoundCloud فعلياً من هذا السيرفر
-    setTimeout(() => this.runSelfTest(), 12_000);
+    // ⛔ الاختبار الذاتي مُعطّل افتراضياً (كان يضيف دفعة CPU عند كل إقلاع — لمسحها تشغّل SELFTEST=1)
+    if (process.env.SELFTEST === '1') setTimeout(() => this.runSelfTest(), 12_000);
     // 📊 مقياس المعالج: يسجّل node% وffmpeg% كل 30 ثانية أثناء التشغيل فقط (يكشف من يلتهم الحصة)
     this.cpuMeter = setInterval(() => this.cpuTick(), 30_000);
+    // 🔬 ملفّر V8 معطّل افتراضياً (overhead ~4% + ذروات تجميع — للتشخيص فقط عبر V8PROFILE=1)
   }
 
   // قياس دلتا المعالج كل 30 ثانية: node (discord.js/demuxer) مقابل ffmpeg (decode+libopus)
@@ -357,6 +358,7 @@ export class MusicHandler {
   // 🔬 ملفّر V8: يبدأ مع أول تشغيل ويوقف بعد 45 ثانية — يطبع أكثر 15 دالة استهلاكاً للوقت
   // يكشف بالاسم الحنّة الحقيقية (demuxer / player / handler / logger ...)
   private startProfile(): void {
+    if (process.env.V8PROFILE !== '1') return; // 🔬 معطّل افتراضياً (overhead ~4% — تشخيص فقط)
     if (this.profStarted) return;
     this.profStarted = true;
     try {
