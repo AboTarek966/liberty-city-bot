@@ -18,8 +18,8 @@ function persist(line: string): void {
   try {
     const ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const entry = `[${ts}] ${line}\n`;
-    const st = fs.statSync(PERSIST_FILE);
-    if (st.size > 400_000) {
+    // ⚠️ existsSync قبل statSync — وإلا ENOENT في أول استدعاء يُلغي الكتابة كلها
+    if (fs.existsSync(PERSIST_FILE) && fs.statSync(PERSIST_FILE).size > 400_000) {
       fs.writeFileSync(PERSIST_FILE + '.old', fs.readFileSync(PERSIST_FILE));
       fs.writeFileSync(PERSIST_FILE, '');
     }
