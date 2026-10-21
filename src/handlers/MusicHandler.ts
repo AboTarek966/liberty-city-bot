@@ -149,6 +149,29 @@ async function initFfmpeg(): Promise<void> {
 }
 
 // --------------------------------------------
+// 🔊 كشف libopus في ffmpeg (يُخزَّن لكل مسار — قد يتغير بعد تنزيل نسخة بديلة)
+// إن وُجد: نخرج الصوت مرمّزاً من ffmpeg نفسه (C أصلي، ~1-2% معالج) وdiscord.js
+// يستقبل حزم opus جاهزة عبر demuxer فقط — **صفر ترميز JavaScript**.
+// هذا يحل قتل الاستضافة (متوسط 15% معالج): opusscript (جافاسكربت) كان يحرق ~16-20%!
+// (المضيف يحجب سكربتات تثبيت @discordjs/opus أصلاً — لم نعد نحتاجها)
+// --------------------------------------------
+const libOpusCache = new Map<string, boolean>();
+function ffmpegHasLibOpus(path: string): boolean {
+  let v = libOpusCache.get(path);
+  if (typeof v !== 'boolean') {
+    try {
+      const r = spawnSync(path, ['-hide_banner', '-encoders'], { windowsHide: true, timeout: 10000 });
+      v = !!r.stdout && r.stdout.toString().includes('libopus');
+    } catch {
+      v = false;
+    }
+    libOpusCache.set(path, v);
+    logger.info(`ffmpeg libopus probe (${path}): ${v ? 'FOUND — ogg/opus pipeline (no JS encoder)' : 'missing — PCM+opusscript fallback (high CPU)'}`);
+  }
+  return v;
+}
+
+// --------------------------------------------
 // SoundCloud — مصدر أساسي للبث الصوتي
 // يعمل من أي عنوان IP (بخلاف يوتيوب الذي يحجب سيرفرات الاستضافة)
 // --------------------------------------------
@@ -259,13 +282,13 @@ export class MusicHandler {
   constructor(client: LibertyClient) {
     this.client = client;
     logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}${FFMPEG_OK ? '' : ' (PROBE FAILED — awaiting static fallback)'}`);
-    // 🔊 أي مرمّز Opus يُستخدم؟ الأصلي (native) يوفّر ~90% من معالج الترميز —
-    // الاستضافة تقتل السيرفر عند متوسط 15% معالج، والـopusscript (جافاسكربت) وحده يتجاوز ذلك!
-    try {
-      require('@discordjs/opus');
-      logger.info('🔊 Opus encoder: @discordjs/opus NATIVE (low CPU)');
-    } catch {
-      logger.warn('🔊 Opus encoder: opusscript PURE-JS (HIGH CPU! native @discordjs/opus not loadable)');
+    // 🔊 خط أنابيب الصوت — يُحدَّد مرة عند الإقلاع:
+    // opus (ffmpeg libopus) → ogg/opus → demuxer فقط = صفر ترميز JS (خفيف جداً)
+    // PCM → opusscript = ترميز JS بطيء (سبب قتل الاستضافة — يُستخدم فقط إن لم يوجد libopus)
+    if (ffmpegHasLibOpus(FFMPEG_PATH)) {
+      logger.info('🔊 Audio pipeline: ffmpeg libopus → ogg/opus (NO JS encoder — very low CPU)');
+    } else {
+      logger.warn('⚠️ Audio pipeline: PCM → opusscript PURE-JS (HIGH CPU! ffmpeg lacks libopus)');
     }
     // اختبار ذاتي بعد الإقلاع: يثبت أن ffmpeg يستطيع جلب بث SoundCloud فعلياً من هذا السيرفر
     setTimeout(() => this.runSelfTest(), 12_000);
@@ -299,7 +322,11 @@ export class MusicHandler {
         logger.warn('🧪 Self-test FAILED: SoundCloud resolve returned no stream URL');
         return;
       }
-      const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1', '-filter_threads', '1', '-probesize', '262144', '-analyzeduration', '1000000', '-user_agent', SC_UA, '-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'];
+      const useOpus = ffmpegHasLibOpus(FFMPEG_PATH);
+      const tail = useOpus
+        ? ['-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-ar', '48000', '-f', 'opus', 'pipe:1']
+        : ['-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'];
+      const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1', '-filter_threads', '1', '-probesize', '262144', '-analyzeduration', '1000000', '-user_agent', SC_UA, '-i', url, '-vn', ...tail];
       const proc = spawn(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
       let bytes = 0;
       proc.stdout?.on('data', (c: Buffer) => { bytes += c.length; });
@@ -310,8 +337,10 @@ export class MusicHandler {
         clearTimeout(killer);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         const kb = Math.round(bytes / 1024);
-        if (bytes > 200_000) {
-          logger.info(`🧪 Self-test OK: SoundCloud→ffmpeg produced ${kb}KB PCM in ${secs}s (exit=${code} signal=${signal ?? '-'})`);
+        // حدّ الحد الأدنى حسب وضع الإخراج: opus مضغوط (~12KB/s) مقابل PCM خام (~320KB/s)
+        const minBytes = useOpus ? 10_000 : 200_000;
+        if (bytes > minBytes) {
+          logger.info(`🧪 Self-test OK: SoundCloud→ffmpeg produced ${kb}KB ${useOpus ? 'ogg/opus' : 'PCM'} in ${secs}s (exit=${code} signal=${signal ?? '-'})`);
           // الاختبار بالبنية الصحيحة (SoundCloud) هو المرجع — وليس رابط HLS عاماً
           // قد تحجبه شبكة الاستضافة. إن نجح البث الفعلي فالبنية صالحة.
           if (!FFMPEG_OK) {
@@ -755,9 +784,9 @@ export class MusicHandler {
       const stream = videoId ? await this.innertubeStream(videoId, beginMs) : null;
       if (!stream) throw new Error('لا يوجد رابط بث (يوتيوب يحجب هذا العنوان)');
 
+      // WebmOpus → demuxer فقط (بلا inlineVolume: كانت ستُفكّ وتُعاد بالـJS — حرق معالج زائد)
       const resource = createAudioResource(stream, {
         inputType: StreamType.WebmOpus,
-        inlineVolume: true,
       });
       if (resource.volume) {
         resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
@@ -857,9 +886,20 @@ export class MusicHandler {
       if (!url) throw new Error('تعذر جلب رابط البث من SoundCloud');
 
       // حدّ المعالج/الذاكرة: خيط واحد + فحص مبكر معتدل — أسرع بدء وأمان من حد الـ35% CPU
+      const useOpus = ffmpegHasLibOpus(FFMPEG_PATH);
+      const gain = Math.max(0, Math.min(2, queue.volume / 100));
       const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1', '-filter_threads', '1', '-probesize', '262144', '-analyzeduration', '1000000', '-user_agent', SC_UA];
       if (beginMs > 0) args.push('-ss', String(Math.floor(beginMs / 1000)));
-      args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
+      args.push('-i', url, '-vn');
+      if (useOpus) {
+        // 🔊 الصوت يخرج مرمّزاً من ffmpeg نفسه (libopus أصلي C) على هيئة ogg/opus،
+        // وdiscord.js يفك التغليف فقط — **صفر ترميز JavaScript** (~16-20% ← ~1-2% معالج).
+        // الصوت (volume) يُطبَّق هنا لعدم وجود مرمّز لحظي في المسار الجديد.
+        if (gain !== 1) args.push('-af', `volume=${gain}`);
+        args.push('-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-ar', '48000', '-frame_duration', '20', '-f', 'opus', 'pipe:1');
+      } else {
+        args.push('-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
+      }
 
       const proc = spawn(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -891,7 +931,11 @@ export class MusicHandler {
         });
         const out = new PassThrough();
         proc.stdout!.pipe(out);
-        const resource = createAudioResource(out, { inputType: StreamType.Raw, inlineVolume: true });
+        // في وضع ogg/opus: inputType OggOpus → demuxer فقط (لا inlineVolume! وإلا فُكّ وأُعيد ترميزه بالـJS)
+        // في وضع PCM القديم: ترميز JS + صوت لحظي كما كانت الطريقة
+        const resource = useOpus
+          ? createAudioResource(out, { inputType: StreamType.OggOpus })
+          : createAudioResource(out, { inputType: StreamType.Raw, inlineVolume: true });
         if (resource.volume) {
           resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
         }
@@ -1297,6 +1341,10 @@ export class MusicHandler {
         : null;
     if (resource?.volume) {
       resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
+    } else if (resource && status === AudioPlayerStatus.Playing && queue.currentTrack && this.connections.has(guildId)) {
+      // وضع ogg/opus (بلا مرمّز لحظي): نعيد بناء البث من نفس الموضع ليُطبَّق الصوت فوراً
+      const posMs = (this.seekOffsets.get(guildId) || 0) + (resource.playbackDuration || 0);
+      void this.startCurrent(guildId, posMs).catch(() => undefined);
     }
     return true;
   }

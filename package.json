@@ -57,7 +57,6 @@
     "node": ">=18.0.0"
   },
   "optionalDependencies": {
-    "@discordjs/opus": "^0.10.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0"
   }
 }
