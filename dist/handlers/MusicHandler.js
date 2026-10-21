@@ -267,7 +267,7 @@ class MusicHandler {
                 logger.warn('🧪 Self-test FAILED: SoundCloud resolve returned no stream URL');
                 return;
             }
-            const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA, '-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'];
+            const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1', '-filter_threads', '1', '-probesize', '262144', '-analyzeduration', '1000000', '-user_agent', SC_UA, '-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'];
             const proc = (0, child_process_1.spawn)(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
             let bytes = 0;
             proc.stdout?.on('data', (c) => { bytes += c.length; });
@@ -806,8 +806,8 @@ class MusicHandler {
             }
             if (!url)
                 throw new Error('تعذر جلب رابط البث من SoundCloud');
-            // الإعدادات الافتراضية أثبتت استقرارها (بث كامل للأغنية) — لا نغيّرها
-            const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA];
+            // حدّ المعالج/الذاكرة: خيط واحد + فحص مبكر معتدل — أسرع بدء وأمان من حد الـ35% CPU
+            const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1', '-filter_threads', '1', '-probesize', '262144', '-analyzeduration', '1000000', '-user_agent', SC_UA];
             if (beginMs > 0)
                 args.push('-ss', String(Math.floor(beginMs / 1000)));
             args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
@@ -837,7 +837,8 @@ class MusicHandler {
                 const spawnMs = Date.now();
                 proc.on('close', (code, signal) => {
                     this.ffprocs.delete(guildId);
-                    logger.info(`ffmpeg ended (${guildId}): exit=${code} signal=${signal ?? '-'}`);
+                    const rss = Math.round(process.memoryUsage().rss / 1048576);
+                    logger.info(`ffmpeg ended (${guildId}): exit=${code} signal=${signal ?? '-'} rss=${rss}MB`);
                 });
                 const out = new stream_1.PassThrough();
                 proc.stdout.pipe(out);
@@ -849,7 +850,8 @@ class MusicHandler {
                 player.play(resource);
                 this.seekOffsets.set(guildId, beginMs);
                 queue.isPlaying = true;
-                logger.info(`SoundCloud stream started for "${track.title}" (seek=${beginMs}ms, attempt=${attempt}, ttfb=${Date.now() - spawnMs}ms)`);
+                const rss = Math.round(process.memoryUsage().rss / 1048576);
+                logger.info(`SoundCloud stream started for "${track.title}" (seek=${beginMs}ms, attempt=${attempt}, ttfb=${Date.now() - spawnMs}ms, rss=${rss}MB)`);
                 return true;
             }
             // فشل (SIGSEGV أو مهلة) — أوقف العملية وأعد المحاولة
