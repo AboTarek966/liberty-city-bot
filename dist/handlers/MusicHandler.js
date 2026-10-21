@@ -869,7 +869,12 @@ class MusicHandler {
             proc.stderr?.on('data', (c) => {
                 stderrBuf = (stderrBuf + c.toString()).slice(-300);
             });
-            // انتظر أول بايت PCM (أو الفشل/الإنهاء) — ناشر عبر PassThrough لتجنّب ضياع البيانات
+            // انتظر أول بايت (أو الفشل/الإنهاء) — ناشر عبر PassThrough لتجنّب ضياع البيانات
+            // ⚠️ لا نستخدم once('data') للاستعداد: المستمع يستهلك أول بايتات (وهي رأس ogg/OpusHead!)
+            // وتضيع قبل وصولها للـdemuxer → كل الصفحات تُعلن مجهولة → صفر صوت → البوت يغادر.
+            // الإشارة readable لا تستهلك أي بايت — الصوت يصل كاملًا للـdemuxer.
+            const out = new stream_1.PassThrough();
+            proc.stdout.pipe(out);
             const ready = await new Promise((resolve) => {
                 let settled = false;
                 const settle = (v) => { if (!settled) {
@@ -878,14 +883,12 @@ class MusicHandler {
                     resolve(v);
                 } };
                 const timer = setTimeout(() => settle('dead'), 10_000);
-                proc.once('spawn', () => {
-                    proc.stdout?.once('data', () => settle('data'));
-                });
+                out.once('readable', () => settle('data'));
                 proc.once('error', () => settle('dead'));
                 proc.once('close', () => settle('dead'));
             });
             if (ready === 'data') {
-                // نجاح — مرّر الـ PCM للمشغّل الآن
+                // نجاح — الـ PassThrough متصل وممتلئ بأول بايتات الصوت (رأس ogg سليم) — مرّره للمشغّل
                 this.ffprocs.set(guildId, proc);
                 const spawnMs = Date.now();
                 proc.on('close', (code, signal) => {
@@ -893,8 +896,6 @@ class MusicHandler {
                     const rss = Math.round(process.memoryUsage().rss / 1048576);
                     logger.info(`ffmpeg ended (${guildId}): exit=${code} signal=${signal ?? '-'} rss=${rss}MB`);
                 });
-                const out = new stream_1.PassThrough();
-                proc.stdout.pipe(out);
                 // في وضع ogg/opus: inputType OggOpus → demuxer فقط (لا inlineVolume! وإلا فُكّ وأُعيد ترميزه بالـJS)
                 // في وضع PCM القديم: ترميز JS + صوت لحظي كما كانت الطريقة
                 const resource = useOpus
