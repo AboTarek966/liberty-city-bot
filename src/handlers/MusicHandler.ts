@@ -259,6 +259,14 @@ export class MusicHandler {
   constructor(client: LibertyClient) {
     this.client = client;
     logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}${FFMPEG_OK ? '' : ' (PROBE FAILED — awaiting static fallback)'}`);
+    // 🔊 أي مرمّز Opus يُستخدم؟ الأصلي (native) يوفّر ~90% من معالج الترميز —
+    // الاستضافة تقتل السيرفر عند متوسط 15% معالج، والـopusscript (جافاسكربت) وحده يتجاوز ذلك!
+    try {
+      require('@discordjs/opus');
+      logger.info('🔊 Opus encoder: @discordjs/opus NATIVE (low CPU)');
+    } catch {
+      logger.warn('🔊 Opus encoder: opusscript PURE-JS (HIGH CPU! native @discordjs/opus not loadable)');
+    }
     // اختبار ذاتي بعد الإقلاع: يثبت أن ffmpeg يستطيع جلب بث SoundCloud فعلياً من هذا السيرفر
     setTimeout(() => this.runSelfTest(), 12_000);
   }
@@ -296,7 +304,8 @@ export class MusicHandler {
       let bytes = 0;
       proc.stdout?.on('data', (c: Buffer) => { bytes += c.length; });
       proc.on('error', (e) => logger.warn(`🧪 Self-test: ffmpeg spawn error: ${e.message}`));
-      const killer = setTimeout(() => { try { proc.kill(); } catch { /* تجاهل */ } }, 6000);
+      // اختبار قصير (3 ثوانٍ فقط) — الاستضافة تراقب المعالج وتحذف عند 15% متوسط!
+      const killer = setTimeout(() => { try { proc.kill(); } catch { /* تجاهل */ } }, 3000);
       proc.on('close', (code, signal) => {
         clearTimeout(killer);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
