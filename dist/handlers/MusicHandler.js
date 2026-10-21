@@ -50,6 +50,7 @@ const stream_1 = require("stream");
 const child_process_1 = require("child_process");
 const fs_1 = __importDefault(require("fs"));
 const os_1 = __importDefault(require("os"));
+const inspector_1 = __importDefault(require("inspector"));
 const helpers_1 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('MusicHandler');
 // --------------------------------------------
@@ -267,6 +268,8 @@ class MusicHandler {
     cpuWall = Date.now();
     cpuNode = process.cpuUsage();
     cpuFfTicks = new Map();
+    // 🔬 ملفّر V8 — يبدأ مع أول تشغيل ويوقف بعد 45 ثانية ليعطي أسماء الدوال الساخنة
+    profStarted = false;
     constructor(client) {
         this.client = client;
         logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}${FFMPEG_OK ? '' : ' (PROBE FAILED — awaiting static fallback)'}`);
@@ -320,6 +323,62 @@ class MusicHandler {
             logger.info(`📊 CPU/30s: node=${nodePct.toFixed(1)}% [${parts.join(' ')}] load1=${os_1.default.loadavg()[0].toFixed(2)} | guilds=${this.ffprocs.size}`);
         }
         catch { /* تجاهل */ }
+    }
+    // 🔬 ملفّر V8: يبدأ مع أول تشغيل ويوقف بعد 45 ثانية — يطبع أكثر 15 دالة استهلاكاً للوقت
+    // يكشف بالاسم الحنّة الحقيقية (demuxer / player / handler / logger ...)
+    startProfile() {
+        if (this.profStarted)
+            return;
+        this.profStarted = true;
+        try {
+            const s = new inspector_1.default.Session();
+            s.connect();
+            s.post('Profiler.enable', () => { });
+            s.post('Profiler.start', () => { });
+            logger.info('🔬 V8 profiler started (45s window during playback)');
+            setTimeout(() => void this.stopProfile(s), 45_000);
+        }
+        catch (e) {
+            logger.warn(`🔬 profiler failed: ${String(e).slice(0, 120)}`);
+        }
+    }
+    async stopProfile(s) {
+        try {
+            const r = await new Promise((res, rej) => s.post('Profiler.stop', {}, (err, v) => (err ? rej(err) : res(v))));
+            const prof = r.profile;
+            const byId = new Map();
+            for (const n of prof.nodes)
+                byId.set(n.id, n);
+            const nodeTime = new Map();
+            const deltas = prof.timeDeltas || [];
+            let acc = 0;
+            prof.samples.forEach((nid, i) => {
+                const d = deltas[i] || 0;
+                nodeTime.set(nid, (nodeTime.get(nid) || 0) + d);
+                acc += d;
+            });
+            const merged = new Map();
+            for (const [nid, t] of nodeTime) {
+                const n = byId.get(nid);
+                if (!n)
+                    continue;
+                const cf = n.callFrame;
+                const file = (cf.url || '').split('/').pop() || (cf.functionName ? '(native)' : '?');
+                const key = `${cf.functionName || '(anon)'} @ ${file}:${cf.lineNumber + 1}`;
+                merged.set(key, (merged.get(key) || 0) + t);
+            }
+            const top = [...merged.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+            logger.info(`🔬 PROFILE 45s (samples ${(acc / 1000).toFixed(1)}s) — top self-time:`);
+            for (const [k, t] of top)
+                logger.info(`   ${(t / 1000).toFixed(1)}s (${((t / (acc || 1)) * 100).toFixed(0)}%) ${k}`);
+            try {
+                s.disconnect();
+            }
+            catch { /* تجاهل */ }
+        }
+        catch (e) {
+            logger.warn(`🔬 profiler stop failed: ${String(e).slice(0, 120)}`);
+        }
     }
     // ينتظر تنزيل النسخة الثابتة (إن لزم) ثم يحدّث FFMPEG_PATH
     async resolveFfmpeg() {
@@ -939,6 +998,7 @@ class MusicHandler {
             if (ready === 'data') {
                 // نجاح — الـ PassThrough متصل وممتلئ بأول بايتات الصوت (رأس ogg سليم) — مرّره للمشغّل
                 this.ffprocs.set(guildId, proc);
+                this.startProfile(); // 🔬 ملفّر V8 يلتقط الحنّة خلال أول 45 ثانية تشغيل
                 const spawnMs = Date.now();
                 proc.on('close', (code, signal) => {
                     this.ffprocs.delete(guildId);

@@ -38,8 +38,11 @@ export declare class MusicHandler {
     private cpuWall;
     private cpuNode;
     private cpuFfTicks;
+    private profStarted;
     constructor(client: LibertyClient);
     private cpuTick;
+    private startProfile;
+    private stopProfile;
     private resolveFfmpeg;
     private runSelfTest;
     private selfTest;
