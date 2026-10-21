@@ -112,9 +112,16 @@ function extractVideoId(url) {
 let FFMPEG_PATH = 'ffmpeg';
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fsMod = require('fs');
     const inst = require('@ffmpeg-installer/ffmpeg');
-    if (inst?.path && require('fs').existsSync(inst.path))
+    if (inst?.path && fsMod.existsSync(inst.path)) {
         FFMPEG_PATH = inst.path;
+        // حماية: بعض الاستضافات تمنع سكربت postinstall (chmod u+x) — نمنح الصلاحية بأنفسنا
+        try {
+            fsMod.chmodSync(inst.path, 0o755);
+        }
+        catch { /* قد تكون منحتة مسبقاً */ }
+    }
 }
 catch {
     /* الحزمة غير مثبتة — نعتمد على ffmpeg في PATH */
