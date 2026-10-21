@@ -2,6 +2,39 @@
 // ============================================
 // Liberty City Bot - Main Entry Point
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -11,6 +44,7 @@ const helpers_1 = require("./utils/helpers");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
+const cp = __importStar(require("child_process"));
 const logger = (0, helpers_1.createLogger)('Main');
 // --------------------------------------------
 // سجل دائم يصمد بعد موت السيرفر (الكونسول يُمسح معه — الملف لا)
@@ -141,6 +175,26 @@ async function main() {
         else {
             logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
         }
+    }
+    catch { /* تجاهل */ }
+    // 🔬 تتبّع spawn/spawnSync: يسجّل أول استدعاء لكل مسار استدعاء مع الـstack —
+    // يكشف من يفتح عمليات (وجه التسرّب الأكبر في ملف V8: spawn = 6% من وقت المعالج)
+    try {
+        const cpMod = cp;
+        const seen = new Set();
+        const wrap = (name, orig) => function (...args) {
+            try {
+                const st = (new Error().stack || '').split('\n').slice(2, 7).map(s => s.trim()).join(' <- ');
+                if (!seen.has(st)) {
+                    seen.add(st);
+                    logger.info(`🔬 ${name}: ${String(args[0]).slice(0, 90)}\n     ${st}`);
+                }
+            }
+            catch { /* تجاهل */ }
+            return orig.apply(this, args);
+        };
+        cpMod.spawn = wrap('spawn', cpMod.spawn);
+        cpMod.spawnSync = wrap('spawnSync', cpMod.spawnSync);
     }
     catch { /* تجاهل */ }
     // Initialize the bot

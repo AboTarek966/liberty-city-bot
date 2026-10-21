@@ -268,6 +268,8 @@ class MusicHandler {
     cpuWall = Date.now();
     cpuNode = process.cpuUsage();
     cpuFfTicks = new Map();
+    // 🧵 قياس كل thread من threads العملية (V8 main مقابل libuv pool مقابل غيرها)
+    cpuTidTicks = new Map();
     // 🔬 ملفّر V8 — يبدأ مع أول تشغيل ويوقف بعد 45 ثانية ليعطي أسماء الدوال الساخنة
     profStarted = false;
     constructor(client) {
@@ -321,6 +323,25 @@ class MusicHandler {
                 }
             }
             logger.info(`📊 CPU/30s: node=${nodePct.toFixed(1)}% [${parts.join(' ')}] load1=${os_1.default.loadavg()[0].toFixed(2)} | guilds=${this.ffprocs.size}`);
+            // 🧵 توزيع المعالج على خيوط العملية: يكشف إن كان الحمل في V8 main أم libuv pool أم غيرها
+            try {
+                const rows = [];
+                for (const tid of fs_1.default.readdirSync('/proc/self/task').slice(0, 100)) {
+                    try {
+                        const st = fs_1.default.readFileSync(`/proc/self/task/${tid}/stat`, 'utf8');
+                        const rest = st.slice(st.lastIndexOf(')') + 2).split(' ');
+                        const ticks = Number(rest[11]) + Number(rest[12]);
+                        const prev = this.cpuTidTicks.get(tid);
+                        this.cpuTidTicks.set(tid, ticks);
+                        if (prev !== undefined && ticks - prev > 0)
+                            rows.push(`${tid}:${((((ticks - prev) * 10) / dWall) * 100).toFixed(0)}%`);
+                    }
+                    catch { /* thread اختفى */ }
+                }
+                if (rows.length)
+                    logger.info(`🧵 threads/30s: ${rows.slice(0, 6).join(' ')}`);
+            }
+            catch { /* لا وصول لـ /proc */ }
         }
         catch { /* تجاهل */ }
     }
@@ -358,19 +379,40 @@ class MusicHandler {
                 acc += d;
             });
             const merged = new Map();
+            const parentOf = new Map();
+            for (const n of prof.nodes)
+                if (n.parent)
+                    parentOf.set(n.id, n.parent);
             for (const [nid, t] of nodeTime) {
                 const n = byId.get(nid);
                 if (!n)
                     continue;
                 const cf = n.callFrame;
-                const file = (cf.url || '').split('/').pop() || (cf.functionName ? '(native)' : '?');
-                const key = `${cf.functionName || '(anon)'} @ ${file}:${cf.lineNumber + 1}`;
+                const file = (furl, ln) => `${(furl || '').split('/').pop() || '?'}:${ln + 1}`;
+                const leaf = `${cf.functionName || '(anon)'} @ ${file(cf.url, cf.lineNumber)}`;
+                // ابحث عن أول إطار أب له اسم حقيقي (يكشف من استدعى الدالة الساخنة)
+                let caller = '';
+                let pid = parentOf.get(nid);
+                let hops = 0;
+                while (pid && hops < 8) {
+                    const pn = byId.get(pid);
+                    if (!pn)
+                        break;
+                    const pcf = pn.callFrame;
+                    if (pcf.functionName && pcf.functionName !== '(idle)' && pcf.functionName !== '(program)') {
+                        caller = `${pcf.functionName} @ ${file(pcf.url, pcf.lineNumber)}`;
+                        break;
+                    }
+                    pid = parentOf.get(pid);
+                    hops++;
+                }
+                const key = caller ? `${leaf}  ←  ${caller}` : leaf;
                 merged.set(key, (merged.get(key) || 0) + t);
             }
             const top = [...merged.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
-            logger.info(`🔬 PROFILE 45s (samples ${(acc / 1000).toFixed(1)}s) — top self-time:`);
+            logger.info(`🔬 PROFILE 45s (total ${(acc / 1000000).toFixed(1)}s sampled) — top self-time:`);
             for (const [k, t] of top)
-                logger.info(`   ${(t / 1000).toFixed(1)}s (${((t / (acc || 1)) * 100).toFixed(0)}%) ${k}`);
+                logger.info(`   ${(t / 1000).toFixed(0)}ms (${((t / (acc || 1)) * 100).toFixed(1)}%) ${k}`);
             try {
                 s.disconnect();
             }

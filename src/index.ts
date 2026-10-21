@@ -7,6 +7,7 @@ import { createLogger } from './utils/helpers';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import * as cp from 'child_process';
 
 const logger = createLogger('Main');
 
@@ -130,6 +131,23 @@ async function main(): Promise<void> {
     } else {
       logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
     }
+  } catch { /* تجاهل */ }
+
+  // 🔬 تتبّع spawn/spawnSync: يسجّل أول استدعاء لكل مسار استدعاء مع الـstack —
+  // يكشف من يفتح عمليات (وجه التسرّب الأكبر في ملف V8: spawn = 6% من وقت المعالج)
+  try {
+    const cpMod = cp as unknown as Record<string, any>;
+    const seen = new Set<string>();
+    const wrap = (name: string, orig: (...a: any[]) => any) =>
+      function (this: unknown, ...args: any[]) {
+        try {
+          const st = (new Error().stack || '').split('\n').slice(2, 7).map(s => s.trim()).join(' <- ');
+          if (!seen.has(st)) { seen.add(st); logger.info(`🔬 ${name}: ${String(args[0]).slice(0, 90)}\n     ${st}`); }
+        } catch { /* تجاهل */ }
+        return orig.apply(this, args);
+      };
+    cpMod.spawn = wrap('spawn', cpMod.spawn);
+    cpMod.spawnSync = wrap('spawnSync', cpMod.spawnSync);
   } catch { /* تجاهل */ }
 
   // Initialize the bot

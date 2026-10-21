@@ -38,6 +38,7 @@ export declare class MusicHandler {
     private cpuWall;
     private cpuNode;
     private cpuFfTicks;
+    private cpuTidTicks;
     private profStarted;
     constructor(client: LibertyClient);
     private cpuTick;
