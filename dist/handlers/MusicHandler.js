@@ -112,63 +112,34 @@ function extractVideoId(url) {
 // --------------------------------------------
 let FFMPEG_PATH = 'ffmpeg';
 let FFMPEG_OK = false;
-let staticFfmpegPromise = null;
-function probeFfmpeg(bin) {
-    try {
-        // اختبار ترميز حقيقي: نولّد صوتاً ثم نرمّزه AAC في حاوية MP4 (مثل SoundCloud HLS)
-        // ثم نفكّ ترميزه إلى PCM — نفس مسار ffmpeg الفعلي عند البث.
-        // `sine` وحده لا يكفي: ينجح حتى في الثوابت التي تنهار بـ SIGSEGV عند فك ترميز AAC.
-        const args = [
-            '-hide_banner', '-loglevel', 'error',
-            '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1',
-            '-c:a', 'aac', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov', 'pipe:1',
-        ];
-        const enc = (0, child_process_1.spawnSync)(bin, args, { windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
-        const mp4 = enc.stdout;
-        if (enc.status !== 0 || !mp4 || mp4.length < 1000)
-            return false;
-        // فك الترميز إلى PCM س16 (هنا قد تظهر مشكلة SIGSEGV في الثوابت المعطوبة)
-        const dec = (0, child_process_1.spawnSync)(bin, ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-vn', '-f', 's16le', '-ac', '2', '-ar', '48000', 'pipe:1'], { windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024, input: mp4 });
-        if (dec.status !== 0 || (dec.stdout?.length ?? 0) < 1000)
-            return false;
-        // (3) فك ترميز HLS/FMP4 عن بُعد عبر HTTP — هذا بالضبط مسار SoundCloud.
-        // لا نفحصه هنا عبر رابط عام: بعض شبكات الاستضافة تحجب روابط HLS التجريبية،
-        // فيبدو أن كل الثوابت معطوبة رغم نجاحها مع SoundCloud.
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
-// نزّل نسخة ffmpeg ثابتة (musl/static — لا تعتمد على مكتبات النظام)
+// نسخة ffmpeg ثابتة (static): مبنية للمنصات ولا تعتمد على مكتبات/system CPU
+// فالحزم المثبّتة تنهار أحياناً بـ SIGSEGV على CPU/VM مختلف (ظهر متقطعاً: 50947KB ثم 0KB)
+const STATIC_FFMPEG_URL = 'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64.gz';
 function ensureStaticFfmpeg() {
     return (async () => {
         const fsMod = require('fs');
         const zlib = require('zlib');
-        const dir = '/home/container/bin';
-        const target = `${dir}/ffmpeg`;
+        const osMod = require('os');
+        const pathMod = require('path');
+        if (osMod.platform() !== 'linux')
+            return null;
+        const dir = pathMod.join(osMod.homedir(), '.cache', 'ffmpeg-static');
+        const target = pathMod.join(dir, 'ffmpeg');
         try {
             fsMod.mkdirSync(dir, { recursive: true });
-            if (fsMod.existsSync(target)) {
-                try {
-                    fsMod.chmodSync(target, 0o755);
-                }
-                catch { /* تجاهل */ }
-                if (probeFfmpeg(target))
-                    return target;
+            if (!fsMod.existsSync(target)) {
+                logger.info('⬇️ Downloading static ffmpeg (~30MB)...');
+                const res = await fetch(STATIC_FFMPEG_URL, { signal: AbortSignal.timeout(180000) });
+                if (!res.ok)
+                    throw new Error(`HTTP ${res.status}`);
+                const gz = Buffer.from(await res.arrayBuffer());
+                fsMod.writeFileSync(target, zlib.gunzipSync(gz), { mode: 0o755 });
             }
-            logger.info('⬇️ Downloading static ffmpeg (~30MB gz)...');
-            const res = await fetch('https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64.gz', { redirect: 'follow', signal: AbortSignal.timeout(180_000) });
-            if (!res.ok)
-                throw new Error(`HTTP ${res.status}`);
-            const gz = Buffer.from(await res.arrayBuffer());
-            const bin = zlib.gunzipSync(gz);
-            fsMod.writeFileSync(target, bin, { mode: 0o755 });
-            fsMod.chmodSync(target, 0o755);
-            if (!probeFfmpeg(target))
-                throw new Error('downloaded binary failed probe');
-            logger.info(`✅ Static ffmpeg ready: ${target} (${(bin.length / 1048576).toFixed(1)}MB)`);
-            return target;
+            try {
+                fsMod.chmodSync(target, 0o755);
+            }
+            catch { /* تجاهل */ }
+            return fsMod.existsSync(target) ? target : null;
         }
         catch (e) {
             logger.warn(`Static ffmpeg download failed: ${e.message}`);
@@ -176,36 +147,56 @@ function ensureStaticFfmpeg() {
         }
     })();
 }
+// اختيار ffmpeg: نفضّل النسخة الثابتة إن توفّرت (أثبتت عملها مع SoundCloud)،
+// وإلا نستخدم المثبّت (الذي قد ينهار أحياناً — نعالج ذلك بـ retry لاحقاً)
+async function initFfmpeg() {
+    if (FFMPEG_OK)
+        return;
+    const s = await ensureStaticFfmpeg();
+    if (s) {
+        FFMPEG_PATH = s;
+        FFMPEG_OK = true;
+        logger.info(`✅ Using static ffmpeg: ${s}`);
+        return;
+    }
+    // لا نسخة ثابتة → نعتمد المثبّت رغم تقطعه (المشكلة تُعالج بإعادة المحاولة عند التشغيل)
+    if (FFMPEG_PATH && FFMPEG_PATH !== 'ffmpeg') {
+        FFMPEG_OK = true;
+        logger.info(`⚠️ Using installed ffmpeg (may crash intermittently): ${FFMPEG_PATH}`);
+    }
+}
+// اختيار أولي متزامن للبنية: نفضّل النسخة الثابتة إن كانت نُزّلت سابقاً،
+// وإلا نجرّب المثبّت (قد ينهار أحياناً — نعالج ذلك بـ retry). التنزيل التتابعي يتم في initFfmpeg().
 {
-    const candidates = [];
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const fsMod = require('fs');
-        const inst = require('@ffmpeg-installer/ffmpeg');
-        if (inst?.path && fsMod.existsSync(inst.path)) {
-            // حماية: بعض الاستضافات تمنع سكربت postinstall (chmod u+x) — نمنح الصلاحية بأنفسنا
-            try {
-                fsMod.chmodSync(inst.path, 0o755);
+    const fsMod = require('fs');
+    const pathMod = require('path');
+    const osMod = require('os');
+    const cachedStatic = osMod.platform() === 'linux'
+        ? pathMod.join(osMod.homedir(), '.cache', 'ffmpeg-static', 'ffmpeg')
+        : null;
+    if (cachedStatic && fsMod.existsSync(cachedStatic)) {
+        try {
+            fsMod.chmodSync(cachedStatic, 0o755);
+        }
+        catch { /* تجاهل */ }
+        FFMPEG_PATH = cachedStatic;
+        FFMPEG_OK = true;
+    }
+    else {
+        try {
+            const inst = require('@ffmpeg-installer/ffmpeg');
+            if (inst?.path && fsMod.existsSync(inst.path)) {
+                // حماية: بعض الاستضافات تمنع سكربت postinstall (chmod u+x) — نمنح الصلاحية بأنفسنا
+                try {
+                    fsMod.chmodSync(inst.path, 0o755);
+                }
+                catch { /* قد تكون منحتة مسبقاً */ }
+                FFMPEG_PATH = inst.path;
             }
-            catch { /* قد تكون منحتة مسبقاً */ }
-            candidates.push(inst.path);
         }
-    }
-    catch {
-        /* الحزمة غير مثبتة */
-    }
-    candidates.push('ffmpeg'); // نظام التشغيل
-    for (const c of candidates) {
-        if (probeFfmpeg(c)) {
-            FFMPEG_PATH = c;
-            FFMPEG_OK = true;
-            break;
+        catch {
+            /* الحزمة غير مثبتة — نعتمد على ffmpeg في PATH */
         }
-        logger.warn(`ffmpeg candidate failed probe (broken binary?): ${c}`);
-    }
-    // لا شيء يعمل على لينكس → نسخة ثابتة
-    if (!FFMPEG_OK && process.platform === 'linux') {
-        staticFfmpegPromise = ensureStaticFfmpeg();
     }
 }
 // --------------------------------------------
@@ -288,14 +279,7 @@ class MusicHandler {
     async resolveFfmpeg() {
         if (FFMPEG_OK)
             return;
-        if (staticFfmpegPromise) {
-            const p = await staticFfmpegPromise;
-            if (p) {
-                FFMPEG_PATH = p;
-                FFMPEG_OK = true;
-                logger.info(`ffmpeg switched to static binary: ${FFMPEG_PATH}`);
-            }
-        }
+        await initFfmpeg();
     }
     runSelfTest() {
         void this.resolveFfmpeg().then(() => this.selfTest());
@@ -817,64 +801,74 @@ class MusicHandler {
         if (!connection)
             return false;
         await this.resolveFfmpeg(); // انتظر تنزيل النسخة الثابتة إن كان المثبّت معطوباً
-        // 1) احصل على رابط البث الموقّع (أول مرة، ثم مرة أخرى بمفتاح جديد عند الفشل)
-        let url = await scResolveStream(track.scTranscodingUrl).catch(() => null);
-        if (!url) {
-            scClientId = null; // أجبر تحديث المفتاح
-            url = await scResolveStream(track.scTranscodingUrl).catch(() => null);
-        }
-        if (!url)
-            throw new Error('تعذر جلب رابط البث من SoundCloud');
-        // 2) أوقف أي ffmpeg سابق
+        // 1) أوقف أي ffmpeg سابق
         this.killFfmpeg(guildId);
-        // 3) شغّل ffmpeg: يقرأ HLS ويطوّيه إلى PCM خام يفهمه Discord
-        const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA];
-        if (beginMs > 0)
-            args.push('-ss', String(Math.floor(beginMs / 1000)));
-        args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
-        const proc = (0, child_process_1.spawn)(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-        this.ffprocs.set(guildId, proc);
-        const spawnMs = Date.now();
-        let firstChunkMs = 0;
-        let totalBytes = 0;
-        let stderrBuf = '';
-        // عدّاد البيانات: نتحقق أن ffmpeg يبث PCM فعلاً (وليس صامتاً)
-        proc.stdout?.on('data', (c) => {
-            if (!firstChunkMs)
-                firstChunkMs = Date.now();
-            totalBytes += c.length;
-        });
-        proc.stderr?.on('data', (c) => {
-            stderrBuf = (stderrBuf + c.toString()).slice(-500);
-        });
-        proc.on('error', (err) => logger.error(`ffmpeg spawn error (${guildId}): ${err.message}`));
-        proc.on('close', (code, signal) => {
-            this.ffprocs.delete(guildId);
-            const secs = ((Date.now() - spawnMs) / 1000).toFixed(1);
-            const kb = Math.round(totalBytes / 1024);
-            const ttfb = firstChunkMs ? `${firstChunkMs - spawnMs}ms` : 'never';
-            // نسجل دائماً — الخروج الصامت كان يخفي السبب الحقيقي
-            if (!firstChunkMs || (code !== 0 && code !== 255)) {
-                logger.warn(`ffmpeg ended (${guildId}): exit=${code} signal=${signal ?? '-'} after ${secs}s | first-data=${ttfb} | pcm=${kb}KB | ${stderrBuf.slice(0, 200)}`);
+        // 2) شغّل ffmpeg وانتظر أول بايت PCM قبل الالتزام بالمشغّل:
+        //    حزم ffmpeg المثبّتة تنهار أحياناً بـ SIGSEGV عند فك ترميز HLS (ظهر متقطعاً).
+        //    إن لم تصل بيانات خلال المهلة → نعيد المحاولة برابط/عملية جديدة حتى ننجح.
+        const MAX_TRIES = 3;
+        for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+            // رابط جديد لكل محاولة: روابط SoundCloud الموقّعة قصيرة الصلاحية وقد تُفقد
+            let url = await scResolveStream(track.scTranscodingUrl).catch(() => null);
+            if (!url) {
+                scClientId = null; // أجبر تحديث المفتاح
+                url = await scResolveStream(track.scTranscodingUrl).catch(() => null);
             }
-            else {
-                logger.info(`ffmpeg ended (${guildId}): exit=${code} after ${secs}s | pcm=${kb}KB`);
+            if (!url)
+                throw new Error('تعذر جلب رابط البث من SoundCloud');
+            const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA];
+            if (beginMs > 0)
+                args.push('-ss', String(Math.floor(beginMs / 1000)));
+            args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
+            const proc = (0, child_process_1.spawn)(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+            let stderrBuf = '';
+            proc.stderr?.on('data', (c) => {
+                stderrBuf = (stderrBuf + c.toString()).slice(-300);
+            });
+            // انتظر أول بايت PCM (أو الفشل/الإنهاء) — ناشر عبر PassThrough لتجنّب ضياع البيانات
+            const ready = await new Promise((resolve) => {
+                let settled = false;
+                const settle = (v) => { if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(v);
+                } };
+                const timer = setTimeout(() => settle('dead'), 10_000);
+                proc.once('spawn', () => {
+                    proc.stdout?.once('data', () => settle('data'));
+                });
+                proc.once('error', () => settle('dead'));
+                proc.once('close', () => settle('dead'));
+            });
+            if (ready === 'data') {
+                // نجاح — مرّر الـ PCM للمشغّل الآن
+                this.ffprocs.set(guildId, proc);
+                const spawnMs = Date.now();
+                proc.on('close', (code, signal) => {
+                    this.ffprocs.delete(guildId);
+                    logger.info(`ffmpeg ended (${guildId}): exit=${code} signal=${signal ?? '-'}`);
+                });
+                const out = new stream_1.PassThrough();
+                proc.stdout.pipe(out);
+                const resource = (0, voice_1.createAudioResource)(out, { inputType: voice_1.StreamType.Raw, inlineVolume: true });
+                if (resource.volume) {
+                    resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
+                }
+                connection.subscribe(player);
+                player.play(resource);
+                this.seekOffsets.set(guildId, beginMs);
+                queue.isPlaying = true;
+                logger.info(`SoundCloud stream started for "${track.title}" (seek=${beginMs}ms, attempt=${attempt}, ttfb=${Date.now() - spawnMs}ms)`);
+                return true;
             }
-        });
-        // 4) مرّر الـ PCM للمشغّل (volume يعمل عبر inlineVolume)
-        const resource = (0, voice_1.createAudioResource)(proc.stdout, {
-            inputType: voice_1.StreamType.Raw,
-            inlineVolume: true,
-        });
-        if (resource.volume) {
-            resource.volume.setVolume(Math.max(0, Math.min(4, queue.volume / 100)));
+            // فشل (SIGSEGV أو مهلة) — أوقف العملية وأعد المحاولة
+            logger.warn(`ffmpeg produced no audio (${guildId}) attempt ${attempt}/${MAX_TRIES} | ${stderrBuf.slice(0, 160)}`);
+            try {
+                proc.kill();
+            }
+            catch { /* تجاهل */ }
         }
-        connection.subscribe(player);
-        player.play(resource);
-        this.seekOffsets.set(guildId, beginMs);
-        queue.isPlaying = true;
-        logger.info(`SoundCloud stream started for "${track.title}" (seek=${beginMs}ms)`);
-        return true;
+        throw new Error(`تعذّر تشغيل ffmpeg بعد ${MAX_TRIES} محاولات`);
     }
     // إيقاف ffmpeg النشط لهذا السيرفر (إن وُجد)
     killFfmpeg(guildId) {
