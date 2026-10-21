@@ -29,6 +29,8 @@ export declare class MusicHandler {
     private ffprocs;
     private lastPlayMs;
     constructor(client: LibertyClient);
+    private resolveFfmpeg;
+    private runSelfTest;
     private selfTest;
     private getQueue;
     private getSettings;

@@ -20,7 +20,7 @@ import {
 } from '@discordjs/voice';
 import { YouTube } from 'youtube-sr';
 import { Readable, PassThrough } from 'stream';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { createLogger } from '../utils/helpers';
 import { LibertyClient } from '../LibertyClient';
 
@@ -90,20 +90,86 @@ function extractVideoId(url: string): string | null {
 
 // --------------------------------------------
 // ffmpeg — لتحويل بث SoundCloud (AAC/HMP4) إلى PCM يفهمه Discord
-// الحزمة اختيارية: إن فشل تثبيتها نستخدم ffmpeg من نظام التشغيل
+// نجرّب كل مرشح بـ "ffmpeg -version" فعلياً:.binary معطّل (SIGSEGV) يُرفض هنا
+// إن لم يعمل أي مرشح → ننزّل نسخة ثابتة (static) من إصدارات GitHub
 // --------------------------------------------
 let FFMPEG_PATH = 'ffmpeg';
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const fsMod = require('fs');
-  const inst = require('@ffmpeg-installer/ffmpeg') as { path?: string };
-  if (inst?.path && fsMod.existsSync(inst.path)) {
-    FFMPEG_PATH = inst.path;
-    // حماية: بعض الاستضافات تمنع سكربت postinstall (chmod u+x) — نمنح الصلاحية بأنفسنا
-    try { fsMod.chmodSync(inst.path, 0o755); } catch { /* قد تكون منحتة مسبقاً */ }
+let FFMPEG_OK = false;
+let staticFfmpegPromise: Promise<string | null> | null = null;
+
+function probeFfmpeg(bin: string): boolean {
+  try {
+    const r = spawnSync(bin, ['-hide_banner', '-version'], {
+      windowsHide: true,
+      timeout: 20000,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return r.status === 0;
+  } catch {
+    return false;
   }
-} catch {
-  /* الحزمة غير مثبتة — نعتمد على ffmpeg في PATH */
+}
+
+// نزّل نسخة ffmpeg ثابتة (musl/static — لا تعتمد على مكتبات النظام)
+function ensureStaticFfmpeg(): Promise<string | null> {
+  return (async () => {
+    const fsMod = require('fs') as typeof import('fs');
+    const zlib = require('zlib') as typeof import('zlib');
+    const dir = '/home/container/bin';
+    const target = `${dir}/ffmpeg`;
+    try {
+      fsMod.mkdirSync(dir, { recursive: true });
+      if (fsMod.existsSync(target)) {
+        try { fsMod.chmodSync(target, 0o755); } catch { /* تجاهل */ }
+        if (probeFfmpeg(target)) return target;
+      }
+      logger.info('⬇️ Downloading static ffmpeg (~30MB gz)...');
+      const res = await fetch(
+        'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64.gz',
+        { redirect: 'follow', signal: AbortSignal.timeout(180_000) }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const gz = Buffer.from(await res.arrayBuffer());
+      const bin = zlib.gunzipSync(gz);
+      fsMod.writeFileSync(target, bin, { mode: 0o755 });
+      fsMod.chmodSync(target, 0o755);
+      if (!probeFfmpeg(target)) throw new Error('downloaded binary failed probe');
+      logger.info(`✅ Static ffmpeg ready: ${target} (${(bin.length / 1048576).toFixed(1)}MB)`);
+      return target;
+    } catch (e: any) {
+      logger.warn(`Static ffmpeg download failed: ${e.message}`);
+      return null;
+    }
+  })();
+}
+
+{
+  const candidates: string[] = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fsMod = require('fs');
+    const inst = require('@ffmpeg-installer/ffmpeg') as { path?: string };
+    if (inst?.path && fsMod.existsSync(inst.path)) {
+      // حماية: بعض الاستضافات تمنع سكربت postinstall (chmod u+x) — نمنح الصلاحية بأنفسنا
+      try { fsMod.chmodSync(inst.path, 0o755); } catch { /* قد تكون منحتة مسبقاً */ }
+      candidates.push(inst.path);
+    }
+  } catch {
+    /* الحزمة غير مثبتة */
+  }
+  candidates.push('ffmpeg'); // نظام التشغيل
+  for (const c of candidates) {
+    if (probeFfmpeg(c)) {
+      FFMPEG_PATH = c;
+      FFMPEG_OK = true;
+      break;
+    }
+    logger.warn(`ffmpeg candidate failed probe (broken binary?): ${c}`);
+  }
+  // لا شيء يعمل على لينكس → نسخة ثابتة
+  if (!FFMPEG_OK && process.platform === 'linux') {
+    staticFfmpegPromise = ensureStaticFfmpeg();
+  }
 }
 
 // --------------------------------------------
@@ -212,9 +278,26 @@ export class MusicHandler {
 
   constructor(client: LibertyClient) {
     this.client = client;
-    logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}`);
+    logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}${FFMPEG_OK ? '' : ' (PROBE FAILED — awaiting static fallback)'}`);
     // اختبار ذاتي بعد الإقلاع: يثبت أن ffmpeg يستطيع جلب بث SoundCloud فعلياً من هذا السيرفر
-    setTimeout(() => this.selfTest(), 12_000);
+    setTimeout(() => this.runSelfTest(), 12_000);
+  }
+
+  // ينتظر تنزيل النسخة الثابتة (إن لزم) ثم يحدّث FFMPEG_PATH
+  private async resolveFfmpeg(): Promise<void> {
+    if (FFMPEG_OK) return;
+    if (staticFfmpegPromise) {
+      const p = await staticFfmpegPromise;
+      if (p) {
+        FFMPEG_PATH = p;
+        FFMPEG_OK = true;
+        logger.info(`ffmpeg switched to static binary: ${FFMPEG_PATH}`);
+      }
+    }
+  }
+
+  private runSelfTest(): void {
+    void this.resolveFfmpeg().then(() => this.selfTest());
   }
 
   // --------------------------------------------
@@ -743,6 +826,7 @@ export class MusicHandler {
     const connection = this.connections.get(guildId);
     const player = this.getPlayer(guildId);
     if (!connection) return false;
+    await this.resolveFfmpeg(); // انتظر تنزيل النسخة الثابتة إن كان المثبّت معطوباً
 
     // 1) احصل على رابط البث الموقّع (أول مرة، ثم مرة أخرى بمفتاح جديد عند الفشل)
     let url = await scResolveStream(track.scTranscodingUrl!).catch(() => null);
