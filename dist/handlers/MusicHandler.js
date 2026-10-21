@@ -199,6 +199,48 @@ class MusicHandler {
     constructor(client) {
         this.client = client;
         logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}`);
+        // اختبار ذاتي بعد الإقلاع: يثبت أن ffmpeg يستطيع جلب بث SoundCloud فعلياً من هذا السيرفر
+        setTimeout(() => this.selfTest(), 12_000);
+    }
+    // --------------------------------------------
+    // اختبار ذاتي: SoundCloud → ffmpeg → PCM (بدون Discord)
+    // يكشف فوراً إن كان ffmpeg أو شبكة الاستضافة هي المشكلة
+    // --------------------------------------------
+    selfTest() {
+        (async () => {
+            const t0 = Date.now();
+            const tracks = await scSearchTracks('despacito', 1).catch(() => []);
+            if (!tracks.length) {
+                logger.warn('🧪 Self-test FAILED: SoundCloud search returned 0 results');
+                return;
+            }
+            const hls = scPickHls(tracks[0].media?.transcodings || []);
+            const url = hls ? await scResolveStream(hls.url).catch(() => null) : null;
+            if (!url) {
+                logger.warn('🧪 Self-test FAILED: SoundCloud resolve returned no stream URL');
+                return;
+            }
+            const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA, '-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'];
+            const proc = (0, child_process_1.spawn)(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+            let bytes = 0;
+            proc.stdout?.on('data', (c) => { bytes += c.length; });
+            proc.on('error', (e) => logger.warn(`🧪 Self-test: ffmpeg spawn error: ${e.message}`));
+            const killer = setTimeout(() => { try {
+                proc.kill();
+            }
+            catch { /* تجاهل */ } }, 6000);
+            proc.on('close', (code, signal) => {
+                clearTimeout(killer);
+                const secs = ((Date.now() - t0) / 1000).toFixed(1);
+                const kb = Math.round(bytes / 1024);
+                if (bytes > 200_000) {
+                    logger.info(`🧪 Self-test OK: SoundCloud→ffmpeg produced ${kb}KB PCM in ${secs}s (exit=${code} signal=${signal ?? '-'})`);
+                }
+                else {
+                    logger.warn(`🧪 Self-test FAILED: only ${kb}KB PCM in ${secs}s (exit=${code} signal=${signal ?? '-'})`);
+                }
+            });
+        })().catch((e) => logger.warn(`🧪 Self-test error: ${e.message}`));
     }
     // --------------------------------------------
     // القائمة
@@ -519,6 +561,9 @@ class MusicHandler {
             selfDeaf: true,
         });
         connection.on('stateChange', (oldState, newState) => {
+            if (oldState.status !== newState.status) {
+                logger.info(`Voice connection ${oldState.status} → ${newState.status} (${guildId})`);
+            }
             if (newState.status === voice_1.VoiceConnectionStatus.Destroyed) {
                 this.cleanup(guildId, false);
             }
@@ -543,6 +588,9 @@ class MusicHandler {
             return player;
         player = (0, voice_1.createAudioPlayer)();
         player.on('stateChange', (oldState, newState) => {
+            if (oldState.status !== newState.status) {
+                logger.info(`Player ${oldState.status} → ${newState.status} (${guildId}, played=${oldState.resource?.playbackDuration ?? 0}ms)`);
+            }
             if (newState.status === voice_1.AudioPlayerStatus.Idle && oldState.status !== voice_1.AudioPlayerStatus.Idle) {
                 // نحفظ المدة المُشغَّلة فعلياً قبل أن يفقد المشغّل الـ resource
                 this.lastPlayMs.set(guildId, oldState.resource?.playbackDuration ?? 0);
@@ -681,15 +729,31 @@ class MusicHandler {
         args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
         const proc = (0, child_process_1.spawn)(FFMPEG_PATH, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
         this.ffprocs.set(guildId, proc);
+        const spawnMs = Date.now();
+        let firstChunkMs = 0;
+        let totalBytes = 0;
         let stderrBuf = '';
+        // عدّاد البيانات: نتحقق أن ffmpeg يبث PCM فعلاً (وليس صامتاً)
+        proc.stdout?.on('data', (c) => {
+            if (!firstChunkMs)
+                firstChunkMs = Date.now();
+            totalBytes += c.length;
+        });
         proc.stderr?.on('data', (c) => {
             stderrBuf = (stderrBuf + c.toString()).slice(-500);
         });
         proc.on('error', (err) => logger.error(`ffmpeg spawn error (${guildId}): ${err.message}`));
-        proc.on('close', (code) => {
+        proc.on('close', (code, signal) => {
             this.ffprocs.delete(guildId);
-            if (code && code !== 0 && code !== 255) {
-                logger.warn(`ffmpeg exited with code ${code}: ${stderrBuf.slice(0, 200)}`);
+            const secs = ((Date.now() - spawnMs) / 1000).toFixed(1);
+            const kb = Math.round(totalBytes / 1024);
+            const ttfb = firstChunkMs ? `${firstChunkMs - spawnMs}ms` : 'never';
+            // نسجل دائماً — الخروج الصامت كان يخفي السبب الحقيقي
+            if (!firstChunkMs || (code !== 0 && code !== 255)) {
+                logger.warn(`ffmpeg ended (${guildId}): exit=${code} signal=${signal ?? '-'} after ${secs}s | first-data=${ttfb} | pcm=${kb}KB | ${stderrBuf.slice(0, 200)}`);
+            }
+            else {
+                logger.info(`ffmpeg ended (${guildId}): exit=${code} after ${secs}s | pcm=${kb}KB`);
             }
         });
         // 4) مرّر الـ PCM للمشغّل (volume يعمل عبر inlineVolume)

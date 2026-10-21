@@ -29,6 +29,7 @@ export declare class MusicHandler {
     private ffprocs;
     private lastPlayMs;
     constructor(client: LibertyClient);
+    private selfTest;
     private getQueue;
     private getSettings;
     search(query: string): Promise<Track | null>;
