@@ -107,80 +107,41 @@ function extractVideoId(url) {
 }
 // --------------------------------------------
 // ffmpeg — لتحويل بث SoundCloud (AAC/HMP4) إلى PCM يفهمه Discord
-// نجرّب كل مرشح بـ "ffmpeg -version" فعلياً:.binary معطّل (SIGSEGV) يُرفض هنا
-// إن لم يعمل أي مرشح → ننزّل نسخة ثابتة (static) من إصدارات GitHub
+// نجرّب "ffmpeg -version" لنظام التشغيل أولاً (المُثبت نجاحه هنا فعلياً)،
+// ثم المثبّت npm احتياطاً. النسخ الثابتة جرى تجربتها و انهارت بـ SIGSEGV.
 // --------------------------------------------
 let FFMPEG_PATH = 'ffmpeg';
 let FFMPEG_OK = false;
-// نسخة ffmpeg ثابتة (static): مبنية للمنصات ولا تعتمد على مكتبات/system CPU
-// فالحزم المثبّتة تنهار أحياناً بـ SIGSEGV على CPU/VM مختلف (ظهر متقطعاً: 50947KB ثم 0KB)
-const STATIC_FFMPEG_URL = 'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64.gz';
-function ensureStaticFfmpeg() {
-    return (async () => {
-        const fsMod = require('fs');
-        const zlib = require('zlib');
-        const osMod = require('os');
-        const pathMod = require('path');
-        if (osMod.platform() !== 'linux')
-            return null;
-        const dir = pathMod.join(osMod.homedir(), '.cache', 'ffmpeg-static');
-        const target = pathMod.join(dir, 'ffmpeg');
-        try {
-            fsMod.mkdirSync(dir, { recursive: true });
-            if (!fsMod.existsSync(target)) {
-                logger.info('⬇️ Downloading static ffmpeg (~30MB)...');
-                const res = await fetch(STATIC_FFMPEG_URL, { signal: AbortSignal.timeout(180000) });
-                if (!res.ok)
-                    throw new Error(`HTTP ${res.status}`);
-                const gz = Buffer.from(await res.arrayBuffer());
-                fsMod.writeFileSync(target, zlib.gunzipSync(gz), { mode: 0o755 });
-            }
-            try {
-                fsMod.chmodSync(target, 0o755);
-            }
-            catch { /* تجاهل */ }
-            return fsMod.existsSync(target) ? target : null;
-        }
-        catch (e) {
-            logger.warn(`Static ffmpeg download failed: ${e.message}`);
-            return null;
-        }
-    })();
-}
-// اختيار ffmpeg: نفضّل النسخة الثابتة إن توفّرت (أثبتت عملها مع SoundCloud)،
-// وإلا نستخدم المثبّت (الذي قد ينهار أحياناً — نعالج ذلك بـ retry لاحقاً)
+// لا نُنزّل نسخة ثابتة: جُرِّبت على هذه الاستضافة و انهارت بـ SIGSEGV أيضاً.
+// ffmpeg نظام التشغيل هو الوحيد المُثبت نجاحه، والمثبّت احتياطي مع retry.
 async function initFfmpeg() {
     if (FFMPEG_OK)
         return;
-    const s = await ensureStaticFfmpeg();
-    if (s) {
-        FFMPEG_PATH = s;
-        FFMPEG_OK = true;
-        logger.info(`✅ Using static ffmpeg: ${s}`);
-        return;
-    }
-    // لا نسخة ثابتة → نعتمد المثبّت رغم تقطعه (المشكلة تُعالج بإعادة المحاولة عند التشغيل)
-    if (FFMPEG_PATH && FFMPEG_PATH !== 'ffmpeg') {
-        FFMPEG_OK = true;
-        logger.info(`⚠️ Using installed ffmpeg (may crash intermittently): ${FFMPEG_PATH}`);
-    }
+    // لا شيء جاهز — نعتمد المسار الحالي مهما كان (retry في startSoundcloud يحمينا)
+    FFMPEG_OK = true;
+    logger.warn(`⚠️ ffmpeg fallback in use (may crash intermittently): ${FFMPEG_PATH}`);
 }
-// اختيار أولي متزامن للبنية: نفضّل النسخة الثابتة إن كانت نُزّلت سابقاً،
-// وإلا نجرّب المثبّت (قد ينهار أحياناً — نعالج ذلك بـ retry). التنزيل التتابعي يتم في initFfmpeg().
+// اختيار أولي متزامن — الترتيب مبني على نتائج فعلية على هذه الاستضافة:
+// 1) ffmpeg نظام التشغيل: الوحيد الذي نجح فعلياً مع SoundCloud (50947KB PCM)
+// 2) @ffmpeg-installer: ينهار أحياناً بـ SIGSEGV عند فك ترميز HLS (يُعالج بـ retry)
 {
     const fsMod = require('fs');
-    const pathMod = require('path');
-    const osMod = require('os');
-    const cachedStatic = osMod.platform() === 'linux'
-        ? pathMod.join(osMod.homedir(), '.cache', 'ffmpeg-static', 'ffmpeg')
-        : null;
-    if (cachedStatic && fsMod.existsSync(cachedStatic)) {
-        try {
-            fsMod.chmodSync(cachedStatic, 0o755);
-        }
-        catch { /* تجاهل */ }
-        FFMPEG_PATH = cachedStatic;
+    let sysOk = false;
+    try {
+        const p = (0, child_process_1.spawnSync)('ffmpeg', ['-hide_banner', '-version'], {
+            windowsHide: true,
+            timeout: 15000,
+            stdio: ['ignore', 'ignore', 'ignore'],
+        });
+        sysOk = p.status === 0;
+    }
+    catch {
+        sysOk = false;
+    }
+    if (sysOk) {
+        FFMPEG_PATH = 'ffmpeg';
         FFMPEG_OK = true;
+        logger.info('ffmpeg: using system binary (only one proven working with SoundCloud on this host)');
     }
     else {
         try {
@@ -197,6 +158,7 @@ async function initFfmpeg() {
         catch {
             /* الحزمة غير مثبتة — نعتمد على ffmpeg في PATH */
         }
+        logger.warn('ffmpeg: system binary unavailable — using npm installer build (intermittent SIGSEGV risk, retries in place)');
     }
 }
 // --------------------------------------------
