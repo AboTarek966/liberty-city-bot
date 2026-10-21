@@ -59,10 +59,17 @@ async function main() {
     process.on('unhandledRejection', (reason, promise) => {
         logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
     });
+    // ⚠️ لا نُنهي العملية عند خطأ غير متوقع — الخطأ الصغير لا يجب أن يقتل البوت كله
+    // (سابقاً أي uncaughtException كان يوقف البوت بالكامل في منتصف تشغيل موسيقى!)
     process.on('uncaughtException', (error) => {
-        logger.error('Uncaught Exception:', error);
-        gracefulShutdown('uncaughtException');
+        logger.error('Uncaught Exception (bot keeps running):', error);
     });
+    // تسجيل دوري للاستهلاك — يكشف ارتفاع الذاكرة قبل أن تقتلها الاستضافة (OOM kill)
+    setInterval(() => {
+        const mu = process.memoryUsage();
+        const mb = (n) => Math.round(n / 1024 / 1024);
+        logger.debug(`MEM rss=${mb(mu.rss)}MB heap=${mb(mu.heapUsed)}/${mb(mu.heapTotal)}MB external=${mb(mu.external)}`);
+    }, 60_000);
     // Initialize the bot
     try {
         await client.initialize();

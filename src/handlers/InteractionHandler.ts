@@ -76,11 +76,23 @@ export class InteractionHandler {
         try {
           const filePath = path.join(buttonsPath, file);
           const buttonModule = require(filePath);
-          const button: ButtonHandler = buttonModule.default || buttonModule;
-          
-          if (button.id) {
-            this.buttons.set(button.id, button);
-            loadedCount++;
+
+          // نجمع كل المعالجات: default إن وُجد، وكل export يشبه معالجاً (id + execute)
+          // (بعض الملفات تُصدّر عدة معالجات باسماء — مثل musicButtons)
+          const candidates: ButtonHandler[] = [];
+          if (buttonModule.default) candidates.push(buttonModule.default);
+          for (const v of Object.values(buttonModule)) {
+            const h = v as any;
+            if (h && typeof h === 'object' && h.id && typeof h.execute === 'function' && !candidates.includes(h)) {
+              candidates.push(h);
+            }
+          }
+
+          for (const button of candidates) {
+            if (button.id) {
+              this.buttons.set(button.id, button);
+              loadedCount++;
+            }
           }
         } catch (error) {
           logger.error(`Failed to load button ${file}:`, error);

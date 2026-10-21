@@ -847,10 +847,8 @@ export class MusicHandler {
       }
       if (!url) throw new Error('تعذر جلب رابط البث من SoundCloud');
 
-      // ⚡ بدء أسرع في المحاولة الأولى: تصغير أحجام الفحص (الافتراضي 5MB يؤخر أول بايت)
-      // إن فشلت المحاولة نعود للإعدادات الافتراضية الآمنة في الثانية والثالثة
+      // الإعدادات الافتراضية أثبتت استقرارها (بث كامل للأغنية) — لا نغيّرها
       const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA];
-      if (attempt === 1) args.push('-probesize', '32768', '-analyzeduration', '0');
       if (beginMs > 0) args.push('-ss', String(Math.floor(beginMs / 1000)));
       args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
 
