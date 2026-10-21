@@ -1,4 +1,4 @@
-import { GuildMember } from 'discord.js';
+import { GuildMember, VoiceBasedChannel, EmbedBuilder, ButtonBuilder, ActionRowBuilder } from 'discord.js';
 import { LibertyClient } from '../LibertyClient';
 export interface Track {
     title: string;
@@ -18,6 +18,11 @@ export interface Queue {
     isPlaying: boolean;
     volume: number;
     loop: 'none' | 'track' | 'queue';
+    /** رسالة لوحة التحكم التلقائية (في روم الصوت أو روم النص) */
+    panel?: {
+        channelId: string;
+        messageId: string;
+    };
 }
 export declare class MusicHandler {
     private client;
@@ -28,6 +33,7 @@ export declare class MusicHandler {
     private seekOffsets;
     private ffprocs;
     private lastPlayMs;
+    private scPrefetched;
     constructor(client: LibertyClient);
     private resolveFfmpeg;
     private runSelfTest;
@@ -48,6 +54,8 @@ export declare class MusicHandler {
     private getPlayer;
     private cleanup;
     private startCurrent;
+    private prefetchScStream;
+    private takePrefetched;
     private startSoundcloud;
     private killFfmpeg;
     private onTrackEnd;
@@ -57,6 +65,10 @@ export declare class MusicHandler {
         track?: Track;
         message: string;
     }>;
+    panelRows(): ActionRowBuilder<ButtonBuilder>[];
+    panelEmbed(guildId: string, userTag?: string): EmbedBuilder | null;
+    sendControlPanel(guildId: string, voiceChannel: VoiceBasedChannel, textChannelId?: string, userTag?: string): Promise<void>;
+    refreshPanel(guildId: string): Promise<void>;
     skip(guildId: string): boolean;
     stop(guildId: string): boolean;
     pause(guildId: string): boolean;

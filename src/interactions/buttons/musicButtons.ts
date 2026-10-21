@@ -2,7 +2,7 @@
 // Liberty City Bot - Music Button Handlers
 // ============================================
 
-import { ButtonInteraction, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, Colors } from 'discord.js';
+import { ButtonInteraction, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { MusicHandler } from '../../handlers/MusicHandler';
@@ -22,34 +22,9 @@ const formatDuration = (seconds: number): string => {
 };
 
 const getMusicEmbed = (music: MusicHandler, guildId: string, userTag: string): { embed: EmbedBuilder; components: ActionRowBuilder<any>[] } | null => {
-  const queue = music.getQueueInfo(guildId);
-  if (!queue?.currentTrack) return null;
-
-  const track = queue.currentTrack!;
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Green)
-    .setTitle('🎵 تشغيل الآن')
-    .setDescription(`**${track.title}**`)
-    .setURL(track.url)
-    .setThumbnail(track.thumbnail)
-    .addFields(
-      { name: '⏱️ المدة', value: formatDuration(track.duration), inline: true },
-      { name: '👤 طلبها', value: track.requestedBy, inline: true },
-      { name: '🔁 التكرار', value: queue.loop === 'track' ? '🔁 الأغنية' : queue.loop === 'queue' ? '🔂 القائمة' : '❌ معطل', inline: true },
-      { name: '🔊 الصوت', value: `${queue.volume}%`, inline: true },
-    )
-    .setFooter({ text: `Liberty City Music • ${userTag}` })
-    .setTimestamp();
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId('music:pause').setLabel('⏸️').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('music:resume').setLabel('▶️').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('music:skip').setLabel('⏭️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('music:stop').setLabel('⏹️').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('music:queue').setLabel('📋 قائمة').setStyle(ButtonStyle.Secondary),
-  );
-
-  return { embed, components: [row] };
+  const embed = music.panelEmbed(guildId, userTag);
+  if (!embed) return null;
+  return { embed, components: music.panelRows() };
 };
 
 const handler: ButtonHandler = {
@@ -88,6 +63,22 @@ const handler: ButtonHandler = {
           }
           const result = getMusicEmbed(client.musicHandler, guildId, interaction.user.tag);
           if (result) await interaction.editReply({ embeds: [result.embed], components: result.components });
+          break;
+        }
+
+        case 'volup':
+        case 'voldown': {
+          const q = music.getQueueInfo(guildId);
+          if (!q || !q.currentTrack) {
+            await interaction.followUp({ content: '❌ لا توجد موسيقى قيد التشغيل!', ephemeral: true });
+            return;
+          }
+          const delta = action === 'volup' ? 10 : -10;
+          const next = Math.max(0, Math.min(200, q.volume + delta));
+          music.setVolume(guildId, next);
+          const result = getMusicEmbed(client.musicHandler, guildId, interaction.user.tag);
+          if (result) await interaction.editReply({ embeds: [result.embed], components: result.components });
+          await interaction.followUp({ content: `🔊 الصوت: **${next}%**`, ephemeral: true });
           break;
         }
 

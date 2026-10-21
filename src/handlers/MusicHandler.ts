@@ -5,7 +5,15 @@
 // البحث عبر youtube-sr، ودعم كامل: تشغيل/إيقاف/استئناف/تخطي/seek/صوت/تكرار
 // ============================================
 
-import { GuildMember, VoiceBasedChannel } from 'discord.js';
+import {
+  GuildMember,
+  VoiceBasedChannel,
+  EmbedBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  Colors,
+} from 'discord.js';
 import {
   AudioPlayer,
   AudioPlayerStatus,
@@ -228,6 +236,8 @@ export interface Queue {
   isPlaying: boolean;
   volume: number;
   loop: 'none' | 'track' | 'queue';
+  /** رسالة لوحة التحكم التلقائية (في روم الصوت أو روم النص) */
+  panel?: { channelId: string; messageId: string };
 }
 
 export class MusicHandler {
@@ -243,6 +253,8 @@ export class MusicHandler {
   private ffprocs = new Map<string, ChildProcess>();
   // مدة التشغيل الفعلية عند آخر انتهاء (للكشف عن الفشل المبكر ومنع تكرار لا نهائي)
   private lastPlayMs = new Map<string, number>();
+  // ⚡ روابط بث SoundCloud مُحلّة مسبقاً (نبدأ حلّها بالتوازي مع انتظار الاتصال الصوتي)
+  private scPrefetched = new Map<string, { url: string; at: number }>();
 
   constructor(client: LibertyClient) {
     this.client = client;
@@ -788,6 +800,27 @@ export class MusicHandler {
   // --------------------------------------------
   // تشغيل SoundCloud: رابط HLS → ffmpeg → PCM خام (48k stereo)
   // --------------------------------------------
+  // --------------------------------------------
+  // ⚡ حلّ رابط البث مسبقاً (بالتوازي مع انتظار الاتصال الصوتي)
+  // --------------------------------------------
+  private prefetchScStream(track: Track): void {
+    if (track.source !== 'soundcloud' || !track.scTranscodingUrl) return;
+    const key = track.scTranscodingUrl;
+    scResolveStream(key)
+      .then((url) => {
+        if (url) this.scPrefetched.set(key, { url, at: Date.now() });
+      })
+      .catch(() => { /* يُعاد المحاولة وقت التشغيل */ });
+  }
+
+  private takePrefetched(key: string): string | null {
+    const hit = this.scPrefetched.get(key);
+    this.scPrefetched.delete(key);
+    // الروابط الموقّعة قصيرة الصلاحية — لا نثق بقديم (> دقيقتين)
+    if (hit && Date.now() - hit.at < 120_000) return hit.url;
+    return null;
+  }
+
   private async startSoundcloud(guildId: string, track: Track, beginMs: number): Promise<boolean> {
     const queue = this.getQueue(guildId);
     const connection = this.connections.get(guildId);
@@ -803,15 +836,21 @@ export class MusicHandler {
     //    إن لم تصل بيانات خلال المهلة → نعيد المحاولة برابط/عملية جديدة حتى ننجح.
     const MAX_TRIES = 3;
     for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-      // رابط جديد لكل محاولة: روابط SoundCloud الموقّعة قصيرة الصلاحية وقد تُفقد
-      let url = await scResolveStream(track.scTranscodingUrl!).catch(() => null);
+      // ⚡ نستخدم الرابط المُحلّى مسبقاً إن وُجد (نوفّر ~1-2 ثانية)، وإلا نحلّه الآن
+      let url = attempt === 1 ? this.takePrefetched(track.scTranscodingUrl!) : null;
+      if (!url) {
+        url = await scResolveStream(track.scTranscodingUrl!).catch(() => null);
+      }
       if (!url) {
         scClientId = null; // أجبر تحديث المفتاح
         url = await scResolveStream(track.scTranscodingUrl!).catch(() => null);
       }
       if (!url) throw new Error('تعذر جلب رابط البث من SoundCloud');
 
+      // ⚡ بدء أسرع في المحاولة الأولى: تصغير أحجام الفحص (الافتراضي 5MB يؤخر أول بايت)
+      // إن فشلت المحاولة نعود للإعدادات الافتراضية الآمنة في الثانية والثالثة
       const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-user_agent', SC_UA];
+      if (attempt === 1) args.push('-probesize', '32768', '-analyzeduration', '0');
       if (beginMs > 0) args.push('-ss', String(Math.floor(beginMs / 1000)));
       args.push('-i', url, '-vn', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
 
@@ -920,11 +959,14 @@ export class MusicHandler {
 
     if (next) {
       queue.isPlaying = true;
-      this.startCurrent(guildId).catch(() => {});
+      this.startCurrent(guildId)
+        .then(() => this.refreshPanel(guildId).catch(() => {}))
+        .catch(() => {});
     } else {
       queue.isPlaying = false;
       queue.currentTrack = null;
       this.cleanup(guildId, true);
+      void this.refreshPanel(guildId).catch(() => {});
     }
   }
 
@@ -968,9 +1010,20 @@ export class MusicHandler {
       return { success: false, message: '❌ لا أملك صلاحية الدخول/التحدث في القناة الصوتية!' };
     }
 
+    // ⚡ السرعة: نبدأ الاتصال بالقناة الصوتية فوراً — بالتوازي مع البحث
+    // (سابقاً: بحث كامل ثم اتصال ثم بث = تأخير مضاعف بلا داعٍ)
+    let connection: VoiceConnection | null = null;
+    try {
+      connection = this.connect(guildId, channel);
+    } catch {
+      connection = null;
+    }
+
     const track = await this.addTrack(guildId, query, member.user.username, member.user.id);
     if (!track) {
       const queue = this.getQueue(guildId);
+      // إن لم يكن هناك تشغيل آخر، لا معنى للاتصال الذي بدأناه — غادر
+      if (!queue.currentTrack && queue.tracks.length === 0) this.cleanup(guildId, true);
       return {
         success: false,
         message:
@@ -993,9 +1046,13 @@ export class MusicHandler {
       queue.volume = Math.max(0, Math.min(200, settings.defaultVolume));
     }
 
+    // ⚡ حلّ رابط البث الآن — بالتوازي مع انتظار جهوزية الاتصال الصوتي
+    this.prefetchScStream(track);
+
     try {
-      this.connect(guildId, channel);
-      const connection = this.connections.get(guildId)!;
+      if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
+        connection = this.connect(guildId, channel);
+      }
       await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
     } catch {
       queue.isPlaying = false;
@@ -1009,7 +1066,137 @@ export class MusicHandler {
       return { success: false, message: `❌ تعذر تشغيل **${track.title}** — جرّب أغنية أخرى` };
     }
 
+    // 🎛️ لوحة تحكم تلقائية (في روم الصوت إن أمكن، أو روم النص)
+    void this.sendControlPanel(guildId, channel, textChannelId, member.user.tag).catch(() => {});
+
     return { success: true, track, message: `🎵 **تشغيل الآن:** ${track.title}` };
+  }
+
+  // --------------------------------------------
+  // 🎛️ لوحة التحكم التلقائية (رسالة بأزرار تأتي مع بدء التشغيل)
+  // تُرسل في روم الصوت نفسه، وإن تعذّر ففي الروم النصي الذي صدر منه الأمر
+  // --------------------------------------------
+  panelRows(): ActionRowBuilder<ButtonBuilder>[] {
+    const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('music:voldown').setLabel('🔉 أخفض').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('music:volup').setLabel('🔊 ارفع').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('music:pause').setLabel('⏸️ إيقاف مؤقت').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('music:resume').setLabel('▶️ تشغيل').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('music:skip').setLabel('⏭️ تخطي').setStyle(ButtonStyle.Primary),
+    );
+    const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId('music:stop').setLabel('⏹️ إيقاف نهائي').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('music:loop').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('music:shuffle').setLabel('🔀 خلط').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('music:queue').setLabel('📋 القائمة').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('music:nowplaying').setLabel('🎵 الحالية').setStyle(ButtonStyle.Secondary),
+    );
+    return [row1, row2];
+  }
+
+  panelEmbed(guildId: string, userTag?: string): EmbedBuilder | null {
+    const queue = this.queues.get(guildId);
+    const track = queue?.currentTrack;
+    if (!queue || !track) return null;
+
+    const fmt = (s: number): string => {
+      const sec = Math.max(0, Math.floor(s));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const ss = sec % 60;
+      return h > 0
+        ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+        : `${m}:${String(ss).padStart(2, '0')}`;
+    };
+
+    const loopLabel =
+      queue.loop === 'track' ? '🔁 الأغنية' : queue.loop === 'queue' ? '🔂 القائمة' : '❌ معطل';
+
+    const embed = new EmbedBuilder()
+      .setColor(queue.isPlaying ? Colors.Green : Colors.Yellow)
+      .setTitle(queue.isPlaying ? '🎵 تشغيل الآن' : '⏸️ إيقاف مؤقت')
+      .setDescription(`**${track.title}**`)
+      .setURL(track.url)
+      .setThumbnail(track.thumbnail || null)
+      .addFields(
+        { name: '⏱️ المدة', value: fmt(track.duration), inline: true },
+        { name: '👤 طلبها', value: track.requestedBy || '؟', inline: true },
+        { name: '🔊 الصوت', value: `${queue.volume}%`, inline: true },
+        { name: '🔁 التكرار', value: loopLabel, inline: true },
+        { name: '📥 بالقائمة', value: String(queue.tracks.length), inline: true },
+      )
+      .setFooter({ text: userTag ? `Liberty Music • ${userTag}` : 'Liberty Music' })
+      .setTimestamp();
+
+    return embed;
+  }
+
+  async sendControlPanel(
+    guildId: string,
+    voiceChannel: VoiceBasedChannel,
+    textChannelId?: string,
+    userTag?: string
+  ): Promise<void> {
+    const embed = this.panelEmbed(guildId, userTag);
+    if (!embed) return;
+    const payload = { embeds: [embed], components: this.panelRows() };
+    const queue = this.getQueue(guildId);
+
+    // لو توجد لوحة سابقة لهذا السيرفر → عدّلها بدل إرسال رسالة جديدة
+    if (queue.panel) {
+      try {
+        const ch: any = await this.client.channels.fetch(queue.panel.channelId);
+        const msg = await ch?.messages?.fetch(queue.panel.messageId);
+        if (msg) {
+          await msg.edit(payload);
+          return;
+        }
+      } catch {
+        queue.panel = undefined; // الرسالة القديمة اختفت — نرسل واحدة جديدة
+      }
+    }
+
+    // 1) الأفضل: داخل روم الصوت نفسه
+    try {
+      const sent = await (voiceChannel as any).send(payload);
+      queue.panel = { channelId: sent.channel.id, messageId: sent.id };
+      return;
+    } catch {
+      /* لا صلاحيات إرسال في الروم الصوتى — نجرب النصي */
+    }
+
+    // 2) احتياطي: الروم النصي الذي صدر منه الأمر
+    if (textChannelId) {
+      try {
+        const ch: any = await this.client.channels.fetch(textChannelId);
+        if (ch && typeof ch.send === 'function') {
+          const sent = await ch.send(payload);
+          queue.panel = { channelId: sent.channel.id, messageId: sent.id };
+        }
+      } catch {
+        /* تجاهل */
+      }
+    }
+  }
+
+  // تحديث اللوحة عند تغيّر الأغنية/الحالة (أو إلغاء أزرارها عند التوقف)
+  async refreshPanel(guildId: string): Promise<void> {
+    const queue = this.queues.get(guildId);
+    const ref = queue?.panel;
+    if (!ref) return;
+    try {
+      const ch: any = await this.client.channels.fetch(ref.channelId);
+      const msg = await ch?.messages?.fetch(ref.messageId);
+      if (!msg) return;
+      const embed = this.panelEmbed(guildId);
+      if (embed) {
+        await msg.edit({ embeds: [embed], components: this.panelRows() });
+      } else {
+        await msg.edit({ content: '⏹️ تم إيقاف الموسيقى', embeds: [], components: [] });
+      }
+    } catch {
+      /* تجاهل */
+    }
   }
 
   // --------------------------------------------
@@ -1036,6 +1223,7 @@ export class MusicHandler {
       player.stop();
     }
     this.cleanup(guildId, true);
+    void this.refreshPanel(guildId).catch(() => {});
     return true;
   }
 

@@ -140,30 +140,23 @@ const musicCommand: Command = {
 
           const track = result.track!;
           const queue = music.getQueueInfo(guildId);
-          
-          const embed = new EmbedBuilder()
-            .setColor(Colors.Green)
-            .setTitle(queue!.isPlaying && queue!.tracks.length > 0 ? '✅ أضيفت للقائمة' : '🎵 تشغيل الآن')
-            .setDescription(`**${track.title}**`)
-            .setURL(track.url)
-            .setThumbnail(track.thumbnail)
-            .addFields(
-              { name: '⏱️ المدة', value: formatDuration(track.duration), inline: true },
-              { name: '👤 طلبها', value: track.requestedBy, inline: true },
-              { name: '📍 الموضع', value: queue!.isPlaying ? `#${queue!.tracks.length}` : 'تشغيل الآن', inline: true },
-            )
-            .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
-            .setTimestamp();
+          const queued = queue!.isPlaying && queue!.tracks.length > 0;
 
-          const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId('music:pause').setLabel('⏸️').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('music:resume').setLabel('▶️').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('music:skip').setLabel('⏭️').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('music:stop').setLabel('⏹️').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('music:queue').setLabel('📋 قائمة').setStyle(ButtonStyle.Secondary),
-          );
+          const embed = (queued
+            ? new EmbedBuilder()
+                .setColor(Colors.Green)
+                .setTitle('✅ أضيفت للقائمة')
+                .setDescription(`**${track.title}**`)
+                .setURL(track.url)
+                .setThumbnail(track.thumbnail)
+                .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
+                .setTimestamp()
+            : music.panelEmbed(guildId, interaction.user.tag))!;
 
-          await interaction.editReply({ embeds: [embed], components: [row] });
+          await interaction.editReply({
+            embeds: [embed],
+            components: queued ? [] : music.panelRows(),
+          });
           break;
         }
 

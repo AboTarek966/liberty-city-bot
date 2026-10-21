@@ -72,17 +72,21 @@ const musicCommand = {
                     }
                     const track = result.track;
                     const queue = music.getQueueInfo(guildId);
-                    const embed = new discord_js_1.EmbedBuilder()
-                        .setColor(discord_js_1.Colors.Green)
-                        .setTitle(queue.isPlaying && queue.tracks.length > 0 ? '✅ أضيفت للقائمة' : '🎵 تشغيل الآن')
-                        .setDescription(`**${track.title}**`)
-                        .setURL(track.url)
-                        .setThumbnail(track.thumbnail)
-                        .addFields({ name: '⏱️ المدة', value: formatDuration(track.duration), inline: true }, { name: '👤 طلبها', value: track.requestedBy, inline: true }, { name: '📍 الموضع', value: queue.isPlaying ? `#${queue.tracks.length}` : 'تشغيل الآن', inline: true })
-                        .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
-                        .setTimestamp();
-                    const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId('music:pause').setLabel('⏸️').setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId('music:resume').setLabel('▶️').setStyle(discord_js_1.ButtonStyle.Success), new discord_js_1.ButtonBuilder().setCustomId('music:skip').setLabel('⏭️').setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId('music:stop').setLabel('⏹️').setStyle(discord_js_1.ButtonStyle.Danger), new discord_js_1.ButtonBuilder().setCustomId('music:queue').setLabel('📋 قائمة').setStyle(discord_js_1.ButtonStyle.Secondary));
-                    await interaction.editReply({ embeds: [embed], components: [row] });
+                    const queued = queue.isPlaying && queue.tracks.length > 0;
+                    const embed = (queued
+                        ? new discord_js_1.EmbedBuilder()
+                            .setColor(discord_js_1.Colors.Green)
+                            .setTitle('✅ أضيفت للقائمة')
+                            .setDescription(`**${track.title}**`)
+                            .setURL(track.url)
+                            .setThumbnail(track.thumbnail)
+                            .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
+                            .setTimestamp()
+                        : music.panelEmbed(guildId, interaction.user.tag));
+                    await interaction.editReply({
+                        embeds: [embed],
+                        components: queued ? [] : music.panelRows(),
+                    });
                     break;
                 }
                 case 'skip': {
