@@ -34,7 +34,12 @@ export declare class MusicHandler {
     private ffprocs;
     private lastPlayMs;
     private scPrefetched;
+    private cpuMeter?;
+    private cpuWall;
+    private cpuNode;
+    private cpuFfTicks;
     constructor(client: LibertyClient);
+    private cpuTick;
     private resolveFfmpeg;
     private runSelfTest;
     private selfTest;

@@ -10,6 +10,7 @@ const LibertyClient_1 = require("./LibertyClient");
 const helpers_1 = require("./utils/helpers");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const os_1 = __importDefault(require("os"));
 const logger = (0, helpers_1.createLogger)('Main');
 // --------------------------------------------
 // سجل دائم يصمد بعد موت السيرفر (الكونسول يُمسح معه — الملف لا)
@@ -113,6 +114,32 @@ async function main() {
                 for (const l of tailLines)
                     console.log('   ' + l);
             }
+        }
+    }
+    catch { /* تجاهل */ }
+    // 🧪 حصة المعالج الفعلية للحاوية — نسبة اللوحة تُحسب على هذه الحصة لا على كامل النواة
+    try {
+        let q = '', p = '';
+        try {
+            const t = fs_1.default.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/);
+            q = t[0];
+            p = t[1];
+        }
+        catch { /* cgroup v1 */ }
+        if (!q) {
+            try {
+                q = fs_1.default.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim();
+                p = fs_1.default.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim();
+            }
+            catch { /* لا وصول */ }
+        }
+        const la = os_1.default.loadavg().map(n => n.toFixed(2)).join(' ');
+        if (q) {
+            const cores = q === 'max' ? '∞' : (Number(q) / Number(p || 100000)).toFixed(2);
+            logger.info(`🧪 CPU quota: ${q}/${p || '-'} = ${cores} core | loadavg ${la}`);
+        }
+        else {
+            logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
         }
     }
     catch { /* تجاهل */ }

@@ -6,6 +6,7 @@ import { LibertyClient } from './LibertyClient';
 import { createLogger } from './utils/helpers';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 const logger = createLogger('Main');
 
@@ -114,6 +115,20 @@ async function main(): Promise<void> {
         logger.info('📜 persist tail (previous session):');
         for (const l of tailLines) console.log('   ' + l);
       }
+    }
+  } catch { /* تجاهل */ }
+
+  // 🧪 حصة المعالج الفعلية للحاوية — نسبة اللوحة تُحسب على هذه الحصة لا على كامل النواة
+  try {
+    let q = '', p = '';
+    try { const t = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/); q = t[0]; p = t[1]; } catch { /* cgroup v1 */ }
+    if (!q) { try { q = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim(); p = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim(); } catch { /* لا وصول */ } }
+    const la = os.loadavg().map(n => n.toFixed(2)).join(' ');
+    if (q) {
+      const cores = q === 'max' ? '∞' : (Number(q) / Number(p || 100000)).toFixed(2);
+      logger.info(`🧪 CPU quota: ${q}/${p || '-'} = ${cores} core | loadavg ${la}`);
+    } else {
+      logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
     }
   } catch { /* تجاهل */ }
 

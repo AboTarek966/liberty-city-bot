@@ -29,6 +29,8 @@ import {
 import { YouTube } from 'youtube-sr';
 import { Readable, PassThrough } from 'stream';
 import { spawn, spawnSync, ChildProcess } from 'child_process';
+import fs from 'fs';
+import os from 'os';
 import { createLogger } from '../utils/helpers';
 import { LibertyClient } from '../LibertyClient';
 
@@ -278,6 +280,11 @@ export class MusicHandler {
   private lastPlayMs = new Map<string, number>();
   // ⚡ روابط بث SoundCloud مُحلّة مسبقاً (نبدأ حلّها بالتوازي مع انتظار الاتصال الصوتي)
   private scPrefetched = new Map<string, { url: string; at: number }>();
+  // 📊 مقياس المعالج أثناء التشغيل: node مقابل ffmpeg (كل 30 ثانية فقط لو فيه ffmpeg شغّال)
+  private cpuMeter?: NodeJS.Timeout;
+  private cpuWall = Date.now();
+  private cpuNode = process.cpuUsage();
+  private cpuFfTicks = new Map<number, number>();
 
   constructor(client: LibertyClient) {
     this.client = client;
@@ -292,6 +299,39 @@ export class MusicHandler {
     }
     // اختبار ذاتي بعد الإقلاع: يثبت أن ffmpeg يستطيع جلب بث SoundCloud فعلياً من هذا السيرفر
     setTimeout(() => this.runSelfTest(), 12_000);
+    // 📊 مقياس المعالج: يسجّل node% وffmpeg% كل 30 ثانية أثناء التشغيل فقط (يكشف من يلتهم الحصة)
+    this.cpuMeter = setInterval(() => this.cpuTick(), 30_000);
+  }
+
+  // قياس دلتا المعالج كل 30 ثانية: node (discord.js/demuxer) مقابل ffmpeg (decode+libopus)
+  // النسب = % من نواة واحدة؛ نسبة اللوحة ≈ المجموع ÷ حصة cgroup (يُطبع عند الإقلاع)
+  private cpuTick(): void {
+    try {
+      const wall = Date.now();
+      const dWall = wall - this.cpuWall;
+      if (dWall < 10_000) return;
+      const node = process.cpuUsage(this.cpuNode); // دلتا µs منذ آخر قياس
+      this.cpuWall = wall;
+      this.cpuNode = process.cpuUsage();
+      const nodePct = ((node.user + node.system) / 1000 / dWall) * 100;
+      if (this.ffprocs.size === 0) {
+        this.cpuFfTicks.clear();
+        if (nodePct > 5) logger.debug(`📊 CPU/idle: node=${nodePct.toFixed(1)}% load1=${os.loadavg()[0].toFixed(2)}`);
+        return;
+      }
+      const parts: string[] = [];
+      for (const [gid, p] of this.ffprocs) {
+        try {
+          const raw = fs.readFileSync(`/proc/${p.pid}/stat`, 'utf8');
+          const rest = raw.slice(raw.lastIndexOf(')') + 2).split(' ');
+          const ticks = Number(rest[11]) + Number(rest[12]); // utime+stime @100Hz
+          const prev = this.cpuFfTicks.get(p.pid!);
+          if (prev !== undefined) parts.push(`ffmpeg:${(((ticks - prev) * 10) / dWall * 100).toFixed(0)}%`);
+          this.cpuFfTicks.set(p.pid!, ticks);
+        } catch { parts.push('ffmpeg:?'); }
+      }
+      logger.info(`📊 CPU/30s: node=${nodePct.toFixed(1)}% [${parts.join(' ')}] load1=${os.loadavg()[0].toFixed(2)} | guilds=${this.ffprocs.size}`);
+    } catch { /* تجاهل */ }
   }
 
   // ينتظر تنزيل النسخة الثابتة (إن لزم) ثم يحدّث FFMPEG_PATH
