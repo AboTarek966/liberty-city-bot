@@ -886,7 +886,8 @@ export class MusicHandler {
       if (!url) throw new Error('تعذر جلب رابط البث من SoundCloud');
 
       // حدّ المعالج/الذاكرة: خيط واحد + فحص مبكر معتدل — أسرع بدء وأمان من حد الـ35% CPU
-      const useOpus = ffmpegHasLibOpus(FFMPEG_PATH);
+      // حماية: إن فشل ogg/opus مرتين تعود المحاولة الأخيرة لوضع PCM المُثبت — لا "دخول ثم خروج بلا تشغيل"
+      const useOpus = ffmpegHasLibOpus(FFMPEG_PATH) && attempt < MAX_TRIES;
       const gain = Math.max(0, Math.min(2, queue.volume / 100));
       const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1', '-filter_threads', '1', '-probesize', '262144', '-analyzeduration', '1000000', '-user_agent', SC_UA];
       if (beginMs > 0) args.push('-ss', String(Math.floor(beginMs / 1000)));
@@ -896,7 +897,7 @@ export class MusicHandler {
         // وdiscord.js يفك التغليف فقط — **صفر ترميز JavaScript** (~16-20% ← ~1-2% معالج).
         // الصوت (volume) يُطبَّق هنا لعدم وجود مرمّز لحظي في المسار الجديد.
         if (gain !== 1) args.push('-af', `volume=${gain}`);
-        args.push('-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-ar', '48000', '-frame_duration', '20', '-f', 'opus', 'pipe:1');
+        args.push('-c:a', 'libopus', '-b:a', '96k', '-ac', '2', '-ar', '48000', '-f', 'opus', 'pipe:1');
       } else {
         args.push('-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
       }
@@ -949,7 +950,7 @@ export class MusicHandler {
       }
 
       // فشل (SIGSEGV أو مهلة) — أوقف العملية وأعد المحاولة
-      logger.warn(`ffmpeg produced no audio (${guildId}) attempt ${attempt}/${MAX_TRIES} | ${stderrBuf.slice(0, 160)}`);
+      logger.warn(`ffmpeg produced no audio (${guildId}) attempt ${attempt}/${MAX_TRIES} [${useOpus ? 'ogg/opus' : 'pcm'}] | ${stderrBuf.slice(0, 160)}`);
       try { proc.kill(); } catch { /* تجاهل */ }
     }
 

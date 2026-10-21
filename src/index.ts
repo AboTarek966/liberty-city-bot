@@ -105,6 +105,17 @@ async function main(): Promise<void> {
   }, 60_000);
   // علامات حياة/موت في الملف الدائم
   persist(`BOOT pid=${process.pid} argv=${process.execArgv.join(' ') || '-'}`);
+  // 📜 نعرض ذيل السجل الدائم من الجلسة السابقة في الكونسول — الكونسول يُمسح مع كل قتل،
+  // وهذا يبقي آخر لحظات الموت (MEM/SIGNAL/UNCAUGHT) ظاهرة في أول إقلاع بعده
+  try {
+    if (fs.existsSync(PERSIST_FILE)) {
+      const tailLines = fs.readFileSync(PERSIST_FILE, 'utf8').split('\n').filter(Boolean).slice(-14);
+      if (tailLines.length) {
+        logger.info('📜 persist tail (previous session):');
+        for (const l of tailLines) console.log('   ' + l);
+      }
+    }
+  } catch { /* تجاهل */ }
 
   // Initialize the bot
   try {
