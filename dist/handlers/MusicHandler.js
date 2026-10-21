@@ -115,11 +115,21 @@ let FFMPEG_OK = false;
 let staticFfmpegPromise = null;
 function probeFfmpeg(bin) {
     try {
-        // اختبار ترميز حقيقي (وليس -version فقط): بعض الثوابت تنهار عند فك الترميز بـ SIGSEGV
-        // sine 0.1s → s16le = ~19KB مخرجات؛ نتحقق أن الخرج فعلاً موجود
-        const r = (0, child_process_1.spawnSync)(bin, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1', '-f', 's16le', '-ac', '2', '-ar', '48000', '-'], { windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
-        const out = r.stdout?.length ?? 0;
-        return r.status === 0 && out > 1000;
+        // اختبار ترميز حقيقي: نولّد صوتاً ثم نرمّزه AAC في حاوية MP4 (مثل SoundCloud HLS)
+        // ثم نفكّ ترميزه إلى PCM — نفس مسار ffmpeg الفعلي عند البث.
+        // `sine` وحده لا يكفي: ينجح حتى في الثوابت التي تنهار بـ SIGSEGV عند فك ترميز AAC.
+        const args = [
+            '-hide_banner', '-loglevel', 'error',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1',
+            '-c:a', 'aac', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov', 'pipe:1',
+        ];
+        const enc = (0, child_process_1.spawnSync)(bin, args, { windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
+        const mp4 = enc.stdout;
+        if (enc.status !== 0 || !mp4 || mp4.length < 1000)
+            return false;
+        // فك الترميز إلى PCM س16 (هنا قد تظهر مشكلة SIGSEGV في الثوابت المعطوبة)
+        const dec = (0, child_process_1.spawnSync)(bin, ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-vn', '-f', 's16le', '-ac', '2', '-ar', '48000', 'pipe:1'], { windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024, input: mp4 });
+        return dec.status === 0 && (dec.stdout?.length ?? 0) > 1000;
     }
     catch {
         return false;
