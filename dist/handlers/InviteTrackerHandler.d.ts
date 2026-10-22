@@ -16,6 +16,7 @@ export declare class InviteTrackerHandler {
         isSuspicious: boolean;
     }>;
     private recordJoin;
+    private isJoinBurst;
     private checkSuspiciousInvite;
     private handleSuspicious;
     onMemberLeave(member: GuildMember): Promise<void>;

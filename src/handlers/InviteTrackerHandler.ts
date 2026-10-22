@@ -191,19 +191,41 @@ export class InviteTrackerHandler {
 
   // --------------------------------------------
   // فحص الدعوة المشبوهة
+  // 🛡️ منطق "الغارة فقط": التحذير/العقوبة ما تشتغل إلا مع نمط غارة
+  //    (3 انضمامات خلال دقيقتين أو أكثر) — انضمام واحد عادي حتى لو الدعوة
+  //    حديثة يُسجَّل باللوج فقط بدون تنبيه (منع التنبيهات الكاذبة)
   // --------------------------------------------
+  private isJoinBurst(guildId: string): boolean {
+    const joins = this.joinTracker.get(guildId) || [];
+    const cutoff = Date.now() - 2 * 60 * 1000; // نافذة دقيقتين
+    return joins.filter(j => j.timestamp >= cutoff).length >= 3;
+  }
+
   private async checkSuspiciousInvite(member: GuildMember, invite: InviteData, cfg: any): Promise<boolean> {
+    const burst = this.isJoinBurst(member.guild.id);
+
     // 1️⃣ دعوة حديثة جداً (أقل من minInviteAgeHours)
     const inviteAgeHours = (Date.now() - invite.createdAt) / (1000 * 60 * 60);
     if (inviteAgeHours < cfg.minInviteAgeHours) {
-      await this.handleSuspicious(member, invite, `دعوة حديثة (${inviteAgeHours.toFixed(1)} ساعة)`, cfg);
+      const reason = `دعوة حديثة (${inviteAgeHours.toFixed(1)} ساعة)`;
+      if (!burst) {
+        // انضمام عادي واحد — تسجيل فقط، بدون تحذير ولا عقوبة
+        logger.info(`Invite age (single join — not a raid) in ${member.guild.name}: ${member.user.tag} — ${reason}`);
+        return false;
+      }
+      await this.handleSuspicious(member, invite, reason, cfg);
       return true;
     }
 
     // 2️⃣ دعوة وصلت للحد الأقصى للاستخدامات
     const inviteUses = invite.uses || 0;
     if (cfg.maxUsesPerInvite && invite.maxUses > 0 && inviteUses >= cfg.maxUsesPerInvite) {
-      await this.handleSuspicious(member, invite, `دعوة وصلت للحد الأقصى (${inviteUses}/${invite.maxUses})`, cfg);
+      const reason = `دعوة وصلت للحد الأقصى (${inviteUses}/${invite.maxUses})`;
+      if (!burst) {
+        logger.info(`Invite max-uses (single join — not a raid) in ${member.guild.name}: ${member.user.tag} — ${reason}`);
+        return false;
+      }
+      await this.handleSuspicious(member, invite, reason, cfg);
       return true;
     }
 
