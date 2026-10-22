@@ -215,6 +215,9 @@ class SecurityHandler {
             return '⏭️ المالك مستثناً';
         if (executor.id === this.client.user?.id)
             return '⏭️ البوت مستثنى';
+        const devId = process.env.DEVELOPER_USER_ID;
+        if (devId && executor.id === devId)
+            return '⏭️ مطوّر البوت مستثنى';
         const member = guild.members.cache.get(executor.id) ||
             (await guild.members.fetch(executor.id).catch(() => null));
         if (!member)
@@ -340,6 +343,24 @@ class SecurityHandler {
             return true;
         return false;
     }
+    // 👑 المنفّذ الموثوق: المالك + مطوّر البوت + القائمة البيضاء المخصصة
+    //    (حاملو Administrator ليسوا مستثنين — الحساب الإداري المخترق هو الأخطر!)
+    //    يُستخدم لمنع البوت من مقاومة المالك أو معاقبة من تثق به
+    async isTrustedExecutor(guild, executorId) {
+        if (executorId === guild.ownerId)
+            return true;
+        const devId = process.env.DEVELOPER_USER_ID;
+        if (devId && executorId === devId)
+            return true;
+        try {
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const wl = settings.protection?.whitelist;
+            if (wl?.enabled && Array.isArray(wl?.userIds) && wl.userIds.includes(executorId))
+                return true;
+        }
+        catch { /* تجاهل */ }
+        return false;
+    }
     // --------------------------------------------
     // 0) ANTI-CREATE: أي بوت ينشئ قناة/رول → يُحذف فوراً (ماعدا الأونر والإدارة)
     // --------------------------------------------
@@ -356,6 +377,8 @@ class SecurityHandler {
                 return; // نافذة أضيق = أسرع رد
             if (entry.executor.id === this.client.user?.id)
                 return;
+            if (await this.isTrustedExecutor(channel.guild, entry.executor.id))
+                return; // 👑 موثوق ينشئ بحرية
             const member = channel.guild.members.cache.get(entry.executor.id);
             // 🤖 بوت → حذف + حظر فوري (ما نستنىش)
             if (entry.executor.bot) {
@@ -393,6 +416,8 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
+            if (await this.isTrustedExecutor(role.guild, entry.executor.id))
+                return; // 👑 موثوق
             const member = role.guild.members.cache.get(entry.executor.id);
             if (entry.executor.bot) {
                 role.delete('Security: bot cannot create roles').catch(() => { });
@@ -428,6 +453,8 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
+            if (await this.isTrustedExecutor(newChannel.guild, entry.executor.id))
+                return; // 👑 موثوق يغيّر بحرية
             const member = newChannel.guild.members.cache.get(entry.executor.id);
             // إرجاع الاسم فوراً
             newChannel.setName(oldChannel.name, 'Security: rename reverted').catch(() => { });
@@ -489,6 +516,8 @@ class SecurityHandler {
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
+            if (await this.isTrustedExecutor(webhook.guild, entry.executor.id))
+                return; // 👑 موثوق
             const member = webhook.guild.members.cache.get(entry.executor.id);
             webhook.delete('Security: webhook spam').catch(() => { });
             member?.roles.set([], 'Security: created webhook').catch(() => { });
@@ -635,7 +664,7 @@ class SecurityHandler {
             tracker[channel.id] = [];
             // معرفة المنفّذ
             const executor = await this.findExecutor(guild, 'MessageDeleteBulk', channel.id);
-            const isWhitelisted = executor && this.isWhitelisted(guild, executor.id);
+            const isWhitelisted = executor ? await this.isWhitelisted(guild, executor.id) : false;
             // 🔒 قفل القناة فوراً لمنع المزيد من الحذف
             try {
                 await channel.permissionOverwrites.edit(guild.id, { SendMessages: false, AddReactions: false }, 'Security: mass message delete detected').catch(() => { });
@@ -813,8 +842,8 @@ class SecurityHandler {
             if (!cfg?.enabled)
                 return;
             const count = this.track(channel.guild.id, 'channel', cfg.timeWindow ?? 10000);
-            const threshold = cfg.threshold ?? 3;
-            if (count < threshold)
+            // ⚡ استجابة فورية من أول حذف — "مايقدر اساسا يحذف قنوات" (العتبة القديمة3/10ث كانت تسمح بحذفين بلا رد)
+            if (count < 1)
                 return;
             this.deletionTracker.get(channel.guild.id).channel = [];
             await this.respondMassDeletion(channel.guild, settings, cfg, 'channel', discord_js_1.AuditLogEvent.ChannelDelete, channel.id);
@@ -832,8 +861,8 @@ class SecurityHandler {
             if (!cfg?.enabled)
                 return;
             const count = this.track(role.guild.id, 'role', cfg.timeWindow ?? 10000);
-            const threshold = cfg.threshold ?? 3;
-            if (count < threshold)
+            // ⚡ استجابة فورية من أول حذف رول
+            if (count < 1)
                 return;
             this.deletionTracker.get(role.guild.id).role = [];
             await this.respondMassDeletion(role.guild, settings, cfg, 'role', discord_js_1.AuditLogEvent.RoleDelete, role.id);
@@ -851,8 +880,8 @@ class SecurityHandler {
             if (!cfg?.enabled)
                 return;
             const count = this.track(ban.guild.id, 'ban', cfg.timeWindow ?? 10000);
-            const threshold = cfg.threshold ?? 3;
-            if (count < threshold)
+            // ⚡ استجابة فورية من أول حظر — يُلغي حظر الضحية ويعاقب المنفّذ
+            if (count < 1)
                 return;
             this.deletionTracker.get(ban.guild.id).ban = [];
             await this.respondMassDeletion(ban.guild, settings, cfg, 'ban', discord_js_1.AuditLogEvent.MemberBanAdd, ban.user?.id);
@@ -888,10 +917,9 @@ class SecurityHandler {
                 this.kickedQueue.set(member.guild.id, queue);
                 this.scheduleKickedRecovery(member.guild, settings);
             }
-            // تتبّع العتبة (نفس منطق القنوات/الرولات/الحظر)
+            // تتبّع العتبة — استجابة فورية من أول طرد (لا عتبة)
             const count = this.track(member.guild.id, 'kick', cfg.timeWindow ?? 10000);
-            const threshold = cfg.threshold ?? 3;
-            if (count < threshold)
+            if (count < 1)
                 return;
             this.deletionTracker.get(member.guild.id).kick = [];
             await this.respondMassDeletion(member.guild, settings, cfg, 'kick', discord_js_1.AuditLogEvent.MemberKick, member.id);
@@ -1070,50 +1098,65 @@ class SecurityHandler {
         };
         const executor = await this.findExecutor(guild, auditType, targetId);
         const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
-        // ⚠️ مفيش وايت ليست — أي حد (أونر/إدارة/عضو/بوت) يهاجم بالسرعة يتعرض للعقوبة
-        const isWhitelisted = executor && this.isWhitelisted(guild, executor.id);
-        let actionText;
-        if (executor) {
-            actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف مكثف (${labels[type].label})`);
+        // ⏱ استجابة فورية — لكن صامتة لو المنفّذ هو البوت نفسه (إغلاق تذكرة/تنظيف داخلي ليس هجوماً)
+        if (executor && executor.id === this.client.user?.id) {
+            logger.info(`⏭️ Anti-Nuke: تخطّي — المنفّذ هو البوت نفسه (${type} في ${guild.name})`);
+            return;
         }
-        else {
+        // 👑 ثقة: المالك + مطوّر البوت + القائمة البيضاء → لا عقوبة ولا استعادة (الباقي: رد فوري كامل)
+        const trusted = executor ? await this.isTrustedExecutor(guild, executor.id) : false;
+        // 🔨 الحظر يُلغى فوراً عن الضحية — "مايقدر اساسا يبندهم"
+        if (type === 'ban' && targetId && executor && !trusted) {
+            await guild.members
+                .unban(targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً')
+                .catch(() => { });
+        }
+        let actionText;
+        if (!executor) {
             actionText = '⚠️ تعذّر تحديد المنفّذ من سجلات التدقيق';
         }
+        else if (trusted) {
+            actionText = '⏭️ المنفّذ موثوق (مالك/مطوّر/وايت ليست) — لا عقوبة';
+        }
+        else {
+            actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف فوري (${labels[type].label})`);
+        }
         const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`🚨 تحذير أمني — هجوم حذف مكثف!`)
-            .setDescription(`${labels[type].emoji} تم حذف **${labels[type].label}** بشكل مكثف خلال ${windowSec} ثانية — هذا نمط هجوم "نيوك" على السيرفر!`)
+            .setTitle(`🚨 تحذير أمني — استجابة فورية`)
+            .setDescription(`${labels[type].emoji} تنفيذ عملية **${labels[type].label}** — ردّ أمني **فوري من أول عملية** (نافذة الرصد ${windowSec}ث) — نمط هجوم "نيوك"!`)
             .setColor(embeds_1.Colors.error)
-            .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)${isWhitelisted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
+            .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)${trusted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
             name: '🛡️ مستوى تسلّم البوت',
             value: await this.hierarchyField(guild),
             inline: false,
         }, {
             name: '♻️ التعافي',
-            value: cfg.autoRestore === false
-                ? 'الاستعادة التلقائية **مطفأة** — استخدم `/backup restore` يدوياً لاستعادة البنية'
-                : 'جاري الاستعادة التلقائية من آخر نسخة احتياطية…',
+            value: type === 'ban'
+                ? '🔨 تم **إلغاء حظر الضحية** تلقائياً (إن أمكن)'
+                : type === 'kick'
+                    ? '👢 سيتم إرسال **رابط الدعوة** للمطرودين تلقائياً (يرجعون بأنفسهم)'
+                    : trusted
+                        ? '⏭️ المنفّذ موثوق — تم تخطّي الاستعادة'
+                        : cfg.autoRestore === false
+                            ? 'الاستعادة التلقائية **مطفأة** — استخدم `/backup restore` يدوياً لاستعادة البنية'
+                            : '♻️ **جارية الآن:** استعادة فورية من آخر نسخة احتياطية…',
             inline: false,
         })
             .setFooter({ text: 'Liberty City Anti-Nuke' })
             .setTimestamp();
+        // ♻️ الاستعادة تبدأ فوراً — بالتوازي مع إرسال التنبيه (لا ننتظر شيئاً)
+        //    الحظر يُلغى أعلاه · الطرد: رابط دعوة عبر scheduleKickedRecovery
+        const restoreP = (type === 'channel' || type === 'role') && cfg.autoRestore !== false && !trusted
+            ? this.runAutoRestore(guild, settings, type).then(() => 
+            // 🧹 تنظيف فوري: حذف أي روم/رول مشبوه بعد الهكر
+            this.cleanupSuspicious(guild).catch(() => { }))
+            : Promise.resolve();
         const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
         if (channel) {
             await channel.send({ embeds: [embed], content: executor ? `<@${guild.ownerId}>` : undefined }).catch(() => { });
         }
-        logger.warn(`🚨 Anti-Nuke: ${type} x${cfg.threshold} in ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
-        // ♻️ استعادة تلقائية للبنية — الحظر والطرد لا يُستعادان من النسخة
-        //    (المطرودين نستعيدهم عبر رابط الدعوة — انظر scheduleKickedRecovery)
-        // 🔑 الأونر لو حذف بإرادته (طلب منه) لا نستعيد — لكن الإدارة/الهاكر = استعادة + عقوبة
-        if ((type === 'channel' || type === 'role') && cfg.autoRestore !== false) {
-            if (executor && executor.id === guild.ownerId) {
-                logger.info(`♻️ تخطّي الاستعادة التلقائية في ${guild.name} — المنفّذ هو مالك السيرفر (حذف يدوي مقصود)`);
-            }
-            else {
-                await this.runAutoRestore(guild, settings, type);
-                // 🧹 تنظيف تلقائي: حذف أي روم/رول مشبوه بعد الهكر
-                setTimeout(() => this.cleanupSuspicious(guild).catch(() => { }), 3000);
-            }
-        }
+        logger.warn(`🚨 Anti-Nuke (فوري): ${type} في ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
+        await restoreP;
     }
     // سطر يوضّح إذا كان البوت قادرًا فعلاً على العقوبة
     async hierarchyField(guild) {

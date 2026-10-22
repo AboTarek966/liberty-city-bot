@@ -826,7 +826,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     },
     antiNuke: {
       enabled: { type: Boolean, default: true },
-      threshold: { type: Number, default: 3 },
+      threshold: { type: Number, default: 1 },
       timeWindow: { type: Number, default: 10000 },
       action: { type: String, enum: ['alert', 'kick', 'ban', 'strip'], default: 'kick' },
       logChannel: { type: String },

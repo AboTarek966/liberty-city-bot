@@ -309,7 +309,7 @@ async function showStatus(interaction: ChatInputCommandInteraction, settings: an
       {
         name: '💣 مضاد النيوك',
         value: p.antiNuke?.enabled
-          ? `✅ مفعل (${p.antiNuke?.threshold ?? 3} عنصر/${Math.round((p.antiNuke?.timeWindow ?? 10000) / 1000)}ث)`
+          ? '✅ مفعل — استجابة فورية من أول عملية'
           : '❌ معطل',
         inline: true,
       },

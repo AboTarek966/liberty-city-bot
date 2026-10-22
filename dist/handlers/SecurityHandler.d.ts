@@ -52,6 +52,7 @@ export declare class SecurityHandler {
      */
     ensureHierarchyAlert(guild: Guild): Promise<HierarchyStatus>;
     private isWhitelisted;
+    private isTrustedExecutor;
     onChannelCreate(channel: any): Promise<void>;
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
