@@ -272,6 +272,10 @@ class MusicHandler {
     cpuTidTicks = new Map();
     // 🔬 ملفّر V8 — يبدأ مع أول تشغيل ويوقف بعد 45 ثانية ليعطي أسماء الدوال الساخنة
     profStarted = false;
+    // ⏳ مؤقت المغادرة عند الخمول: لو مفيش أغنية شغالة → يغادر الفويس بعد 10 دقائق فقط.
+    //    ولو فيه أغنية (حتى مؤقتة) لا يغادر أبداً، وأي إجراء يدوي (إيقاف/مغادرة) يخرجه فوراً.
+    idleLeaveTimers = new Map();
+    static IDLE_LEAVE_MS = 10 * 60 * 1000; // 10 دقائق
     constructor(client) {
         this.client = client;
         logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}${FFMPEG_OK ? '' : ' (PROBE FAILED — awaiting static fallback)'}`);
@@ -290,6 +294,25 @@ class MusicHandler {
         // 📊 مقياس المعالج: يسجّل node% وffmpeg% كل 30 ثانية أثناء التشغيل فقط (يكشف من يلتهم الحصة)
         this.cpuMeter = setInterval(() => this.cpuTick(), 30_000);
         // 🔬 ملفّر V8 معطّل افتراضياً (overhead ~4% + ذروات تجميع — للتشخيص فقط عبر V8PROFILE=1)
+        // 🚀 تدفئة أثناء الخمول — تنقل كلفة أول تشغيل للأغنية (client_id + FFmpeg.getInfo) إلى هنا
+        void this.prewarm();
+    }
+    // 🚀 تدفئة عند الإقلاع — تبعد التكلفة عن مسار أول تشغيل:
+    //   1) client_id SoundCloud (صفحة كاملة + حتى 8 ملفات JS = 1-4 ثوانٍ عند أول بحث/تشغيل بعد الإقلاع)
+    //   2) FFmpeg.getInfo — كاش prism المشترك مع @discordjs/voice (يمنع spawnSync×2 عند أول اتصال صوتي)
+    prewarm() {
+        scGetClientId()
+            .then(() => logger.debug('🔊 prewarm: SoundCloud client_id جاهز'))
+            .catch((e) => logger.debug(`prewarm client_id skipped: ${e?.message || e}`));
+        try {
+            const prism = require('prism-media');
+            const info = prism?.FFmpeg?.getInfo?.();
+            if (info)
+                logger.debug(`🔊 prewarm: FFmpeg.getInfo مُدفّأ (${String(info.version || '').split('\n')[0]})`);
+        }
+        catch (e) {
+            logger.debug(`prewarm FFmpeg.getInfo skipped: ${e?.message || e}`);
+        }
     }
     // قياس دلتا المعالج كل 30 ثانية: node (discord.js/demuxer) مقابل ffmpeg (decode+libopus)
     // النسب = % من نواة واحدة؛ نسبة اللوحة ≈ المجموع ÷ حصة cgroup (يُطبع عند الإقلاع)
@@ -850,8 +873,37 @@ class MusicHandler {
         this.players.set(guildId, player);
         return player;
     }
+    // --------------------------------------------
+    // ⏳ المغادرة عند الخمول: بعد 10 دقائق بدون أي تشغيل (تُلغى فوراً عند بداية أي أغنية)
+    // --------------------------------------------
+    armIdleLeave(guildId) {
+        if (this.idleLeaveTimers.has(guildId))
+            return;
+        const mins = Math.round(MusicHandler.IDLE_LEAVE_MS / 60_000);
+        logger.info(`⏳ مفيش أغنية شغالة — هغادر الفويس بعد ${mins} دقيقة لو مفيش تشغيل (${guildId})`);
+        const timer = setTimeout(() => {
+            this.idleLeaveTimers.delete(guildId);
+            const q = this.queues.get(guildId);
+            const player = this.players.get(guildId);
+            const busy = (!!q && (q.isPlaying || !!q.currentTrack || q.tracks.length > 0)) ||
+                (!!player && player.state.status !== voice_1.AudioPlayerStatus.Idle);
+            if (busy)
+                return; // بدأت أغنية بالفعل أثناء الانتظار — نلغي الخروج
+            logger.info(`⏳ خرجت من الفويس بعد ${mins} دقيقة خمول بدون تشغيل (${guildId})`);
+            this.cleanup(guildId, true);
+        }, MusicHandler.IDLE_LEAVE_MS);
+        this.idleLeaveTimers.set(guildId, timer);
+    }
+    cancelIdleLeave(guildId) {
+        const timer = this.idleLeaveTimers.get(guildId);
+        if (timer) {
+            clearTimeout(timer);
+            this.idleLeaveTimers.delete(guildId);
+        }
+    }
     // تنظيف الاتصال والمشغّل
     cleanup(guildId, destroyConnection = true) {
+        this.cancelIdleLeave(guildId);
         const connection = this.connections.get(guildId);
         if (connection) {
             this.connections.delete(guildId);
@@ -872,6 +924,7 @@ class MusicHandler {
     // بدء تشغيل الأغنية الحالية
     // --------------------------------------------
     async startCurrent(guildId, beginMs = 0) {
+        this.cancelIdleLeave(guildId); // بدأت أغنية (أو إعادة محاولة) → نوقف عدّ الـ10 دقائق
         const queue = this.getQueue(guildId);
         const track = queue.currentTrack;
         if (!track)
@@ -944,7 +997,8 @@ class MusicHandler {
             }
             else {
                 queue.currentTrack = null;
-                this.cleanup(guildId, true);
+                // كل المصادر فشلت ولا يوجد شيء آخر في القائمة → ننتظر 10 دقائق خمول بدل المغادرة الفورية
+                this.armIdleLeave(guildId);
             }
             return false;
         }
@@ -1131,7 +1185,8 @@ class MusicHandler {
         else {
             queue.isPlaying = false;
             queue.currentTrack = null;
-            this.cleanup(guildId, true);
+            // ⏳ لا نغادر فوراً: ننتظر 10 دقائق خمول (لو بدأت أغنية جديدة تُلغى الجلسة)
+            this.armIdleLeave(guildId);
             void this.refreshPanel(guildId).catch(() => { });
         }
     }
@@ -1167,8 +1222,11 @@ class MusicHandler {
         if (botPerms && (!botPerms.has('Connect') || !botPerms.has('Speak'))) {
             return { success: false, message: '❌ لا أملك صلاحية الدخول/التحدث في القناة الصوتية!' };
         }
+        // ⏳ أي محاولة تشغيل توقف عدّ الـ10 دقائق (لو فشلت لاحقاً يُعاد العد من جديد)
+        this.cancelIdleLeave(guildId);
         // ⚡ السرعة: نبدأ الاتصال بالقناة الصوتية فوراً — بالتوازي مع البحث
         // (سابقاً: بحث كامل ثم اتصال ثم بث = تأخير مضاعف بلا داعٍ)
+        const t0 = Date.now();
         let connection = null;
         try {
             connection = this.connect(guildId, channel);
@@ -1177,11 +1235,12 @@ class MusicHandler {
             connection = null;
         }
         const track = await this.addTrack(guildId, query, member.user.username, member.user.id);
+        const tSearch = Date.now() - t0;
         if (!track) {
             const queue = this.getQueue(guildId);
-            // إن لم يكن هناك تشغيل آخر، لا معنى للاتصال الذي بدأناه — غادر
+            // دخلنا الفويس بطلب المستخدم — ننتظر 10 دقائق خمول بدل المغادرة الفورية
             if (!queue.currentTrack && queue.tracks.length === 0)
-                this.cleanup(guildId, true);
+                this.armIdleLeave(guildId);
             return {
                 success: false,
                 message: queue.tracks.length >= (Number(settings.maxQueueSize) || 50)
@@ -1217,6 +1276,8 @@ class MusicHandler {
         if (!started) {
             return { success: false, message: `❌ تعذر تشغيل **${track.title}** — جرّب أغنية أخرى` };
         }
+        // ⏱ قياس سرعة البدء (من لحظة الأمر حتى بدء البث): بحث + (اتصال صوتي + تشغيل)
+        logger.info(`⏱ تشغيل: المدة الكلية ${Date.now() - t0}ms (بحث=${tSearch}ms، اتصال+بث=${Date.now() - t0 - tSearch}ms) (${guildId})`);
         // 🎛️ لوحة تحكم تلقائية (في روم الصوت إن أمكن، أو روم النص)
         void this.sendControlPanel(guildId, channel, textChannelId, member.user.tag).catch(() => { });
         return { success: true, track, message: `🎵 **تشغيل الآن:** ${track.title}` };

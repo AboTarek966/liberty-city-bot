@@ -40,7 +40,10 @@ export declare class MusicHandler {
     private cpuFfTicks;
     private cpuTidTicks;
     private profStarted;
+    private idleLeaveTimers;
+    private static readonly IDLE_LEAVE_MS;
     constructor(client: LibertyClient);
+    private prewarm;
     private cpuTick;
     private startProfile;
     private stopProfile;
@@ -61,6 +64,8 @@ export declare class MusicHandler {
     addTrack(guildId: string, query: string, requestedBy: string, requestedById: string): Promise<Track | null>;
     private connect;
     private getPlayer;
+    private armIdleLeave;
+    private cancelIdleLeave;
     private cleanup;
     private startCurrent;
     private prefetchScStream;

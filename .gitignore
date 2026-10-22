@@ -2,3 +2,8 @@ node_modules/
 .env
 .env.*
 *.log
+
+# ملفات بيئية فيها أسرار — لا تُرفع أبداً
+fadehost-env*.txt
+fadehost-env.json
+server.env
