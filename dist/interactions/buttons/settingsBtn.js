@@ -58,7 +58,8 @@ const handler = {
                 .setCustomId('value')
                 .setLabel(title.substring(0, 45))
                 .setStyle(style)
-                .setPlaceholder(placeholder)
+                // 🛟 حد ديسكورد = 160 حرف فقط للـplaceholder — النص الأطول كان يرفض المودال كاملاً (خطأ50035 → "حدث خطأ أثناء معالجة التفاعل")
+                .setPlaceholder(placeholder.substring(0, 160))
                 .setMaxLength(max)
                 .setRequired(required);
             if (value)

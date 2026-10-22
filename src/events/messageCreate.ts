@@ -4,6 +4,7 @@
 
 import {
   Message,
+  Guild,
   ChannelType,
   PermissionFlagsBits,
   EmbedBuilder,
@@ -1374,6 +1375,20 @@ async function handleMusicGeneration(message: Message, prompt: string, question:
     .catch(() => {});
 }
 
+// 🎨 تحويل اختصارات إيموجي السيرفر (:اسم:) إلى إيموجي حقيقي <:اسم:id>
+//    ديسكورد لا يحوّل الاختصارات تلقائياً في رسائل البوت (تظهر كنص خام مثل ":اسم:") —
+//    نبحث في كاش إيموجي السيرفر ونستبدلها، وما لا يُوجد في السيرفر يبقى نصاً كما هو
+function resolveEmojiShortcodes(text: string, guild: Guild | null): string {
+  if (!guild || !text.includes(':')) return text;
+  const emojis = guild.emojis.cache;
+  if (!emojis.size) return text;
+  return text.replace(/:([\w-]{1,32}):/g, (match, name: string) => {
+    const emoji = emojis.find((e) => e.name?.toLowerCase() === name.toLowerCase());
+    if (!emoji) return match;
+    return `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`;
+  });
+}
+
 async function handleAIResponse(message: Message, client: LibertyClient): Promise<void> {
   if (!client.aiHandler) return;
 
@@ -1546,7 +1561,8 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
   );
 
   if (response) {
-    const parts = splitAiText(response.content, 1900);
+    // 🎨 اختصارات الإيموجي (:اسم:) → إيموجي حقيقي قبل الإرسال (ديسكورد لا يحوّلها في رسائل البوت)
+    const parts = splitAiText(resolveEmojiShortcodes(response.content, message.guild), 1900);
 
     if (streamedMsg) {
       // الرد الأول مُرسَل أثناء البث — نضبطه بالمحتوى النهائي ثم نُكمل البقية
