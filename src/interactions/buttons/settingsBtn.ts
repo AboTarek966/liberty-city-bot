@@ -63,7 +63,7 @@ const handler: ButtonHandler = {
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
       'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
-      'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
+      'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
       'translator:settings',
       'music:volume', 'music:queue_limit',
       'announce:dm', 'announce:channel', 'announce:preview',
@@ -912,7 +912,7 @@ const handler: ButtonHandler = {
       case 'announce:history': {
         const annHistory = (settings.protection as any)?.announcements?.history || settings.announcements?.history || [];
         if (!annHistory.length) {
-          await interaction.reply({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
+          await interaction.followUp({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
           return;
         }
         const embed = new EmbedBuilder()
@@ -925,7 +925,7 @@ const handler: ButtonHandler = {
           )
           .setFooter({ text: `${interaction.guild!.name} • Liberty City` })
           .setTimestamp();
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.followUp({ embeds: [embed], ephemeral: true });
         return;
       }
       case 'music:channels': {

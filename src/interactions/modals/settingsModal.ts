@@ -401,7 +401,7 @@ const handler: ModalHandler = {
           .setMinValues(1)
           .setMaxValues(1);
 
-        await interaction.reply({
+        await interaction.followUp({
           content: '📢 اختر القناة التي تريد الإرسال فيها:',
           components: [new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(channelSelect)],
           ephemeral: true,

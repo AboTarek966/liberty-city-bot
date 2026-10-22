@@ -43,7 +43,7 @@ const handler = {
             'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
             'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
             'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
-            'commands:add', 'commands:addadmin', 'welcome:cardnum', 'shop:add',
+            'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
             'translator:settings',
             'music:volume', 'music:queue_limit',
             'announce:dm', 'announce:channel', 'announce:preview',
@@ -777,7 +777,7 @@ const handler = {
             case 'announce:history': {
                 const annHistory = settings.protection?.announcements?.history || settings.announcements?.history || [];
                 if (!annHistory.length) {
-                    await interaction.reply({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
+                    await interaction.followUp({ content: '📜 لا يوجد سجل إعلانات', ephemeral: true });
                     return;
                 }
                 const embed = new discord_js_1.EmbedBuilder()
@@ -786,7 +786,7 @@ const handler = {
                     .setDescription(annHistory.slice(-10).reverse().map((a, i) => `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('\n'))
                     .setFooter({ text: `${interaction.guild.name} • Liberty City` })
                     .setTimestamp();
-                await interaction.reply({ embeds: [embed], ephemeral: true });
+                await interaction.followUp({ embeds: [embed], ephemeral: true });
                 return;
             }
             case 'music:channels': {

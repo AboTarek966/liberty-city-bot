@@ -387,7 +387,7 @@ const handler = {
                     .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
                     .setMinValues(1)
                     .setMaxValues(1);
-                await interaction.reply({
+                await interaction.followUp({
                     content: '📢 اختر القناة التي تريد الإرسال فيها:',
                     components: [new discord_js_1.ActionRowBuilder().addComponents(channelSelect)],
                     ephemeral: true,
