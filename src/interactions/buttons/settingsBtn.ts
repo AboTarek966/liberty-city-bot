@@ -18,6 +18,7 @@ import {
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildEmojiSelectRows, buildCommandAddModal } from '../../utils/emojiPicker';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
@@ -376,27 +377,20 @@ const handler: ButtonHandler = {
       // 🔓 أمر للجميع · 🔒 أمر إداري — نفس المودال، والنطاق يُرسل في customId
       const isAdmin = `${section}:${action}` === 'commands:addadmin';
       const scope = isAdmin ? 'admin' : 'public';
+      await interaction.showModal(buildCommandAddModal(scope));
+      return;
+    }
 
-      const nameInput = new TextInputBuilder()
-        .setCustomId('name')
-        .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
-        .setStyle(TextInputStyle.Short)
-        .setMaxLength(50)
-        .setRequired(true);
-      const contentInput = new TextInputBuilder()
-        .setCustomId('content')
-        .setLabel('رد البوت (حتى 1900 حرف) — {user} {server}')
-        .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(1900)
-        .setRequired(true);
-      const modal = new ModalBuilder()
-        .setCustomId(`settings_modal:commands:add:${scope}`)
-        .setTitle(isAdmin ? '🔒 أمر للإداريين فقط' : '🔓 أمر للجميع')
-        .addComponents(
-          new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-          new ActionRowBuilder<TextInputBuilder>().addComponents(contentInput)
-        );
-      await interaction.showModal(modal);
+    if (`${section}:${action}` === 'commands:emojipick') {
+      // 🎨 اختيار إيموجي أولاً (مثل قائمة ديسكورد) — ثم تُفتح نافذة الإضافة والإيموجي جاهز بالرد
+      const scope = parts[3] === 'admin' ? 'admin' : 'public';
+      await interaction.reply({
+        content:
+          '😀 **اختر إيموجي** من القائمة (إيموجي السيرفر ثم الشائعة — وزر تنقل للصفحات)\n' +
+          'بعد الاختيار تُفتح نافذة إضافة الأمر — **الرد يبدأ بالإيموجي تلقائياً**، اكتب باقي الرد واحفظ',
+        components: buildEmojiSelectRows(interaction.guild!, scope, interaction.user.id) as any,
+        ephemeral: true,
+      });
       return;
     }
 

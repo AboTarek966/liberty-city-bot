@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const settingsPanel_1 = require("../../utils/settingsPanel");
+const emojiPicker_1 = require("../../utils/emojiPicker");
 const models_1 = require("../../models");
 const guildMemberAdd_1 = require("../../events/guildMemberAdd");
 const guildMemberRemove_1 = require("../../events/guildMemberRemove");
@@ -254,23 +255,18 @@ const handler = {
             // 🔓 أمر للجميع · 🔒 أمر إداري — نفس المودال، والنطاق يُرسل في customId
             const isAdmin = `${section}:${action}` === 'commands:addadmin';
             const scope = isAdmin ? 'admin' : 'public';
-            const nameInput = new discord_js_1.TextInputBuilder()
-                .setCustomId('name')
-                .setLabel('اسم الأمر (الكلمة التي تُكتب في الشات)')
-                .setStyle(discord_js_1.TextInputStyle.Short)
-                .setMaxLength(50)
-                .setRequired(true);
-            const contentInput = new discord_js_1.TextInputBuilder()
-                .setCustomId('content')
-                .setLabel('رد البوت (حتى 1900 حرف) — {user} {server}')
-                .setStyle(discord_js_1.TextInputStyle.Paragraph)
-                .setMaxLength(1900)
-                .setRequired(true);
-            const modal = new discord_js_1.ModalBuilder()
-                .setCustomId(`settings_modal:commands:add:${scope}`)
-                .setTitle(isAdmin ? '🔒 أمر للإداريين فقط' : '🔓 أمر للجميع')
-                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(nameInput), new discord_js_1.ActionRowBuilder().addComponents(contentInput));
-            await interaction.showModal(modal);
+            await interaction.showModal((0, emojiPicker_1.buildCommandAddModal)(scope));
+            return;
+        }
+        if (`${section}:${action}` === 'commands:emojipick') {
+            // 🎨 اختيار إيموجي أولاً (مثل قائمة ديسكورد) — ثم تُفتح نافذة الإضافة والإيموجي جاهز بالرد
+            const scope = parts[3] === 'admin' ? 'admin' : 'public';
+            await interaction.reply({
+                content: '😀 **اختر إيموجي** من القائمة (إيموجي السيرفر ثم الشائعة — وزر تنقل للصفحات)\n' +
+                    'بعد الاختيار تُفتح نافذة إضافة الأمر — **الرد يبدأ بالإيموجي تلقائياً**، اكتب باقي الرد واحفظ',
+                components: (0, emojiPicker_1.buildEmojiSelectRows)(interaction.guild, scope, interaction.user.id),
+                ephemeral: true,
+            });
             return;
         }
         if (`${section}:${action}` === 'shop:add') {
