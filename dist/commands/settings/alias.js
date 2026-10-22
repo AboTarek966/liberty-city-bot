@@ -25,7 +25,7 @@ const command = {
         .setName('command')
         .setDescription('🎯 أوامر الإدارة والعقوبات')
         .setRequired(false)
-        .addChoices({ name: '🔨 حظر', value: 'ban' }, { name: '👢 طرد', value: 'kick' }, { name: '⏱️ تايم أوت', value: 'timeout' }, { name: '⚠️ تحذير', value: 'warn' }, { name: '🔇 كتم', value: 'mute' }, { name: '🔊 فك كتم', value: 'unmute' }, { name: '🗣️ السماح بالكلام', value: 'speak' }, { name: '🗑️ مسح', value: 'purge' }, { name: '🚫 إلغاء حظر', value: 'unban' }, { name: '🗑️ إلغاء تايم', value: 'untimeout' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إفراج', value: 'unjail' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 لوكداون', value: 'lockdown' }, { name: '🔒 قفل/فتح الروم', value: 'lock' }, { name: '🔕 كتم مؤقت', value: 'timeout' }, { name: '🏓 بينج', value: 'ping' }, { name: '💬 say', value: 'say' }, { name: '🖼️ أفاتار', value: 'avatar' }, { name: '📝 إمبد', value: 'embed' }, { name: '🏆 توب', value: 'top' }, { name: '👤 يوزر إنفو', value: 'userinfo' }))
+        .addChoices({ name: '🔨 حظر', value: 'ban' }, { name: '👢 طرد', value: 'kick' }, { name: '⏱️ تايم أوت', value: 'timeout' }, { name: '⚠️ تحذير', value: 'warn' }, { name: '🔇 كتم', value: 'mute' }, { name: '🔊 فك كتم', value: 'unmute' }, { name: '🗣️ السماح بالكلام', value: 'speak' }, { name: '🗑️ مسح', value: 'purge' }, { name: '🚫 إلغاء حظر', value: 'unban' }, { name: '🗑️ إلغاء تايم', value: 'untimeout' }, { name: '✅ إزالة تحذير', value: 'unwarn' }, { name: '🔒 سجن', value: 'jail' }, { name: '🔓 إفراج', value: 'unjail' }, { name: '⬆️ ترقية', value: 'promote' }, { name: '🚨 لوكداون', value: 'lockdown' }, { name: '🔒 قفل/فتح الروم', value: 'lock' }, { name: '🏷️ تغيير الاسم', value: 'nick' }, { name: '🔕 كتم مؤقت', value: 'timeout' }, { name: '🏓 بينج', value: 'ping' }, { name: '💬 say', value: 'say' }, { name: '🖼️ أفاتار', value: 'avatar' }, { name: '📝 إمبد', value: 'embed' }, { name: '🏆 توب', value: 'top' }, { name: '👤 يوزر إنفو', value: 'userinfo' }))
         .addStringOption(o => o
         .setName('extra')
         .setDescription('🎮 ألعاب (25 لعبة)')
@@ -52,6 +52,7 @@ const command = {
         .setName('remove')
         .setDescription('حذف اختصار')
         .addStringOption(o => o.setName('shortcut').setDescription('الاختصار').setRequired(true)))
+        .addSubcommand(sub => sub.setName('clear').setDescription('🗑️ حذف جميع الاختصارات دفعة واحدة (مع تأكيد)'))
         .addSubcommand(sub => sub.setName('list').setDescription('عرض جميع الاختصارات')),
     cooldown: 5,
     permissions: [discord_js_1.PermissionFlagsBits.ManageGuild],
@@ -63,6 +64,9 @@ const command = {
         }
         else if (sub === 'remove') {
             await handleRemove(interaction);
+        }
+        else if (sub === 'clear') {
+            await handleClear(interaction);
         }
         else if (sub === 'list') {
             await handleList(interaction);
@@ -167,6 +171,28 @@ async function handleRemove(interaction) {
     }
     (0, aliasCache_1.invalidateAliasCache)(interaction.guildId);
     await interaction.reply({ content: `✅ تم حذف الاختصار \`${shortcut}\``, ephemeral: true });
+}
+// --------------------------------------------
+// Clear All Aliases (with confirmation button)
+// --------------------------------------------
+async function handleClear(interaction) {
+    const count = await models_1.CommandAlias.countDocuments({ guildId: interaction.guildId });
+    if (!count) {
+        await interaction.reply({ content: '📭 لا توجد اختصارات لحذفها', ephemeral: true });
+        return;
+    }
+    const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+        .setCustomId(`alias:clear:confirm:${interaction.user.id}`)
+        .setLabel(`🗑️ نعم، احذف الكل (${count})`)
+        .setStyle(discord_js_1.ButtonStyle.Danger), new discord_js_1.ButtonBuilder()
+        .setCustomId(`alias:clear:cancel:${interaction.user.id}`)
+        .setLabel('❌ إلغاء')
+        .setStyle(discord_js_1.ButtonStyle.Secondary));
+    await interaction.reply({
+        content: `⚠️ **تأكيد الحذف الكامل** — سيتم حذف **${count}** اختصار نهائياً من هذا السيرفر. هذا لا يمكن التراجع عنه.`,
+        components: [row],
+        ephemeral: true,
+    });
 }
 // --------------------------------------------
 // List Aliases

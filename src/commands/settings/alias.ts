@@ -8,6 +8,9 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder,
   PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
@@ -53,6 +56,7 @@ const command: Command = {
               { name: '⬆️ ترقية', value: 'promote' },
               { name: '🚨 لوكداون', value: 'lockdown' },
               { name: '🔒 قفل/فتح الروم', value: 'lock' },
+              { name: '🏷️ تغيير الاسم', value: 'nick' },
               { name: '🔕 كتم مؤقت', value: 'timeout' },
               { name: '🏓 بينج', value: 'ping' },
               { name: '💬 say', value: 'say' },
@@ -183,6 +187,9 @@ const command: Command = {
         .addStringOption(o => o.setName('shortcut').setDescription('الاختصار').setRequired(true))
     )
     .addSubcommand(sub =>
+      sub.setName('clear').setDescription('🗑️ حذف جميع الاختصارات دفعة واحدة (مع تأكيد)')
+    )
+    .addSubcommand(sub =>
       sub.setName('list').setDescription('عرض جميع الاختصارات')
     ),
 
@@ -197,6 +204,8 @@ const command: Command = {
       await handleAdd(interaction, client);
     } else if (sub === 'remove') {
       await handleRemove(interaction);
+    } else if (sub === 'clear') {
+      await handleClear(interaction);
     } else if (sub === 'list') {
       await handleList(interaction);
     }
@@ -318,6 +327,35 @@ async function handleRemove(interaction: ChatInputCommandInteraction): Promise<v
 
   invalidateAliasCache(interaction.guildId!);
   await interaction.reply({ content: `✅ تم حذف الاختصار \`${shortcut}\``, ephemeral: true });
+}
+
+// --------------------------------------------
+// Clear All Aliases (with confirmation button)
+// --------------------------------------------
+async function handleClear(interaction: ChatInputCommandInteraction): Promise<void> {
+  const count = await CommandAlias.countDocuments({ guildId: interaction.guildId! });
+
+  if (!count) {
+    await interaction.reply({ content: '📭 لا توجد اختصارات لحذفها', ephemeral: true });
+    return;
+  }
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`alias:clear:confirm:${interaction.user.id}`)
+      .setLabel(`🗑️ نعم، احذف الكل (${count})`)
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`alias:clear:cancel:${interaction.user.id}`)
+      .setLabel('❌ إلغاء')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  await interaction.reply({
+    content: `⚠️ **تأكيد الحذف الكامل** — سيتم حذف **${count}** اختصار نهائياً من هذا السيرفر. هذا لا يمكن التراجع عنه.`,
+    components: [row],
+    ephemeral: true,
+  });
 }
 
 // --------------------------------------------
