@@ -574,11 +574,12 @@ function buildCommands(guild, s) {
         `> 🔓 **للجميع:** ${publicCount} · 🔒 **للإداريين فقط:** ${adminCount}\n\n` +
         `💡 *مثال عام: كلمة \`سلام\` → رد \`وعليكم السلام\` — يرد لأي عضو*\n` +
         `🔒 *مثال إداري: كلمة \`نماذج\` → رد يحتوي قوالب الإدارة — **لا يظهر للأعضاء العاديين إطلاقاً***\n` +
+        `😀 *الإيموجي: ألصقه مباشرة في الرد أو اسم الأمر — يظهر كما هو (أو اكتب \`:اسم:\` وحوله البوت تلقائياً)*\n` +
         `🔤 *متغيرات في الرد: {user} = منشن صاحب الرسالة، {server} = اسم السيرفر*`);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:commands:add', '➕ أمر للجميع', discord_js_1.ButtonStyle.Success, '🔓'), btn('settings_btn:commands:addadmin', '🔒 أمر للإداريين', discord_js_1.ButtonStyle.Danger, '🔒'), btn('settings_btn:commands:clear', '🗑️ حذف الكل', discord_js_1.ButtonStyle.Secondary, '🗑️'));
-    // 🎨 اختيار إيموجي (مثل قائمة ديسكورد) — للجميع والإداريين
-    const emojiRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:commands:emojipick:public', '😀 بإيموجي للجميع', discord_js_1.ButtonStyle.Success, '😀'), btn('settings_btn:commands:emojipick:admin', '😀 بإيموجي إداري', discord_js_1.ButtonStyle.Danger, '😀'));
-    const rows = [row1, emojiRow];
+    // 🚫 أُزيل زرا قائمة الإيموجي (بطلب المستخدم) — يُلصق الإيموجي مباشرة في نص الرد
+    //    ويُحفظ ويُرسَل كما هو (إصلاح resolveEmojiShortcodes يمنع تلف `<:اسم:id>`)
+    const rows = [row1];
     if (cmds.length > 0) {
         const select = new discord_js_1.StringSelectMenuBuilder()
             .setCustomId('settings_sel:commands:remove')

@@ -6,4 +6,11 @@ import { Guild } from 'discord.js';
  *    (إيموجي سيرفر آخر لا يظهر — لازم يكون من نفس السيرفر)
  */
 export declare function resolveEmojiShortcodes(text: string, guild: Guild | null): string;
+/**
+ * 🎯 توحيد شكل الإيموجي للمطابقة — يتعرّف على الإيموجي مهما كُتب:
+ *    - `<:اسم:id>` و `<a:اسم:id>` ← `:اسم:` (مطابقة بالاسم — الرقم غير مطلوب)
+ *    - يزيل علامات العرض FE0F/FE0E ودرجات البشرة لتطابق ❤️ مع ❤ و👍 مع 👍🏽
+ *    يُستخدم في مطابقة الردود التلقائية: اكتب المحفّز كإيموجي عادي أو اختصار — كلاهما يشتغل
+ */
+export declare function normalizeEmojiForMatch(text: string): string;
 //# sourceMappingURL=emoji.d.ts.map

@@ -6,7 +6,7 @@
 import { Message, PermissionFlagsBits } from 'discord.js';
 import { getGuildSettings, Ticket, UserProfile } from '../models';
 import { createLogger } from './helpers';
-import { resolveEmojiShortcodes } from './emoji';
+import { normalizeEmojiForMatch, resolveEmojiShortcodes } from './emoji';
 
 const logger = createLogger('MessageSystems');
 
@@ -24,10 +24,14 @@ export async function handleCustomCommand(message: Message): Promise<boolean> {
   const commands = settings.customCommands;
   if (!commands || commands.length === 0) return false;
 
-  const firstWord = content.split(/\s+/)[0];
-  const cmd =
-    commands.find(c => c.name.toLowerCase() === content) ||
-    commands.find(c => c.name.toLowerCase() === firstWord);
+  // 🎯 مطابقة موحدة للإيموجي — المحفّز يُكتب إيموجي عادي أو `<:اسم:id>` أو `:اسم:`،
+  //    وكل الصيغ تُطابق بعضها (تُوحَّد بالاسم — الرقم غير مطلوب، و❤️ تطابق ❤ و👍 تطابق 👍🏽)
+  const norm = normalizeEmojiForMatch(content);
+  const firstWord = norm.split(/\s+/)[0];
+  const cmd = commands.find(c => {
+    const n = normalizeEmojiForMatch(c.name);
+    return n === norm || n === firstWord;
+  });
   if (!cmd) return false;
 
   // 🔒 أمر إداري — يرد فقط على حاملي صلاحية Administrator.

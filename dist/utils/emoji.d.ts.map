@@ -1,1 +1,1 @@
-{"version":3,"file":"emoji.d.ts","sourceRoot":"","sources":["../../src/utils/emoji.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,KAAK,EAAE,MAAM,YAAY,CAAC;AAEnC;;;;;GAKG;AACH,wBAAgB,sBAAsB,CAAC,IAAI,EAAE,MAAM,EAAE,KAAK,EAAE,KAAK,GAAG,IAAI,GAAG,MAAM,CAShF"}
+{"version":3,"file":"emoji.d.ts","sourceRoot":"","sources":["../../src/utils/emoji.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,KAAK,EAAE,MAAM,YAAY,CAAC;AAEnC;;;;;GAKG;AACH,wBAAgB,sBAAsB,CAAC,IAAI,EAAE,MAAM,EAAE,KAAK,EAAE,KAAK,GAAG,IAAI,GAAG,MAAM,CAWhF;AAED;;;;;GAKG;AACH,wBAAgB,sBAAsB,CAAC,IAAI,EAAE,MAAM,GAAG,MAAM,CAM3D"}
