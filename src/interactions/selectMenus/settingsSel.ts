@@ -22,7 +22,6 @@ import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { setPendingWarnRoles } from '../../utils/pendingWarnRoles';
-import { flipEmojiPage, resolveEmojiChoice, buildCommandAddModal } from '../../utils/emojiPicker';
 import { LibertyClient } from '../../LibertyClient';
 
 type AnySelect =
@@ -128,30 +127,6 @@ const handler: SelectMenuHandler = {
         modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(colorInput));
       }
       await interaction.showModal(modal);
-      return;
-    }
-
-    // 🎨 منتقي إيموجي الأوامر المخصصة — تنقل بين الصفحات أو فتح نافذة الإضافة بالإيموجي جاهزاً
-    if (interaction.customId.startsWith('settings_sel:cmdemoji:')) {
-      const scope = interaction.customId.split(':')[2] === 'admin' ? 'admin' : 'public';
-      const value = interaction.values[0];
-
-      if (value === 'page:next' || value === 'page:prev') {
-        const rows = flipEmojiPage(interaction.guild!, scope, interaction.user.id, value === 'page:next' ? 1 : -1);
-        await interaction.update({ components: rows as any });
-        return;
-      }
-
-      const text = resolveEmojiChoice(interaction.guild!, value);
-      if (!text) {
-        await interaction.update({
-          content: '❌ هذا الإيموجي لم يعد موجوداً في السيرفر — اختر غيره من القائمة',
-          components: [],
-        });
-        return;
-      }
-      // النافذة نفسها المستخدمة في زر الإضافة — الرد معبّى بالإيموجي المختار
-      await interaction.showModal(buildCommandAddModal(scope, text));
       return;
     }
 

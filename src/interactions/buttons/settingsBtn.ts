@@ -18,7 +18,7 @@ import {
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
-import { buildEmojiSelectRows, buildCommandAddModal } from '../../utils/emojiPicker';
+import { buildCommandAddModal } from '../../utils/emojiPicker';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { handleWelcome } from '../../events/guildMemberAdd';
@@ -378,19 +378,6 @@ const handler: ButtonHandler = {
       const isAdmin = `${section}:${action}` === 'commands:addadmin';
       const scope = isAdmin ? 'admin' : 'public';
       await interaction.showModal(buildCommandAddModal(scope));
-      return;
-    }
-
-    if (`${section}:${action}` === 'commands:emojipick') {
-      // 🎨 اختيار إيموجي أولاً (مثل قائمة ديسكورد) — ثم تُفتح نافذة الإضافة والإيموجي جاهز بالرد
-      const scope = parts[3] === 'admin' ? 'admin' : 'public';
-      await interaction.reply({
-        content:
-          '😀 **اختر إيموجي** من القائمة (إيموجي السيرفر ثم الشائعة — وزر تنقل للصفحات)\n' +
-          'بعد الاختيار تُفتح نافذة إضافة الأمر — **الرد يبدأ بالإيموجي تلقائياً**، اكتب باقي الرد واحفظ',
-        components: buildEmojiSelectRows(interaction.guild!, scope, interaction.user.id) as any,
-        ephemeral: true,
-      });
       return;
     }
 

@@ -757,13 +757,7 @@ export function buildCommands(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:commands:clear', '🗑️ حذف الكل', ButtonStyle.Secondary, '🗑️'),
   );
 
-  // 🎨 اختيار إيموجي (مثل قائمة ديسكورد) — للجميع والإداريين
-  const emojiRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    btn('settings_btn:commands:emojipick:public', '😀 بإيموجي للجميع', ButtonStyle.Success, '😀'),
-    btn('settings_btn:commands:emojipick:admin', '😀 بإيموجي إداري', ButtonStyle.Danger, '😀'),
-  );
-
-  const rows: PanelComponent[] = [row1, emojiRow];
+  const rows: PanelComponent[] = [row1];
 
   if (cmds.length > 0) {
     const select = new StringSelectMenuBuilder()
