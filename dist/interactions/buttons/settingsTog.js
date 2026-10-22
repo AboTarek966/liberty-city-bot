@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const settingsPanel_1 = require("../../utils/settingsPanel");
 const models_1 = require("../../models");
 const lockdown_1 = require("../../utils/lockdown");
+const ownerApproval_1 = require("../../utils/ownerApproval");
 const handler = {
     id: 'settings_tog',
     async execute(interaction) {
@@ -42,6 +43,28 @@ const handler = {
                             : `🔓 **تم إلغاء وضع الطوارئ** — فُتحت ${result.textChannels} قناة نصية و${result.voiceChannels} صوتية`,
                         ephemeral: true,
                     });
+                    break;
+                }
+                // 👑 بوابة الموافقة — هل هذا الزر "إطفاء"؟ (الميزة مفعّلة الآن والزر سيعطّلها)
+                const curOn = field === 'ownerApproval'
+                    ? prot.ownerApproval !== false
+                    : !!(prot[field] && prot[field].enabled);
+                if (curOn) {
+                    const gateMsg = await (0, ownerApproval_1.gateProtectionOff)({
+                        settings,
+                        guild: interaction.guild,
+                        user: interaction.user,
+                        channel: interaction.channel,
+                        field,
+                    });
+                    if (gateMsg) {
+                        await interaction.followUp({ content: gateMsg, ephemeral: true });
+                        return; // ⛔ لم يُطبَّق شيء — الحماية تبقى كما هي بانتظار المالك
+                    }
+                }
+                if (field === 'ownerApproval') {
+                    // خيار الموافقة نفسه — بوليان مستقل (وليس { enabled })
+                    prot.ownerApproval = !(prot.ownerApproval !== false);
                     break;
                 }
                 if (!prot[field])

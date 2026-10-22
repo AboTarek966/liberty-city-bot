@@ -8,6 +8,8 @@ export interface IGuildSettings extends Document {
     protection: {
         /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
         logChannel?: string;
+        /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
+        ownerApproval?: boolean;
         antiRaid: {
             enabled: boolean;
             threshold: number;

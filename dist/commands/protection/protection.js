@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
+const ownerApproval_1 = require("../../utils/ownerApproval");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('protection')
@@ -126,6 +127,31 @@ const command = {
         const subcommand = interaction.options.getSubcommand();
         const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
         await interaction.deferReply({ ephemeral: true });
+        // 👑 بوابة موافقة المالك — "enabled:false" = إطفاء حماية → يحتاج نقرة مالك السيرفر (التاج)
+        const SUB_TO_FIELD = {
+            antiraid: 'antiRaid',
+            antispam: 'antiSpam',
+            antilink: 'antiLink',
+            antiinvite: 'antiInvite',
+            antinuke: 'antiNuke',
+            antibot: 'antiBot',
+            antiadmin: 'antiAdmin',
+            autobackup: 'autoBackup',
+        };
+        const gateField = SUB_TO_FIELD[subcommand];
+        if (gateField && interaction.options.getBoolean('enabled') === false) {
+            const gateMsg = await (0, ownerApproval_1.gateProtectionOff)({
+                settings,
+                guild: interaction.guild,
+                user: interaction.user,
+                channel: interaction.channel,
+                field: gateField,
+            });
+            if (gateMsg) {
+                await interaction.editReply({ content: gateMsg });
+                return; // ⛔ لم يُطبَّق شيء
+            }
+        }
         switch (subcommand) {
             case 'status':
                 return showStatus(interaction, settings);

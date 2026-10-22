@@ -27,6 +27,8 @@ export interface IGuildSettings extends Document {
   protection: {
     /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
     logChannel?: string;
+    /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
+    ownerApproval?: boolean;
     antiRaid: {
       enabled: boolean;
       threshold: number;
@@ -777,6 +779,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   
   protection: {
     logChannel: { type: String },
+    // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
+    ownerApproval: { type: Boolean, default: true },
     antiRaid: {
       enabled: { type: Boolean, default: true },
       threshold: { type: Number, default: 5 },

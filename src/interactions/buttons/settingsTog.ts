@@ -8,6 +8,7 @@ import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerif
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { setLockdown } from '../../utils/lockdown';
+import { gateProtectionOff } from '../../utils/ownerApproval';
 
 const handler: ButtonHandler = {
   id: 'settings_tog',
@@ -49,6 +50,31 @@ const handler: ButtonHandler = {
               : `🔓 **تم إلغاء وضع الطوارئ** — فُتحت ${result.textChannels} قناة نصية و${result.voiceChannels} صوتية`,
             ephemeral: true,
           });
+          break;
+        }
+
+        // 👑 بوابة الموافقة — هل هذا الزر "إطفاء"؟ (الميزة مفعّلة الآن والزر سيعطّلها)
+        const curOn =
+          field === 'ownerApproval'
+            ? prot.ownerApproval !== false
+            : !!(prot[field] && prot[field].enabled);
+        if (curOn) {
+          const gateMsg = await gateProtectionOff({
+            settings,
+            guild: interaction.guild!,
+            user: interaction.user,
+            channel: interaction.channel,
+            field,
+          });
+          if (gateMsg) {
+            await interaction.followUp({ content: gateMsg, ephemeral: true });
+            return; // ⛔ لم يُطبَّق شيء — الحماية تبقى كما هي بانتظار المالك
+          }
+        }
+
+        if (field === 'ownerApproval') {
+          // خيار الموافقة نفسه — بوليان مستقل (وليس { enabled })
+          prot.ownerApproval = !(prot.ownerApproval !== false);
           break;
         }
         if (!prot[field]) prot[field] = { enabled: false };

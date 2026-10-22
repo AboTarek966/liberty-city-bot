@@ -131,6 +131,8 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
     protection: {
         logChannel: { type: String },
+        // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
+        ownerApproval: { type: Boolean, default: true },
         antiRaid: {
             enabled: { type: Boolean, default: true },
             threshold: { type: Number, default: 5 },
