@@ -5,9 +5,11 @@
 //      تُرسل طلباً لمالك السيرفر (صاحب تاج الملكية) — يوافق ✅ فيُطفى فوراً،
 //      أو يرفض ❌ فتبقى الحماية. لا شيء يُطفى بدون نقرته.
 //    • المالك يطفى بنفسه مباشرة (هو صاحب التاج أصلاً).
-//    • من يقدّرون "طلب" الإطفاء: المالك + مطوّر البوت (DEVELOPER_USER_ID)
-//      + القائمة البيضاء. (إن لم يكن DEVELOPER_USER_ID مضبوطاً في البيئة
-//      يُسمح لمن عنده صلاحية الإعدادات أن يطلب — القرار النهائي يبقى للتاج.)
+//    • 🛠️ مطوّر البوت (DEVELOPER_USER_ID) يطفى بنفسه أيضاً ويملك أزرار
+//      الموافقة ✅/❌ — المالك والمطوّر هما الأساسيان وحدهما.
+//    • من يقدّرون "طلب" الإطفاء: المالك + المطوّر + القائمة البيضاء.
+//      (إن لم يكن DEVELOPER_USER_ID مضبوطاً يُسمح لمن عنده صلاحية
+//      الإعدادات أن يطلب — لكن الموافقة تبقى للمالك/المطوّر.)
 // ============================================
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Guild, User } from 'discord.js';
@@ -74,6 +76,8 @@ export async function gateProtectionOff(opts: {
 }): Promise<string | null> {
   if (!approvalEnabled(opts.settings)) return null; // الخيار مطفأ → إطفاء مباشر (القديم)
   if (opts.guild.ownerId === opts.user.id) return null; // 👑 المالك يطفى بنفسه
+  const devEnv = process.env.DEVELOPER_USER_ID;
+  if (devEnv && opts.user.id === devEnv) return null; // 🛠️ المطوّر يطفى بنفسه (المالك والمطوّر الأساسيان)
 
   if (!canRequestProtectionOff(opts.settings, opts.guild, opts.user.id)) {
     return '⛔ إطفاء الحماية محصور بمالك السيرفر 👑 (والمطوّر والقائمة البيضاء)';
@@ -88,7 +92,7 @@ export async function gateProtectionOff(opts: {
   });
 
   return sent === 'sent'
-    ? `👑 أُرسل طلب إيقاف **${label}** إلى مالك السيرفر — **لن يُطفى شيء قبل موافته** (أزرار ✅/❌ لمدة 5 دقائق)`
+    ? `👑 أُرسل طلب إيقاف **${label}** إلى مالك السيرفر${devEnv ? ' والمطوّر' : ''} — **لن يُطفى شيء قبل الموافقة** (أزرار ✅/❌ لمدة 5 دقائق)`
     : '❌ تعذّر إرسال الطلب للمالك (لا توجد صلاحية إرسال في هذه القناة)';
 }
 
@@ -135,8 +139,9 @@ export async function requestOwnerApproval(opts: {
   });
 
   try {
+    const devEnv = process.env.DEVELOPER_USER_ID;
     await ch.send({
-      content: `<@${opts.guild.ownerId}>`,
+      content: `<@${opts.guild.ownerId}>${devEnv ? ` <@${devEnv}>` : ''}`, // منشن المالك (+ المطوّر إن وُجد)
       allowedMentions: { parse: ['users'] },
       embeds: [embed],
       components: [row],

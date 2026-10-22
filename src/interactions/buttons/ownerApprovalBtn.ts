@@ -1,7 +1,7 @@
 // ============================================
 // Liberty City Bot - 👑 أزرار موافقة/رفض مالك السيرفر على إطفاء الحماية
 //    customId: ownappr:yes:{field} | ownappr:no:{field}
-//    يقرّر فقط صاحب تاج الملكية (مالك السيرفر).
+//    يقرّر: صاحب التاج (المالك 👑) + مطوّر البوت (🛠️ DEVELOPER_USER_ID).
 // ============================================
 
 import { ButtonInteraction } from 'discord.js';
@@ -18,14 +18,18 @@ const handler: ButtonHandler = {
       return;
     }
 
-    // 👑 يحق القرار فقط لمالك السيرفر (صاحب تاج الملكية)
-    if (interaction.user.id !== interaction.guild.ownerId) {
+    // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مطوّر البوت — الأساسيان
+    const devId = process.env.DEVELOPER_USER_ID;
+    const isOwner = interaction.user.id === interaction.guild.ownerId;
+    const isDev = !!devId && interaction.user.id === devId;
+    if (!isOwner && !isDev) {
       await interaction.reply({
-        content: '👑 يحق الموافقة على إطفاء الحماية **فقط لمالك السيرفر** (صاحب التاج)',
+        content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 والمطوّر 🛠️ فقط**',
         ephemeral: true,
       });
       return;
     }
+    const who = isOwner ? 'مالك السيرفر' : 'المطوّر';
 
     const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
     const verdict = parts[1];
@@ -44,7 +48,7 @@ const handler: ButtonHandler = {
 
     if (verdict === 'no') {
       await interaction.update({
-        content: `❌ رفض مالك السيرفر ${interaction.user} طلب إيقاف **${label}** — الحماية تبقى مفعّلة ✅\nطلبه: <@${pending.requestedBy}>`,
+        content: `❌ رفض ${who} ${interaction.user} طلب إيقاف **${label}** — الحماية تبقى مفعّلة ✅\nطلبه: <@${pending.requestedBy}>`,
         embeds: [],
         components: [],
       });
@@ -75,7 +79,7 @@ const handler: ButtonHandler = {
       }
 
       await interaction.update({
-        content: `✅ وافق مالك السيرفر ${interaction.user} — تم إيقاف **${label}** فوراً\nطلبها: <@${pending.requestedBy}> (${pending.requestedByTag})`,
+        content: `✅ وافق ${who} ${interaction.user} — تم إيقاف **${label}** فوراً\nطلبها: <@${pending.requestedBy}> (${pending.requestedByTag})`,
         embeds: [],
         components: [],
       });
