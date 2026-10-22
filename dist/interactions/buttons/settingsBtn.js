@@ -59,8 +59,8 @@ const handler = {
                 .setCustomId('value')
                 .setLabel(title.substring(0, 45))
                 .setStyle(style)
-                // 🛟 حد ديسكورد = 160 حرف فقط للـplaceholder — النص الأطول كان يرفض المودال كاملاً (خطأ50035 → "حدث خطأ أثناء معالجة التفاعل")
-                .setPlaceholder(placeholder.substring(0, 160))
+                // 🛟 حد ديسكورد = 100 حرف فقط لـplaceholder بالمودال — النص الأطول كان يرفض المودال كاملاً (ExpectedConstraintError → "حدث خطأ أثناء معالجة التفاعل")
+                .setPlaceholder(placeholder.substring(0, 100))
                 .setMaxLength(max)
                 .setRequired(required);
             if (value)
@@ -203,10 +203,7 @@ const handler = {
                     if (!prot.aiTranslator)
                         prot.aiTranslator = { enabled: false, defaultTargetLang: 'ar', autoTranslateChannels: [], ignoredChannels: [], ignoredRoles: [], showOriginal: true, maxLength: 2000 };
                     const t = prot.aiTranslator;
-                    const channels = t.autoTranslateChannels?.map((c) => `<#${c}>`).join(', ') || 'لا شيء';
-                    const ignoredCh = t.ignoredChannels?.map((c) => `<#${c}>`).join(', ') || 'لا شيء';
-                    const ignoredRo = t.ignoredRoles?.map((r) => `<@&${r}>`).join(', ') || 'لا شيء';
-                    return openModal('⚙️ إعدادات AI Translator', `الحالة: ${t.enabled ? 'مفعّل ✅' : 'معطّل ❌'}\nاللغة الافتراضية: ${t.defaultTargetLang || 'ar'}\nقنوات الترجمة التلقائية: ${channels}\nقنوات مستثناة: ${ignoredCh}\nرولات مستثناة: ${ignoredRo}\nإظهار النص الأصلي: ${t.showOriginal ? 'نعم' : 'لا'}\nالحد الأقصى: ${t.maxLength || 2000} حرف\n\nاكتب الإعدادات كـ JSON:\n{"enabled":true,"defaultTargetLang":"ar","autoTranslateChannels":["123"],"ignoredChannels":[],"ignoredRoles":[],"showOriginal":true,"maxLength":2000}`, discord_js_1.TextInputStyle.Paragraph, 2000, JSON.stringify(t, null, 2));
+                    return openModal('⚙️ إعدادات AI Translator', 'عدّل JSON وأرسل — مثال: {"enabled":true,"defaultTargetLang":"ar","showOriginal":true}', discord_js_1.TextInputStyle.Paragraph, 2000, JSON.stringify(t, null, 2));
                 }
                 case 'announce:dm': {
                     return openModal('📩 إعلان للخاص (DM) — اكتب الرسالة', 'الرسالة ستُرسل في خاص لجميع الأعضاء\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\nمرحباً {user}! أهلاً بك في {server} 🎉', discord_js_1.TextInputStyle.Paragraph, 2000, '');

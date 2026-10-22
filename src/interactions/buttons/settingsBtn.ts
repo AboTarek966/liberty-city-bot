@@ -89,8 +89,8 @@ const handler: ButtonHandler = {
         .setCustomId('value')
         .setLabel(title.substring(0, 45))
         .setStyle(style)
-        // 🛟 حد ديسكورد = 160 حرف فقط للـplaceholder — النص الأطول كان يرفض المودال كاملاً (خطأ50035 → "حدث خطأ أثناء معالجة التفاعل")
-        .setPlaceholder(placeholder.substring(0, 160))
+        // 🛟 حد ديسكورد = 100 حرف فقط لـplaceholder بالمودال — النص الأطول كان يرفض المودال كاملاً (ExpectedConstraintError → "حدث خطأ أثناء معالجة التفاعل")
+        .setPlaceholder(placeholder.substring(0, 100))
         .setMaxLength(max)
         .setRequired(required);
       if (value) input.setValue(value.substring(0, max));
@@ -261,12 +261,9 @@ const handler: ButtonHandler = {
           const prot = settings.protection;
           if (!prot.aiTranslator) prot.aiTranslator = { enabled: false, defaultTargetLang: 'ar', autoTranslateChannels: [], ignoredChannels: [], ignoredRoles: [], showOriginal: true, maxLength: 2000 };
           const t = prot.aiTranslator;
-          const channels = t.autoTranslateChannels?.map((c: string) => `<#${c}>`).join(', ') || 'لا شيء';
-          const ignoredCh = t.ignoredChannels?.map((c: string) => `<#${c}>`).join(', ') || 'لا شيء';
-          const ignoredRo = t.ignoredRoles?.map((r: string) => `<@&${r}>`).join(', ') || 'لا شيء';
           return openModal(
             '⚙️ إعدادات AI Translator',
-            `الحالة: ${t.enabled ? 'مفعّل ✅' : 'معطّل ❌'}\nاللغة الافتراضية: ${t.defaultTargetLang || 'ar'}\nقنوات الترجمة التلقائية: ${channels}\nقنوات مستثناة: ${ignoredCh}\nرولات مستثناة: ${ignoredRo}\nإظهار النص الأصلي: ${t.showOriginal ? 'نعم' : 'لا'}\nالحد الأقصى: ${t.maxLength || 2000} حرف\n\nاكتب الإعدادات كـ JSON:\n{"enabled":true,"defaultTargetLang":"ar","autoTranslateChannels":["123"],"ignoredChannels":[],"ignoredRoles":[],"showOriginal":true,"maxLength":2000}`,
+            'عدّل JSON وأرسل — مثال: {"enabled":true,"defaultTargetLang":"ar","showOriginal":true}',
             TextInputStyle.Paragraph,
             2000,
             JSON.stringify(t, null, 2)
