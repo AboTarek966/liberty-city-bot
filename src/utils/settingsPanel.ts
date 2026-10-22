@@ -1353,8 +1353,8 @@ export function buildWelcomeCardPanel(guild: Guild, s: any, userId = 'default'):
   const sizeRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_btn:welcome:cardsz:out', 'أصغر ➖', ButtonStyle.Danger, '➖'),
     btn('settings_btn:welcome:cardsz:in', 'أكبر ➕', ButtonStyle.Success, '➕'),
-    btn('settings_btn:welcome:cardrot:dec', 'تدوير ➖', ButtonStyle.Secondary, '↶'),
-    btn('settings_btn:welcome:cardrot:inc', 'تدوير ➕', ButtonStyle.Secondary, '↷'),
+    btn('settings_btn:welcome:cardrot:dec', 'تدوير ➖', ButtonStyle.Secondary, '🔃'),
+    btn('settings_btn:welcome:cardrot:inc', 'تدوير ➕', ButtonStyle.Secondary, '🔄'),
     btn('settings_btn:welcome:cardsel', `${el.emoji} ${el.label}`, ButtonStyle.Primary, '🔄'),
   );
 
