@@ -1340,6 +1340,7 @@ export function buildWelcomeCardPanel(guild: Guild, s: any, userId = 'default'):
     btn('settings_btn:welcome:cardmv:r', 'يمين ▶️', ButtonStyle.Secondary, '▶️'),
     btn('settings_btn:welcome:cardmv:u', 'أعلى 🔼', ButtonStyle.Secondary, '🔼'),
     btn('settings_btn:welcome:cardmv:d', 'أسفل 🔽', ButtonStyle.Secondary, '🔽'),
+    btn('settings_btn:welcome:cardstep', `الخطوة ${st.step}px`, ButtonStyle.Secondary, '⚡'),
   );
 
   // صف الحجم + التدوير + تبديل عنصر + خطوة
@@ -1349,7 +1350,6 @@ export function buildWelcomeCardPanel(guild: Guild, s: any, userId = 'default'):
     btn('settings_btn:welcome:cardrot:dec', 'تدوير ➖', ButtonStyle.Secondary, '↶'),
     btn('settings_btn:welcome:cardrot:inc', 'تدوير ➕', ButtonStyle.Secondary, '↷'),
     btn('settings_btn:welcome:cardsel', `${el.emoji} ${el.label}`, ButtonStyle.Primary, '🔄'),
-    btn('settings_btn:welcome:cardstep', `الخطوة ${st.step}px`, ButtonStyle.Secondary, '⚡'),
   );
 
   // صف الخصائص المتقدمة (حسب العنصر)
@@ -1368,10 +1368,14 @@ export function buildWelcomeCardPanel(guild: Guild, s: any, userId = 'default'):
     btn('settings_btn:welcome:cardbgfit', `Fit: ${c.backgroundFit}`, ButtonStyle.Secondary, '📐'),
     btn('settings_btn:welcome:cardcustom', 'نصوص مخصصة ➕', ButtonStyle.Primary, '➕'),
     btn('settings_btn:welcome:cardreset', 'تخطيط تلقائي ✨', ButtonStyle.Secondary, '✨'),
+  );
+
+  // صف الرجوع (5 صفوف = الحد الأقصى في رسالة واحدة)
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:welcome', 'رجوع 🏠', ButtonStyle.Secondary, '🏠'),
   );
 
-  return { embeds: [embed], components: [arrowsRow, sizeRow, propsRow, actionsRow] };
+  return { embeds: [embed], components: [arrowsRow, sizeRow, propsRow, actionsRow, backRow] };
 }
 
 /**
