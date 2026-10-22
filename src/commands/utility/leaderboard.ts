@@ -155,10 +155,12 @@ export async function buildLeaderboardPage(
   const start = (safePage - 1) * LB_PAGE_SIZE;
   const slice = rows.slice(start, start + LB_PAGE_SIZE);
 
+  const medals = ['🥇', '🥈', '🥉'];
   const lines = slice.map((r, i) => {
     const rank = start + i + 1;
+    const badge = medals[rank - 1] || `**#${rank}**`;
     return (
-      `**#${rank}** <@${r.userId}> — ` +
+      `${badge} <@${r.userId}> — ` +
       `📝 **${r.messages.toLocaleString('en-US')}** رسالة • ` +
       `🔊 **${formatMinutes(r.voiceMinutes)}**`
     );

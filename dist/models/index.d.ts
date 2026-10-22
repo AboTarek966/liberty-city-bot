@@ -228,6 +228,11 @@ export interface IGuildSettings extends Document {
         welcomeEnabled: boolean;
         /** 📊 إحصائيات استلام التذاكر لكل إداري (userId → عدد التذاكر المستلمة) */
         claimStats: Map<string, number>;
+        /** 📅 سجل زمني لتذاكر الاستلام (لحساب يومي/أسبوعي/شهري) */
+        claimLog: Array<{
+            userId: string;
+            at: Date;
+        }>;
     };
     logging: {
         enabled: boolean;

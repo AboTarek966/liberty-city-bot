@@ -23,7 +23,8 @@ import { Colors } from '../utils/embeds';
 import { executeAIModeration, runSequentialWarn } from '../handlers/AIModeration';
 import { executeCommandFromMessage } from '../utils/aliasRunner';
 import { handleTopCommand } from '../utils/topCommand';
-import { getAliasesForShortcut } from '../utils/aliasCache';
+import { buildTicketTopPage } from '../utils/ticketTop';
+import { getAliasesForShortcut, getAllGuildAliases } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
@@ -204,30 +205,38 @@ async function handleAliasCommand(message: Message, client: LibertyClient): Prom
   const prefix = settings.prefix || 'lc!';
 
   // Check prefix command (e.g., "lc!تايم @user")
+  // يدعم الاختصارات متعددة الكلمات (مسافات) — الأطول أولاً
   if (message.content.startsWith(prefix)) {
-    const args = message.content.slice(prefix.length).trim().split(/\s+/);
-    const shortcut = args[0]?.toLowerCase();
-
-    if (shortcut) {
-      const matched = await getAliasesForShortcut(message.guild!.id, shortcut);
-      if (matched.length > 0) {
-        logger.info(`⌨️ Alias matched (prefix): "${shortcut}" → ${matched.map(a => a.command).join(', ')} | by ${message.author.tag}`);
-        await runMatchedAliases(message, client, matched, args.slice(1), shortcut);
+    const words = message.content.slice(prefix.length).trim().split(/\s+/);
+    const allAliases = await getAllGuildAliases(message.guild!.id);
+    const maxWords = Math.min(words.length, 5);
+    for (let n = maxWords; n >= 1; n--) {
+      const candidate = words.slice(0, n).join(' ').toLowerCase();
+      if (!candidate || candidate.length > 30) continue;
+      const matched = allAliases.get(candidate);
+      if (matched && matched.length > 0) {
+        logger.info(`⌨️ Alias matched (prefix): "${candidate}" → ${matched.map(a => a.command).join(', ')} | by ${message.author.tag}`);
+        await runMatchedAliases(message, client, matched, words.slice(n), candidate);
         return true;
       }
     }
   }
 
   // Check standalone shortcut (e.g., user types just "تايم @user")
-  const parts = message.content.trim().split(/\s+/);
-  const potentialAlias = parts[0]?.toLowerCase();
-
-  if (potentialAlias && potentialAlias.length <= 15) {
-    const matched = await getAliasesForShortcut(message.guild!.id, potentialAlias);
-    if (matched.length > 0) {
-      logger.info(`⌨️ Alias matched: "${potentialAlias}" → ${matched.map(a => a.command).join(', ')} | by ${message.author.tag}`);
-      await runMatchedAliases(message, client, matched, parts.slice(1), potentialAlias);
-      return true;
+  // يدعم الاختصارات متعددة الكلمات (تحتوي مسافات) — يجرب الأطول أولاً
+  const allAliases = await getAllGuildAliases(message.guild!.id);
+  if (allAliases.size > 0) {
+    const words = message.content.trim().split(/\s+/);
+    const maxWords = Math.min(words.length, 5); // حد أقصى 5 كلمات للاختصار
+    for (let n = maxWords; n >= 1; n--) {
+      const candidate = words.slice(0, n).join(' ').toLowerCase();
+      if (!candidate || candidate.length > 30) continue;
+      const matched = allAliases.get(candidate);
+      if (matched && matched.length > 0) {
+        logger.info(`⌨️ Alias matched: "${candidate}" → ${matched.map(a => a.command).join(', ')} | by ${message.author.tag}`);
+        await runMatchedAliases(message, client, matched, words.slice(n), candidate);
+        return true;
+      }
     }
   }
 
@@ -451,13 +460,19 @@ async function messageTriggersAfkCommand(message: Message, guildId: string): Pro
     if (!raw) return false;
     const settings = await getGuildSettings(guildId);
     const prefix = settings.prefix || 'lc!';
-    let first = raw.split(/\s+/)[0]?.toLowerCase() || '';
-    if (first.startsWith(prefix.toLowerCase())) {
-      first = first.slice(prefix.length).split(/\s+/)[0] || '';
+    let content = raw;
+    if (content.toLowerCase().startsWith(prefix.toLowerCase())) {
+      content = content.slice(prefix.length).trim();
     }
-    if (!first || first.length > 15) return false;
-    const aliases = await getAliasesForShortcut(guildId, first);
-    return aliases.some(a => a.command === 'afk');
+    const words = content.split(/\s+/);
+    const maxWords = Math.min(words.length, 5);
+    const allAliases = await getAllGuildAliases(guildId);
+    for (let n = maxWords; n >= 1; n--) {
+      const candidate = words.slice(0, n).join(' ').toLowerCase();
+      const aliases = allAliases.get(candidate);
+      if (aliases && aliases.some(a => a.command === 'afk')) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -572,25 +587,17 @@ export async function executeAliasCommand(
       return;
     }
 
-    // ticket_top
-    const stats = settings.tickets.claimStats;
-    if (!stats || stats.size === 0) {
-      await respond(message, '📊 لا توجد إحصائيات استلام بعد.');
-      return;
-    }
-    const sorted = [...stats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-    const medals = ['🥇', '🥈', '🥉'];
-    const lines = sorted.map(([userId, count], i) => {
-      const medal = medals[i] || `\`${i + 1}.\``;
-      return `${medal} <@${userId}> — **${count}** تذكرة`;
-    });
-    const embed = new EmbedBuilder()
-      .setTitle('🏆 أعلى 10 إداريين في استلام التذاكر')
-      .setColor(Colors.primary)
-      .setDescription(lines.join('\n'))
-      .setFooter({ text: 'Liberty City Tickets' })
-      .setTimestamp();
-    await respond(message, { embeds: [embed] });
+    // ticket_top — دعم فترة اختيارية (يومي/أسبوعي/شهري/إجمالي)
+    const periodArg = (args[0] || '').toLowerCase();
+    const period =
+      ['يومي', 'day', 'اليوم'].includes(periodArg) ? 'day'
+      : ['أسبوعي', 'اسبوعي', 'week', 'الأسبوع', 'الاسبوع'].includes(periodArg) ? 'week'
+      : ['شهري', 'month', 'الشهر'].includes(periodArg) ? 'month'
+      : ['إجمالي', 'اجمالي', 'total', 'الكل'].includes(periodArg) ? 'total'
+      : 'total';
+
+    const ttop = await buildTicketTopPage(message.guild!, period as any, 1);
+    await respond(message, { embeds: [ttop.embed], components: ttop.components as any });
     return;
   }
 

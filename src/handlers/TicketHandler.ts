@@ -658,6 +658,13 @@ export class TicketHandler {
       settings.tickets.claimStats.set(claimedBy.id, currentCount + 1);
       claimHistory.push(claimedBy.id);
       ticket.claimHistory = claimHistory;
+      // 📅 سجل زمني (يومي/أسبوعي/شهري)
+      if (!settings.tickets.claimLog) (settings.tickets as any).claimLog = [];
+      settings.tickets.claimLog.push({ userId: claimedBy.id, at: new Date() });
+      // ⏳ نحتفظ بآخر 500 سجلاً فقط حتى لا يكبر المخطط بلا حدود
+      if (settings.tickets.claimLog.length > 500) {
+        settings.tickets.claimLog = settings.tickets.claimLog.slice(-500);
+      }
     } else {
       // إداري سبق واستلم هذه التذكرة — لا نحتسب نقاطاً، نعرض العدد الحالي
       currentCount = settings.tickets.claimStats?.get(claimedBy.id) || 0;

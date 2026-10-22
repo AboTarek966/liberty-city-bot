@@ -7,6 +7,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAliasesForShortcut = getAliasesForShortcut;
 exports.invalidateAliasCache = invalidateAliasCache;
+exports.getAllGuildAliases = getAllGuildAliases;
 const CommandAlias_1 = require("../models/CommandAlias");
 const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('AliasCache');
@@ -48,5 +49,24 @@ function invalidateAliasCache(guildId) {
         cache.delete(guildId);
     else
         cache.clear();
+}
+/**
+ * كل اختصارات السيرفر في خريطة واحدة (alias → أوامر).
+ * تُستخدم لمطابقة اختصارات متعددة الكلمات (تحتوي مسافات).
+ */
+async function getAllGuildAliases(guildId) {
+    let entry = cache.get(guildId);
+    if (!entry || Date.now() - entry.ts > TTL) {
+        try {
+            const map = await loadGuildAliases(guildId);
+            entry = { map, ts: Date.now() };
+            cache.set(guildId, entry);
+        }
+        catch (e) {
+            logger.warn(`Alias cache load failed for ${guildId}: ${e.message}`);
+            return new Map();
+        }
+    }
+    return entry.map;
 }
 //# sourceMappingURL=aliasCache.js.map

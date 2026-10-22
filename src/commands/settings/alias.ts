@@ -30,9 +30,9 @@ const command: Command = {
         .addStringOption(o =>
           o
             .setName('shortcut')
-            .setDescription('الاختصار الذي سكتبه في الشات (مثال: تايم)')
+            .setDescription('الاختصار الذي سكتبه في الشات (يمكن أن يحتوي مسافات)')
             .setRequired(true)
-            .setMaxLength(15)
+            .setMaxLength(30)
         )
         .addStringOption(o =>
           o
@@ -144,6 +144,7 @@ const command: Command = {
               { name: '🕵️ سنايب', value: 'snipe' },
               { name: '💾 باك أب', value: 'backup' },
               { name: '🎫 تذاكر', value: 'ticket' },
+              { name: '🏆 توب التفاعل', value: 'leaderboard' },
               { name: '🤖 AI', value: 'ai' },
               { name: '🎮 ألعاب', value: 'games' },
               { name: '🎮 لعبة', value: 'game' },
@@ -239,10 +240,11 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
   // 🎵 أوامر بفرعي مثل `music:play` → الأمر الأساسي للتحقق هو `music`
   const baseCommand = cleanCommand.includes(':') ? cleanCommand.split(':')[0] : cleanCommand;
 
-  // Validate shortcut: no spaces, reasonable length, not a reserved word
-  if (shortcut.includes(' ') || shortcut.length > 15) {
+  // Validate shortcut: reasonable length, not empty
+  // (المسافات مسموحة الآن — الاختصار قد يكون متعدد الكلمات مثل "top يومي")
+  if (shortcut.length > 30 || shortcut.length === 0) {
     await interaction.reply({
-      content: '❌ الاختصار لا يمكن أن يحتوي على مسافات وألا يزيد عن 15 حرف',
+      content: '❌ الاختصار فارغ أو يزيد عن 30 حرف',
       ephemeral: true,
     });
     return;
@@ -252,8 +254,11 @@ async function handleAdd(interaction: ChatInputCommandInteraction, client: Liber
   if (shortcut.startsWith('/')) shortcut = shortcut.slice(1);
 
   // Check if command exists
+  // ⚠️ بعض القيم خاصة (ticket_top / ticket_mystats) تُعالَج يدوياً في messageCreate
+  //    وليست أوامر سلاش — نسمح بها رغم غياب getCommand
+  const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats']);
   const targetCommand = client.commandHandler.getCommand(baseCommand);
-  if (!targetCommand) {
+  if (!targetCommand && !SPECIAL_COMMANDS.has(baseCommand)) {
     await interaction.reply({
       content: `❌ الأمر \`${baseCommand}\` غير موجود. استخدم \`/help\` لعرض الأوامر`,
       ephemeral: true,

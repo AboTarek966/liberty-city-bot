@@ -338,6 +338,10 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         lockUntilClaim: { type: Boolean, default: false },
         welcomeEnabled: { type: Boolean, default: false },
         claimStats: { type: Map, of: Number, default: {} },
+        claimLog: {
+            type: [{ _id: false, userId: { type: String }, at: { type: Date } }],
+            default: [],
+        },
     },
     logging: {
         enabled: { type: Boolean, default: true },

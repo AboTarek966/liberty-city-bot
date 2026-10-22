@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
+const ticketTop_1 = require("../../utils/ticketTop");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('ticket')
@@ -62,7 +63,12 @@ const command = {
         .setDescription('📊 عرض عدد التذاكر التي استلمتها'))
         .addSubcommand(sub => sub
         .setName('top')
-        .setDescription('🏆 أعلى 10 إداريين في استلام التذاكر'))
+        .setDescription('🏆 أعلى إداريين في استلام التذاكر — يومي/أسبوعي/شهري')
+        .addStringOption(opt => opt
+        .setName('period')
+        .setDescription('الفترة الزمنية')
+        .setRequired(false)
+        .addChoices({ name: '📅 يومي', value: 'day' }, { name: '📆 أسبوعي', value: 'week' }, { name: '🗓️ شهري', value: 'month' }, { name: '📈 إجمالي', value: 'total' })))
         .addSubcommand(sub => sub
         .setName('add')
         .setDescription('إضافة عضو للتذكرة')
@@ -423,27 +429,9 @@ async function handleMyStats(interaction) {
 // --------------------------------------------
 async function handleTop(interaction) {
     await interaction.deferReply();
-    const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
-    const stats = settings.tickets.claimStats;
-    if (!stats || stats.size === 0) {
-        await interaction.editReply({ content: '📊 لا توجد إحصائيات استلام بعد.' });
-        return;
-    }
-    const sorted = [...stats.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
-    const medals = ['🥇', '🥈', '🥉'];
-    const lines = sorted.map(([userId, count], i) => {
-        const medal = medals[i] || `\`${i + 1}.\``;
-        return `${medal} <@${userId}> — **${count}** تذكرة`;
-    });
-    const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('🏆 أعلى 10 إداريين في استلام التذاكر')
-        .setColor(embeds_1.Colors.primary)
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Liberty City Tickets' })
-        .setTimestamp();
-    await interaction.editReply({ embeds: [embed] });
+    const period = (0, ticketTop_1.sanitizeTicketTopPeriod)(interaction.options.getString('period'));
+    const result = await (0, ticketTop_1.buildTicketTopPage)(interaction.guild, period, 1);
+    await interaction.editReply({ embeds: [result.embed], components: result.components });
 }
 // --------------------------------------------
 // Add

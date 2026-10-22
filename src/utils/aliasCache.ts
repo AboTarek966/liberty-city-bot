@@ -51,3 +51,22 @@ export function invalidateAliasCache(guildId?: string): void {
   if (guildId) cache.delete(guildId);
   else cache.clear();
 }
+
+/**
+ * كل اختصارات السيرفر في خريطة واحدة (alias → أوامر).
+ * تُستخدم لمطابقة اختصارات متعددة الكلمات (تحتوي مسافات).
+ */
+export async function getAllGuildAliases(guildId: string): Promise<Map<string, ICommandAlias[]>> {
+  let entry = cache.get(guildId);
+  if (!entry || Date.now() - entry.ts > TTL) {
+    try {
+      const map = await loadGuildAliases(guildId);
+      entry = { map, ts: Date.now() };
+      cache.set(guildId, entry);
+    } catch (e: any) {
+      logger.warn(`Alias cache load failed for ${guildId}: ${e.message}`);
+      return new Map();
+    }
+  }
+  return entry.map;
+}

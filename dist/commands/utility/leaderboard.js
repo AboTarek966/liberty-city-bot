@@ -106,9 +106,11 @@ async function buildLeaderboardPage(client, guild, type, period, limit, page) {
     const safePage = clampPage(page, totalPages);
     const start = (safePage - 1) * exports.LB_PAGE_SIZE;
     const slice = rows.slice(start, start + exports.LB_PAGE_SIZE);
+    const medals = ['🥇', '🥈', '🥉'];
     const lines = slice.map((r, i) => {
         const rank = start + i + 1;
-        return (`**#${rank}** <@${r.userId}> — ` +
+        const badge = medals[rank - 1] || `**#${rank}**`;
+        return (`${badge} <@${r.userId}> — ` +
             `📝 **${r.messages.toLocaleString('en-US')}** رسالة • ` +
             `🔊 **${formatMinutes(r.voiceMinutes)}**`);
     });

@@ -14,6 +14,7 @@ import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, Ticket } from '../../models';
+import { buildTicketTopPage, sanitizeTicketTopPeriod } from '../../utils/ticketTop';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -100,7 +101,19 @@ const command: Command = {
     .addSubcommand(sub =>
       sub
         .setName('top')
-        .setDescription('🏆 أعلى 10 إداريين في استلام التذاكر')
+        .setDescription('🏆 أعلى إداريين في استلام التذاكر — يومي/أسبوعي/شهري')
+        .addStringOption(opt =>
+          opt
+            .setName('period')
+            .setDescription('الفترة الزمنية')
+            .setRequired(false)
+            .addChoices(
+              { name: '📅 يومي', value: 'day' },
+              { name: '📆 أسبوعي', value: 'week' },
+              { name: '🗓️ شهري', value: 'month' },
+              { name: '📈 إجمالي', value: 'total' }
+            )
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -581,32 +594,9 @@ async function handleMyStats(interaction: ChatInputCommandInteraction): Promise<
 // --------------------------------------------
 async function handleTop(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();
-  const settings = await getGuildSettings(interaction.guildId!);
-  const stats = settings.tickets.claimStats;
-
-  if (!stats || stats.size === 0) {
-    await interaction.editReply({ content: '📊 لا توجد إحصائيات استلام بعد.' });
-    return;
-  }
-
-  const sorted = [...stats.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-
-  const medals = ['🥇', '🥈', '🥉'];
-  const lines = sorted.map(([userId, count], i) => {
-    const medal = medals[i] || `\`${i + 1}.\``;
-    return `${medal} <@${userId}> — **${count}** تذكرة`;
-  });
-
-  const embed = new EmbedBuilder()
-    .setTitle('🏆 أعلى 10 إداريين في استلام التذاكر')
-    .setColor(Colors.primary)
-    .setDescription(lines.join('\n'))
-    .setFooter({ text: 'Liberty City Tickets' })
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
+  const period = sanitizeTicketTopPeriod(interaction.options.getString('period'));
+  const result = await buildTicketTopPage(interaction.guild!, period, 1);
+  await interaction.editReply({ embeds: [result.embed], components: result.components });
 }
 
 // --------------------------------------------

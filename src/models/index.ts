@@ -251,6 +251,8 @@ export interface IGuildSettings extends Document {
     welcomeEnabled: boolean;
     /** 📊 إحصائيات استلام التذاكر لكل إداري (userId → عدد التذاكر المستلمة) */
     claimStats: Map<string, number>;
+    /** 📅 سجل زمني لتذاكر الاستلام (لحساب يومي/أسبوعي/شهري) */
+    claimLog: Array<{ userId: string; at: Date }>;
   };
   
   // Logging
@@ -988,6 +990,10 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     lockUntilClaim: { type: Boolean, default: false },
     welcomeEnabled: { type: Boolean, default: false },
     claimStats: { type: Map, of: Number, default: {} },
+    claimLog: {
+      type: [{ _id: false, userId: { type: String }, at: { type: Date } }],
+      default: [],
+    },
   },
   
   logging: {
