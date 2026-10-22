@@ -576,7 +576,9 @@ function buildCommands(guild, s) {
         `🔒 *مثال إداري: كلمة \`نماذج\` → رد يحتوي قوالب الإدارة — **لا يظهر للأعضاء العاديين إطلاقاً***\n` +
         `🔤 *متغيرات في الرد: {user} = منشن صاحب الرسالة، {server} = اسم السيرفر*`);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:commands:add', '➕ أمر للجميع', discord_js_1.ButtonStyle.Success, '🔓'), btn('settings_btn:commands:addadmin', '🔒 أمر للإداريين', discord_js_1.ButtonStyle.Danger, '🔒'), btn('settings_btn:commands:clear', '🗑️ حذف الكل', discord_js_1.ButtonStyle.Secondary, '🗑️'));
-    const rows = [row1];
+    // 🎨 اختيار إيموجي (مثل قائمة ديسكورد) — للجميع والإداريين
+    const emojiRow = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:commands:emojipick:public', '😀 بإيموجي للجميع', discord_js_1.ButtonStyle.Success, '😀'), btn('settings_btn:commands:emojipick:admin', '😀 بإيموجي إداري', discord_js_1.ButtonStyle.Danger, '😀'));
+    const rows = [row1, emojiRow];
     if (cmds.length > 0) {
         const select = new discord_js_1.StringSelectMenuBuilder()
             .setCustomId('settings_sel:commands:remove')

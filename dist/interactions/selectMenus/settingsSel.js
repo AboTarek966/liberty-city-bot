@@ -7,6 +7,7 @@ const discord_js_1 = require("discord.js");
 const settingsPanel_1 = require("../../utils/settingsPanel");
 const models_1 = require("../../models");
 const pendingWarnRoles_1 = require("../../utils/pendingWarnRoles");
+const emojiPicker_1 = require("../../utils/emojiPicker");
 const handler = {
     id: 'settings_sel',
     async execute(interaction) {
@@ -95,6 +96,27 @@ const handler = {
                 modal.addComponents(new discord_js_1.ActionRowBuilder().addComponents(colorInput));
             }
             await interaction.showModal(modal);
+            return;
+        }
+        // 🎨 منتقي إيموجي الأوامر المخصصة — تنقل بين الصفحات أو فتح نافذة الإضافة بالإيموجي جاهزاً
+        if (interaction.customId.startsWith('settings_sel:cmdemoji:')) {
+            const scope = interaction.customId.split(':')[2] === 'admin' ? 'admin' : 'public';
+            const value = interaction.values[0];
+            if (value === 'page:next' || value === 'page:prev') {
+                const rows = (0, emojiPicker_1.flipEmojiPage)(interaction.guild, scope, interaction.user.id, value === 'page:next' ? 1 : -1);
+                await interaction.update({ components: rows });
+                return;
+            }
+            const text = (0, emojiPicker_1.resolveEmojiChoice)(interaction.guild, value);
+            if (!text) {
+                await interaction.update({
+                    content: '❌ هذا الإيموجي لم يعد موجوداً في السيرفر — اختر غيره من القائمة',
+                    components: [],
+                });
+                return;
+            }
+            // النافذة نفسها المستخدمة في زر الإضافة — الرد معبّى بالإيموجي المختار
+            await interaction.showModal((0, emojiPicker_1.buildCommandAddModal)(scope, text));
             return;
         }
         // ✅ اختيار رول عنصر المتجر → مودال الاسم والسعر (showModal كأول استجابة)

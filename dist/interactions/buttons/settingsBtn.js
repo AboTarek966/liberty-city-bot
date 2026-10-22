@@ -255,6 +255,17 @@ const handler = {
             await interaction.showModal((0, emojiPicker_1.buildCommandAddModal)(scope));
             return;
         }
+        if (`${section}:${action}` === 'commands:emojipick') {
+            // 🎨 اختيار إيموجي أولاً (مثل قائمة ديسكورد) — ثم تُفتح نافذة الإضافة والإيموجي جاهز بالرد
+            const scope = parts[3] === 'admin' ? 'admin' : 'public';
+            await interaction.reply({
+                content: '😀 **اختر إيموجي** من القائمة (إيموجي السيرفر ثم الشائعة — وزر تنقل للصفحات)\n' +
+                    'بعد الاختيار تُفتح نافذة إضافة الأمر — **الرد يبدأ بالإيموجي تلقائياً**، اكتب باقي الرد واحفظ',
+                components: (0, emojiPicker_1.buildEmojiSelectRows)(interaction.guild, scope, interaction.user.id),
+                ephemeral: true,
+            });
+            return;
+        }
         if (`${section}:${action}` === 'shop:add') {
             // الخطوة الأولى: اختيار رول العنصر — ثم يفتح مودال الاسم والسعر
             const roleSelect = new discord_js_1.RoleSelectMenuBuilder()
