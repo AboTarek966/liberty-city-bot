@@ -1417,6 +1417,15 @@ async function handleAIResponse(message: Message, client: LibertyClient): Promis
     }
 
     if (!isMention && !repliedToBot) return;
+
+    // ⛔ "الذكاء" مطفأ في الإعدادات ← لا ردود AI أصلًا (مصدر الحقيقة = زر الذكاء في اللوحة)
+    //    يشمل: الرد على المنشن + القواعد المخصصة — حتى لو تعذّرت مزامنة AIConfig
+    try {
+      const gs = await getGuildSettings(message.guild!.id);
+      if (!gs.ai?.enabled) return;
+    } catch {
+      /* فشل القراءة → يبقى فحص AIConfig داخل generateResponse كخط ثاني */
+    }
   }
 
   // Extract question (remove bot mention)

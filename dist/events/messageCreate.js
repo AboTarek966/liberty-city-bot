@@ -1301,6 +1301,16 @@ async function handleAIResponse(message, client) {
         }
         if (!isMention && !repliedToBot)
             return;
+        // ⛔ "الذكاء" مطفأ في الإعدادات ← لا ردود AI أصلًا (مصدر الحقيقة = زر الذكاء في اللوحة)
+        //    يشمل: الرد على المنشن + القواعد المخصصة — حتى لو تعذّرت مزامنة AIConfig
+        try {
+            const gs = await (0, models_1.getGuildSettings)(message.guild.id);
+            if (!gs.ai?.enabled)
+                return;
+        }
+        catch {
+            /* فشل القراءة → يبقى فحص AIConfig داخل generateResponse كخط ثاني */
+        }
     }
     // Extract question (remove bot mention)
     const question = message.content

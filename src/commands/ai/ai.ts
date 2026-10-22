@@ -11,7 +11,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { Colors } from '../../utils/embeds';
-import { getGuildSettings } from '../../models';
+import { getGuildSettings, AIConfig } from '../../models';
 import { config } from '../../config';
 
 const command: Command = {
@@ -309,7 +309,16 @@ async function handleConfig(interaction: ChatInputCommandInteraction, client: Li
   const systemPrompt = interaction.options.getString('system_prompt');
   const temperature = interaction.options.getNumber('temperature');
 
-  if (enabled !== null) settings.ai.enabled = enabled;
+  if (enabled !== null) {
+    settings.ai.enabled = enabled;
+    // 🔄 مزامنة فورية مع AIConfig (هي التي يقرأها مسار الرد فعلياً)
+    //    بدون هذا السطر يبقى البوت يرد حتى بعد "تعطيل" الذكاء — ثغرة قديمة
+    await AIConfig.findOneAndUpdate(
+      { guildId: interaction.guildId },
+      { enabled },
+      { upsert: true }
+    ).catch(() => {});
+  }
   if (systemPrompt) settings.ai.systemPrompt = systemPrompt;
   if (temperature !== null) settings.ai.temperature = temperature;
 

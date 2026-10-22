@@ -226,8 +226,12 @@ async function handleConfig(interaction, client) {
     const enabled = interaction.options.getBoolean('enabled');
     const systemPrompt = interaction.options.getString('system_prompt');
     const temperature = interaction.options.getNumber('temperature');
-    if (enabled !== null)
+    if (enabled !== null) {
         settings.ai.enabled = enabled;
+        // 🔄 مزامنة فورية مع AIConfig (هي التي يقرأها مسار الرد فعلياً)
+        //    بدون هذا السطر يبقى البوت يرد حتى بعد "تعطيل" الذكاء — ثغرة قديمة
+        await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guildId }, { enabled }, { upsert: true }).catch(() => { });
+    }
     if (systemPrompt)
         settings.ai.systemPrompt = systemPrompt;
     if (temperature !== null)
