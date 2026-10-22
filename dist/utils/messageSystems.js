@@ -10,6 +10,7 @@ exports.earnCreditsRandom = earnCreditsRandom;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const helpers_1 = require("./helpers");
+const emoji_1 = require("./emoji");
 const logger = (0, helpers_1.createLogger)('MessageSystems');
 // --------------------------------------------
 // الأوامر المخصصة (ردود تلقائية لكلمات محددة)
@@ -43,7 +44,8 @@ async function handleCustomCommand(message) {
         .replace(/\{server\}/g, message.guild.name);
     cmd.uses = (cmd.uses || 0) + 1;
     await settings.save().catch(() => { });
-    await message.reply(reply.substring(0, 2000)).catch(() => { });
+    // 🎨 تحويل اختصارات الإيموجي (:اسم:) — يُقصّ أولاً حتى لا يُقصّ إيموجي حديث في منتصفه
+    await message.reply((0, emoji_1.resolveEmojiShortcodes)(reply.substring(0, 2000), message.guild)).catch(() => { });
     logger.info(`📝 الأمر المخصص "${cmd.name}" استُخدم بواسطة ${message.author.tag}`);
     return true;
 }

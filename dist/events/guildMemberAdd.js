@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleWelcome = handleWelcome;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
+const emoji_1 = require("../utils/emoji");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const logger = (0, helpers_1.createLogger)('Event:GuildMemberAdd');
@@ -139,14 +140,14 @@ async function handleWelcome(member, opts = {}) {
     const channel = member.guild.channels.cache.get(channelId);
     if (!channel || channel.type !== discord_js_1.ChannelType.GuildText)
         return 'bad-channel';
-    // Format welcome message
-    const message = (settings.welcome.message || '🎉 مرحباً {user}! أهلاً بك في {server}')
+    // Format welcome message (+ 🎨 تحويل اختصارات الإيموجي إلى إيموجي حقيقي)
+    const message = (0, emoji_1.resolveEmojiShortcodes)((settings.welcome.message || '🎉 مرحباً {user}! أهلاً بك في {server}')
         .replace(/{user}/g, `<@${member.id}>`)
         .replace(/{user\.tag}/g, member.user.tag)
         .replace(/{user\.name}/g, member.user.username)
         .replace(/{server}/g, member.guild.name)
         .replace(/{count}/g, member.guild.memberCount.toString())
-        .replace(/{member\.count}/g, member.guild.memberCount.toString());
+        .replace(/{member\.count}/g, member.guild.memberCount.toString()), member.guild);
     // 🖼️ بطاقة مخصصة (ProBot-style): صورة مرسومة بدل الإمبد
     const cardCfg = settings.welcome.card;
     if (cardCfg?.enabled) {

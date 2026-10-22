@@ -6,6 +6,7 @@ import { GuildMember, ChannelType, TextChannel } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
 import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
+import { resolveEmojiShortcodes } from '../utils/emoji';
 import { getGuildSettings, Ticket, UserProfile, Warning, ModerationCase } from '../models';
 import { leaveEmbed } from '../utils/embeds';
 
@@ -63,14 +64,17 @@ export async function handleLeave(
   const channel = member.guild.channels.cache.get(channelId) as TextChannel;
   if (!channel || channel.type !== ChannelType.GuildText) return 'bad-channel';
 
-  // Format leave message
-  const message = (settings.leave.message || 'وداعاً {user}! نتمنى لك التوفيق.')
-    .replace(/{user}/g, member.user.tag)
-    .replace(/{user\.mention}/g, `<@${member.id}>`)
-    .replace(/{user\.name}/g, member.user.username)
-    .replace(/{server}/g, member.guild.name)
-    .replace(/{count}/g, member.guild.memberCount.toString())
-    .replace(/{member\.count}/g, member.guild.memberCount.toString());
+  // Format leave message (+ 🎨 تحويل اختصارات الإيموجي إلى إيموجي حقيقي)
+  const message = resolveEmojiShortcodes(
+    (settings.leave.message || 'وداعاً {user}! نتمنى لك التوفيق.')
+      .replace(/{user}/g, member.user.tag)
+      .replace(/{user\.mention}/g, `<@${member.id}>`)
+      .replace(/{user\.name}/g, member.user.username)
+      .replace(/{server}/g, member.guild.name)
+      .replace(/{count}/g, member.guild.memberCount.toString())
+      .replace(/{member\.count}/g, member.guild.memberCount.toString()),
+    member.guild
+  );
 
   // Send leave embed
   const embed = leaveEmbed({

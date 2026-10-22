@@ -49,6 +49,7 @@ const aliasCache_1 = require("../utils/aliasCache");
 const afk_1 = require("../utils/afk");
 const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
+const emoji_1 = require("../utils/emoji");
 const pendingUploads_1 = require("../utils/pendingUploads");
 const imageGen_1 = require("../utils/imageGen");
 const mediaGen_1 = require("../utils/mediaGen");
@@ -1259,22 +1260,6 @@ async function handleMusicGeneration(message, prompt, question) {
     })
         .catch(() => { });
 }
-// 🎨 تحويل اختصارات إيموجي السيرفر (:اسم:) إلى إيموجي حقيقي <:اسم:id>
-//    ديسكورد لا يحوّل الاختصارات تلقائياً في رسائل البوت (تظهر كنص خام مثل ":اسم:") —
-//    نبحث في كاش إيموجي السيرفر ونستبدلها، وما لا يُوجد في السيرفر يبقى نصاً كما هو
-function resolveEmojiShortcodes(text, guild) {
-    if (!guild || !text.includes(':'))
-        return text;
-    const emojis = guild.emojis.cache;
-    if (!emojis.size)
-        return text;
-    return text.replace(/:([\w-]{1,32}):/g, (match, name) => {
-        const emoji = emojis.find((e) => e.name?.toLowerCase() === name.toLowerCase());
-        if (!emoji)
-            return match;
-        return `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`;
-    });
-}
 async function handleAIResponse(message, client) {
     if (!client.aiHandler)
         return;
@@ -1437,7 +1422,7 @@ async function handleAIResponse(message, client) {
     const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM, attachments });
     if (response) {
         // 🎨 اختصارات الإيموجي (:اسم:) → إيموجي حقيقي قبل الإرسال (ديسكورد لا يحوّلها في رسائل البوت)
-        const parts = splitAiText(resolveEmojiShortcodes(response.content, message.guild), 1900);
+        const parts = splitAiText((0, emoji_1.resolveEmojiShortcodes)(response.content, message.guild), 1900);
         if (streamedMsg) {
             // الرد الأول مُرسَل أثناء البث — نضبطه بالمحتوى النهائي ثم نُكمل البقية
             await streamedMsg.edit(msgOptions(parts[0])).catch(() => { });

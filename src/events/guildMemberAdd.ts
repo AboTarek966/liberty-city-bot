@@ -6,6 +6,7 @@ import { GuildMember, ChannelType, TextChannel } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
 import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
+import { resolveEmojiShortcodes } from '../utils/emoji';
 import { getGuildSettings } from '../models';
 import { welcomeEmbed, logEmbed } from '../utils/embeds';
 
@@ -128,14 +129,17 @@ export async function handleWelcome(
   const channel = member.guild.channels.cache.get(channelId) as TextChannel;
   if (!channel || channel.type !== ChannelType.GuildText) return 'bad-channel';
 
-  // Format welcome message
-  const message = (settings.welcome.message || '🎉 مرحباً {user}! أهلاً بك في {server}')
-    .replace(/{user}/g, `<@${member.id}>`)
-    .replace(/{user\.tag}/g, member.user.tag)
-    .replace(/{user\.name}/g, member.user.username)
-    .replace(/{server}/g, member.guild.name)
-    .replace(/{count}/g, member.guild.memberCount.toString())
-    .replace(/{member\.count}/g, member.guild.memberCount.toString());
+  // Format welcome message (+ 🎨 تحويل اختصارات الإيموجي إلى إيموجي حقيقي)
+  const message = resolveEmojiShortcodes(
+    (settings.welcome.message || '🎉 مرحباً {user}! أهلاً بك في {server}')
+      .replace(/{user}/g, `<@${member.id}>`)
+      .replace(/{user\.tag}/g, member.user.tag)
+      .replace(/{user\.name}/g, member.user.username)
+      .replace(/{server}/g, member.guild.name)
+      .replace(/{count}/g, member.guild.memberCount.toString())
+      .replace(/{member\.count}/g, member.guild.memberCount.toString()),
+    member.guild
+  );
 
   // 🖼️ بطاقة مخصصة (ProBot-style): صورة مرسومة بدل الإمبد
   const cardCfg = settings.welcome.card;

@@ -6,6 +6,7 @@
 import { Message, PermissionFlagsBits } from 'discord.js';
 import { getGuildSettings, Ticket, UserProfile } from '../models';
 import { createLogger } from './helpers';
+import { resolveEmojiShortcodes } from './emoji';
 
 const logger = createLogger('MessageSystems');
 
@@ -43,7 +44,8 @@ export async function handleCustomCommand(message: Message): Promise<boolean> {
   cmd.uses = (cmd.uses || 0) + 1;
   await settings.save().catch(() => {});
 
-  await message.reply(reply.substring(0, 2000)).catch(() => {});
+  // 🎨 تحويل اختصارات الإيموجي (:اسم:) — يُقصّ أولاً حتى لا يُقصّ إيموجي حديث في منتصفه
+  await message.reply(resolveEmojiShortcodes(reply.substring(0, 2000), message.guild)).catch(() => {});
   logger.info(`📝 الأمر المخصص "${cmd.name}" استُخدم بواسطة ${message.author.tag}`);
   return true;
 }

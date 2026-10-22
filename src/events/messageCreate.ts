@@ -27,6 +27,7 @@ import { getAliasesForShortcut } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
+import { resolveEmojiShortcodes } from '../utils/emoji';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
 import { detectImagePrompt, generateImageWithRetry, translateForImage } from '../utils/imageGen';
 import {
@@ -1373,20 +1374,6 @@ async function handleMusicGeneration(message: Message, prompt: string, question:
       files: [{ attachment: music.data, name: `song.${music.ext}` }],
     })
     .catch(() => {});
-}
-
-// 🎨 تحويل اختصارات إيموجي السيرفر (:اسم:) إلى إيموجي حقيقي <:اسم:id>
-//    ديسكورد لا يحوّل الاختصارات تلقائياً في رسائل البوت (تظهر كنص خام مثل ":اسم:") —
-//    نبحث في كاش إيموجي السيرفر ونستبدلها، وما لا يُوجد في السيرفر يبقى نصاً كما هو
-function resolveEmojiShortcodes(text: string, guild: Guild | null): string {
-  if (!guild || !text.includes(':')) return text;
-  const emojis = guild.emojis.cache;
-  if (!emojis.size) return text;
-  return text.replace(/:([\w-]{1,32}):/g, (match, name: string) => {
-    const emoji = emojis.find((e) => e.name?.toLowerCase() === name.toLowerCase());
-    if (!emoji) return match;
-    return `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`;
-  });
 }
 
 async function handleAIResponse(message: Message, client: LibertyClient): Promise<void> {
