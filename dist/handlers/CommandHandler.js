@@ -11,6 +11,7 @@ const discord_js_1 = require("discord.js");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const helpers_1 = require("../utils/helpers");
+const botOwner_1 = require("../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('CommandHandler');
 class CommandHandler {
     client;
@@ -125,7 +126,7 @@ class CommandHandler {
             return;
         }
         // Owner only check
-        if (command.ownerOnly && interaction.user.id !== process.env.OWNER_ID) {
+        if (command.ownerOnly && !(await (0, botOwner_1.isBotOwner)(this.client, interaction.user.id))) {
             await interaction.reply({
                 content: '❌ هذا الأمر مخصص لمالك البوت فقط',
                 ephemeral: true,

@@ -1,1 +1,1 @@
-{"version":3,"file":"ownerApprovalBtn.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/ownerApprovalBtn.ts"],"names":[],"mappings":"AAOA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAKlE,QAAA,MAAM,OAAO,EAAE,aA+Ed,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"ownerApprovalBtn.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/ownerApprovalBtn.ts"],"names":[],"mappings":"AAOA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAMlE,QAAA,MAAM,OAAO,EAAE,aA8Ed,CAAC;AAEF,eAAe,OAAO,CAAC"}

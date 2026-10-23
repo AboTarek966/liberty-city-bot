@@ -9,6 +9,7 @@ import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { takePending, PROTECTION_LABELS } from '../../utils/ownerApproval';
+import { isBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
   id: 'ownappr',
@@ -18,18 +19,17 @@ const handler: ButtonHandler = {
       return;
     }
 
-    // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مطوّر البوت — الأساسيان
-    const devId = process.env.DEVELOPER_USER_ID;
-    const isOwner = interaction.user.id === interaction.guild.ownerId;
-    const isDev = !!devId && interaction.user.id === devId;
-    if (!isOwner && !isDev) {
+    // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مالك البوت — الأساسيان
+    const isGuildOwner = interaction.user.id === interaction.guild.ownerId;
+    const isBotAdmin = await isBotOwner(interaction.client, interaction.user.id);
+    if (!isGuildOwner && !isBotAdmin) {
       await interaction.reply({
-        content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 والمطوّر 🛠️ فقط**',
+        content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 ومالك البوت 🛠️ فقط**',
         ephemeral: true,
       });
       return;
     }
-    const who = isOwner ? 'مالك السيرفر' : 'المطوّر';
+    const who = isGuildOwner ? 'مالك السيرفر' : 'مالك البوت';
 
     const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
     const verdict = parts[1];

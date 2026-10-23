@@ -7,6 +7,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const models_1 = require("../../models");
 const ownerApproval_1 = require("../../utils/ownerApproval");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'ownappr',
     async execute(interaction) {
@@ -14,18 +15,17 @@ const handler = {
             await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
             return;
         }
-        // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مطوّر البوت — الأساسيان
-        const devId = process.env.DEVELOPER_USER_ID;
-        const isOwner = interaction.user.id === interaction.guild.ownerId;
-        const isDev = !!devId && interaction.user.id === devId;
-        if (!isOwner && !isDev) {
+        // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مالك البوت — الأساسيان
+        const isGuildOwner = interaction.user.id === interaction.guild.ownerId;
+        const isBotAdmin = await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id);
+        if (!isGuildOwner && !isBotAdmin) {
             await interaction.reply({
-                content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 والمطوّر 🛠️ فقط**',
+                content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 ومالك البوت 🛠️ فقط**',
                 ephemeral: true,
             });
             return;
         }
-        const who = isOwner ? 'مالك السيرفر' : 'المطوّر';
+        const who = isGuildOwner ? 'مالك السيرفر' : 'مالك البوت';
         const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
         const verdict = parts[1];
         const field = parts[2];

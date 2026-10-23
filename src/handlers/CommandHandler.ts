@@ -16,6 +16,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from '../utils/helpers';
+import { isBotOwner } from '../utils/botOwner';
 
 const logger = createLogger('CommandHandler');
 
@@ -172,7 +173,7 @@ export class CommandHandler {
     }
 
     // Owner only check
-    if (command.ownerOnly && interaction.user.id !== process.env.OWNER_ID) {
+    if (command.ownerOnly && !(await isBotOwner(this.client, interaction.user.id))) {
       await interaction.reply({
         content: '❌ هذا الأمر مخصص لمالك البوت فقط',
         ephemeral: true,
