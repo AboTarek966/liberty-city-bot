@@ -1316,10 +1316,8 @@ class SecurityHandler {
                 return;
             const isEveryone = newRole.id === newRole.guild.id;
             const executor = await this.findExecutor(newRole.guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id);
-            let actionText = '📢 تم الإشعار فقط';
-            if (executor && cfg.action === 'kick') {
-                actionText = await this.punish(newRole.guild, executor, 'kick', 'Liberty City Anti-Admin: منح صلاحية Administrator بدون إذن');
-            }
+            // 🛡️ تنبيه فقط — لا نعاقب/نطرد المنفّذ حتى لو كان admin streiter
+            const actionText = '📢 تم الإشعار فقط';
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle(`⚠️ منح صلاحية Administrator${isEveryone ? ' لـ @everyone' : ''}!`)
                 .setDescription(isEveryone

@@ -103,12 +103,8 @@ const command = {
         .addUserOption(opt => opt.setName('remove').setDescription('إزالة بوت من القائمة البيضاء')))
         .addSubcommand(sub => sub
         .setName('antiadmin')
-        .setDescription('مراقبة منح صلاحية Administrator')
-        .addBooleanOption(opt => opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true))
-        .addStringOption(opt => opt
-        .setName('action')
-        .setDescription('الإجراء عند رصد المنح')
-        .addChoices({ name: 'تنبيه فقط', value: 'alert' }, { name: 'طرد المنفّذ', value: 'kick' })))
+        .setDescription('مراقبة منح صلاحية Administrator (تنبيه فقط)')
+        .addBooleanOption(opt => opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)))
         .addSubcommand(sub => sub
         .setName('autobackup')
         .setDescription('النسخ الاحتياطي التلقائي لبنية السيرفر')
@@ -231,7 +227,7 @@ async function showStatus(interaction, settings) {
         inline: true,
     }, {
         name: '⚠️ مراقبة الأدمن',
-        value: p.antiAdmin?.enabled ? `✅ مفعل (${p.antiAdmin?.action === 'kick' ? 'طرد' : 'تنبيه'})` : '❌ معطل',
+        value: p.antiAdmin?.enabled ? '✅ مفعل (📢 تنبيه فقط)' : '❌ معطل',
         inline: true,
     }, {
         name: '💾 نسخ تلقائي',
@@ -475,23 +471,20 @@ async function configureAntiBot(interaction, settings) {
 // --------------------------------------------
 async function configureAntiAdmin(interaction, settings) {
     const enabled = interaction.options.getBoolean('enabled', true);
-    const action = interaction.options.getString('action');
     if (!settings.protection.antiAdmin)
         settings.protection.antiAdmin = {};
     settings.protection.antiAdmin.enabled = enabled;
-    if (action)
-        settings.protection.antiAdmin.action = action;
     await settings.save();
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('⚠️ مراقبة منح صلاحية Administrator')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
         .addFields({ name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true }, {
         name: 'الإجراء',
-        value: settings.protection.antiAdmin.action === 'kick' ? '👢 طرد المنفّذ' : '📢 تنبيه فقط',
+        value: '📢 تنبيه فقط (لا يعاقب المنفّذ أبداً)',
         inline: true,
     }, {
         name: 'كيف يعمل؟',
-        value: 'يراقب أي رول (بما فيه @everyone) يحصل على Administrator — يحدّد المنفّذ من سجلات التدقيق وينبّهك فوراً',
+        value: 'يراقب أي رول (بما فيه @everyone) يحصل على Administrator — يحدّد المنفّذ من سجلات التدقيق وينبّهك فوراً. لا يعاقب المنفّذ أبداً حتى لو كان admin streiter.',
         inline: false,
     })
         .setFooter({ text: 'Liberty City Protection' })

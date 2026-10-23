@@ -187,18 +187,9 @@ const command: Command = {
     .addSubcommand(sub =>
       sub
         .setName('antiadmin')
-        .setDescription('مراقبة منح صلاحية Administrator')
+        .setDescription('مراقبة منح صلاحية Administrator (تنبيه فقط)')
         .addBooleanOption(opt =>
           opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('action')
-            .setDescription('الإجراء عند رصد المنح')
-            .addChoices(
-              { name: 'تنبيه فقط', value: 'alert' },
-              { name: 'طرد المنفّذ', value: 'kick' }
-            )
         )
     )
     .addSubcommand(sub =>
@@ -349,7 +340,7 @@ async function showStatus(interaction: ChatInputCommandInteraction, settings: an
       },
       {
         name: '⚠️ مراقبة الأدمن',
-        value: p.antiAdmin?.enabled ? `✅ مفعل (${p.antiAdmin?.action === 'kick' ? 'طرد' : 'تنبيه'})` : '❌ معطل',
+        value: p.antiAdmin?.enabled ? '✅ مفعل (📢 تنبيه فقط)' : '❌ معطل',
         inline: true,
       },
       {
@@ -660,11 +651,9 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
 // --------------------------------------------
 async function configureAntiAdmin(interaction: ChatInputCommandInteraction, settings: any): Promise<void> {
   const enabled = interaction.options.getBoolean('enabled', true);
-  const action = interaction.options.getString('action');
 
   if (!settings.protection.antiAdmin) settings.protection.antiAdmin = {};
   settings.protection.antiAdmin.enabled = enabled;
-  if (action) settings.protection.antiAdmin.action = action;
 
   await settings.save();
 
@@ -675,12 +664,12 @@ async function configureAntiAdmin(interaction: ChatInputCommandInteraction, sett
       { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
       {
         name: 'الإجراء',
-        value: settings.protection.antiAdmin.action === 'kick' ? '👢 طرد المنفّذ' : '📢 تنبيه فقط',
+        value: '📢 تنبيه فقط (لا يعاقب المنفّذ أبداً)',
         inline: true,
       },
       {
         name: 'كيف يعمل؟',
-        value: 'يراقب أي رول (بما فيه @everyone) يحصل على Administrator — يحدّد المنفّذ من سجلات التدقيق وينبّهك فوراً',
+        value: 'يراقب أي رول (بما فيه @everyone) يحصل على Administrator — يحدّد المنفّذ من سجلات التدقيق وينبّهك فوراً. لا يعاقب المنفّذ أبداً حتى لو كان admin streiter.',
         inline: false,
       }
     )
