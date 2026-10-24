@@ -553,15 +553,92 @@ export class SecurityHandler {
       if (Date.now() - entry.createdTimestamp > 1500) return;
       if (entry.executor.id === this.client.user?.id) return;
       if (await this.isTrustedExecutor(newChannel.guild, entry.executor.id)) return; // 👑 موثوق يغيّر بحرية
-      const member = newChannel.guild.members.cache.get(entry.executor.id);
+      
+      const guild = newChannel.guild;
+      const member = guild.members.cache.get(entry.executor.id);
+      if (!member) return;
 
-      // إرجاع الاسم فوراً
-      newChannel.setName(oldChannel.name, 'Security: rename reverted').catch(() => {});
-      // سحب الرولات + طرد في التوازي (من أول مرة)
-      member?.roles.set([], 'Security: rapid rename').catch(() => {});
-      member?.kick('Security: rapid channel rename').catch(() => {});
-      getGuildSettings(newChannel.guild.id).then(s => this.getAlertChannel(newChannel.guild, s))
-        .then(a => a?.send({ content: `✏️ **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر اسم قناة:** ${entry.executor.tag} — أُعيد الاسم + عقوبة` }).catch(() => {}));
+      // 📋 جلب الإعدادات
+      const settings = await getGuildSettings(guild.id);
+      const antiNuke = settings.protection?.antiNuke;
+      if (!antiNuke?.enabled) return;
+
+      // 🛡️ فحص التسلسل الهرمي — لو البوت مش أعلى رتبة، العقوبات تفشل
+      const hierarchy = this.checkHierarchy(guild);
+      if (!hierarchy.ok) {
+        const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+        alert?.send({
+          content: `⚠️ **فشل حماية إعادة التسمية** — البوت ليس أعلى رتبة!\n` +
+            `المنفّذ: ${entry.executor.tag} | رول البوت: ${hierarchy.botRoleName} (#${hierarchy.botPosition})\n` +
+            `رولات فوق البوت: ${hierarchy.offenderCount} — اسحب رول البوت للأعلى.`
+        }).catch(() => {});
+        logger.warn(`Hierarchy block: rename revert failed in ${guild.name} — bot not top role`);
+        return;
+      }
+
+      // 🔐 فحص الصلاحيات
+      const me = guild.members.me;
+      const canManageChannels = me?.permissions.has(PermissionFlagsBits.ManageChannels) ?? false;
+      const canKick = me?.permissions.has(PermissionFlagsBits.KickMembers) ?? false;
+      const canBan = me?.permissions.has(PermissionFlagsBits.BanMembers) ?? false;
+
+      let nameRestored = false;
+      let punished = false;
+      let punishType = 'none';
+
+      // 1️⃣ إرجاع الاسم
+      if (canManageChannels) {
+        try {
+          await newChannel.setName(oldChannel.name, 'Security: rename reverted');
+          nameRestored = true;
+        } catch (e: any) {
+          logger.warn(`Failed to restore channel name in ${guild.name}: ${e.message}`);
+        }
+      }
+
+      // 2️⃣ العقوبة حسب إعدادات antiNuke
+      const action = antiNuke.action || 'kick';
+      if (action !== 'alert' && member) {
+        if (action === 'strip' && canKick) {
+          try {
+            await member.roles.set([], 'Security: rapid rename (strip roles)');
+            punished = true;
+            punishType = 'strip';
+          } catch (e: any) {
+            logger.warn(`Failed to strip roles in ${guild.name}: ${e.message}`);
+          }
+        } else if (action === 'kick' && canKick) {
+          try {
+            await member.kick('Security: rapid channel rename');
+            punished = true;
+            punishType = 'kick';
+          } catch (e: any) {
+            logger.warn(`Failed to kick in ${guild.name}: ${e.message}`);
+          }
+        } else if (action === 'ban' && canBan) {
+          try {
+            await member.ban({ reason: 'Security: rapid channel rename (anti-nuke)' });
+            punished = true;
+            punishType = 'ban';
+          } catch (e: any) {
+            logger.warn(`Failed to ban in ${guild.name}: ${e.message}`);
+          }
+        }
+      }
+
+      // 3️⃣ إرسال التقرير
+      const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+      const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
+      let msg = `✏️ **${executorType} غيّر اسم قناة:** ${entry.executor.tag}\n`;
+      msg += `📝 القناة: <#${newChannel.id}>\n`;
+      msg += `🔄 استرجاع الاسم: ${nameRestored ? '✅ تم' : canManageChannels ? '❌ فشل' : '⚠️ لا توجد صلاحية ManageChannels'}\n`;
+      if (action === 'alert') {
+        msg += `🔔 الإجراء: تنبيه فقط (حسب الإعدادات)`;
+      } else {
+        msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل — تحقق من الصلاحيات/الهرمية'}`;
+      }
+      alert?.send({ content: msg }).catch(() => {});
+
     } catch (error: any) {
       logger.error(`onChannelUpdate error: ${error.message}`);
     }
@@ -604,13 +681,54 @@ export class SecurityHandler {
       if (Date.now() - entry.createdTimestamp > 1500) return;
       if (entry.executor.id === this.client.user?.id) return;
       if (await this.isTrustedExecutor(webhook.guild, entry.executor.id)) return; // 👑 موثوق
-      const member = webhook.guild.members.cache.get(entry.executor.id);
 
-      webhook.delete('Security: webhook spam').catch(() => {});
-      member?.roles.set([], 'Security: created webhook').catch(() => {});
-      member?.kick('Security: webhook spam').catch(() => member?.ban({ reason: 'Security: webhook spam' }).catch(() => {}));
-      getGuildSettings(webhook.guild.id).then(s => this.getAlertChannel(webhook.guild, s))
-        .then(a => a?.send({ content: `🔗 **${entry.executor.bot ? 'بوت' : 'عضو'} أنشأ ويب هوك:** ${entry.executor.tag} — تم الحذف + عقوبة` }).catch(() => {}));
+      const guild = webhook.guild;
+      const member = guild.members.cache.get(entry.executor.id);
+      if (!member) return;
+
+      const settings = await getGuildSettings(guild.id);
+      const antiNuke = settings.protection?.antiNuke;
+      if (!antiNuke?.enabled) return;
+
+      const hierarchy = this.checkHierarchy(guild);
+      if (!hierarchy.ok) {
+        const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+        alert?.send({ content: `⚠️ **فشل حماية الويب هوك** — البوت ليس أعلى رتبة! اسحب رول البوت للأعلى.` }).catch(() => {});
+        return;
+      }
+
+      const me = guild.members.me;
+      const canManageWebhooks = me?.permissions.has(PermissionFlagsBits.ManageWebhooks) ?? false;
+      const canKick = me?.permissions.has(PermissionFlagsBits.KickMembers) ?? false;
+      const canBan = me?.permissions.has(PermissionFlagsBits.BanMembers) ?? false;
+
+      let deleted = false;
+      let punished = false;
+      let punishType = 'none';
+
+      if (canManageWebhooks) {
+        try { await webhook.delete('Security: webhook spam'); deleted = true; } catch {}
+      }
+
+      const action = antiNuke.action || 'kick';
+      if (action !== 'alert' && member) {
+        if (action === 'strip' && canKick) {
+          try { await member.roles.set([], 'Security: webhook spam'); punished = true; punishType = 'strip'; } catch {}
+        } else if (action === 'kick' && canKick) {
+          try { await member.kick('Security: webhook spam'); punished = true; punishType = 'kick'; } catch {}
+        } else if (action === 'ban' && canBan) {
+          try { await member.ban({ reason: 'Security: webhook spam' }); punished = true; punishType = 'ban'; } catch {}
+        }
+      }
+
+      const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+      const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
+      let msg = `🔗 **${executorType} أنشأ ويب هوك:** ${entry.executor.tag}\n`;
+      msg += `🗑️ الحذف: ${deleted ? '✅' : canManageWebhooks ? '❌' : '⚠️ لا توجد صلاحية'}\n`;
+      if (action === 'alert') msg += `🔔 الإجراء: تنبيه فقط`;
+      else msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل'}`;
+      alert?.send({ content: msg }).catch(() => {});
+
     } catch (error: any) {
       logger.error(`onWebhookUpdate error: ${error.message}`);
     }
@@ -631,12 +749,53 @@ export class SecurityHandler {
       if (entry.executor.id === this.client.user?.id) return;
       const executorMember = newMember.guild.members.cache.get(entry.executor.id);
 
-      // إرجاع الرولات فوراً + عقوبة المنفّذ
-      newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment').catch(() => {});
-      executorMember?.roles.set([], 'Security: role assignment spam').catch(() => {});
-      executorMember?.kick('Security: role assignment spam').catch(() => executorMember?.ban({ reason: 'Security: role assignment spam' }).catch(() => {}));
-      getGuildSettings(newMember.guild.id).then(s => this.getAlertChannel(newMember.guild, s))
-        .then(a => a?.send({ content: `🎭 **${entry.executor.bot ? 'بوت' : 'عضو'} أعطى رول:** ${entry.executor.tag} — أُعيدت الرولات + عقوبة` }).catch(() => {}));
+      const guild = newMember.guild;
+      const settings = await getGuildSettings(guild.id);
+      const antiNuke = settings.protection?.antiNuke;
+      if (!antiNuke?.enabled) return;
+
+      if (await this.isTrustedExecutor(guild, entry.executor.id)) return;
+
+      const hierarchy = this.checkHierarchy(guild);
+      if (!hierarchy.ok) {
+        const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+        alert?.send({ content: `⚠️ **فشل حماية إعطاء الرولات** — البوت ليس أعلى رتبة! اسحب رول البوت للأعلى.` }).catch(() => {});
+        return;
+      }
+
+      const me = guild.members.me;
+      const canManageRoles = me?.permissions.has(PermissionFlagsBits.ManageRoles) ?? false;
+      const canKick = me?.permissions.has(PermissionFlagsBits.KickMembers) ?? false;
+      const canBan = me?.permissions.has(PermissionFlagsBits.BanMembers) ?? false;
+
+      let rolesRestored = false;
+      let punished = false;
+      let punishType = 'none';
+
+      if (canManageRoles) {
+        try { await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment'); rolesRestored = true; } catch {}
+      }
+
+      const action = antiNuke.action || 'kick';
+      if (action !== 'alert' && executorMember) {
+        if (action === 'strip' && canKick) {
+          try { await executorMember.roles.set([], 'Security: role assignment spam'); punished = true; punishType = 'strip'; } catch {}
+        } else if (action === 'kick' && canKick) {
+          try { await executorMember.kick('Security: role assignment spam'); punished = true; punishType = 'kick'; } catch {}
+        } else if (action === 'ban' && canBan) {
+          try { await executorMember.ban({ reason: 'Security: role assignment spam' }); punished = true; punishType = 'ban'; } catch {}
+        }
+      }
+
+      const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+      const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
+      let msg = `🎭 **${executorType} أعطى رول:** ${entry.executor.tag}\n`;
+      msg += `👤 الهدف: ${newMember.user.tag}\n`;
+      msg += `🔄 استرجاع الرولات: ${rolesRestored ? '✅' : canManageRoles ? '❌' : '⚠️ لا توجد صلاحية ManageRoles'}\n`;
+      if (action === 'alert') msg += `🔔 الإجراء: تنبيه فقط`;
+      else msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل'}`;
+      alert?.send({ content: msg }).catch(() => {});
+
     } catch (error: any) {
       logger.error(`onGuildMemberUpdate error: ${error.message}`);
     }
@@ -658,13 +817,53 @@ export class SecurityHandler {
       if (entry.executor.id === this.client.user?.id) return;
       const member = newChannel.guild.members.cache.get(entry.executor.id);
 
-      // إرجاع الصلاحيات فوراً
-      newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o: any) => [o.id, o]), 'Security: perm overwrite reverted').catch(() => {});
-      // عقوبة فورية
-      member?.roles.set([], 'Security: perm overwrite spam').catch(() => {});
-      member?.kick('Security: perm overwrite spam').catch(() => member?.ban({ reason: 'Security: perm overwrite spam' }).catch(() => {}));
-      getGuildSettings(newChannel.guild.id).then(s => this.getAlertChannel(newChannel.guild, s))
-        .then(a => a?.send({ content: `🔐 **${entry.executor.bot ? 'بوت' : 'عضو'} غيّر صلاحيات قناة:** ${entry.executor.tag} — أُعيدت الصلاحيات + عقوبة` }).catch(() => {}));
+      const guild = newChannel.guild;
+      const settings = await getGuildSettings(guild.id);
+      const antiNuke = settings.protection?.antiNuke;
+      if (!antiNuke?.enabled) return;
+
+      if (await this.isTrustedExecutor(guild, entry.executor.id)) return;
+
+      const hierarchy = this.checkHierarchy(guild);
+      if (!hierarchy.ok) {
+        const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+        alert?.send({ content: `⚠️ **فشل حماية الصلاحيات** — البوت ليس أعلى رتبة! اسحب رول البوت للأعلى.` }).catch(() => {});
+        return;
+      }
+
+      const me = guild.members.me;
+      const canManageChannels = me?.permissions.has(PermissionFlagsBits.ManageChannels) ?? false;
+      const canKick = me?.permissions.has(PermissionFlagsBits.KickMembers) ?? false;
+      const canBan = me?.permissions.has(PermissionFlagsBits.BanMembers) ?? false;
+
+      let permsRestored = false;
+      let punished = false;
+      let punishType = 'none';
+
+      if (canManageChannels) {
+        try { await newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o: any) => [o.id, o]), 'Security: perm overwrite reverted'); permsRestored = true; } catch {}
+      }
+
+      const action = antiNuke.action || 'kick';
+      if (action !== 'alert' && member) {
+        if (action === 'strip' && canKick) {
+          try { await member.roles.set([], 'Security: perm overwrite spam'); punished = true; punishType = 'strip'; } catch {}
+        } else if (action === 'kick' && canKick) {
+          try { await member.kick('Security: perm overwrite spam'); punished = true; punishType = 'kick'; } catch {}
+        } else if (action === 'ban' && canBan) {
+          try { await member.ban({ reason: 'Security: perm overwrite spam' }); punished = true; punishType = 'ban'; } catch {}
+        }
+      }
+
+      const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+      const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
+      let msg = `🔐 **${executorType} غيّر صلاحيات قناة:** ${entry.executor.tag}\n`;
+      msg += `📍 القناة: <#${newChannel.id}>\n`;
+      msg += `🔄 استرجاع الصلاحيات: ${permsRestored ? '✅' : canManageChannels ? '❌' : '⚠️ لا توجد صلاحية ManageChannels'}\n`;
+      if (action === 'alert') msg += `🔔 الإجراء: تنبيه فقط`;
+      else msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل'}`;
+      alert?.send({ content: msg }).catch(() => {});
+
     } catch (error: any) {
       logger.error(`onChannelPermissionUpdate error: ${error.message}`);
     }
