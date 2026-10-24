@@ -58,6 +58,8 @@ export class ProtectionHandler {
 
   constructor(client: Client) {
     this.client = client;
+    // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
+    setInterval(() => this.cleanup(), 5 * 60 * 1000).unref();
   }
 
   // --------------------------------------------
@@ -642,6 +644,13 @@ export class ProtectionHandler {
         this.userCooldowns.delete(key);
       }
     });
+
+    // Clean webhook spam cooldown (older than 1 minute)
+    for (const [key, timestamp] of this.webhookSpamCooldown) {
+      if (now - timestamp > 60000) {
+        this.webhookSpamCooldown.delete(key);
+      }
+    }
   }
 }
 

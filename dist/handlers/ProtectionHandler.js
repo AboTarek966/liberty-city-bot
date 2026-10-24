@@ -53,6 +53,8 @@ class ProtectionHandler {
     userCooldowns = new discord_js_1.Collection(); // key: userId_action
     constructor(client) {
         this.client = client;
+        // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
+        setInterval(() => this.cleanup(), 5 * 60 * 1000).unref();
     }
     // --------------------------------------------
     // Webhook Spam Handler — Death Note / Raid Webhooks
@@ -558,6 +560,12 @@ class ProtectionHandler {
                 this.userCooldowns.delete(key);
             }
         });
+        // Clean webhook spam cooldown (older than 1 minute)
+        for (const [key, timestamp] of this.webhookSpamCooldown) {
+            if (now - timestamp > 60000) {
+                this.webhookSpamCooldown.delete(key);
+            }
+        }
     }
 }
 exports.ProtectionHandler = ProtectionHandler;

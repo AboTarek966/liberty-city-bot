@@ -187,6 +187,8 @@ export class SecurityHandler {
 
   constructor(client: Client) {
     this.client = client;
+    // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
+    setInterval(() => this.cleanup(), 5 * 60 * 1000).unref();
   }
 
   // --------------------------------------------
@@ -215,6 +217,7 @@ export class SecurityHandler {
     this.hierarchyState.delete(guildId);
     this.restoreLocks.delete(guildId);
     this.kickedQueue.delete(guildId);
+    this.nukeTracker.delete(guildId);
     logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
   }
 
@@ -246,6 +249,13 @@ export class SecurityHandler {
         if (tracker[channelId].length === 0) delete tracker[channelId];
       }
       if (Object.keys(tracker).length === 0) this.messageDeletionTracker.delete(guildId);
+    }
+    // Cleanup nuke tracker (older than 1 minute)
+    const now = Date.now();
+    for (const [guildId, tracker] of this.nukeTracker) {
+      if (now - tracker.lastAction > 60000) {
+        this.nukeTracker.delete(guildId);
+      }
     }
   }
 

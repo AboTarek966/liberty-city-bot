@@ -99,6 +99,8 @@ class SecurityHandler {
     nukeTracker = new Map();
     constructor(client) {
         this.client = client;
+        // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
+        setInterval(() => this.cleanup(), 5 * 60 * 1000).unref();
     }
     // --------------------------------------------
     // تنظيف كل موارد السيرفر — يُستدعى عند مغادرة البوت (guildDelete)
@@ -126,6 +128,7 @@ class SecurityHandler {
         this.hierarchyState.delete(guildId);
         this.restoreLocks.delete(guildId);
         this.kickedQueue.delete(guildId);
+        this.nukeTracker.delete(guildId);
         logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
     }
     cleanup() {
@@ -163,6 +166,13 @@ class SecurityHandler {
             }
             if (Object.keys(tracker).length === 0)
                 this.messageDeletionTracker.delete(guildId);
+        }
+        // Cleanup nuke tracker (older than 1 minute)
+        const now = Date.now();
+        for (const [guildId, tracker] of this.nukeTracker) {
+            if (now - tracker.lastAction > 60000) {
+                this.nukeTracker.delete(guildId);
+            }
         }
     }
     // --------------------------------------------
