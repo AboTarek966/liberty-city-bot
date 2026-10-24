@@ -1913,16 +1913,30 @@ export class SecurityHandler {
 
     const channels = guild.channels.cache
       .filter(c => !c.isThread() && !SUSPICIOUS.test(c.name))
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        type: c.type,
-        position: 'position' in c ? (c as any).position : 0,
-        topic: (c as any).topic ?? null,
-        parentId: c.parentId ?? null,
-        nsfw: (c as any).nsfw ?? false,
-        rateLimitPerUser: (c as any).rateLimitPerUser ?? 0,
-      }))
+      .map(c => {
+        const guildChannel = c as any; // GuildChannel types
+        const base = {
+          id: c.id,
+          name: c.name,
+          type: c.type,
+          position: 'position' in c ? guildChannel.position : 0,
+          topic: guildChannel.topic ?? null,
+          parentId: c.parentId ?? null,
+          nsfw: guildChannel.nsfw ?? false,
+          rateLimitPerUser: guildChannel.rateLimitPerUser ?? 0,
+        };
+        // حفظ الأوفررايتس (الصلاحيات)
+        let permissionOverwrites: any[] = [];
+        if (guildChannel.permissionOverwrites?.cache) {
+          permissionOverwrites = guildChannel.permissionOverwrites.cache.map((ow: any) => ({
+            id: ow.id,
+            type: ow.type, // 'role' | 'member'
+            allow: ow.allow?.toString() ?? '0',
+            deny: ow.deny?.toString() ?? '0',
+          }));
+        }
+        return { ...base, permissionOverwrites };
+      })
       .sort((a, b) => a.position - b.position);
 
     const roles = guild.roles.cache
@@ -2002,14 +2016,20 @@ export class SecurityHandler {
     // نمط القنوات/الرولات المشبوهة — لا تُستعاد أبداً
     const SUSPICIOUS_PATTERN = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123|vxl.?hak/i;
 
-    // 1) الرولات أولاً — استراتيجية الصمت: لو اتحددنا نوقف تماماً 30 دقيقة
-    let rateLimitStrikes = 0;
-    for (const rd of data.roles || []) {
+    // 1) الرولات — إنشاء بالترتيب الدقيق من النسخة الاحتياطية
+    const sortedRoles = [...(data.roles || [])].sort((a, b) => (b.position || 0) - (a.position || 0));
+    
+    for (const rd of sortedRoles) {
       if (SUSPICIOUS_PATTERN.test(rd.name)) { result.skipped++; continue; }
-      const exists =
-        guild.roles.cache.get(rd.id) ||
-        guild.roles.cache.find(r => r.name === rd.name && r.id !== guild.id);
+      
+      // التحقق من وجود الرول (بالمعرف أو بالاسم + الموقع)
+      let exists = guild.roles.cache.get(rd.id);
+      if (!exists) {
+        // البحث بالرول اللي بنفس الاسم ومفيش conflict
+        exists = guild.roles.cache.find(r => r.name === rd.name && r.id !== guild.id);
+      }
       if (exists) {
+        idMap[`role:${rd.id}`] = exists.id;
         result.skipped++;
         continue;
       }
@@ -2030,25 +2050,16 @@ export class SecurityHandler {
           idMap[`role:${rd.id}`] = created.id;
           result.roles++;
           created2 = true;
-          rateLimitStrikes = 0; // reset strikes on success
         } catch (error: any) {
           const isRateLimit =
             error?.status === 429 ||
             error?.httpStatus === 429 ||
             /rate limit|too many/i.test(error?.message || '');
           if (isRateLimit) {
-            rateLimitStrikes++;
             const retryAfter = error?.retry_after ?? error?.data?.retry_after ?? 60;
-            if (rateLimitStrikes >= 2) {
-              // محاولة ثالثة = صمت كامل 30 دقيقة
-              logger.warn(`restore role "${rd.name}" — strike ${rateLimitStrikes}, full silence 30min`);
-              await sleep(30 * 60 * 1000);
-              rateLimitStrikes = 0;
-            } else {
-              const waitMs = Math.min((Number(retryAfter) || 60) * 1000 + 3000, 700000);
-              logger.warn(`restore role "${rd.name}" — RL, waiting ${Math.round(waitMs / 1000)}s`);
-              await sleep(waitMs);
-            }
+            const waitMs = Math.min((Number(retryAfter) || 60) * 1000 + 3000, 700000);
+            logger.warn(`restore role "${rd.name}" — rate limited, waiting ${Math.round(waitMs / 1000)}s`);
+            await sleep(waitMs);
           } else {
             logger.warn(`restore role "${rd.name}" failed: ${error.message}`);
             result.skipped++;
@@ -2060,41 +2071,42 @@ export class SecurityHandler {
       await sleep(700);
     }
 
-    // 1.5) إعادة ترتيب الرولات حسب النسخة الاحتياطية
+    // 2) إعادة ترتيب الرولات بدقة حسب النسخة الاحتياطية
     if (result.roles > 0) {
       try {
         await sleep(2000);
         const curRoles = await guild.roles.fetch();
-        const nameToId: Record<string, string> = {};
+        const nameToRole = new Map<string, Role>();
         for (const [, role] of curRoles) {
           if (role.managed || role.id === guild.id) continue;
-          nameToId[role.name] = role.id;
+          if (!nameToRole.has(role.name)) {
+            nameToRole.set(role.name, role);
+          }
         }
 
-        // الترتيب: الأعلى position في النسخة = رقم position الأعلى في السيرفر
-        const backupSorted = [...(data.roles || [])].sort(
-          (a: any, b: any) => (b.position || 0) - (a.position || 0)
-        );
         const positions: Array<{ role: string; position: number }> = [];
-        let pos = backupSorted.length;
-        for (const rd of backupSorted) {
-          const id = nameToId[rd.name];
-          if (id) {
-            positions.push({ role: id, position: pos });
-            pos--;
+        // استخدام الترتيب من النسخة الاحتياطية مباشرة
+        for (const rd of sortedRoles) {
+          if (SUSPICIOUS_PATTERN.test(rd.name)) continue;
+          const role = nameToRole.get(rd.name);
+          if (role && role.id !== guild.id) {
+            // الموقع الدقيق من النسخة (أعلى position = رقم أعلى)
+            positions.push({ role: role.id, position: rd.position || 0 });
           }
         }
 
         if (positions.length > 1) {
+          // ترتيب تنازلي للأعلى أولاً
+          positions.sort((a, b) => b.position - a.position);
           await guild.roles.setPositions(positions);
-          logger.info(`📐 Reordered ${positions.length} roles to match backup`);
+          logger.info(`📐 Reordered ${positions.length} roles to match backup positions exactly`);
         }
       } catch (error: any) {
         logger.warn(`Role reorder failed: ${error.message}`);
       }
     }
 
-    // 2) القنوات (الفئات أولاً ثم حسب الترتيب)
+    // 3) القنوات — الفئات أولاً، ثم الترتيب الدقيق
     const sortedChannels = [...(data.channels || [])].sort((a: any, b: any) => {
       const aCat = a.type === ChannelType.GuildCategory ? 0 : 1;
       const bCat = b.type === ChannelType.GuildCategory ? 0 : 1;
@@ -2110,6 +2122,7 @@ export class SecurityHandler {
         guild.channels.cache.get(cd.id) ||
         guild.channels.cache.find(c => c.name === cd.name && c.type === cd.type);
       if (exists) {
+        idMap[`ch:${cd.id}`] = exists.id;
         result.skipped++;
         continue;
       }
@@ -2130,7 +2143,8 @@ export class SecurityHandler {
         idMap[`ch:${cd.id}`] = created.id;
         result.channels++;
 
-        if (typeof cd.position === 'number' && cd.position > 0) {
+        // ضبط الموقع بدقة من النسخة الاحتياطية
+        if (typeof cd.position === 'number' && cd.position >= 0) {
           await created.setPosition(cd.position).catch(() => {});
         }
       } catch (error: any) {
@@ -2138,6 +2152,43 @@ export class SecurityHandler {
         result.skipped++;
       }
       await sleep(700);
+    }
+
+    // 4) ضبط صلاحيات القنوات (overwrites) من النسخة الاحتياطية
+    if (result.channels > 0) {
+      try {
+        await sleep(1000);
+        for (const cd of sortedChannels) {
+          if (!RESTORABLE_CHANNEL_TYPES.includes(cd.type)) continue;
+          if (SUSPICIOUS_PATTERN.test(cd.name)) continue;
+          
+          const channelId = idMap[`ch:${cd.id}`] || guild.channels.cache.get(cd.id)?.id;
+          if (!channelId) continue;
+          
+          const channel = guild.channels.cache.get(channelId);
+          if (!channel || !cd.permissionOverwrites) continue;
+          
+          for (const ow of cd.permissionOverwrites) {
+            if (!ow.id || !ow.allow || !ow.deny) continue;
+            
+            // تحويل الـ ID القديم للـ ID الجديد للرول
+            let targetId = ow.id;
+            if (ow.type === 'role') {
+              targetId = idMap[`role:${ow.id}`] || ow.id;
+            }
+            
+            try {
+              const gChannel = channel as any;
+              await gChannel.permissionOverwrites.edit(targetId, {
+                Allow: BigInt(ow.allow),
+                Deny: BigInt(ow.deny),
+              }, 'Liberty City — استعادة أوفررايتس').catch(() => {});
+            } catch {}
+          }
+        }
+      } catch (error: any) {
+        logger.warn(`Permission overwrites restore failed: ${error.message}`);
+      }
     }
 
     logger.info(

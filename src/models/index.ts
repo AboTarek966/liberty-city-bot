@@ -848,7 +848,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     },
     antiAdmin: {
       enabled: { type: Boolean, default: true },
-      action: { type: String, enum: ['alert', 'kick'], default: 'alert' },
+      action: { type: String, enum: ['alert', 'kick', 'ban'], default: 'kick' },
       logChannel: { type: String },
     },
     autoBackup: {
