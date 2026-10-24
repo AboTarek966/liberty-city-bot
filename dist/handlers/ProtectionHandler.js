@@ -2,6 +2,39 @@
 // ============================================
 // Liberty City Bot - Protection Handler
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProtectionHandler = void 0;
 const discord_js_1 = require("discord.js");
@@ -22,14 +55,107 @@ class ProtectionHandler {
         this.client = client;
     }
     // --------------------------------------------
+    // Webhook Spam Handler — Death Note / Raid Webhooks
+    // --------------------------------------------
+    webhookSpamCooldown = new Map();
+    async handleWebhookMessage(message) {
+        if (!message.guild || !message.webhookId)
+            return false;
+        const settings = await (0, models_1.getGuildSettings)(message.guild.id);
+        if (!settings.protection)
+            return false;
+        // فحص: هل الرسالة تحتوي @everyone أو mentions كتيرة أو رابط دعوة؟
+        const isMassMention = message.mentions.everyone ||
+            message.mentions.users.size >= 5 ||
+            message.mentions.roles.size >= 3;
+        const isInvite = /discord\.(gg|com\/invite)|discordapp\.com\/invite/i.test(message.content);
+        const isScamLink = /(?:free|nitro|steam|airdrop|claim).*(?:discord\.gg|bit\.ly|tinyurl|cutt\.ly)/i.test(message.content);
+        if (!isMassMention && !isInvite && !isScamLink)
+            return false;
+        // Rate limit: webhook cooldown 5 ثواني
+        const key = `${message.guild.id}:${message.webhookId}`;
+        const lastAction = this.webhookSpamCooldown.get(key) || 0;
+        if (Date.now() - lastAction < 5000) {
+            // احذف الرسالة فقط بدون تكرار الإجراء
+            await message.delete().catch(() => { });
+            return true;
+        }
+        this.webhookSpamCooldown.set(key, Date.now());
+        // 1) احذف الرسالة فوراً
+        await message.delete().catch(() => { });
+        // 2) احذف الـ Webhook نفسه
+        let webhookDeleted = false;
+        try {
+            const channel = message.channel;
+            if (channel && 'webhooks' in channel) {
+                const webhooks = await channel.webhooks.fetch();
+                const target = webhooks.find((w) => w.id === message.webhookId);
+                if (target) {
+                    await target.delete('Liberty City — Anti-Webhook-Spam');
+                    webhookDeleted = true;
+                }
+            }
+        }
+        catch (e) {
+            logger.warn(`Failed to delete webhook ${message.webhookId}: ${e.message}`);
+        }
+        // 3) ابحث عن المنفّذ عبر Audit Log
+        let executor = null;
+        try {
+            const audit = await message.guild.fetchAuditLogs({ limit: 10, type: discord_js_1.AuditLogEvent.WebhookCreate });
+            const entry = audit.entries.find(e => e.target?.id === message.webhookId &&
+                Date.now() - e.createdTimestamp < 60000);
+            if (entry)
+                executor = entry.executor;
+        }
+        catch { }
+        // 4) اعاقب المنفّذ لو موجود
+        let punished = false;
+        if (executor && !executor.bot) {
+            try {
+                const member = await message.guild.members.fetch(executor.id).catch(() => null);
+                if (member && !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
+                    await member.kick('Liberty City — Anti-Webhook-Spam (Death Note)');
+                    punished = true;
+                }
+            }
+            catch { }
+        }
+        // 5) سجّل + أرسل تنبيه
+        logger.warn(`🚨 WEBHOOK SPAM in ${message.guild.name}: deleted ${webhookDeleted ? 'webhook' : 'message only'}, ` +
+            `punished=${punished}, executor=${executor?.tag || 'unknown'}, ` +
+            `reason=${isMassMention ? '@everyone' : isInvite ? 'invite' : 'scam-link'}`);
+        // إرسال تنبيه لقروم الحماية
+        try {
+            const logChannelId = settings.protection?.logChannel;
+            if (logChannelId) {
+                const logChannel = await message.guild.channels.fetch(logChannelId).catch(() => null);
+                if (logChannel && 'send' in logChannel) {
+                    const { EmbedBuilder } = await Promise.resolve().then(() => __importStar(require('discord.js')));
+                    const embed = new EmbedBuilder()
+                        .setColor(0xff0000)
+                        .setTitle('🚨 Webhook Spam — Death Note')
+                        .addFields({ name: 'القناة', value: message.channel?.name || 'unknown', inline: true }, { name: 'حذف الـ Webhook', value: webhookDeleted ? '✅ نعم' : '❌ لا', inline: true }, { name: 'المنفّذ', value: executor?.tag || 'غير معروف', inline: true }, { name: 'العقوبة', value: punished ? '✅ تم طرد المنفّذ' : '❌ لم يتم', inline: true }, { name: 'السبب', value: isMassMention ? '@everyone mass mention' : isInvite ? 'Invite link' : 'Scam link', inline: true })
+                        .setTimestamp();
+                    await logChannel.send({ embeds: [embed] });
+                }
+            }
+        }
+        catch { }
+        return true;
+    }
+    // --------------------------------------------
     // Main Message Check
     // --------------------------------------------
     async checkMessage(message) {
         if (!message.guild || !message.member)
             return null;
-        if (message.author.bot)
+        // 🚨 Webhook messages — Death Note / Raid protection
+        if (message.webhookId) {
+            await this.handleWebhookMessage(message);
             return null;
-        if (message.webhookId)
+        }
+        if (message.author.bot)
             return null;
         const settings = await (0, models_1.getGuildSettings)(message.guild.id);
         // Skip if protection is disabled

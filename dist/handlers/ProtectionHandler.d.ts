@@ -10,6 +10,8 @@ export declare class ProtectionHandler {
     private raidTracker;
     private userCooldowns;
     constructor(client: Client);
+    private webhookSpamCooldown;
+    handleWebhookMessage(message: Message): Promise<boolean>;
     checkMessage(message: Message): Promise<ProtectionAction | null>;
     private checkAntiSpam;
     private checkAntiLink;
