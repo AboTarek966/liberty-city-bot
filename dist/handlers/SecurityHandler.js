@@ -95,8 +95,6 @@ class SecurityHandler {
     kickedTimers = new Map();
     // Pro Max: sticky role watchdog timers
     topWatchdogs = new Map();
-    // 🔒 Auto-Lockdown cooldown
-    lockdownCooldown = new Map();
     // 💣 Nuke detection tracker
     nukeTracker = new Map();
     constructor(client) {
@@ -400,9 +398,11 @@ class SecurityHandler {
             channel.delete('Security: rapid channel create').catch(() => { });
             member?.roles.set([], 'Security: rapid channel creation').catch(() => { });
             member?.ban({ reason: 'Security: rapid channel creation (anti-nuke)' }).catch(() => { });
-            // 💣 Nuke detection tracking
+            // 💣 Nuke detection tracking — تنبيه فقط، بدون قفل
             if (this.trackNukeActivity(channel.guild.id, 'channel')) {
-                await this.triggerAutoLockdown(channel.guild, await (0, models_1.getGuildSettings)(channel.guild.id), 'Nuke detected: mass channel creation');
+                const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
+                const alert = await this.getAlertChannel(channel.guild, settings);
+                alert?.send({ content: `🚨 **نكهة جماعية مكتشفة!**\n${entry.executor.tag} أنشأ 3+ قنوات في 10 ثواني\nتم حذف القناة + حظر المنفّذ` }).catch(() => { });
             }
             // تنبيه في الخلفية
             (0, models_1.getGuildSettings)(channel.guild.id).then(s => this.getAlertChannel(channel.guild, s))
@@ -439,9 +439,11 @@ class SecurityHandler {
             role.delete('Security: rapid role create').catch(() => { });
             member?.roles.set([], 'Security: rapid role creation').catch(() => { });
             member?.ban({ reason: 'Security: rapid role creation (anti-nuke)' }).catch(() => { });
-            // 💣 Nuke detection tracking
+            // 💣 Nuke detection tracking — تنبيه فقط، بدون قفل
             if (this.trackNukeActivity(role.guild.id, 'role')) {
-                await this.triggerAutoLockdown(role.guild, await (0, models_1.getGuildSettings)(role.guild.id), 'Nuke detected: mass role creation');
+                const settings = await (0, models_1.getGuildSettings)(role.guild.id);
+                const alert = await this.getAlertChannel(role.guild, settings);
+                alert?.send({ content: `🚨 **نكهة جماعية مكتشفة!**\n${entry.executor.tag} أنشأ 3+ رولات في 10 ثواني\nتم حذف الرول + حظر المنفّذ` }).catch(() => { });
             }
             (0, models_1.getGuildSettings)(role.guild.id).then(s => this.getAlertChannel(role.guild, s))
                 .then(a => a?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ رول!**\nتم الحذف + الحظر` }).catch(() => { }));
@@ -663,9 +665,10 @@ class SecurityHandler {
                     catch { }
                 }
             }
-            // 💣 Nuke detection tracking
+            // 💣 Nuke detection tracking — تنبيه فقط، بدون قفل
             if (this.trackNukeActivity(guild.id, 'webhook')) {
-                await this.triggerAutoLockdown(guild, settings, 'Nuke detected: mass webhook creation');
+                const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
+                alert?.send({ content: `🚨 **نكهة جماعية مكتشفة!**\n${entry.executor.tag} أنشأ 2+ ويب هوك في 10 ثواني\nتم حذف الويب هوك + معاقبة المنفّذ` }).catch(() => { });
             }
             const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
             const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
@@ -848,8 +851,6 @@ class SecurityHandler {
                     logger.warn(`Failed to restore @everyone perms in ${guild.name}: ${e.message}`);
                 }
             }
-            // 2️⃣ تفعيل Auto-Lockdown فوري
-            await this.triggerAutoLockdown(guild, settings, `Anti-@everyone: ${entry.executor.tag} tried to grant dangerous perms`);
             // 3️⃣ العقوبة
             const action = antiNuke.action || 'kick';
             if (action !== 'alert' && member) {
@@ -885,7 +886,6 @@ class SecurityHandler {
             msg += `👤 المنفّذ: ${entry.executor.tag}\n`;
             msg += `📍 القناة: <#${newChannel.id}>\n`;
             msg += `🔄 استرجاع الصلاحيات: ${permsRestored ? '✅ تم' : '❌ فشل'}\n`;
-            msg += `🔒 Auto-Lockdown: ✅ مفعل\n`;
             if (action === 'alert')
                 msg += `🔔 الإجراء: تنبيه فقط`;
             else
@@ -895,67 +895,6 @@ class SecurityHandler {
         }
         catch (error) {
             logger.error(`onChannelPermissionUpdate (@everyone) error: ${error.message}`);
-        }
-    }
-    // --------------------------------------------
-    // PREVENTIVE: AUTO-LOCKDOWN — يقفل كل القنوات عند كشف هجوم
-    // --------------------------------------------
-    async triggerAutoLockdown(guild, settings, reason) {
-        try {
-            const lockdownKey = `lockdown:${guild.id}`;
-            const now = Date.now();
-            const lastLockdown = this.lockdownCooldown?.get(lockdownKey) || 0;
-            // Cooldown 30 ثانية بين كل قفل
-            if (now - lastLockdown < 30000)
-                return;
-            this.lockdownCooldown = this.lockdownCooldown || new Map();
-            this.lockdownCooldown.set(lockdownKey, now);
-            // حفظ حالة القفل في الإعدادات
-            settings.protection = settings.protection || {};
-            settings.protection.lockdown = true;
-            // قفل كل القنوات النصية
-            const me = guild.members.me;
-            if (!me?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels))
-                return;
-            const everyoneRole = guild.roles.everyone;
-            let locked = 0;
-            for (const [, channel] of guild.channels.cache) {
-                if (channel.isTextBased() && !channel.isThread()) {
-                    try {
-                        const perms = {
-                            SendMessages: false,
-                            AddReactions: false,
-                            CreatePublicThreads: false,
-                            CreatePrivateThreads: false,
-                            SendMessagesInThreads: false,
-                        };
-                        await channel.permissionOverwrites.edit(everyoneRole, perms).catch(() => { });
-                        locked++;
-                    }
-                    catch { }
-                }
-            }
-            logger.warn(`🔒 AUTO-LOCKDOWN activated in ${guild.name}: ${locked} channels locked — ${reason}`);
-            // تنبيه في قروم الحماية
-            const antiNuke = settings.protection?.antiNuke;
-            const alert = await this.getAlertChannel(guild, settings, antiNuke?.logChannel);
-            alert?.send({
-                content: `🔴 **AUTO-LOCKDOWN مفعّل!**\n` +
-                    `📋 السبب: ${reason}\n` +
-                    `🔒 قنوات مقفولة: ${locked}\n` +
-                    `⏰ المدة: 30 دقيقة (أو استخدم \`/lockdown off\`)`
-            }).catch(() => { });
-            // إلغاء القفل تلقائياً بعد 30 دقيقة
-            setTimeout(async () => {
-                try {
-                    settings.protection.lockdown = false;
-                    // ملاحظة: الفتح اليدوي أفضل، لكن نضيف خيار auto-unlock في الإعدادات
-                }
-                catch { }
-            }, 30 * 60 * 1000);
-        }
-        catch (error) {
-            logger.error(`triggerAutoLockdown error: ${error.message}`);
         }
     }
     // --------------------------------------------

@@ -38,7 +38,6 @@ export declare class SecurityHandler {
     private kickedQueue;
     private kickedTimers;
     private topWatchdogs;
-    private lockdownCooldown;
     private nukeTracker;
     constructor(client: Client);
     clearGuild(guildId: string): void;
@@ -62,7 +61,6 @@ export declare class SecurityHandler {
     onWebhookUpdate(webhook: any): Promise<void>;
     onGuildMemberUpdate(oldMember: any, newMember: any): Promise<void>;
     onChannelPermissionUpdate(oldChannel: any, newChannel: any): Promise<void>;
-    private triggerAutoLockdown;
     onGuildMemberAdd(member: any): Promise<void>;
     private trackNukeActivity;
     startStickyRoleWatchdog(guild: Guild): void;
