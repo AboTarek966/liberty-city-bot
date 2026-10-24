@@ -11,10 +11,10 @@
   <div class="d-flex gap-2 flex-wrap">
     <input type="text" class="form-control form-control-sm" style="width: 250px;" id="memberSearch" placeholder="بحث بالاسم/الايدي/النيكنيم..." oninput="filterMembers()">
     <select class="form-select form-select-sm" style="width: auto;" id="roleFilter" onchange="filterMembers()">
-      <option value="">جميع الرولات</option>
-      <% if (guild) { const g = client.guilds.cache.get(guild.id); if (g) { g.roles.cache.filter(r => r.id !== g.id).sort((a,b) => b.position - a.position).forEach(r => { %>
-      <option value="<%= r.id %>"><%= r.name %></option>
-      <% }) } } %>
+      <option value="">جميع الأعضاء</option>
+      <option value="admin">إداريون</option>
+      <option value="bot">بوتات</option>
+      <option value="human">أشخاص</option>
     </select>
     <select class="form-select form-select-sm" style="width: auto;" id="presenceFilter" onchange="filterMembers()">
       <option value="">جميع الحالات</option>

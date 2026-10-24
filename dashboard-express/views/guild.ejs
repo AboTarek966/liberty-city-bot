@@ -1,195 +1,152 @@
-﻿<%- include('layout-top', { title: guild?.name || 'السيرفر', activePage: null }) %>
+﻿<%- include('layout-top', { title: 'نظرة عامة', activePage: 'guild' }) %>
 
 <div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
   <div>
-    <h1 class="h3 fw-bold mb-1">
-      <% if (guild.icon) { %>
-        <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" class="guild-avatar me-2">
-      <% } else { %>
-        <div class="d-inline-flex align-items-center justify-content-center guild-avatar me-2" style="background: linear-gradient(135deg, var(--primary), #a855f7);">
-          <i class="bi bi-bot text-white fs-3"></i>
-        </div>
-      <% } %>
-      <%= guild.name %>
-      <% if (guild.owner) { %><span class="guild-badge ms-2">المالك</span><% } %>
-    </h1>
-    <p class="text-muted mb-0">إدارة إعدادات الحماية، التذاكر، الذكاء الاصطناعي، والأعضاء</p>
+    <h1><i class="bi bi-grid-1x2"></i> <%= guild.name %></h1>
+    <p>نظرة عامة على السيرفر والبوت — آخر تحديث الآن</p>
   </div>
-  <div class="d-flex gap-2 flex-wrap mt-3 mt-md-0">
-    <span class="badge bg-primary fs-6 px-3 py-2"><%= stats?.memberCount || 0 %> عضو</span>
-    <span class="badge bg-info fs-6 px-3 py-2"><%= stats?.channelCount || 0 %> قناة</span>
-    <span class="badge bg-warning fs-6 px-3 py-2"><%= stats?.roleCount || 0 %> رول</span>
+  <div class="btn-group">
+    <a href="/dashboard/<%= guild.id %>/settings" class="btn btn-outline-secondary"><i class="bi bi-gear"></i> الإعدادات</a>
+    <button class="btn btn-primary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> تحديث</button>
   </div>
 </div>
 
-<div class="row g-4 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="card stat-card h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <p class="text-muted small mb-1">إجمالي الأعضاء</p>
-            <h2 class="fw-bold mb-0"><%= stats?.memberCount || 0 %></h2>
-          </div>
-          <div class="stat-icon bg-primary bg-opacity-20 text-primary">
-            <i class="bi bi-people fs-3"></i>
-          </div>
-        </div>
-      </div>
+<!-- Stats -->
+<div class="grid-4 mb-4">
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-people"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">الأعضاء</div>
+      <div class="stat-value"><%= (stats?.memberCount || 0).toLocaleString('en-US') %></div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card stat-card h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <p class="text-muted small mb-1">قنوات</p>
-            <h2 class="fw-bold mb-0"><%= stats?.channelCount || 0 %></h2>
-          </div>
-          <div class="stat-icon bg-info bg-opacity-20 text-info">
-            <i class="bi bi-hash fs-3"></i>
-          </div>
-        </div>
-      </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-hash"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">القنوات</div>
+      <div class="stat-value"><%= stats?.channelCount || 0 %></div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card stat-card h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <p class="text-muted small mb-1">أدوار</p>
-            <h2 class="fw-bold mb-0"><%= stats?.roleCount || 0 %></h2>
-          </div>
-          <div class="stat-icon bg-warning bg-opacity-20 text-warning">
-            <i class="bi bi-shield fs-3"></i>
-          </div>
-        </div>
-      </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-person-badge"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">الرولات</div>
+      <div class="stat-value"><%= stats?.roleCount || 0 %></div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card stat-card h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <p class="text-muted small mb-1">سيرفرات البوت</p>
-            <h2 class="fw-bold mb-0"><%= botStats?.totalGuilds || 0 %></h2>
-          </div>
-          <div class="stat-icon bg-success bg-opacity-20 text-success">
-            <i class="bi bi-globe fs-3"></i>
-          </div>
-        </div>
-      </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);"><i class="bi bi-ticket-perforated"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">تذاكر مفتوحة</div>
+      <div class="stat-value"><%= Array.isArray(tickets) ? tickets.filter(t => t.status === 'open').length : 0 %></div>
     </div>
   </div>
+</div>
+
+<!-- Quick actions -->
+<div class="grid-3 mb-4">
+  <a href="/dashboard/<%= guild.id %>/protection" class="guild-card text-decoration-none">
+    <div class="cat-icon" style="background:var(--danger-bg);color:var(--danger);"><i class="bi bi-shield-check" style="font-size:20px;"></i></div>
+    <div class="guild-title">الحماية</div>
+    <div class="guild-meta">Anti-Raid، Anti-Spam، فلتر الروابط، حماية الرولات والقنوات</div>
+    <span class="badge <%= settings?.protection?.antiRaid?.enabled || settings?.protection?.antiSpam?.enabled ? 'bg-success' : 'bg-secondary' %>">
+      <%= settings?.protection?.antiRaid?.enabled || settings?.protection?.antiSpam?.enabled ? 'مفعّلة' : 'معطّلة' %>
+    </span>
+  </a>
+  <a href="/dashboard/<%= guild.id %>/ai" class="guild-card text-decoration-none">
+    <div class="cat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-robot" style="font-size:20px;"></i></div>
+    <div class="guild-title">الذكاء الاصطناعي</div>
+    <div class="guild-meta">أوتومود بالـ AI، مساعد التذاكر، المترجم، الردود الذكية</div>
+    <span class="badge <%= settings?.protection?.aiModerator?.enabled ? 'bg-success' : 'bg-secondary' %>">
+      <%= settings?.protection?.aiModerator?.enabled ? 'مفعّل' : 'معطّل' %>
+    </span>
+  </a>
+  <a href="/dashboard/<%= guild.id %>/welcome" class="guild-card text-decoration-none">
+    <div class="cat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-door-open" style="font-size:20px;"></i></div>
+    <div class="guild-title">الترحيب</div>
+    <div class="guild-meta">رسائل ترحيب ومغادرة مع بطاقة مرّسومة وDM</div>
+    <span class="badge <%= settings?.welcome?.enabled ? 'bg-success' : 'bg-secondary' %>">
+      <%= settings?.welcome?.enabled ? 'مفعّل' : 'معطّل' %>
+    </span>
+  </a>
 </div>
 
 <div class="row g-4">
-  <div class="col-lg-8">
+  <!-- Status of systems -->
+  <div class="col-12 col-lg-7">
     <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">إجراءات سريعة</h5>
+      <div class="card-header">
+        <h5><i class="bi bi-list-check"></i> حالة الأنظمة</h5>
       </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-6 col-md-4">
-            <a href="/dashboard/<%= guild.id %>/protection" class="card text-decoration-none h-100 text-center p-4">
-              <div class="stat-icon bg-primary bg-opacity-20 text-primary mx-auto mb-3">
-                <i class="bi bi-shield-lock fs-2"></i>
-              </div>
-              <h6 class="fw-bold">الحماية</h6>
-              <p class="text-muted small mb-0">Anti-Raid، Anti-Spam، Anti-Nuke، وغيرها</p>
-            </a>
+      <div class="card-body p-0">
+        <%
+          const systems = [
+            { name: 'نظام التذاكر', icon: 'ticket-perforated', on: settings?.tickets?.enabled !== false, page: 'tickets' },
+            { name: 'الترحيب والمغادرة', icon: 'door-open', on: !!settings?.welcome?.enabled, page: 'welcome' },
+            { name: 'المستويات والخبرة', icon: 'graph-up', on: settings?.leveling?.enabled !== false, page: 'settings' },
+            { name: 'الاقتصاد', icon: 'coin', on: settings?.economy?.enabled !== false, page: 'economy' },
+            { name: 'أوتومود', icon: 'shield', on: settings?.automod?.enabled !== false, page: 'settings' },
+            { name: 'التوثيق', icon: 'patch-check', on: !!settings?.verification?.enabled, page: 'settings' },
+            { name: 'السجلات', icon: 'journal-text', on: settings?.logging?.enabled !== false, page: 'logs' },
+            { name: 'الرول التلقائي', icon: 'person-plus', on: !!settings?.autorole?.enabled, page: 'settings' },
+          ];
+        %>
+        <% systems.forEach(s => { %>
+        <div class="switch-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+          <div class="switch-info d-flex align-items-center gap-3">
+            <div class="cat-icon" style="background:<%= s.on ? 'var(--success-bg)' : 'rgba(90,101,133,0.12)' %>;color:<%= s.on ? 'var(--success)' : 'var(--text-muted)' %>;">
+              <i class="bi bi-<%= s.icon %>"></i>
+            </div>
+            <div>
+              <h6><%= s.name %></h6>
+              <p><%= s.on ? 'مفعّل ويعمل' : 'معطّل' %></p>
+            </div>
           </div>
-          <div class="col-6 col-md-4">
-            <a href="/dashboard/<%= guild.id %>/ai" class="card text-decoration-none h-100 text-center p-4">
-              <div class="stat-icon bg-purple bg-opacity-20 text-purple mx-auto mb-3">
-                <i class="bi bi-robot fs-2"></i>
-              </div>
-              <h6 class="fw-bold">الذكاء الاصطناعي</h6>
-              <p class="text-muted small mb-0">Auto-Mod، Ticket Assistant، Translator</p>
-            </a>
-          </div>
-          <div class="col-6 col-md-4">
-            <a href="/dashboard/<%= guild.id %>/tickets" class="card text-decoration-none h-100 text-center p-4">
-              <div class="stat-icon bg-info bg-opacity-20 text-info mx-auto mb-3">
-                <i class="bi bi-ticket-perforated fs-2"></i>
-              </div>
-              <h6 class="fw-bold">التذاكر</h6>
-              <p class="text-muted small mb-0">نظام الدعم الفني</p>
-            </a>
-          </div>
-          <div class="col-6 col-md-4">
-            <a href="/dashboard/<%= guild.id %>/members" class="card text-decoration-none h-100 text-center p-4">
-              <div class="stat-icon bg-success bg-opacity-20 text-success mx-auto mb-3">
-                <i class="bi bi-people fs-2"></i>
-              </div>
-              <h6 class="fw-bold">الأعضاء</h6>
-              <p class="text-muted small mb-0">إدارة الأعضاء والأدوار</p>
-            </a>
-          </div>
-          <div class="col-6 col-md-4">
-            <a href="/dashboard/<%= guild.id %>/settings" class="card text-decoration-none h-100 text-center p-4">
-              <div class="stat-icon bg-warning bg-opacity-20 text-warning mx-auto mb-3">
-                <i class="bi bi-gear fs-2"></i>
-              </div>
-              <h6 class="fw-bold">الإعدادات</h6>
-              <p class="text-muted small mb-0">عام، الترحيب، الاقتصاد، الأوامر</p>
-            </a>
-          </div>
-          <div class="col-6 col-md-4">
-            <a href="/dashboard/<%= guild.id %>/logs" class="card text-decoration-none h-100 text-center p-4">
-              <div class="stat-icon bg-secondary bg-opacity-20 text-secondary mx-auto mb-3">
-                <i class="bi bi-file-text fs-2"></i>
-              </div>
-              <h6 class="fw-bold">السجلات</h6>
-              <p class="text-muted small mb-0">سجلات التدقيق والرسائل</p>
-            </a>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge <%= s.on ? 'bg-success' : 'bg-secondary' %>"><%= s.on ? '● يعمل' : '○ متوقف' %></span>
+            <a href="/dashboard/<%= guild.id %>/<%= s.page %>" class="btn btn-outline-secondary btn-sm">إعدادات</a>
           </div>
         </div>
+        <% }) %>
       </div>
     </div>
   </div>
-  
-  <div class="col-lg-4">
+
+  <!-- Recent activity -->
+  <div class="col-12 col-lg-5">
     <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">معلومات السيرفر</h5>
+      <div class="card-header">
+        <h5><i class="bi bi-clock-history"></i> آخر الأنشطة</h5>
+        <a href="/dashboard/<%= guild.id %>/logs" class="btn btn-outline-secondary btn-sm">الكل</a>
       </div>
-      <div class="card-body">
-        <div class="mb-3">
-          <label class="form-label text-muted small">معرف السيرفر</label>
-          <div class="input-group">
-            <input type="text" class="form-control form-control-sm font-monospace" value="<%= guild.id %>" readonly>
-            <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('<%= guild.id %>')">
-              <i class="bi bi-clipboard"></i>
-            </button>
+      <div class="card-body p-0">
+        <%
+          const recentLogs = (logs && logs.logs) ? logs.logs.slice(0, 8) : (Array.isArray(logs) ? logs.slice(0, 8) : []);
+        %>
+        <% if (recentLogs.length === 0) { %>
+          <div class="empty-state" style="padding:40px 20px;">
+            <i class="bi bi-inbox"></i>
+            <h5>لا توجد أنشطة</h5>
+            <p>ستظهر هنا إجراءات الإشراف الأخيرة (تحذيرات، طرود، حظر...)</p>
           </div>
-        </div>
-        <div class="row g-3 text-center">
-          <div class="col-6">
-            <div class="p-3 bg-dark rounded">
-              <div class="fw-bold fs-4"><%= stats?.memberCount || 0 %></div>
-              <small class="text-muted">إجمالي الأعضاء</small>
+        <% } else { %>
+          <% recentLogs.forEach(l => { %>
+          <div class="switch-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
+            <div class="switch-info d-flex align-items-center gap-3">
+              <div class="cat-icon" style="background:var(--info-bg);color:var(--info);">
+                <i class="bi bi-<%= l.type === 'ban' ? 'x-circle' : l.type === 'kick' ? 'door-open' : l.type === 'warn' ? 'exclamation-triangle' : 'shield' %>"></i>
+              </div>
+              <div>
+                <h6 style="font-size:13px;">
+                  <%= l.type === 'ban' ? 'حظر' : l.type === 'kick' ? 'طرد' : l.type === 'warn' ? 'تحذير' : l.type %>
+                </h6>
+                <p style="font-size:11.5px;"><code><%= l.targetId %></code> — <%= l.reason || 'بدون سبب' %></p>
+              </div>
             </div>
+            <small class="text-muted"><%= l.createdAt ? new Date(l.createdAt).toLocaleDateString('ar-SA') : '' %></small>
           </div>
-          <div class="col-6">
-            <div class="p-3 bg-dark rounded">
-              <div class="fw-bold fs-4"><%= stats?.onlineCount || 0 %></div>
-              <small class="text-muted">متصلين الآن</small>
-            </div>
-          </div>
-        </div>
-        <hr>
-        <div class="d-grid gap-2">
-          <a href="https://discord.com/oauth2/authorize?client_id=<%= clientId %>&permissions=8&scope=bot&guild_id=<%= guild.id %>" target="_blank" class="btn btn-outline">
-            <i class="bi bi-plus-circle me-2"></i> دعوة البوت لسيرفر آخر
-          </a>
-          <a href="https://discord.gg/your-invite" target="_blank" class="btn btn-outline">
-            <i class="bi bi-discord me-2"></i> سيرفر الدعم
-          </a>
-        </div>
+          <% }) %>
+        <% } %>
       </div>
     </div>
   </div>

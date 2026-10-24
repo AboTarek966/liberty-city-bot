@@ -1,6 +1,7 @@
 require('dotenv').config();
-const express = require('express');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const express = require('express');
 const session = require('express-session');
 const fetch = require('node-fetch');
 
@@ -11,6 +12,80 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${PORT}/auth/callback`;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'liberty-city-dashboard-secret';
+
+// ===== MongoDB direct access (fallback when bot API is offline) =====
+let dbReady = false;
+(async () => {
+  try {
+    const mongoose = require('mongoose');
+    const uri = process.env.MONGODB_URI;
+    if (uri) {
+      await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
+      dbReady = true;
+      console.log('🗄️  MongoDB connected (direct settings access)');
+    }
+  } catch (err) {
+    console.warn('⚠️  MongoDB not reachable — falling back to bot API only');
+  }
+})();
+
+// Get settings: bot API first, MongoDB fallback
+async function getSettings(guildId) {
+  try {
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/settings`, { timeout: 4000 });
+    if (r.ok) return await r.json();
+  } catch {}
+  if (dbReady) {
+    try {
+      const { getGuildSettings } = require(path.join(__dirname, '..', 'dist', 'models'));
+      const s = await getGuildSettings(guildId);
+      return s ? JSON.parse(JSON.stringify(s)) : {};
+    } catch (err) {
+      console.warn('Settings fallback failed:', err.message);
+    }
+  }
+  return {};
+}
+
+// Save settings: bot API first, MongoDB fallback
+async function saveSettings(guildId, update) {
+  try {
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+      timeout: 5000
+    });
+    if (r.ok) return { ok: true, data: await r.json() };
+  } catch {}
+  if (dbReady) {
+    try {
+      const { getGuildSettings, invalidateGuildSettings } = require(path.join(__dirname, '..', 'dist', 'models'));
+      const s = await getGuildSettings(guildId);
+      Object.keys(update).forEach(k => {
+        if (k.startsWith('$')) return;
+        const v = update[k];
+        if (v && typeof v === 'object' && !Array.isArray(v) && s[k] && typeof s[k] === 'object' && !Array.isArray(s[k])) {
+          Object.assign(s[k], v);
+        } else {
+          s[k] = v;
+        }
+      });
+      if (update.$push) for (const [k, v] of Object.entries(update.$push)) { if (!Array.isArray(s[k])) s[k] = []; s[k].push(v); }
+      if (update.$pull) for (const [k, cond] of Object.entries(update.$pull)) {
+        if (!Array.isArray(s[k])) continue;
+        s[k] = s[k].filter(item => !Object.keys(cond).every(c => item[c] === cond[c]));
+      }
+      await s.save();
+      if (typeof invalidateGuildSettings === 'function') invalidateGuildSettings(guildId);
+      return { ok: true, data: JSON.parse(JSON.stringify(s)) };
+    } catch (err) {
+      console.warn('Settings save fallback failed:', err.message);
+      return { ok: false, error: err.message };
+    }
+  }
+  return { ok: false, error: 'Bot offline and database unavailable' };
+}
 
 if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
   console.warn('⚠️ DISCORD_CLIENT_ID/SECRET not set - OAuth will not work');
@@ -153,6 +228,36 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
+// Dev login: allows local testing without Discord OAuth (enabled only in development)
+app.get('/auth/dev', async (req, res) => {
+  if (process.env.NODE_ENV !== 'development' && process.env.DEV_LOGIN !== '1') {
+    return res.status(404).send('Not found');
+  }
+  try {
+    const user = { id: 'dev-user', username: 'Ahmad', discriminator: '0000', avatar: null };
+    let guilds = [];
+    try {
+      const r = await fetch('https://discord.com/api/v10/guilds', {
+        headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
+      });
+      if (r.ok) {
+        const raw = await r.json();
+        guilds = raw.map(g => ({ id: g.id, name: g.name, icon: g.icon, owner: false }));
+      }
+    } catch {}
+    if (guilds.length === 0) {
+      guilds = [{ id: '1481739211143909499', name: 'Liberty City', icon: null, owner: true }];
+    }
+    req.session.accessToken = 'dev';
+    req.session.user = user;
+    req.session.guilds = guilds;
+    req.session.selectedGuild = guilds[0]?.id || null;
+    res.redirect('/dashboard');
+  } catch (err) {
+    res.redirect('/?error=dev_failed');
+  }
+});
+
 app.get('/dashboard', requireAuth, async (req, res) => {
   try {
     // Fetch bot stats
@@ -169,88 +274,46 @@ app.get('/dashboard', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/dashboard/:guildId', requireAuth, async (req, res) => {
-  const { guildId } = req.params;
-  const guild = req.session.guilds.find(g => g.id === guildId);
-  if (!guild) return res.redirect('/dashboard');
-  
-  req.session.selectedGuild = guildId;
-  
-  // Fetch guild settings
-  let settings = {};
-  try {
-    const res = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/settings`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
-    if (res.ok) settings = await res.json();
-  } catch {}
-  
-  // Fetch guild stats
-  let stats = { memberCount: 0, channelCount: 0, roleCount: 0 };
-  try {
-    const res = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/stats`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
-    if (res.ok) stats = await res.json();
-  } catch {}
-  
-  res.render('guild', { guild, settings, stats, activePage: null });
-});
+app.get('/dashboard/:guildId', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'guild'));
 
 // Helper: fetch settings/stats for guild sub-pages
 async function guildPageData(req, res, guildId, page) {
   const guild = req.session.guilds.find(g => g.id === guildId);
   if (!guild) return res.redirect('/dashboard');
   req.session.selectedGuild = guildId;
-  
-  let settings = {};
-  try {
-    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/settings`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
-    if (r.ok) settings = await r.json();
-  } catch {}
-  
+
+  let settings = await getSettings(guildId);
+
   let stats = {};
   try {
-    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/stats`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/stats`, { timeout: 4000 });
     if (r.ok) stats = await r.json();
   } catch {}
-  
+
   let tickets = [];
   try {
-    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/tickets`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/tickets`, { timeout: 4000 });
     if (r.ok) tickets = await r.json();
   } catch {}
-  
+
   let members = [];
   try {
-    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/members`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/members`, { timeout: 4000 });
     if (r.ok) members = await r.json();
   } catch {}
-  
-  let logs = [];
+
+  let logs = { logs: [], page: 1, pages: 1 };
   try {
-    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/logs`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/logs`, { timeout: 4000 });
     if (r.ok) logs = await r.json();
   } catch {}
-  
-  let economy = {};
+
+  let economy = [];
   try {
-    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/economy`, {
-      headers: { Authorization: `Bearer ${req.session.accessToken}` }
-    });
+    const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/economy`, { timeout: 4000 });
     if (r.ok) economy = await r.json();
   } catch {}
-  
+
   res.render(page, { guild, settings, stats, tickets, members, logs, economy, activePage: page });
 }
 
@@ -267,7 +330,7 @@ app.post('/api/guilds/:guildId/settings', requireAuth, async (req, res) => {
   const { guildId } = req.params;
   const guild = req.session.guilds.find(g => g.id === guildId);
   if (!guild) return res.status(403).json({ error: 'No access' });
-  
+
   try {
     // Handle special push/pull operations for arrays
     const body = { ...req.body };
@@ -275,19 +338,10 @@ app.post('/api/guilds/:guildId/settings', requireAuth, async (req, res) => {
     if (body._pullCmd) { body.$pull = { customCommands: { name: body._pullCmd } }; delete body._pullCmd; }
     if (body._pushTag) { body.$push = { ...(body.$push||{}), tags: body._pushTag }; delete body._pushTag; }
     if (body._pullTag) { body.$pull = { ...(body.$pull||{}), tags: { name: body._pullTag } }; delete body._pullTag; }
-    
-    const res2 = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/settings`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${req.session.accessToken}`
-      },
-      body: JSON.stringify(body)
-    });
-    if (res2.ok) {
-      return res.json(await res2.json());
-    }
-    return res.status(500).json({ error: 'Failed to update' });
+
+    const result = await saveSettings(guildId, body);
+    if (result.ok) return res.json(result.data || { success: true });
+    return res.status(500).json({ error: result.error || 'Failed to update' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

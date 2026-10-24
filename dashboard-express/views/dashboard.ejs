@@ -1,111 +1,92 @@
-<%- include('layout-top', { title: 'السيرفرات', activePage: 'dashboard' }) %>
+<%- include('layout-top', { title: 'سيرفراتي', activePage: 'dashboard' }) %>
 
-<div class="container-fluid px-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0"><i class="bi bi-server me-2"></i>السيرفرات</h1>
-    <a href="https://discord.com/oauth2/authorize?client_id=<%= clientId %>&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn btn-primary">
-      <i class="bi bi-plus-circle me-1"></i> إضافة البوت لسيرفر جديد
-    </a>
-  </div>
+<div class="page-header">
+  <h1><i class="bi bi-server"></i> سيرفراتي</h1>
+  <p>اختر السيرفر الذي تريد إدارته — <%= guilds.length %> سيرفر متاح</p>
+</div>
 
-  <div class="row mb-4">
-    <div class="col-md-6">
-      <div class="card stat-card">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="stat-icon bg-primary bg-opacity-25 text-primary me-3">
-              <i class="bi bi-server" style="font-size: 1.5rem;"></i>
-            </div>
-            <div>
-              <div class="text-muted small">إجمالي السيرفرات</div>
-              <div class="fw-bold fs-4 text-white"><%= botStats.totalGuilds || guilds.length %></div>
-            </div>
-          </div>
-        </div>
-      </div>
+<% if (!botStats || !botStats.totalGuilds) { %>
+<div class="alert alert-warning mb-4">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>ملاحظة:</strong> البوت غير متصل حالياً — قد لا تُعرض بعض البيانات الحيّة. الإعدادات المحفوظة ستظل متاحة.
+</div>
+<% } %>
+
+<!-- Bot status cards -->
+<div class="grid-3 mb-4">
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-hdd-rack"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">سيرفرات البوت</div>
+      <div class="stat-value"><%= botStats?.totalGuilds || guilds.length %></div>
     </div>
-    <div class="col-md-6">
-      <div class="card stat-card">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="stat-icon bg-success bg-opacity-25 text-success me-3">
-              <i class="bi bi-people" style="font-size: 1.5rem;"></i>
-            </div>
-            <div>
-              <div class="text-muted small">إجمالي الأعضاء</div>
-              <div class="fw-bold fs-4 text-white"><%= botStats.totalUsers || '—' %></div>
-            </div>
-          </div>
-        </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-people"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">إجمالي الأعضاء</div>
+      <div class="stat-value"><%= (botStats?.totalUsers || 0).toLocaleString('en-US') %></div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-activity"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">حالة الاتصال</div>
+      <div class="stat-value" style="font-size:18px;color:<%= botStats?.totalGuilds ? 'var(--success)' : 'var(--warning)' %>;">
+        <%= botStats?.totalGuilds ? 'متصل ●' : 'غير متصل ○' %>
       </div>
     </div>
   </div>
+</div>
 
-  <% if (guilds.length === 0) { %>
-    <div class="card">
-      <div class="card-body text-center py-5">
-        <i class="bi bi-server text-muted" style="font-size: 3rem;"></i>
-        <h4 class="mt-3">لا توجد سيرفرات</h4>
-        <p class="text-muted">أنت لا تملك صلاحيات إدارة في أي سيرفر يوجد فيه البوت.</p>
-        <a href="https://discord.com/oauth2/authorize?client_id=<%= clientId %>&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn btn-primary mt-2">
-          <i class="bi bi-plus-circle me-1"></i> أضف البوت لسيرفر
-        </a>
+<div class="card">
+  <div class="card-header">
+    <h5><i class="bi bi-grid-3x3-gap"></i> السيرفرات التي تملك فيها صلاحية الإدارة</h5>
+    <a href="/auth/discord" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-repeat"></i> تحديث القائمة</a>
+  </div>
+  <div class="card-body">
+    <% if (guilds.length === 0) { %>
+      <div class="empty-state">
+        <i class="bi bi-emoji-frown"></i>
+        <h5>لا توجد سيرفرات</h5>
+        <p>لم نعثر على أي سيرفر تملك فيه صلاحية الإدارة. تأكد أنك مدير في السيرفر.</p>
       </div>
-    </div>
-  <% } else { %>
-    <div class="row">
-      <% guilds.forEach(g => { %>
-        <div class="col-xl-4 col-lg-6 col-md-12 mb-3">
-          <div class="card card-hover h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center mb-3">
-                <% if (g.icon) { %>
-                  <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png?size=128" 
-                       alt="<%= g.name %>" class="avatar me-3" style="width: 60px; height: 60px;">
-                <% } else { %>
-                  <div class="avatar me-3 bg-primary bg-opacity-25" style="width: 60px; height: 60px;">
-                    <i class="bi bi-server text-primary" style="font-size: 1.5rem;"></i>
-                  </div>
-                <% } %>
-                <div class="flex-grow-1 min-w-0">
-                  <h5 class="mb-1 text-truncate"><%= g.name %></h5>
-                  <small class="text-muted">ID: <%= g.id %></small>
-                </div>
-                <% if (g.owner) { %>
-                  <span class="badge bg-warning text-dark"><i class="bi bi-crown me-1"></i>مالك</span>
-                <% } %>
-              </div>
-              <div class="d-flex gap-2">
-                <a href="/dashboard/<%= g.id %>" class="btn btn-primary flex-grow-1">
-                  <i class="bi bi-gear me-1"></i> لوحة التحكم
-                </a>
-                <button class="btn btn-outline-danger" onclick="leaveGuild('<%= g.id %>', '<%= g.name %>')">
-                  <i class="bi bi-x-circle"></i>
-                </button>
-              </div>
+    <% } else { %>
+      <div class="grid-3">
+        <% guilds.forEach(g => { %>
+        <div class="guild-card">
+          <% if (g.icon) { %>
+            <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png?size=128" alt="" onerror="this.style.display='none'">
+          <% } else { %>
+            <div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;font-size:26px;"><%= g.name.charAt(0) %></div>
+          <% } %>
+          <div>
+            <div class="guild-title"><%= g.name %></div>
+            <div class="guild-meta">
+              <% if (g.owner) { %><span class="badge bg-warning me-1">👑 مالك</span><% } %>
+              <code style="font-size:11px;"><%= g.id %></code>
             </div>
           </div>
+          <div class="guild-actions">
+            <a href="/dashboard/<%= g.id %>" class="manage-btn text-decoration-none">إدارة</a>
+            <button class="leave-btn" onclick="leaveGuild('<%= g.id %>', '<%= g.name %>')">مغادرة</button>
+          </div>
         </div>
-      <% }) %>
-    </div>
-  <% } %>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
 </div>
 
 <script>
-  function leaveGuild(guildId, guildName) {
-    if (confirm(`هل تريد مغادرة البوت لسيرفر "${guildName}"؟`)) {
-      fetch('/api/guilds/' + guildId + '/leave', { method: 'POST', credentials: 'include' })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            showToast('تم مغادرة السيرفر', 'success');
-            setTimeout(() => location.reload(), 1000);
-          } else {
-            showToast(data.error || 'فشل المغادرة', 'danger');
-          }
-        })
-        .catch(() => showToast('حدث خطأ', 'danger'));
-    }
-  }
+async function leaveGuild(id, name) {
+  if (!confirm(`هل أنت متأكد من إخراج البوت من "${name}"؟`)) return;
+  try {
+    const res = await fetch('/api/guilds/' + id + '/leave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    if (res.ok) { showToast('تمت المغادرة ✅', 'success'); setTimeout(() => location.reload(), 1200); }
+    else { const d = await res.json().catch(()=>({})); showToast(d.error || 'فشلت العملية — تأكد أن البوت متصل', 'danger'); }
+  } catch (e) { showToast('البوت غير متصل حالياً', 'danger'); }
+}
 </script>
+
 <%- include('layout-bottom') %>

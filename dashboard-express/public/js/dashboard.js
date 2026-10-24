@@ -72,32 +72,53 @@ function serializeForm(form) {
 
 // Toast notifications
 function showToast(message, type = 'info') {
-  const toastContainer = document.getElementById('toast-container') || createToastContainer();
+  let toastContainer = document.getElementById('toastContainer');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toastContainer';
+    toastContainer.className = 'toast-container';
+    document.body.appendChild(toastContainer);
+  }
+  const icons = { success: 'check-circle-fill', danger: 'x-circle-fill', warning: 'exclamation-triangle-fill', info: 'info-circle-fill' };
   const toast = document.createElement('div');
-  toast.className = `toast align-items-center text-white bg-${type} border-0`;
+  toast.className = `toast toast-${type}`;
   toast.setAttribute('role', 'alert');
-  toast.setAttribute('aria-live', 'assertive');
-  toast.setAttribute('aria-atomic', 'true');
+  toast.style.cssText = 'background:var(--bg-secondary,#1a2035);color:#f0f4ff;display:flex;align-items:center;gap:10px;padding:14px 18px;min-width:280px;';
   toast.innerHTML = `
-    <div class="d-flex">
-      <div class="toast-body">${message}</div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>
+    <i class="bi bi-${icons[type] || icons.info}" style="font-size:18px;"></i>
+    <span style="flex:1;font-size:14px;font-weight:500;">${message}</span>
+    <button type="button" class="btn-close" data-bs-dismiss="toast" style="filter:invert(1);opacity:.5;"></button>
   `;
   toastContainer.appendChild(toast);
-  const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+  const bsToast = new bootstrap.Toast(toast, { delay: 3500 });
   bsToast.show();
   toast.addEventListener('hidden.bs.toast', () => toast.remove());
 }
 
-function createToastContainer() {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-  container.style.zIndex = '9999';
-  document.body.appendChild(container);
-  return container;
+// Save button helper with loading state
+async function saveWith(btn, url, payload) {
+  if (btn) {
+    btn.disabled = true;
+    btn.dataset.oldHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الحفظ...';
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) { showToast('تم الحفظ بنجاح ✅', 'success'); return true; }
+    showToast('فشل الحفظ ❌', 'danger');
+    return false;
+  } catch (e) {
+    showToast('خطأ في الاتصال', 'danger');
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.oldHtml; }
+  }
 }
+window.saveWith = saveWith;
 
 // Confirm dialog
 function confirmAction(message, callback) {
