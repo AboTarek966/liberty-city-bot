@@ -1549,7 +1549,6 @@ class SecurityHandler {
             if (!newRole.guild)
                 return;
             // 🚨 أخطر هجوم صامت: خفض رتبة البوت — يعطّل كل الحماية دفعة واحدة
-            //    (مضاد النيوك + الاستعادة التلقائية + العقوبات تفشل فجأة بلا سبب ظاهر)
             const me = newRole.guild.members.me;
             if (me &&
                 me.roles.cache.has(newRole.id) &&
@@ -1561,31 +1560,73 @@ class SecurityHandler {
                 newRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
             if (!gainedAdmin)
                 return;
-            const settings = await (0, models_1.getGuildSettings)(newRole.guild.id);
+            const guild = newRole.guild;
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
             const cfg = settings.protection?.antiAdmin;
             if (!cfg?.enabled)
                 return;
-            const isEveryone = newRole.id === newRole.guild.id;
-            const executor = await this.findExecutor(newRole.guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id);
-            // 🛡️ تنبيه فقط — لا نعاقب/نطرد المنفّذ حتى لو كان admin streiter
-            const actionText = '📢 تم الإشعار فقط';
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle(`⚠️ منح صلاحية Administrator${isEveryone ? ' لـ @everyone' : ''}!`)
-                .setDescription(isEveryone
-                ? '**تغيير خطير:** مُنحت صلاحية Administrator لـ @everyone — أي عضو يصبح يملك تحكماً كاملاً في السيرفر!'
-                : `مُنحت صلاحية Administrator للرول ${newRole}`)
-                .setColor(embeds_1.Colors.error)
-                .addFields({ name: 'المنفّذ', value: executor ? `${executor} (\`${executor.tag}\`)` : 'غير معروف', inline: true }, { name: 'الإجراء', value: actionText, inline: true }, {
-                name: '🔔 التوصية',
-                value: 'راجع الصلاحيات فوراً — إن لم تكن أنت من فعلها، احذف الصلاحية واستخدم `/backup restore` للرولات',
-                inline: false,
-            })
-                .setFooter({ text: 'Liberty City Anti-Admin' })
-                .setTimestamp();
-            const channel = await this.getAlertChannel(newRole.guild, settings, cfg.logChannel);
-            if (channel)
-                await channel.send({ embeds: [embed] }).catch(() => { });
-            logger.warn(`⚠️ Anti-Admin: Administrator granted to ${isEveryone ? '@everyone' : newRole.name} in ${newRole.guild.name} | ${actionText}`);
+            const isEveryone = newRole.id === guild.id;
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id);
+            if (!executor)
+                return;
+            if (executor.id === this.client.user?.id)
+                return;
+            if (await this.isTrustedExecutor(guild, executor.id))
+                return; // 👑 موثوق
+            const executorMember = guild.members.cache.get(executor.id);
+            if (!executorMember)
+                return;
+            // 🛡️ فحص التسلسل الهرمي
+            const hierarchy = this.checkHierarchy(guild);
+            if (!hierarchy.ok) {
+                const alert = await this.getAlertChannel(guild, settings, cfg.logChannel);
+                alert?.send({ content: `⚠️ **فشل Anti-Admin** — البوت ليس أعلى رتبة! لا يمكن استرجاع Administrator من ${isEveryone ? '@everyone' : newRole.name}. اسحب رول البوت للأعلى.` }).catch(() => { });
+                return;
+            }
+            const botMember = guild.members.me;
+            const canManageRoles = botMember?.permissions.has(discord_js_1.PermissionFlagsBits.ManageRoles) ?? false;
+            const canKick = botMember?.permissions.has(discord_js_1.PermissionFlagsBits.KickMembers) ?? false;
+            const action = cfg.action || 'alert'; // 'alert' | 'kick'
+            let permRevoked = false;
+            let punished = false;
+            let punishType = 'none';
+            // 1️⃣ استرجاع صلاحية Administrator فوراً
+            if (canManageRoles) {
+                try {
+                    const perms = newRole.permissions;
+                    perms.remove(discord_js_1.PermissionFlagsBits.Administrator);
+                    await newRole.setPermissions(perms, 'Security: Administrator revoked (anti-admin)');
+                    permRevoked = true;
+                }
+                catch (e) {
+                    logger.warn(`Failed to revoke Administrator in ${guild.name}: ${e.message}`);
+                }
+            }
+            // 2️⃣ العقوبة حسب الإعداد
+            if (action === 'kick' && canKick && executorMember) {
+                try {
+                    await executorMember.kick('Security: granted Administrator (anti-admin)');
+                    punished = true;
+                    punishType = 'kick';
+                }
+                catch (e) {
+                    logger.warn(`Failed to kick admin granter in ${guild.name}: ${e.message}`);
+                }
+            }
+            // 3️⃣ إرسال التقرير
+            const alert = await this.getAlertChannel(guild, settings, cfg.logChannel);
+            const executorType = executor.bot ? '🤖 بوت' : '👤 عضو';
+            let msg = `⚠️ **منح صلاحية Administrator ${isEveryone ? 'لـ @everyone' : `للرول ${newRole.name}`}**\n`;
+            msg += `🎯 المنفّذ: ${executorType} ${executor.tag}\n`;
+            msg += `🔄 استرجاع Administrator: ${permRevoked ? '✅ تم' : canManageRoles ? '❌ فشل' : '⚠️ لا توجد صلاحية ManageRoles'}\n`;
+            if (action === 'alert') {
+                msg += `🔔 الإجراء: تنبيه فقط (حسب إعدادات antiAdmin)`;
+            }
+            else {
+                msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل — تحقق من الصلاحيات/الهرمية'}`;
+            }
+            alert?.send({ content: msg }).catch(() => { });
+            logger.warn(`⚠️ Anti-Admin: Administrator granted to ${isEveryone ? '@everyone' : newRole.name} in ${guild.name} | revoked=${permRevoked} | action=${action} | punished=${punished}`);
         }
         catch (error) {
             logger.error(`onRoleUpdate error: ${error.message}`);
