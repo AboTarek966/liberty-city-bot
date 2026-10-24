@@ -1,0 +1,303 @@
+﻿<%- include('layout-top', { title: 'الذكاء الاصطناعي', activePage: 'ai' }) %>
+
+<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+  <div>
+    <h1 class="h3 fw-bold mb-1">
+      <i class="bi bi-robot me-2 text-primary"></i>
+      الذكاء الاصطناعي
+    </h1>
+    <p class="text-muted mb-0">إدارة أنظمة AI Auto-Mod، Ticket Assistant، Translator</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- AI Auto-Mod -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-purple bg-opacity-10 border-purple">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-purple bg-opacity-20 text-purple" style="width: 48px; height: 48px; border-radius: 12px;">
+            <i class="bi bi-shield fs-2"></i>
+          </div>
+          <div>
+            <h5 class="mb-0 fw-bold">AI Auto-Moderation</h5>
+            <small class="text-muted">يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال/تهديد/تسريب</small>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% const aiAutoMod = settings?.protection?.aiAutoMod || {}; const enabled = aiAutoMod.enabled; const sensitivity = aiAutoMod.sensitivity || 7; const categories = aiAutoMod.categories || {}; const actions = aiAutoMod.actions || {}; const ignoredChannels = aiAutoMod.ignoredChannels || []; const ignoredRoles = aiAutoMod.ignoredRoles || []; const logChannel = aiAutoMod.logChannel; const escalation = aiAutoMod.escalation; const maxWarnings = aiAutoMod.maxWarningsBeforeEscalation; const muteDuration = aiAutoMod.muteDuration || 10; %>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h6 class="mb-0">الحالة: <span class="badge bg-<%= enabled ? 'success' : 'secondary' %>"><%= enabled ? 'مفعلة ✅' : 'معطلة ❌' %></span></h6>
+          <div class="toggle-switch">
+            <input type="checkbox" id="aiAutoModEnabled" <%= enabled ? 'checked' : '' %> onchange="toggleAI('aiAutoMod', this.checked)">
+            <span class="toggle-slider" for="aiAutoModEnabled"></span>
+          </div>
+        </div>
+        
+        <hr>
+        
+        <h6 class="fw-bold mb-3">فئات الكشف:</h6>
+        <div class="row g-2 mb-4">
+          <% const categoriesList = [
+            { key: 'spam', name: 'سبام', icon: 'bi-chat-text', color: 'primary' },
+            { key: 'toxicity', name: 'سمية', icon: 'bi-emoji-frown', color: 'danger' },
+            { key: 'nsfw', name: 'محتوى للبالغين', icon: 'bi-eye-slash', color: 'pink' },
+            { key: 'scam', name: 'احتيال', icon: 'bi-shield-exclamation', color: 'orange' },
+            { key: 'threat', name: 'تهديد', icon: 'bi-exclamation-triangle', color: 'danger' },
+            { key: 'pii', name: 'تسريب بيانات', icon: 'bi-key', color: 'warning' },
+            { key: 'raid', name: 'raid', icon: 'bi-people', color: 'info' },
+            { key: 'selfharm', name: 'إيذاء ذاتي', icon: 'bi-heart-pulse', color: 'success' }
+          ]; categoriesList.forEach(c => { const catEnabled = categories[c.key]; const action = actions[c.key] || 'warn'; const actionLabels = { delete: 'حذف', warn: 'تحذير', mute: 'كتم', ban: 'حظر', resources: 'موارد' }; const actionColors = { delete: 'danger', warn: 'warning', mute: 'info', ban: 'dark', resources: 'success' }; %>
+          <div class="col-12 col-md-6">
+            <div class="card border-0 bg-transparent">
+              <div class="card-body py-2">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-<%= c.color %> bg-opacity-20 text-<%= c.color %>" style="width: 36px; height: 36px; border-radius: 8px;">
+                      <i class="bi <%= c.icon %> fs-5"></i>
+                    </div>
+                    <div>
+                      <h6 class="mb-1 fw-bold small"><%= c.name %></h6>
+                      <p class="text-muted small mb-0"><%= actionLabels[action] %> (<%= actionColors[action] %>)</p>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" style="width: auto;" <%= !enabled || !catEnabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'actions.<%= c.key %>', this.value)">
+                      <option value="delete" <%= action === 'delete' ? 'selected' : '' %>>حذف</option>
+                      <option value="warn" <%= action === 'warn' ? 'selected' : '' %>>تحذير</option>
+                      <option value="mute" <%= action === 'mute' ? 'selected' : '' %>>كتم</option>
+                      <option value="ban" <%= action === 'ban' ? 'selected' : '' %>>حظر</option>
+                      <% if (c.key === 'selfharm') { %>
+                      <option value="resources" <%= action === 'resources' ? 'selected' : '' %>>موارد</option>
+                      <% } %>
+                    </select>
+                    <div class="toggle-switch">
+                      <input type="checkbox" <%= catEnabled ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'categories.<%= c.key %>', this.checked)">
+                      <span class="toggle-slider"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+        
+        <hr>
+        
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label small">الحساسية (1-10)</label>
+            <input type="range" class="form-range" min="1" max="10" value="<%= sensitivity %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'sensitivity', this.value)">
+            <div class="d-flex justify-content-between text-muted small"><span>منخفضة</span><span class="fw-bold"><%= sensitivity %></span><span>عالية</span></div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">مدة الكتم (دقائق)</label>
+            <input type="number" class="form-control form-control-sm" value="<%= muteDuration %>" min="1" max="10080" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'muteDuration', this.value)">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">قناة السجلات</label>
+            <input type="text" class="form-control form-control-sm" placeholder="Channel ID" value="<%= logChannel || '' %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'logChannel', this.value)">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">قنوات مستثناة (IDs مفصولة بفاصلة)</label>
+            <input type="text" class="form-control form-control-sm" placeholder="123,456,789" value="<%= ignoredChannels.join(',') %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'ignoredChannels', this.value.split(',').map(x=>x.trim()).filter(x=>x))">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">رولات مستثناة (IDs مفصولة بفاصلة)</label>
+            <input type="text" class="form-control form-control-sm" placeholder="123,456,789" value="<%= ignoredRoles.join(',') %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'ignoredRoles', this.value.split(',').map(x=>x.trim()).filter(x=>x))">
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch mt-4">
+              <input class="form-check-input" type="checkbox" id="escalation" <%= escalation ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'escalation', this.checked)">
+              <label class="form-check-label small" for="escalation">التصعيد التلقائي بعد التحذيرات</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small mt-4">تحذيرات قبل التصعيد</label>
+            <input type="number" class="form-control form-control-sm" value="<%= maxWarnings || 3 %>" min="1" max="10" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiAutoMod', 'maxWarningsBeforeEscalation', this.value)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Ticket Assistant -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-pink bg-opacity-10 border-pink">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-pink bg-opacity-20 text-pink" style="width: 48px; height: 48px; border-radius: 12px;">
+            <i class="bi bi-chat-dots fs-2"></i>
+          </div>
+          <div>
+            <h5 class="mb-0 fw-bold">AI Ticket Assistant</h5>
+            <small class="text-muted">يستلم التذكرة، يحلل، يحل، يطلب موافقة للإجراءات الحساسة</small>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% const aiTicket = settings?.protection?.aiTicketAssistant || {}; const enabled = aiTicket.enabled; const autoClaim = aiTicket.autoClaim; const analyzeOnCreate = aiTicket.analyzeOnCreate; const reqApprovalRoles = aiTicket.requireAdminApprovalForRoles; const reqApprovalPerms = aiTicket.requireAdminApprovalForPermissions; const reqApprovalBans = aiTicket.requireAdminApprovalForBans; const maxAutoActions = aiTicket.maxAutoActionsPerTicket || 3; const confidence = aiTicket.confidenceThreshold || 70; const notifyOnFail = aiTicket.notifyAdminsOnFailure; const logChannel = aiTicket.logChannel; %>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h6 class="mb-0">الحالة: <span class="badge bg-<%= enabled ? 'success' : 'secondary' %>"><%= enabled ? 'مفعلة ✅' : 'معطلة ❌' %></span></h6>
+          <div class="toggle-switch">
+            <input type="checkbox" id="aiTicketEnabled" <%= enabled ? 'checked' : '' %> onchange="toggleAI('aiTicketAssistant', this.checked)">
+            <span class="toggle-slider" for="aiTicketEnabled"></span>
+          </div>
+        </div>
+        
+        <hr>
+        
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="autoClaim" <%= autoClaim ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'autoClaim', this.checked)">
+              <label class="form-check-label small" for="autoClaim">استلام تلقائي للتذاكر</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="analyzeOnCreate" <%= analyzeOnCreate ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'analyzeOnCreate', this.checked)">
+              <label class="form-check-label small" for="analyzeOnCreate">تحليل عند الإنشاء</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="reqApprovalRoles" <%= reqApprovalRoles ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'requireAdminApprovalForRoles', this.checked)">
+              <label class="form-check-label small" for="reqApprovalRoles">موافقة إداري للرولات</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="reqApprovalPerms" <%= reqApprovalPerms ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'requireAdminApprovalForPermissions', this.checked)">
+              <label class="form-check-label small" for="reqApprovalPerms">موافقة إداري للصلاحيات</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="reqApprovalBans" <%= reqApprovalBans ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'requireAdminApprovalForBans', this.checked)">
+              <label class="form-check-label small" for="reqApprovalBans">موافقة إداري للحظر</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="notifyOnFail" <%= notifyOnFail ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'notifyAdminsOnFailure', this.checked)">
+              <label class="form-check-label small" for="notifyOnFail">إشعار إداريين عند الفشل</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">الحد الأقصى للإجراءات التلقائية</label>
+            <input type="number" class="form-control form-control-sm" value="<%= maxAutoActions %>" min="1" max="10" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'maxAutoActionsPerTicket', this.value)">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">حد الثقة (%)</label>
+            <input type="range" class="form-range" min="10" max="100" value="<%= confidence %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'confidenceThreshold', this.value)">
+            <div class="d-flex justify-content-between text-muted small"><span>10%</span><span class="fw-bold"><%= confidence %>%</span><span>100%</span></div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">قناة السجلات</label>
+            <input type="text" class="form-control form-control-sm" placeholder="Channel ID" value="<%= logChannel || '' %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTicketAssistant', 'logChannel', this.value)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Translator -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-info bg-opacity-10 border-info">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-info bg-opacity-20 text-info" style="width: 48px; height: 48px; border-radius: 12px;">
+            <i class="bi bi-translate fs-2"></i>
+          </div>
+          <div>
+            <h5 class="mb-0 fw-bold">AI Translator</h5>
+            <small class="text-muted">ترجمة فورية مع كشف اللغة التلقائي</small>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% const aiTranslator = settings?.protection?.aiTranslator || {}; const enabled = aiTranslator.enabled; const targetLang = aiTranslator.defaultTargetLang || 'ar'; const autoChannels = aiTranslator.autoTranslateChannels || []; const ignoredChannels = aiTranslator.ignoredChannels || []; const ignoredRoles = aiTranslator.ignoredRoles || []; const showOriginal = aiTranslator.showOriginal; const maxLength = aiTranslator.maxLength || 2000; const logChannel = aiTranslator.logChannel; %>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h6 class="mb-0">الحالة: <span class="badge bg-<%= enabled ? 'success' : 'secondary' %>"><%= enabled ? 'مفعلة ✅' : 'معطلة ❌' %></span></h6>
+          <div class="toggle-switch">
+            <input type="checkbox" id="aiTranslatorEnabled" <%= enabled ? 'checked' : '' %> onchange="toggleAI('aiTranslator', this.checked)">
+            <span class="toggle-slider" for="aiTranslatorEnabled"></span>
+          </div>
+        </div>
+        
+        <hr>
+        
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label small">اللغة الافتراضية</label>
+            <select class="form-select form-select-sm" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'defaultTargetLang', this.value)">
+              <option value="ar" <%= targetLang === 'ar' ? 'selected' : '' %>>العربية</option>
+              <option value="en" <%= targetLang === 'en' ? 'selected' : '' %>>English</option>
+              <option value="fr" <%= targetLang === 'fr' ? 'selected' : '' %>>Français</option>
+              <option value="es" <%= targetLang === 'es' ? 'selected' : '' %>>Español</option>
+              <option value="de" <%= targetLang === 'de' ? 'selected' : '' %>>Deutsch</option>
+              <option value="tr" <%= targetLang === 'tr' ? 'selected' : '' %>>Türkçe</option>
+              <option value="ru" <%= targetLang === 'ru' ? 'selected' : '' %>>Русский</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-check form-switch mt-4">
+              <input class="form-check-input" type="checkbox" id="showOriginal" <%= showOriginal ? 'checked' : '' %> <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'showOriginal', this.checked)">
+              <label class="form-check-label small" for="showOriginal">إظهار النص الأصلي</label>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">الحد الأقصى للطول</label>
+            <input type="number" class="form-control form-control-sm" value="<%= maxLength %>" min="100" max="4000" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'maxLength', this.value)">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">قنوات الترجمة التلقائية (IDs مفصولة بفاصلة)</label>
+            <input type="text" class="form-control form-control-sm" placeholder="123,456,789" value="<%= autoChannels.join(',') %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'autoTranslateChannels', this.value.split(',').map(x=>x.trim()).filter(x=>x))">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">قنوات مستثناة (IDs مفصولة بفاصلة)</label>
+            <input type="text" class="form-control form-control-sm" placeholder="123,456,789" value="<%= ignoredChannels.join(',') %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'ignoredChannels', this.value.split(',').map(x=>x.trim()).filter(x=>x))">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">رولات مستثناة (IDs مفصولة بفاصلة)</label>
+            <input type="text" class="form-control form-control-sm" placeholder="123,456,789" value="<%= ignoredRoles.join(',') %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'ignoredRoles', this.value.split(',').map(x=>x.trim()).filter(x=>x))">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small">قناة السجلات</label>
+            <input type="text" class="form-control form-control-sm" placeholder="Channel ID" value="<%= logChannel || '' %>" <%= !enabled ? 'disabled' : '' %> onchange="updateAIConfig('aiTranslator', 'logChannel', this.value)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function toggleAI(featureId, enabled) {
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/ai/' + featureId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    });
+    if (!res.ok) { showToast('فشل التحديث', 'danger'); location.reload(); }
+    else showToast('تم التحديث', 'success');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); location.reload(); }
+}
+
+async function updateAIConfig(featureId, key, value) {
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/ai/' + featureId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: { [key]: value } })
+    });
+    if (!res.ok) location.reload();
+  } catch (e) { location.reload(); }
+}
+</script>
+
+<%- include('layout-bottom') %>

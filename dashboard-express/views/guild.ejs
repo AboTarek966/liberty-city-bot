@@ -1,0 +1,198 @@
+﻿<%- include('layout-top', { title: guild?.name || 'السيرفر', activePage: null }) %>
+
+<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+  <div>
+    <h1 class="h3 fw-bold mb-1">
+      <% if (guild.icon) { %>
+        <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" class="guild-avatar me-2">
+      <% } else { %>
+        <div class="d-inline-flex align-items-center justify-content-center guild-avatar me-2" style="background: linear-gradient(135deg, var(--primary), #a855f7);">
+          <i class="bi bi-bot text-white fs-3"></i>
+        </div>
+      <% } %>
+      <%= guild.name %>
+      <% if (guild.owner) { %><span class="guild-badge ms-2">المالك</span><% } %>
+    </h1>
+    <p class="text-muted mb-0">إدارة إعدادات الحماية، التذاكر، الذكاء الاصطناعي، والأعضاء</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap mt-3 mt-md-0">
+    <span class="badge bg-primary fs-6 px-3 py-2"><%= stats?.memberCount || 0 %> عضو</span>
+    <span class="badge bg-info fs-6 px-3 py-2"><%= stats?.channelCount || 0 %> قناة</span>
+    <span class="badge bg-warning fs-6 px-3 py-2"><%= stats?.roleCount || 0 %> رول</span>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <p class="text-muted small mb-1">إجمالي الأعضاء</p>
+            <h2 class="fw-bold mb-0"><%= stats?.memberCount || 0 %></h2>
+          </div>
+          <div class="stat-icon bg-primary bg-opacity-20 text-primary">
+            <i class="bi bi-people fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <p class="text-muted small mb-1">قنوات</p>
+            <h2 class="fw-bold mb-0"><%= stats?.channelCount || 0 %></h2>
+          </div>
+          <div class="stat-icon bg-info bg-opacity-20 text-info">
+            <i class="bi bi-hash fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <p class="text-muted small mb-1">أدوار</p>
+            <h2 class="fw-bold mb-0"><%= stats?.roleCount || 0 %></h2>
+          </div>
+          <div class="stat-icon bg-warning bg-opacity-20 text-warning">
+            <i class="bi bi-shield fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <p class="text-muted small mb-1">سيرفرات البوت</p>
+            <h2 class="fw-bold mb-0"><%= botStats?.totalGuilds || 0 %></h2>
+          </div>
+          <div class="stat-icon bg-success bg-opacity-20 text-success">
+            <i class="bi bi-globe fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">إجراءات سريعة</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6 col-md-4">
+            <a href="/dashboard/<%= guild.id %>/protection" class="card text-decoration-none h-100 text-center p-4">
+              <div class="stat-icon bg-primary bg-opacity-20 text-primary mx-auto mb-3">
+                <i class="bi bi-shield-lock fs-2"></i>
+              </div>
+              <h6 class="fw-bold">الحماية</h6>
+              <p class="text-muted small mb-0">Anti-Raid، Anti-Spam، Anti-Nuke، وغيرها</p>
+            </a>
+          </div>
+          <div class="col-6 col-md-4">
+            <a href="/dashboard/<%= guild.id %>/ai" class="card text-decoration-none h-100 text-center p-4">
+              <div class="stat-icon bg-purple bg-opacity-20 text-purple mx-auto mb-3">
+                <i class="bi bi-robot fs-2"></i>
+              </div>
+              <h6 class="fw-bold">الذكاء الاصطناعي</h6>
+              <p class="text-muted small mb-0">Auto-Mod، Ticket Assistant، Translator</p>
+            </a>
+          </div>
+          <div class="col-6 col-md-4">
+            <a href="/dashboard/<%= guild.id %>/tickets" class="card text-decoration-none h-100 text-center p-4">
+              <div class="stat-icon bg-info bg-opacity-20 text-info mx-auto mb-3">
+                <i class="bi bi-ticket-perforated fs-2"></i>
+              </div>
+              <h6 class="fw-bold">التذاكر</h6>
+              <p class="text-muted small mb-0">نظام الدعم الفني</p>
+            </a>
+          </div>
+          <div class="col-6 col-md-4">
+            <a href="/dashboard/<%= guild.id %>/members" class="card text-decoration-none h-100 text-center p-4">
+              <div class="stat-icon bg-success bg-opacity-20 text-success mx-auto mb-3">
+                <i class="bi bi-people fs-2"></i>
+              </div>
+              <h6 class="fw-bold">الأعضاء</h6>
+              <p class="text-muted small mb-0">إدارة الأعضاء والأدوار</p>
+            </a>
+          </div>
+          <div class="col-6 col-md-4">
+            <a href="/dashboard/<%= guild.id %>/settings" class="card text-decoration-none h-100 text-center p-4">
+              <div class="stat-icon bg-warning bg-opacity-20 text-warning mx-auto mb-3">
+                <i class="bi bi-gear fs-2"></i>
+              </div>
+              <h6 class="fw-bold">الإعدادات</h6>
+              <p class="text-muted small mb-0">عام، الترحيب، الاقتصاد، الأوامر</p>
+            </a>
+          </div>
+          <div class="col-6 col-md-4">
+            <a href="/dashboard/<%= guild.id %>/logs" class="card text-decoration-none h-100 text-center p-4">
+              <div class="stat-icon bg-secondary bg-opacity-20 text-secondary mx-auto mb-3">
+                <i class="bi bi-file-text fs-2"></i>
+              </div>
+              <h6 class="fw-bold">السجلات</h6>
+              <p class="text-muted small mb-0">سجلات التدقيق والرسائل</p>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">معلومات السيرفر</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-muted small">معرف السيرفر</label>
+          <div class="input-group">
+            <input type="text" class="form-control form-control-sm font-monospace" value="<%= guild.id %>" readonly>
+            <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('<%= guild.id %>')">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <div class="p-3 bg-dark rounded">
+              <div class="fw-bold fs-4"><%= stats?.memberCount || 0 %></div>
+              <small class="text-muted">إجمالي الأعضاء</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 bg-dark rounded">
+              <div class="fw-bold fs-4"><%= stats?.onlineCount || 0 %></div>
+              <small class="text-muted">متصلين الآن</small>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <div class="d-grid gap-2">
+          <a href="https://discord.com/oauth2/authorize?client_id=<%= clientId %>&permissions=8&scope=bot&guild_id=<%= guild.id %>" target="_blank" class="btn btn-outline">
+            <i class="bi bi-plus-circle me-2"></i> دعوة البوت لسيرفر آخر
+          </a>
+          <a href="https://discord.gg/your-invite" target="_blank" class="btn btn-outline">
+            <i class="bi bi-discord me-2"></i> سيرفر الدعم
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('layout-bottom') %>

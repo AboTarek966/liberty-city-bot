@@ -194,6 +194,322 @@ export class LibertyClient extends Client {
       }
     });
 
+    // Guild tickets
+    router.get('/guilds/:guildId/tickets', async (req: Request, res: Response) => {
+      try {
+        const { Ticket } = await import('./models');
+        const tickets = await Ticket.find({ guildId: req.params.guildId })
+          .sort({ createdAt: -1 })
+          .limit(100)
+          .lean();
+        res.json(tickets);
+      } catch (error) {
+        logger.error('Failed to get tickets:', error);
+        res.status(500).json({ error: 'Failed to get tickets' });
+      }
+    });
+
+    router.post('/guilds/:guildId/tickets/:ticketId/claim', async (req: Request, res: Response) => {
+      try {
+        const { Ticket } = await import('./models');
+        const ticket = await Ticket.findOneAndUpdate(
+          { channelId: req.params.ticketId, guildId: req.params.guildId },
+          { status: 'claimed', claimedBy: req.body.claimedBy, claimHistory: { $concatArrays: ['$claimHistory', [req.body.claimedBy]] } },
+          { new: true }
+        );
+        if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+        res.json(ticket);
+      } catch (error) {
+        logger.error('Failed to claim ticket:', error);
+        res.status(500).json({ error: 'Failed to claim ticket' });
+      }
+    });
+
+    router.post('/guilds/:guildId/tickets/:ticketId/close', async (req: Request, res: Response) => {
+      try {
+        const { Ticket } = await import('./models');
+        const ticket = await Ticket.findOneAndUpdate(
+          { channelId: req.params.ticketId, guildId: req.params.guildId },
+          { status: 'closed', closedBy: req.body.closedBy, closeReason: req.body.reason, closedAt: new Date() },
+          { new: true }
+        );
+        if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+        res.json(ticket);
+      } catch (error) {
+        logger.error('Failed to close ticket:', error);
+        res.status(500).json({ error: 'Failed to close ticket' });
+      }
+    });
+
+    // Guild members
+    router.get('/guilds/:guildId/members', async (req: Request, res: Response) => {
+      try {
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        
+        const members = await guild.members.fetch();
+        const memberList = members.map(m => ({
+          id: m.id,
+          username: m.user.username,
+          discriminator: m.user.discriminator,
+          avatar: m.user.avatar,
+          nickname: m.nickname,
+          roles: m.roles.cache.map(r => r.id).filter(r => r !== guild.id),
+          joinedAt: m.joinedAt?.toISOString(),
+          presence: m.presence?.status || 'offline',
+          bot: m.user.bot,
+        }));
+        res.json(memberList);
+      } catch (error) {
+        logger.error('Failed to get members:', error);
+        res.status(500).json({ error: 'Failed to get members' });
+      }
+    });
+
+    router.post('/guilds/:guildId/members/:memberId/warn', async (req: Request, res: Response) => {
+      try {
+        const { ModerationCase, getNextCaseId } = await import('./models');
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        
+        const caseId = await getNextCaseId(req.params.guildId);
+        const warning = await ModerationCase.create({
+          guildId: req.params.guildId,
+          caseId,
+          type: 'warn',
+          moderatorId: req.body.moderatorId,
+          targetId: req.params.memberId,
+          reason: req.body.reason,
+          active: true,
+        });
+        res.json(warning);
+      } catch (error) {
+        logger.error('Failed to warn member:', error);
+        res.status(500).json({ error: 'Failed to warn member' });
+      }
+    });
+
+    router.post('/guilds/:guildId/members/:memberId/kick', async (req: Request, res: Response) => {
+      try {
+        const { ModerationCase, getNextCaseId } = await import('./models');
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        
+        const member = await guild.members.fetch(req.params.memberId).catch(() => null);
+        if (!member) return res.status(404).json({ error: 'Member not found' });
+        
+        await member.kick(req.body.reason);
+        
+        const caseId = await getNextCaseId(req.params.guildId);
+        await ModerationCase.create({
+          guildId: req.params.guildId,
+          caseId,
+          type: 'kick',
+          moderatorId: req.body.moderatorId,
+          targetId: req.params.memberId,
+          reason: req.body.reason,
+          active: true,
+        });
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Failed to kick member:', error);
+        res.status(500).json({ error: 'Failed to kick member' });
+      }
+    });
+
+    router.post('/guilds/:guildId/members/:memberId/ban', async (req: Request, res: Response) => {
+      try {
+        const { ModerationCase, getNextCaseId } = await import('./models');
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        
+        await guild.members.ban(req.params.memberId, { reason: req.body.reason });
+        
+        const caseId = await getNextCaseId(req.params.guildId);
+        await ModerationCase.create({
+          guildId: req.params.guildId,
+          caseId,
+          type: 'ban',
+          moderatorId: req.body.moderatorId,
+          targetId: req.params.memberId,
+          reason: req.body.reason,
+          active: true,
+        });
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Failed to ban member:', error);
+        res.status(500).json({ error: 'Failed to ban member' });
+      }
+    });
+
+    // Guild logs
+    router.get('/guilds/:guildId/logs', async (req: Request, res: Response) => {
+      try {
+        const { ModerationCase } = await import('./models');
+        const { type, userId, limit = 50, page = 1 } = req.query;
+        const query: any = { guildId: req.params.guildId };
+        if (type) query.type = type;
+        if (userId) query.targetId = userId;
+        
+        const logs = await ModerationCase.find(query)
+          .sort({ createdAt: -1 })
+          .skip((Number(page) - 1) * Number(limit))
+          .limit(Number(limit))
+          .lean();
+        
+        const total = await ModerationCase.countDocuments(query);
+        res.json({ logs, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+      } catch (error) {
+        logger.error('Failed to get logs:', error);
+        res.status(500).json({ error: 'Failed to get logs' });
+      }
+    });
+
+    // Guild economy
+    router.get('/guilds/:guildId/economy', async (req: Request, res: Response) => {
+      try {
+        const { UserProfile } = await import('./models');
+        const users = await UserProfile.find({ guildId: req.params.guildId })
+          .sort({ balance: -1 })
+          .limit(50)
+          .lean();
+        res.json(users);
+      } catch (error) {
+        logger.error('Failed to get economy:', error);
+        res.status(500).json({ error: 'Failed to get economy' });
+      }
+    });
+
+    router.post('/guilds/:guildId/economy/give', async (req: Request, res: Response) => {
+      try {
+        const { UserProfile, getOrCreateUserProfile } = await import('./models');
+        const { userId, amount, type = 'balance' } = req.body;
+        const profile = await getOrCreateUserProfile(userId, req.params.guildId);
+        (profile as any)[type] = ((profile as any)[type] || 0) + Number(amount);
+        await profile.save();
+        res.json(profile);
+      } catch (error) {
+        logger.error('Failed to give economy:', error);
+        res.status(500).json({ error: 'Failed to give economy' });
+      }
+    });
+
+    router.post('/guilds/:guildId/economy/reset', async (req: Request, res: Response) => {
+      try {
+        const { UserProfile } = await import('./models');
+        await UserProfile.deleteMany({ guildId: req.params.guildId });
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Failed to reset economy:', error);
+        res.status(500).json({ error: 'Failed to reset economy' });
+      }
+    });
+
+    // Guild shop
+    router.get('/guilds/:guildId/shop', async (req: Request, res: Response) => {
+      try {
+        const { getGuildSettings } = await import('./models');
+        const settings = await getGuildSettings(req.params.guildId);
+        res.json(settings.shop?.items || []);
+      } catch (error) {
+        logger.error('Failed to get shop:', error);
+        res.status(500).json({ error: 'Failed to get shop' });
+      }
+    });
+
+    router.post('/guilds/:guildId/shop', async (req: Request, res: Response) => {
+      try {
+        const { getGuildSettings } = await import('./models');
+        const settings = await getGuildSettings(req.params.guildId);
+        settings.shop = settings.shop || { enabled: true, items: [] };
+        settings.shop.items.push(req.body);
+        await settings.save();
+        res.json(settings.shop.items);
+      } catch (error) {
+        logger.error('Failed to add shop item:', error);
+        res.status(500).json({ error: 'Failed to add shop item' });
+      }
+    });
+
+    router.delete('/guilds/:guildId/shop/:itemId', async (req: Request, res: Response) => {
+      try {
+        const { getGuildSettings } = await import('./models');
+        const settings = await getGuildSettings(req.params.guildId);
+        settings.shop.items = settings.shop.items.filter((i: any) => i.id !== req.params.itemId);
+        await settings.save();
+        res.json(settings.shop.items);
+      } catch (error) {
+        logger.error('Failed to delete shop item:', error);
+        res.status(500).json({ error: 'Failed to delete shop item' });
+      }
+    });
+
+    // Welcome messages
+    router.get('/guilds/:guildId/welcome', async (req: Request, res: Response) => {
+      try {
+        const { getGuildSettings } = await import('./models');
+        const settings = await getGuildSettings(req.params.guildId);
+        res.json(settings.welcome || {});
+      } catch (error) {
+        logger.error('Failed to get welcome:', error);
+        res.status(500).json({ error: 'Failed to get welcome' });
+      }
+    });
+
+    // Protection features
+    router.post('/guilds/:guildId/protection/:feature', async (req: Request, res: Response) => {
+      try {
+        const { getGuildSettings } = await import('./models');
+        const settings = await getGuildSettings(req.params.guildId);
+        const feature = req.params.feature as any;
+        const prot = (settings as any).protection;
+        if (prot[feature]) {
+          prot[feature].enabled = req.body.enabled;
+          await settings.save();
+          res.json(prot[feature]);
+        } else {
+          res.status(404).json({ error: 'Feature not found' });
+        }
+      } catch (error) {
+        logger.error('Failed to update protection:', error);
+        res.status(500).json({ error: 'Failed to update protection' });
+      }
+    });
+
+    // AI features
+    router.post('/guilds/:guildId/ai/:feature', async (req: Request, res: Response) => {
+      try {
+        const { getGuildSettings } = await import('./models');
+        const settings = await getGuildSettings(req.params.guildId);
+        const feature = req.params.feature as any;
+        const prot = (settings as any).protection;
+        if (prot[feature]) {
+          prot[feature].enabled = req.body.enabled;
+          Object.assign(prot[feature], req.body.config || {});
+          await settings.save();
+          res.json(prot[feature]);
+        } else {
+          res.status(404).json({ error: 'Feature not found' });
+        }
+      } catch (error) {
+        logger.error('Failed to update AI:', error);
+        res.status(500).json({ error: 'Failed to update AI' });
+      }
+    });
+
+    // Bot leave guild
+    router.post('/guilds/:guildId/leave', async (req: Request, res: Response) => {
+      try {
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        await guild.leave();
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Failed to leave guild:', error);
+        res.status(500).json({ error: 'Failed to leave guild' });
+      }
+    });
+
     this.expressApp.use('/api', router);
   }
 

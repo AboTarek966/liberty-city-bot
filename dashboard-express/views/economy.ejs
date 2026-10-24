@@ -1,0 +1,334 @@
+﻿<%- include('layout-top', { title: 'الاقتصاد', activePage: 'economy' }) %>
+
+<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+  <div>
+    <h1 class="h3 fw-bold mb-1">
+      <i class="bi bi-coin me-2 text-warning"></i>
+      نظام الاقتصاد
+    </h1>
+    <p class="text-muted mb-0">المتصدرين، المتجر، الإعدادات المالية</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" onclick="saveEconomy()">
+      <i class="bi bi-check-lg me-1"></i> حفظ
+    </button>
+  </div>
+</div>
+
+<ul class="nav nav-pills mb-4" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-leaderboard"><i class="bi bi-trophy me-1"></i> المتصدرين</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-shop"><i class="bi bi-shop me-1"></i> المتجر</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-economy-settings"><i class="bi bi-gear me-1"></i> الإعدادات</button></li>
+</ul>
+
+<div class="tab-content">
+  <!-- Leaderboard Tab -->
+  <div class="tab-pane fade show active" id="tab-leaderboard">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-trophy me-2"></i> المتصدرين</h5>
+        <div class="d-flex gap-2">
+          <select class="form-select form-select-sm" style="width: auto;" id="lbType" onchange="refreshLeaderboard()">
+            <option value="balance">الرصيد</option>
+            <option value="bank">البنك</option>
+            <option value="xp">الخبرة</option>
+          </select>
+          <button class="btn btn-outline-primary btn-sm" onclick="refreshLeaderboard()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th style="width: 60px;">الترتيب</th>
+                <th>العضو</th>
+                <th>الرصيد</th>
+                <th>البنك</th>
+                <th>المستوى</th>
+                <th>الخبرة</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% const economyUsers = economy && Array.isArray(economy) ? economy : (economy?.users || []); %>
+              <% if (economyUsers.length > 0) { economyUsers.forEach((u, i) => { const medals = ['🥇', '🥈', '🥉']; const medal = i < 3 ? medals[i] : ''; const sym = settings?.economy?.currencySymbol || '💰'; %>
+              <tr>
+                <td class="fw-bold text-center"><%= medal || (i + 1) %></td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="avatar bg-primary bg-opacity-25" style="width: 36px; height: 36px;">
+                      <i class="bi bi-person text-primary"></i>
+                    </div>
+                    <span class="fw-medium"><%= u.userId %></span>
+                  </div>
+                </td>
+                <td class="fw-bold"><%= sym %> <%= (u.balance || 0).toLocaleString('en-US') %></td>
+                <td><%= sym %> <%= (u.bank || 0).toLocaleString('en-US') %></td>
+                <td><span class="badge bg-info"><%= u.level || 0 %></span></td>
+                <td><%= (u.xp || 0).toLocaleString('en-US') %></td>
+              </tr>
+              <% }) } else { %>
+              <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد بيانات اقتصادية بعد</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shop Tab -->
+  <div class="tab-pane fade" id="tab-shop">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-shop me-2"></i> متجر السيرفر</h5>
+        <button class="btn btn-primary btn-sm" onclick="showAddItemModal()">
+          <i class="bi bi-plus-circle me-1"></i> إضافة عنصر
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="shopTable">
+            <thead>
+              <tr>
+                <th style="width: 50px;">الإيموجي</th>
+                <th>الاسم</th>
+                <th>السعر</th>
+                <th>الرول</th>
+                <th style="width: 100px;">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% const shopItems = settings?.shop?.items || []; %>
+              <% if (shopItems.length > 0) { shopItems.forEach(item => { %>
+              <tr>
+                <td class="text-center"><%= item.emoji || '🎁' %></td>
+                <td class="fw-medium"><%= item.name %></td>
+                <td class="fw-bold text-warning"><%= (item.price || 0).toLocaleString('en-US') %> 💰</td>
+                <td><code class="small"><%= item.roleId %></code></td>
+                <td>
+                  <button class="btn btn-outline-danger btn-sm" onclick="deleteShopItem('<%= item.id %>')">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              <% }) } else { %>
+              <tr><td colspan="5" class="text-center py-4 text-muted">لا توجد عناصر في المتجر</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addShopModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">إضافة عنصر جديد</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">الإيموجي</label>
+              <input type="text" class="form-control" id="shopEmoji" placeholder="🎁" maxlength="4">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">اسم العنصر</label>
+              <input type="text" class="form-control" id="shopName" placeholder="VIP Role">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">السعر</label>
+              <input type="number" class="form-control" id="shopPrice" placeholder="1000" min="0">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">الرول الممنوح (Role ID)</label>
+              <input type="text" class="form-control" id="shopRole" placeholder="123456789">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+            <button type="button" class="btn btn-primary" onclick="addShopItem()">إضافة</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Tab -->
+  <div class="tab-pane fade" id="tab-economy-settings">
+    <%
+      const ec = settings?.economy || {};
+    %>
+    <div class="row g-4">
+      <div class="col-12 col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-cash-coin me-2"></i> الإعدادات الأساسية</h5></div>
+          <div class="card-body">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="ecEnabled" <%= ec.enabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="ecEnabled">تفعيل الاقتصاد</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">اسم العملة</label>
+              <input type="text" class="form-control" id="ecCurrency" value="<%= ec.currency || 'عملة' %>">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">رمز العملة</label>
+              <input type="text" class="form-control" id="ecSymbol" value="<%= ec.currencySymbol || '💰' %>" maxlength="4">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">المكافأة اليومية</label>
+              <input type="number" class="form-control" id="ecDaily" value="<%= ec.dailyAmount || 500 %>" min="0">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">المكافأة الأسبوعية</label>
+              <input type="number" class="form-control" id="ecWeekly" value="<%= ec.weeklyAmount || 2000 %>" min="0">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">المكافأة الشهرية</label>
+              <input type="number" class="form-control" id="ecMonthly" value="<%= ec.monthlyAmount || 10000 %>" min="0">
+            </div>
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label">أدنى راتب العمل</label>
+                <input type="number" class="form-control" id="ecWorkMin" value="<%= ec.workAmount?.min || 100 %>" min="0">
+              </div>
+              <div class="col-6">
+                <label class="form-label">أعلى راتب العمل</label>
+                <input type="number" class="form-control" id="ecWorkMax" value="<%= ec.workAmount?.max || 500 %>" min="0">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-sliders me-2"></i> الأنظمة المتقدمة</h5></div>
+          <div class="card-body">
+            <h6 class="fw-bold mb-3">البنك</h6>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecBank" <%= ec.bankEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecBank">نظام البنك</label>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6"><label class="form-label small">فائدة يومية (%)</label><input type="number" class="form-control form-control-sm" id="ecInterest" value="<%= ec.bankInterestRate || 0.5 %>" step="0.1" min="0"></div>
+              <div class="col-6"><label class="form-label small">حد أقصى للإيداع</label><input type="number" class="form-control form-control-sm" id="ecMaxDeposit" value="<%= ec.bankMaxDeposit || 1000000 %>" min="0"></div>
+            </div>
+            <h6 class="fw-bold mb-3">اللعبة والقمار</h6>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecRob" <%= ec.robEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecRob">نظام السرقة</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecSlots" <%= ec.slotsEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecSlots">السلوتس</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecBlackjack" <%= ec.blackjackEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecBlackjack">البلاكجاك</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecCoinflip" <%= ec.coinflipEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecCoinflip">عملة ومزاج (Coinflip)</label>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="ecDice" <%= ec.diceEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecDice">النرد</label>
+            </div>
+            <h6 class="fw-bold mb-3">التحويلات</h6>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecTransfer" <%= ec.transferEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecTransfer">تحويل الأموال</label>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6"><label class="form-label small">ضريبة التحويل (%)</label><input type="number" class="form-control form-control-sm" id="ecTax" value="<%= ec.transferTax || 5 %>" min="0" max="100"></div>
+            </div>
+            <h6 class="fw-bold mb-3">مكافآت الصوت</h6>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="ecVoice" <%= ec.voiceRewardsEnabled !== false ? 'checked' : '' %>>
+              <label class="form-check-label" for="ecVoice">مكافآت الصوت</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">الرصيد لكل دقيقة صوت</label>
+              <input type="number" class="form-control form-control-sm" id="ecVoicePerMin" value="<%= ec.voiceRewardPerMinute || 5 %>" min="0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function saveEconomy() {
+  const payload = {
+    economy: {
+      enabled: document.getElementById('ecEnabled').checked,
+      currency: document.getElementById('ecCurrency').value,
+      currencySymbol: document.getElementById('ecSymbol').value,
+      dailyAmount: +document.getElementById('ecDaily').value,
+      weeklyAmount: +document.getElementById('ecWeekly').value,
+      monthlyAmount: +document.getElementById('ecMonthly').value,
+      workAmount: { min: +document.getElementById('ecWorkMin').value, max: +document.getElementById('ecWorkMax').value },
+      bankEnabled: document.getElementById('ecBank').checked,
+      bankInterestRate: +document.getElementById('ecInterest').value,
+      bankMaxDeposit: +document.getElementById('ecMaxDeposit').value,
+      robEnabled: document.getElementById('ecRob').checked,
+      slotsEnabled: document.getElementById('ecSlots').checked,
+      blackjackEnabled: document.getElementById('ecBlackjack').checked,
+      coinflipEnabled: document.getElementById('ecCoinflip').checked,
+      diceEnabled: document.getElementById('ecDice').checked,
+      transferEnabled: document.getElementById('ecTransfer').checked,
+      transferTax: +document.getElementById('ecTax').value,
+      voiceRewardsEnabled: document.getElementById('ecVoice').checked,
+      voiceRewardPerMinute: +document.getElementById('ecVoicePerMin').value,
+    }
+  };
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) showToast('تم الحفظ بنجاح ✅', 'success');
+    else showToast('فشل الحفظ ❌', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+
+function showAddItemModal() { new bootstrap.Modal(document.getElementById('addShopModal')).show(); }
+
+async function addShopItem() {
+  const data = {
+    id: 'item_' + Date.now(),
+    emoji: document.getElementById('shopEmoji').value,
+    name: document.getElementById('shopName').value,
+    price: +document.getElementById('shopPrice').value,
+    roleId: document.getElementById('shopRole').value,
+  };
+  if (!data.name || !data.price || !data.roleId) { showToast('املأ جميع الحقول', 'warning'); return; }
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/shop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) { showToast('تمت الإضافة ✅', 'success'); location.reload(); }
+    else showToast('فشل الإضافة', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+
+async function deleteShopItem(id) {
+  if (!confirm('هل تريد حذف هذا العنصر؟')) return;
+  try {
+    const res = await fetch(`/api/guilds/<%= guild.id %>/shop/${id}`, { method: 'DELETE' });
+    if (res.ok) { showToast('تم الحذف ✅', 'success'); location.reload(); }
+    else showToast('فشل الحذف', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+
+async function refreshLeaderboard() { location.reload(); }
+</script>
+
+<%- include('layout-bottom') %>

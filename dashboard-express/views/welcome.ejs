@@ -1,0 +1,272 @@
+﻿<%- include('layout-top', { title: 'الترحيب والمغادرة', activePage: 'welcome' }) %>
+
+<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+  <div>
+    <h1 class="h3 fw-bold mb-1">
+      <i class="bi bi-door-open me-2 text-primary"></i>
+      الترحيب والمغادرة
+    </h1>
+    <p class="text-muted mb-0">رسائل الترحيب عند الانضمام ورسالة المغادرة</p>
+  </div>
+  <button class="btn btn-primary" onclick="saveWelcome()">
+    <i class="bi bi-check-lg me-1"></i> حفظ التغييرات
+  </button>
+</div>
+
+<% const w = settings?.welcome || {}; const lv = settings?.leave || {}; %>
+
+<ul class="nav nav-pills mb-4" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-welcome"><i class="bi bi-door-open me-1"></i> الترحيب</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-leave"><i class="bi bi-box-arrow-right me-1"></i> المغادرة</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-card"><i class="bi bi-image me-1"></i> البطاقة المرسومة</button></li>
+</ul>
+
+<div class="tab-content">
+  <!-- Welcome Tab -->
+  <div class="tab-pane fade show active" id="tab-welcome">
+    <div class="row g-4">
+      <div class="col-12 col-lg-7">
+        <div class="card">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-gear me-2"></i> إعدادات الترحيب</h5></div>
+          <div class="card-body">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wEnabled" <%= w.enabled ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="wEnabled">تفعيل الترحيب</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">قناة الترحيب (Channel ID)</label>
+              <input type="text" class="form-control" id="wChannel" value="<%= w.channelId || '' %>" placeholder="123456789">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">رسالة الترحيب</label>
+              <textarea class="form-control" id="wMessage" rows="4"><%= w.message || 'مرحباً {user}! أهلاً بك في **{server}**. أنت العضو رقم {count} 🎉' %></textarea>
+              <div class="form-text">
+                المتغيرات: {user} {server} {count}
+              </div>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wEmbed" checked disabled>
+              <label class="form-check-label" for="wEmbed">إرسال كـ Embed</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">عنوان الإمبد</label>
+              <input type="text" class="form-control" id="wEmbedTitle" value="<%= w.embedTitle || 'مرحباً بك!' %>">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">لون الإمبد (HEX)</label>
+              <div class="input-group">
+                <input type="color" class="form-control form-control-color" id="wEmbedColor" value="<%= w.embedColor || '#00D4FF' %>">
+                <input type="text" class="form-control" id="wEmbedColorText" value="<%= w.embedColor || '#00D4FF' %>" oninput="document.getElementById('wEmbedColor').value=this.value">
+              </div>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wImage" <%= w.imageEnabled ? 'checked' : '' %>>
+              <label class="form-check-label" for="wImage">صورة ترحيب مرسومة</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">صورة الخلفية (رابط)</label>
+              <input type="text" class="form-control" id="wImageBg" value="<%= w.imageBackground || '' %>" placeholder="https://...">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">رابط صورة الإمبد (Thumbnail)</label>
+              <input type="text" class="form-control" id="wEmbedThumb" value="<%= w.embedThumbnail || '' %>" placeholder="https://...">
+            </div>
+            <hr>
+            <h6 class="fw-bold mb-3"><i class="bi bi-envelope me-2"></i> رسالة DM عند الانضمام</h6>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wDM" <%= w.dmEnabled ? 'checked' : '' %>>
+              <label class="form-check-label" for="wDM">إرسال رسالة خاصة</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">رسالة DM</label>
+              <textarea class="form-control" id="wDMMessage" rows="3"><%= w.dmMessage || 'مرحباً بك في {server}! نتمنى لك وقتاً ممتعاً.' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-5">
+        <div class="card sticky-top" style="top: 20px;">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-eye me-2"></i> معاينة مباشرة</h5></div>
+          <div class="card-body">
+            <div class="card" style="border-left: 4px solid <%= w.embedColor || '#00D4FF' %>;">
+              <div class="card-body">
+                <div class="d-flex align-items-start gap-3">
+                  <div class="avatar bg-primary bg-opacity-25" style="width: 50px; height: 50px;">
+                    <i class="bi bi-person-plus text-primary"></i>
+                  </div>
+                  <div class="flex-1">
+                    <h6 class="fw-bold mb-1" id="previewTitle"><%= w.embedTitle || 'مرحباً بك!' %></h6>
+                    <p class="mb-1" id="previewMessage">مرحباً <span class="fw-bold text-primary">@Ahmad</span>! أهلاً بك في <span class="fw-bold">Liberty City</span>. أنت العضو رقم <span class="fw-bold">150</span> 🎉</p>
+                    <small class="text-muted" id="previewFooter">Liberty City Bot • اليوم</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 text-center">
+              <small class="text-muted">المعاينة تقريبية — المتغيرات تُستبدل بالقيم الحقيقية</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leave Tab -->
+  <div class="tab-pane fade" id="tab-leave">
+    <div class="row g-4">
+      <div class="col-12 col-lg-7">
+        <div class="card">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-gear me-2"></i> إعدادات المغادرة</h5></div>
+          <div class="card-body">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="lEnabled" <%= lv.enabled ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="lEnabled">تفعيل رسالة المغادرة</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">قناة المغادرة (Channel ID)</label>
+              <input type="text" class="form-control" id="lChannel" value="<%= lv.channelId || '' %>" placeholder="123456789">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">رسالة المغادرة</label>
+              <textarea class="form-control" id="lMessage" rows="3"><%= lv.message || '{user} غادر السيرفر. أصبح عدد الأعضاء {count} 😢' %></textarea>
+              <div class="form-text">المتغيرات: {user} {count}</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">لون الإمبد (HEX)</label>
+              <div class="input-group">
+                <input type="color" class="form-control form-control-color" id="lColor" value="<%= lv.embedColor || '#FF3366' %>">
+                <input type="text" class="form-control" id="lColorText" value="<%= lv.embedColor || '#FF3366' %>" oninput="document.getElementById('lColor').value=this.value">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-5">
+        <div class="card sticky-top" style="top: 20px;">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-eye me-2"></i> معاينة</h5></div>
+          <div class="card-body">
+            <div class="card" style="border-left: 4px solid <%= lv.embedColor || '#FF3366' %>;">
+              <div class="card-body">
+                <p class="mb-0"><span class="fw-bold text-danger">@Ahmad</span> غادر السيرفر. أصبح عدد الأعضاء <span class="fw-bold">149</span> 😢</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Tab -->
+  <div class="tab-pane fade" id="tab-card">
+    <%
+      const card = w.card || {};
+    %>
+    <div class="row g-4">
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-palette me-2"></i> إعدادات البطاقة المرسومة</h5></div>
+          <div class="card-body">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="cardEnabled" <%= card.enabled ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="cardEnabled">تفعيل البطاقة المرسومة</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">رابط الخلفية (800×300 مفضل)</label>
+              <input type="text" class="form-control" id="cardBg" value="<%= card.backgroundUrl || '' %>" placeholder="https://...">
+            </div>
+            <hr>
+            <h6>موقع الأفاتار</h6>
+            <div class="row g-2 mb-2">
+              <div class="col-6"><label class="form-label small">X</label><input type="number" class="form-control form-control-sm" id="cardAvX" value="<%= card.avatarX || 130 %>"></div>
+              <div class="col-6"><label class="form-label small">Y</label><input type="number" class="form-control form-control-sm" id="cardAvY" value="<%= card.avatarY || 150 %>"></div>
+              <div class="col-6"><label class="form-label small">الحجم</label><input type="number" class="form-control form-control-sm" id="cardAvSize" value="<%= card.avatarSize || 170 %>"></div>
+            </div>
+            <h6>اسم العضو</h6>
+            <div class="row g-2 mb-2">
+              <div class="col-6"><label class="form-label small">X</label><input type="number" class="form-control form-control-sm" id="cardNameX" value="<%= card.nameX || 350 %>"></div>
+              <div class="col-6"><label class="form-label small">Y</label><input type="number" class="form-control form-control-sm" id="cardNameY" value="<%= card.nameY || 130 %>"></div>
+              <div class="col-6"><label class="form-label small">الحجم</label><input type="number" class="form-control form-control-sm" id="cardNameSize" value="<%= card.nameSize || 52 %>"></div>
+              <div class="col-6"><label class="form-label small">اللون</label><input type="color" class="form-control form-control-color" id="cardNameColor" value="<%= card.nameColor || '#FFFFFF' %>"></div>
+            </div>
+            <h6>رقم العضو</h6>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label small">X</label><input type="number" class="form-control form-control-sm" id="cardCountX" value="<%= card.countX || 350 %>"></div>
+              <div class="col-6"><label class="form-label small">Y</label><input type="number" class="form-control form-control-sm" id="cardCountY" value="<%= card.countY || 195 %>"></div>
+              <div class="col-6"><label class="form-label small">الحجم</label><input type="number" class="form-control form-control-sm" id="cardCountSize" value="<%= card.countSize || 28 %>"></div>
+              <div class="col-6"><label class="form-label small">اللون</label><input type="color" class="form-control form-control-color" id="cardCountColor" value="<%= card.countColor || '#C7CED8' %>"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-header"><h5 class="mb-0"><i class="bi bi-image me-2"></i> معاينة البطاقة</h5></div>
+          <div class="card-body text-center">
+            <div style="position: relative; width: 100%; max-width: 800px; aspect-ratio: 8/3; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); border-radius: 16px; margin: 0 auto; overflow: hidden;">
+              <div style="position: absolute; left: 12%; top: 50%; transform: translate(-50%, -50%); width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #a855f7); border: 3px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-person text-white" style="font-size: 2.5rem;"></i>
+              </div>
+              <div style="position: absolute; left: 28%; top: 38%; color: white; font-weight: bold; font-size: 1.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Ahmad</div>
+              <div style="position: absolute; left: 28%; top: 58%; color: #a0aec0; font-size: 1rem;">عضو #150</div>
+            </div>
+            <div class="mt-3">
+              <small class="text-muted d-block">المساحة: 800×300 بكسل</small>
+              <small class="text-muted d-block">الأفاتار دائري — الإحداثيات من المركز</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function saveWelcome() {
+  const payload = {
+    welcome: {
+      enabled: document.getElementById('wEnabled').checked,
+      channelId: document.getElementById('wChannel').value,
+      message: document.getElementById('wMessage').value,
+      embedTitle: document.getElementById('wEmbedTitle').value,
+      embedColor: document.getElementById('wEmbedColor').value,
+      imageEnabled: document.getElementById('wImage').checked,
+      imageBackground: document.getElementById('wImageBg').value,
+      embedThumbnail: document.getElementById('wEmbedThumb').value,
+      dmEnabled: document.getElementById('wDM').checked,
+      dmMessage: document.getElementById('wDMMessage').value,
+      card: {
+        enabled: document.getElementById('cardEnabled').checked,
+        backgroundUrl: document.getElementById('cardBg').value,
+        avatarX: +document.getElementById('cardAvX').value,
+        avatarY: +document.getElementById('cardAvY').value,
+        avatarSize: +document.getElementById('cardAvSize').value,
+        nameX: +document.getElementById('cardNameX').value,
+        nameY: +document.getElementById('cardNameY').value,
+        nameSize: +document.getElementById('cardNameSize').value,
+        nameColor: document.getElementById('cardNameColor').value,
+        countX: +document.getElementById('cardCountX').value,
+        countY: +document.getElementById('cardCountY').value,
+        countSize: +document.getElementById('cardCountSize').value,
+        countColor: document.getElementById('cardCountColor').value,
+      }
+    },
+    leave: {
+      enabled: document.getElementById('lEnabled').checked,
+      channelId: document.getElementById('lChannel').value,
+      message: document.getElementById('lMessage').value,
+      embedColor: document.getElementById('lColor').value,
+    }
+  };
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) showToast('تم الحفظ بنجاح ✅', 'success');
+    else showToast('فشل الحفظ ❌', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+</script>
+
+<%- include('layout-bottom') %>

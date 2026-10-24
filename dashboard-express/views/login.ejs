@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liberty City Bot - تسجيل الدخول</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #5865f2;
+      --primary-dark: #4752c4;
+      --dark: #1e1f22;
+      --darker: #151517;
+      --border: #2f3136;
+      --text: #dcddde;
+      --muted: #72767d;
+    }
+    body { background: var(--dark); color: var(--text); min-height: 100vh; }
+    .login-card { background: var(--darker); border: 1px solid var(--border); border-radius: 16px; }
+    .btn-discord { background: var(--primary); border: none; }
+    .btn-discord:hover { background: var(--primary-dark); }
+    .logo { width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), #a855f7); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+  </style>
+</head>
+<body class="d-flex align-items-center justify-center" style="min-height: 100vh;">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-5">
+        <div class="login-card p-5">
+          <div class="logo">
+            <i class="bi bi-bot text-white fs-1"></i>
+          </div>
+          <h2 class="text-center mb-1">Liberty City Bot</h2>
+          <p class="text-center text-muted mb-4">لوحة التحكم الشاملة</p>
+          
+          <% if (error) { %>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              <% if (error === 'invalid_state') { %>جلسة منتهية، حاول مرة أخرى<% } else if (error === 'auth_failed') { %>فشل المصادقة، حاول مرة أخرى<% } else { %><%= error %><% } %>
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          <% } %>
+          
+          <a href="/auth/discord" class="btn btn-discord btn-lg w-100 py-3">
+            <i class="bi bi-discord me-2"></i> تسجيل الدخول بـ Discord
+          </a>
+          
+          <div class="text-center mt-4 text-muted small">
+            <p class="mb-1">بوت Discord شامل للحماية، التذاكر، الذكاء الاصطناعي</p>
+            <p>المعروف بـ <strong>Liberty City</strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+﻿<%- include('layout-top', { title: 'الأعضاء', activePage: 'members' }) %>
+
+<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+  <div>
+    <h1 class="h3 fw-bold mb-1">
+      <i class="bi bi-people me-2 text-primary"></i>
+      إدارة الأعضاء
+    </h1>
+    <p class="text-muted mb-0">بحث، فلترة، تحذير، طرد، حظر</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <input type="text" class="form-control form-control-sm" style="width: 250px;" id="memberSearch" placeholder="بحث بالاسم/الايدي/النيكنيم..." oninput="filterMembers()">
+    <select class="form-select form-select-sm" style="width: auto;" id="roleFilter" onchange="filterMembers()">
+      <option value="">جميع الرولات</option>
+      <% if (guild) { const g = client.guilds.cache.get(guild.id); if (g) { g.roles.cache.filter(r => r.id !== g.id).sort((a,b) => b.position - a.position).forEach(r => { %>
+      <option value="<%= r.id %>"><%= r.name %></option>
+      <% }) } } %>
+    </select>
+    <select class="form-select form-select-sm" style="width: auto;" id="presenceFilter" onchange="filterMembers()">
+      <option value="">جميع الحالات</option>
+      <option value="online">أونلاين 🟢</option>
+      <option value="idle">خامل 🟡</option>
+      <option value="dnd">مشغول 🔴</option>
+      <option value="offline">أوفلاين ⚫</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="refreshMembers()">
+      <i class="bi bi-arrow-clockwise me-1"></i> تحديث
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="membersTable">
+        <thead>
+          <tr>
+            <th style="width: 50px;">#</th>
+            <th style="width: 100px;">الصورة</th>
+            <th>المستخدم</th>
+            <th>النيكنيم</th>
+            <th>الرولات</th>
+            <th>الحالة</th>
+            <th>تاريخ الانضمام</th>
+            <th style="width: 180px;">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (members && members.length > 0) { members.forEach((m, i) => { const statusColors = { online: 'success', idle: 'warning', dnd: 'danger', offline: 'secondary' }; const statusDots = { online: 'status-online', idle: 'status-idle', dnd: 'status-dnd', offline: 'status-offline' }; const roles = m.roles?.slice(0, 3).map(r => `<span class="badge bg-secondary me-1">${r}</span>`).join(' ') || '<span class="text-muted">—</span>'; const moreRoles = m.roles && m.roles.length > 3 ? ` <span class="badge bg-info">+${m.roles.length - 3}</span>` : ''; %>
+          <tr data-user="<%= m.username.toLowerCase() %><%= m.discriminator %><%= (m.nickname || '').toLowerCase() %><%= m.id %>" data-roles="<%= (m.roles || []).join(',') %>" data-presence="<%= m.presence || 'offline' %>" data-bot="<%= m.bot %>">
+            <td class="fw-bold"><%= i + 1 %></td>
+            <td>
+              <% if (m.avatar) { %>
+                <img src="https://cdn.discordapp.com/avatars/<%= m.id %>/<%= m.avatar %>.png?size=64" alt="" class="rounded-circle" style="width: 40px; height: 40px;">
+              <% } else { %>
+                <div class="avatar bg-primary bg-opacity-25" style="width: 40px; height: 40px;">
+                  <i class="bi bi-person text-primary"></i>
+                </div>
+              <% } %>
+            </td>
+            <td>
+              <div class="d-flex flex-column">
+                <span class="fw-medium"><%= m.username %>#<%= m.discriminator %></span>
+                <small class="text-muted"><%= m.id %></small>
+                <% if (m.bot) { %><span class="badge bg-purple ms-1">بوت</span><% } %>
+              </div>
+            </td>
+            <td><%= m.nickname || '<span class="text-muted">—</span>' %></td>
+            <td><%= roles %><%= moreRoles %></td>
+            <td>
+              <span class="status-dot <%= statusDots[m.presence] %> me-1"></span>
+              <span class="text-capitalize"><%= m.presence %></span>
+            </td>
+            <td class="small"><%= m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('ar-SA') : '—' %></td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-warning" onclick="warnMember('<%= m.id %>', '<%= m.username %>')" title="تحذير">
+                  <i class="bi bi-exclamation-triangle"></i>
+                </button>
+                <button class="btn btn-outline-danger" onclick="kickMember('<%= m.id %>', '<%= m.username %>')" title="طرد">
+                  <i class="bi bi-door-open"></i>
+                </button>
+                <button class="btn btn-outline-dark" onclick="banMember('<%= m.id %>', '<%= m.username %>')" title="حظر">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <% }) } else { %>
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-people" style="font-size: 2rem;"></i>
+              <p class="mt-2">لا توجد أعضاء</p>
+            </td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function filterMembers() {
+  const search = document.getElementById('memberSearch').value.toLowerCase();
+  const role = document.getElementById('roleFilter').value;
+  const presence = document.getElementById('presenceFilter').value;
+  const rows = document.querySelectorAll('#membersTable tbody tr');
+  
+  rows.forEach(row => {
+    const rowUser = row.dataset.user;
+    const rowRoles = row.dataset.roles.split(',');
+    const rowPresence = row.dataset.presence;
+    const rowBot = row.dataset.bot === 'true';
+    
+    const matchSearch = !search || rowUser.includes(search);
+    const matchRole = !role || rowRoles.includes(role);
+    const matchPresence = !presence || rowPresence === presence;
+    
+    row.style.display = (matchSearch && matchRole && matchPresence) ? '' : 'none';
+  });
+}
+
+async function refreshMembers() {
+  location.reload();
+}
+
+async function warnMember(userId, username) {
+  const reason = prompt(`سبب تحذير ${username}:`);
+  if (!reason) return;
+  try {
+    const res = await fetch(`/api/guilds/<%= guild.id %>/members/${userId}/warn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moderatorId: '<%= user.id %>', reason })
+    });
+    if (res.ok) { showToast('تم التحذير', 'success'); }
+    else showToast('فشل التحذير', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+
+async function kickMember(userId, username) {
+  if (!confirm(`هل تريد طرد ${username}؟`)) return;
+  const reason = prompt('سبب الطرد:');
+  if (reason === null) return;
+  try {
+    const res = await fetch(`/api/guilds/<%= guild.id %>/members/${userId}/kick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moderatorId: '<%= user.id %>', reason: reason || 'لا يوجد سبب' })
+    });
+    if (res.ok) { showToast('تم الطرد', 'success'); setTimeout(() => location.reload(), 1000); }
+    else showToast('فشل الطرد', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+
+async function banMember(userId, username) {
+  if (!confirm(`هل تريد حظر ${username}؟`)) return;
+  const reason = prompt('سبب الحظر:');
+  if (reason === null) return;
+  try {
+    const res = await fetch(`/api/guilds/<%= guild.id %>/members/${userId}/ban`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moderatorId: '<%= user.id %>', reason: reason || 'لا يوجد سبب' })
+    });
+    if (res.ok) { showToast('تم الحظر', 'success'); setTimeout(() => location.reload(), 1000); }
+    else showToast('فشل الحظر', 'danger');
+  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
+}
+</script>
+
+<%- include('layout-bottom') %>

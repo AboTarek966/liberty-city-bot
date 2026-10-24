@@ -1,0 +1,206 @@
+﻿<%- include('layout-top', { title: 'الحماية', activePage: 'protection' }) %>
+
+<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+  <div>
+    <h1 class="h3 fw-bold mb-1">
+      <i class="bi bi-shield-lock me-2 text-primary"></i>
+      أنظمة الحماية
+    </h1>
+    <p class="text-muted mb-0">إدارة Anti-Raid، Anti-Spam، Anti-Nuke، وغيرها من أنظمة الأمان</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap mt-3 mt-md-0">
+    <span class="badge bg-primary fs-6 px-3 py-2">
+      <%= Object.keys(settings?.protection || {}).filter(k => (settings.protection[k]?.enabled)).length %> مفعلة
+    </span>
+    <span class="badge bg-secondary fs-6 px-3 py-2">
+      <%= Object.keys(settings?.protection || {}).length %> إجمالي
+    </span>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i> الحماية الأساسية</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <% const basicFeatures = [
+            { id: 'antiRaid', name: 'Anti-Raid', desc: 'يحمي من الانضمام السريع', icon: 'bi-people', color: 'primary' },
+            { id: 'antiSpam', name: 'Anti-Spam', desc: 'يوقف تكرار الرسائل', icon: 'bi-chat-text', color: 'success' },
+            { id: 'antiLink', name: 'Anti-Link', desc: 'يمنع الروابط الخارجية', icon: 'bi-link-45deg', color: 'purple' },
+            { id: 'antiInvite', name: 'Anti-Invite', desc: 'يمنع روابط الدعوة', icon: 'bi-envelope', color: 'orange' },
+            { id: 'antiMention', name: 'Anti-Mention', desc: 'يمنع المنشن الجماعي', icon: 'bi-megaphone', color: 'danger' },
+            { id: 'antiCaps', name: 'Anti-Caps', desc: 'يمنع الحروف الكبيرة', icon: 'bi-type-bold', color: 'warning' },
+            { id: 'antiEmoji', name: 'Anti-Emoji', desc: 'يمنع الإيموجي المتكرر', icon: 'bi-emoji-smile', color: 'pink' }
+          ]; basicFeatures.forEach(f => { const s = settings?.protection?.[f.id] || {}; const enabled = s.enabled; const action = s.action || 'delete'; %>
+          <div class="col-12">
+            <div class="card border-0 bg-transparent">
+              <div class="card-body py-2">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 40px; height: 40px; border-radius: 10px;">
+                      <i class="bi <%= f.icon %> fs-4"></i>
+                    </div>
+                    <div>
+                      <h6 class="mb-1 fw-bold"><%= f.name %></h6>
+                      <p class="text-muted small mb-0"><%= f.desc %></p>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center gap-3">
+                    <select class="form-select form-select-sm" style="width: auto;" onchange="updateProtection('<%= f.id %>', 'action', this.value)" <%= !enabled ? 'disabled' : '' %>>
+                      <option value="delete" <%= action === 'delete' ? 'selected' : '' %>>حذف</option>
+                      <option value="warn" <%= action === 'warn' ? 'selected' : '' %>>تحذير</option>
+                      <option value="mute" <%= action === 'mute' ? 'selected' : '' %>>كتم</option>
+                      <option value="kick" <%= action === 'kick' ? 'selected' : '' %>>طرد</option>
+                      <option value="ban" <%= action === 'ban' ? 'selected' : '' %>>حظر</option>
+                    </select>
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
+                      <span class="toggle-slider" for="prot-<%= f.id %>"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i> الحماية المتقدمة</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <% const advancedFeatures = [
+            { id: 'antiNuke', name: 'Anti-Nuke', desc: 'يوقف الحذف الجماعي ويعاقب المخالف', icon: 'bi-shield-exclamation', color: 'danger' },
+            { id: 'antiBot', name: 'Anti-Bot', desc: 'يطرد البوتات غير المصرح بها', icon: 'bi-robot', color: 'info' },
+            { id: 'antiAdmin', name: 'Anti-Admin', desc: 'تنبيه فوري عند منح أدمن', icon: 'bi-shield-lock', color: 'orange' },
+            { id: 'autoBackup', name: 'Auto-Backup', desc: 'نسخ احتياطي تلقائي للرولات', icon: 'bi-hdd', color: 'primary' },
+            { id: 'autoScan', name: 'Auto-Scan', desc: 'فحص دوري للرومات/الرولات', icon: 'bi-search', color: 'indigo' },
+            { id: 'scamFilter', name: 'Scam Filter', desc: 'يحذف روابط الصيد', icon: 'bi-shield-check', color: 'success' }
+          ]; advancedFeatures.forEach(f => { const s = settings?.protection?.[f.id] || {}; const enabled = s.enabled; const action = s.action || 'alert'; %>
+          <div class="col-12">
+            <div class="card border-0 bg-transparent">
+              <div class="card-body py-2">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 40px; height: 40px; border-radius: 10px;">
+                      <i class="bi <%= f.icon %> fs-4"></i>
+                    </div>
+                    <div>
+                      <h6 class="mb-1 fw-bold"><%= f.name %></h6>
+                      <p class="text-muted small mb-0"><%= f.desc %></p>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
+                      <span class="toggle-slider" for="prot-<%= f.id %>"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-robot me-2"></i> أنظمة الذكاء الاصطناعي</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <% const aiFeatures = [
+            { id: 'aiAutoMod', name: 'AI Auto-Moderation', desc: 'يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال', icon: 'bi-shield', color: 'purple' },
+            { id: 'aiTicketAssistant', name: 'AI Ticket Assistant', desc: 'يستلم التذكرة، يحلل، يحل، يطلب موافقة', icon: 'bi-chat-dots', color: 'pink' },
+            { id: 'aiTranslator', name: 'AI Translator', desc: 'ترجمة فورية مع كشف اللغة التلقائي', icon: 'bi-translate', color: 'info' }
+          ]; aiFeatures.forEach(f => { const s = settings?.protection?.[f.id] || {}; const enabled = s.enabled; const sensitivity = s.sensitivity || 7; %>
+          <div class="col-12 col-md-4">
+            <div class="card border-0 bg-transparent h-100">
+              <div class="card-body">
+                <div class="d-flex align-items-start gap-3">
+                  <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;">
+                    <i class="bi <%= f.icon %> fs-2"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <h6 class="fw-bold mb-1"><%= f.name %></h6>
+                        <p class="text-muted small mb-2"><%= f.desc %></p>
+                      </div>
+                      <div class="toggle-switch">
+                        <input type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
+                        <span class="toggle-slider" for="prot-<%= f.id %>"></span>
+                      </div>
+                    </div>
+                    <p class="text-muted small mb-2"><%= f.desc %></p>
+                    <% if (enabled) { %>
+                      <div class="mt-2">
+                        <label class="form-label small text-muted">الحساسية</label>
+                        <input type="range" class="form-range" min="1" max="10" value="<%= sensitivity %>" onchange="updateProtection('<%= f.id %>', 'sensitivity', this.value)">
+                        <div class="d-flex justify-content-between text-muted small mt-1">
+                          <span>منخفضة</span>
+                          <span class="fw-bold"><%= sensitivity %></span>
+                          <span>عالية</span>
+                        </div>
+                      </div>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function toggleProtection(featureId, enabled) {
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ featureId, enabled })
+    });
+    if (!res.ok) {
+      alert('فشل التحديث');
+      location.reload();
+    }
+  } catch (e) {
+    alert('خطأ في الاتصال');
+    location.reload();
+  }
+}
+
+async function updateProtection(featureId, key, value) {
+  try {
+    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ featureId, [key]: value })
+    });
+    if (!res.ok) location.reload();
+  } catch (e) {
+    location.reload();
+  }
+}
+</script>
+
+<%- include('layout-bottom') %>

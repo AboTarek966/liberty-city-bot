@@ -1,0 +1,27 @@
+    </div>
+  </main>
+  
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('show');
+      document.getElementById('sidebarOverlay').classList.toggle('show');
+    }
+    function changeGuild(guildId) {
+      if (!guildId) return;
+      fetch('/api/select-guild', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guildId })
+      }).then(() => window.location.href = '/dashboard/' + guildId);
+    }
+    // Auto-close alerts after 5 seconds
+    setTimeout(() => {
+      document.querySelectorAll('.alert-dismissible').forEach(alert => {
+        const bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      });
+    }, 5000);
+  </script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>
