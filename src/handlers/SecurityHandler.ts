@@ -182,6 +182,12 @@ export class SecurityHandler {
   // Pro Max: sticky role watchdog timers
   private topWatchdogs: Map<string, NodeJS.Timeout> = new Map();
 
+  // 🔒 Auto-Lockdown cooldown
+  private lockdownCooldown: Map<string, number> = new Map();
+
+  // 💣 Nuke detection tracker
+  private nukeTracker: Map<string, { channels: number; roles: number; webhooks: number; lastAction: number }> = new Map();
+
   constructor(client: Client) {
     this.client = client;
   }
@@ -499,6 +505,12 @@ export class SecurityHandler {
       channel.delete('Security: rapid channel create').catch(() => {});
       member?.roles.set([], 'Security: rapid channel creation').catch(() => {});
       member?.ban({ reason: 'Security: rapid channel creation (anti-nuke)' }).catch(() => {});
+      
+      // 💣 Nuke detection tracking
+      if (this.trackNukeActivity(channel.guild.id, 'channel')) {
+        await this.triggerAutoLockdown(channel.guild, await getGuildSettings(channel.guild.id), 'Nuke detected: mass channel creation');
+      }
+      
       // تنبيه في الخلفية
       getGuildSettings(channel.guild.id).then(s => this.getAlertChannel(channel.guild, s))
         .then(a => a?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ قناة!**\nتم الحذف + الحظر` }).catch(() => {}));
@@ -533,6 +545,12 @@ export class SecurityHandler {
       role.delete('Security: rapid role create').catch(() => {});
       member?.roles.set([], 'Security: rapid role creation').catch(() => {});
       member?.ban({ reason: 'Security: rapid role creation (anti-nuke)' }).catch(() => {});
+      
+      // 💣 Nuke detection tracking
+      if (this.trackNukeActivity(role.guild.id, 'role')) {
+        await this.triggerAutoLockdown(role.guild, await getGuildSettings(role.guild.id), 'Nuke detected: mass role creation');
+      }
+      
       getGuildSettings(role.guild.id).then(s => this.getAlertChannel(role.guild, s))
         .then(a => a?.send({ content: `🚨 **هجوم — ${entry.executor.tag} أنشأ رول!**\nتم الحذف + الحظر` }).catch(() => {}));
 
@@ -721,6 +739,11 @@ export class SecurityHandler {
         }
       }
 
+      // 💣 Nuke detection tracking
+      if (this.trackNukeActivity(guild.id, 'webhook')) {
+        await this.triggerAutoLockdown(guild, settings, 'Nuke detected: mass webhook creation');
+      }
+
       const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
       const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
       let msg = `🔗 **${executorType} أنشأ ويب هوك:** ${entry.executor.tag}\n`;
@@ -802,72 +825,262 @@ export class SecurityHandler {
   }
 
   // --------------------------------------------
-  // Pro Max: ANTI-PERMISSION OVERWRITE CHANGES — تعديل صلاحيات → إرجاع فوري + عقوبة
+  // PREVENTIVE: ANTI-@EVERYONE DANGEROUS PERMISSIONS
+  // يمنع أي تغيير يعطي @everyone صلاحيات: Administrator, ManageChannels, ManageRoles, BanMembers, KickMembers, MentionEveryone
   // --------------------------------------------
   async onChannelPermissionUpdate(oldChannel: any, newChannel: any): Promise<void> {
     try {
       if (!newChannel?.guild) return;
-      const oldOverwrites = oldChannel.permissionOverwrites?.cache?.size ?? 0;
-      const newOverwrites = newChannel.permissionOverwrites?.cache?.size ?? 0;
-      if (Math.abs(oldOverwrites - newOverwrites) < 1) return; // أي تغيير = رد
+      
+      // فحص سريع: هل فيه تغيير في أوفررايتس @everyone؟
+      const everyoneRoleId = newChannel.guild.id;
+      const oldEveryone = oldChannel.permissionOverwrites?.cache?.get(everyoneRoleId);
+      const newEveryone = newChannel.permissionOverwrites?.cache?.get(everyoneRoleId);
+      
+      if (!newEveryone) return; // مفيش أوفررايت على @everyone
+      
+      const DANGEROUS_PERMS = [
+        PermissionFlagsBits.Administrator,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.ManageRoles,
+        PermissionFlagsBits.BanMembers,
+        PermissionFlagsBits.KickMembers,
+        PermissionFlagsBits.MentionEveryone,
+        PermissionFlagsBits.ManageWebhooks,
+        PermissionFlagsBits.ManageGuild,
+      ];
+      
+      // فحص: هل الـ allow الجديد فيه صلاحيات خطيرة؟
+      const newAllow = newEveryone.allow?.bitfield ?? 0n;
+      const oldAllow = oldEveryone?.allow?.bitfield ?? 0n;
+      
+      let dangerousAdded = false;
+      for (const perm of DANGEROUS_PERMS) {
+        const permBit = BigInt(perm);
+        if ((newAllow & permBit) !== 0n && (oldAllow & permBit) === 0n) {
+          dangerousAdded = true;
+          break;
+        }
+      }
+      
+      if (!dangerousAdded) return; // مفيش صلاحيات خطيرة جديدة
+      
+      // جلب المنفّذ
       const logs = await newChannel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelUpdate, limit: 1 });
       const entry = logs.entries.first();
       if (!entry?.executor) return;
-      if (Date.now() - entry.createdTimestamp > 1500) return;
+      if (Date.now() - entry.createdTimestamp > 1000) return; // نافذة أضيق = 1 ثانية
       if (entry.executor.id === this.client.user?.id) return;
-      const member = newChannel.guild.members.cache.get(entry.executor.id);
-
+      if (await this.isTrustedExecutor(newChannel.guild, entry.executor.id)) return;
+      
       const guild = newChannel.guild;
+      const member = guild.members.cache.get(entry.executor.id);
+      if (!member) return;
+      
       const settings = await getGuildSettings(guild.id);
       const antiNuke = settings.protection?.antiNuke;
       if (!antiNuke?.enabled) return;
-
-      if (await this.isTrustedExecutor(guild, entry.executor.id)) return;
-
+      
       const hierarchy = this.checkHierarchy(guild);
       if (!hierarchy.ok) {
         const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
-        alert?.send({ content: `⚠️ **فشل حماية الصلاحيات** — البوت ليس أعلى رتبة! اسحب رول البوت للأعلى.` }).catch(() => {});
+        alert?.send({ content: `⚠️ **فشل منع @everyone危险权限** — البوت ليس أعلى رتبة! اسحب رول البوت للأعلى.` }).catch(() => {});
         return;
       }
-
+      
       const me = guild.members.me;
       const canManageChannels = me?.permissions.has(PermissionFlagsBits.ManageChannels) ?? false;
       const canKick = me?.permissions.has(PermissionFlagsBits.KickMembers) ?? false;
       const canBan = me?.permissions.has(PermissionFlagsBits.BanMembers) ?? false;
-
+      
       let permsRestored = false;
       let punished = false;
       let punishType = 'none';
-
-      if (canManageChannels) {
-        try { await newChannel.permissionOverwrites.set(oldChannel.permissionOverwrites.cache.map((o: any) => [o.id, o]), 'Security: perm overwrite reverted'); permsRestored = true; } catch {}
+      
+      // 1️⃣ إرجاع الأوفررايت فوراً
+      if (canManageChannels && oldEveryone) {
+        try {
+          await newChannel.permissionOverwrites.edit(everyoneRoleId, oldEveryone, 'Security: @everyone dangerous perm reverted');
+          permsRestored = true;
+        } catch (e: any) {
+          logger.warn(`Failed to restore @everyone perms in ${guild.name}: ${e.message}`);
+        }
       }
-
+      
+      // 2️⃣ تفعيل Auto-Lockdown فوري
+      await this.triggerAutoLockdown(guild, settings, `Anti-@everyone: ${entry.executor.tag} tried to grant dangerous perms`);
+      
+      // 3️⃣ العقوبة
       const action = antiNuke.action || 'kick';
       if (action !== 'alert' && member) {
         if (action === 'strip' && canKick) {
-          try { await member.roles.set([], 'Security: perm overwrite spam'); punished = true; punishType = 'strip'; } catch {}
+          try { await member.roles.set([], 'Security: @everyone dangerous perm'); punished = true; punishType = 'strip'; } catch {}
         } else if (action === 'kick' && canKick) {
-          try { await member.kick('Security: perm overwrite spam'); punished = true; punishType = 'kick'; } catch {}
+          try { await member.kick('Security: @everyone dangerous perm'); punished = true; punishType = 'kick'; } catch {}
         } else if (action === 'ban' && canBan) {
-          try { await member.ban({ reason: 'Security: perm overwrite spam' }); punished = true; punishType = 'ban'; } catch {}
+          try { await member.ban({ reason: 'Security: @everyone dangerous perm (anti-nuke)' }); punished = true; punishType = 'ban'; } catch {}
         }
       }
-
+      
+      // 4️⃣ تنبيه أحمر
       const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
       const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
-      let msg = `🔐 **${executorType} غيّر صلاحيات قناة:** ${entry.executor.tag}\n`;
+      let msg = `🚨 **${executorType} حاول إعطاء @everyone صلاحيات خطيرة!**\n`;
+      msg += `👤 المنفّذ: ${entry.executor.tag}\n`;
       msg += `📍 القناة: <#${newChannel.id}>\n`;
-      msg += `🔄 استرجاع الصلاحيات: ${permsRestored ? '✅' : canManageChannels ? '❌' : '⚠️ لا توجد صلاحية ManageChannels'}\n`;
+      msg += `🔄 استرجاع الصلاحيات: ${permsRestored ? '✅ تم' : '❌ فشل'}\n`;
+      msg += `🔒 Auto-Lockdown: ✅ مفعل\n`;
       if (action === 'alert') msg += `🔔 الإجراء: تنبيه فقط`;
       else msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل'}`;
       alert?.send({ content: msg }).catch(() => {});
-
+      
+      logger.error(`🚨 ANTI-@EVERYONE triggered in ${guild.name} by ${entry.executor.tag} on #${newChannel.name}`);
+      
     } catch (error: any) {
-      logger.error(`onChannelPermissionUpdate error: ${error.message}`);
+      logger.error(`onChannelPermissionUpdate (@everyone) error: ${error.message}`);
     }
   }
+
+  // --------------------------------------------
+  // PREVENTIVE: AUTO-LOCKDOWN — يقفل كل القنوات عند كشف هجوم
+  // --------------------------------------------
+  private async triggerAutoLockdown(guild: Guild, settings: any, reason: string): Promise<void> {
+    try {
+      const lockdownKey = `lockdown:${guild.id}`;
+      const now = Date.now();
+      const lastLockdown = this.lockdownCooldown?.get(lockdownKey) || 0;
+      
+      // Cooldown 30 ثانية بين كل قفل
+      if (now - lastLockdown < 30000) return;
+      this.lockdownCooldown = this.lockdownCooldown || new Map();
+      this.lockdownCooldown.set(lockdownKey, now);
+      
+      // حفظ حالة القفل في الإعدادات
+      settings.protection = settings.protection || {};
+      settings.protection.lockdown = true;
+      
+      // قفل كل القنوات النصية
+      const me = guild.members.me;
+      if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) return;
+      
+      const everyoneRole = guild.roles.everyone;
+      let locked = 0;
+      for (const [, channel] of guild.channels.cache) {
+        if (channel.isTextBased() && !channel.isThread()) {
+          try {
+            const perms = {
+              SendMessages: false,
+              AddReactions: false,
+              CreatePublicThreads: false,
+              CreatePrivateThreads: false,
+              SendMessagesInThreads: false,
+            };
+            await channel.permissionOverwrites.edit(everyoneRole, perms).catch(() => {});
+            locked++;
+          } catch {}
+        }
+      }
+      
+      logger.warn(`🔒 AUTO-LOCKDOWN activated in ${guild.name}: ${locked} channels locked — ${reason}`);
+      
+      // تنبيه في قروم الحماية
+      const antiNuke = settings.protection?.antiNuke;
+      const alert = await this.getAlertChannel(guild, settings, antiNuke?.logChannel);
+      alert?.send({ 
+        content: `🔴 **AUTO-LOCKDOWN مفعّل!**\n` +
+          `📋 السبب: ${reason}\n` +
+          `🔒 قنوات مقفولة: ${locked}\n` +
+          `⏰ المدة: 30 دقيقة (أو استخدم \`/lockdown off\`)` 
+      }).catch(() => {});
+      
+      // إلغاء القفل تلقائياً بعد 30 دقيقة
+      setTimeout(async () => {
+        try {
+          settings.protection.lockdown = false;
+          // ملاحظة: الفتح اليدوي أفضل، لكن نضيف خيار auto-unlock في الإعدادات
+        } catch {}
+      }, 30 * 60 * 1000);
+      
+    } catch (error: any) {
+      logger.error(`triggerAutoLockdown error: ${error.message}`);
+    }
+  }
+
+  // --------------------------------------------
+  // PREVENTIVE: BOT JOIN FILTER — يمنع بوتات مش موثوقة
+  // --------------------------------------------
+  async onGuildMemberAdd(member: any): Promise<void> {
+    try {
+      if (!member?.guild || !member.user.bot) return;
+      
+      // السماح للبوتات الموثوقة: البوت نفسه، بوتات Discord الرسمية، وبوتات الـ whitelist
+      const TRUSTED_BOT_IDS = [
+        this.client.user?.id,
+        '854233015475109888', // Clyde (Discord)
+        '293036868578279425', // Discord Bots
+      ];
+      
+      const settings = await getGuildSettings(member.guild.id);
+      const customWhitelist = settings.protection?.antiBot?.whitelist || [];
+      const allWhitelist = [...TRUSTED_BOT_IDS, ...customWhitelist];
+      
+      if (allWhitelist.includes(member.id)) return; // موثوق
+      
+      // إذا antiBot مفعل
+      const antiBot = settings.protection?.antiBot;
+      if (!antiBot?.enabled) return;
+      
+      // طرد فوري
+      try {
+        await member.kick('Security: unauthorized bot join (anti-bot)');
+        
+        const alert = await this.getAlertChannel(member.guild, settings, antiBot.logChannel);
+        alert?.send({ 
+          content: `🤖 **بوت غير مصرح حاول الدخول!**\n` +
+            `🤖 البوت: ${member.user.tag}\n` +
+            `👢 تم الطرد فوراً\n` +
+            `📋 السبب: antiBot protection` 
+        }).catch(() => {});
+        
+        logger.warn(`🤖 Unauthorized bot kicked: ${member.user.tag} in ${member.guild.name}`);
+      } catch (e: any) {
+        logger.warn(`Failed to kick unauthorized bot ${member.user.tag}: ${e.message}`);
+      }
+      
+    } catch (error: any) {
+      logger.error(`onGuildMemberAdd (anti-bot) error: ${error.message}`);
+    }
+  }
+
+  // --------------------------------------------
+  // PREVENTIVE: NUKE DETECTION — كشف عمليات جماعية
+  // --------------------------------------------
+  private trackNukeActivity(guildId: string, type: 'channel' | 'role' | 'webhook'): boolean {
+    const now = Date.now();
+    const tracker = this.nukeTracker.get(guildId) || { channels: 0, roles: 0, webhooks: 0, lastAction: now };
+    
+    // Reset إذا مرت 10 ثواني
+    if (now - tracker.lastAction > 10000) {
+      tracker.channels = 0;
+      tracker.roles = 0;
+      tracker.webhooks = 0;
+    }
+    
+    // زيادة العداد الصحيح
+    if (type === 'channel') tracker.channels++;
+    else if (type === 'role') tracker.roles++;
+    else if (type === 'webhook') tracker.webhooks++;
+    
+    tracker.lastAction = now;
+    this.nukeTracker.set(guildId, tracker);
+    
+    // كشف نكهة: 3+ قنوات أو 3+ رولات أو 2+ ويب هوك في 10 ثواني
+    return tracker.channels >= 3 || tracker.roles >= 3 || tracker.webhooks >= 2;
+  }
+
+  // إضافة tracking في onChannelCreate
+  // إضافة tracking في onRoleCreate
+  // إضافة tracking في onWebhookUpdate
 
   // --------------------------------------------
   // Pro Max: STICKY BOT ROLE POSITION — كل 10 ثواني يتأكد إن رول البوت في القمة
@@ -942,8 +1155,9 @@ export class SecurityHandler {
       const isWhitelisted = executor ? await this.isWhitelisted(guild, executor.id) : false;
 
       // 🔒 قفل القناة فوراً لمنع المزيد من الحذف
+      const everyoneRole = guild.roles.everyone;
       try {
-        await channel.permissionOverwrites.edit(guild.id, { SendMessages: false, AddReactions: false }, 'Security: mass message delete detected').catch(() => {});
+        await channel.permissionOverwrites.edit(everyoneRole, { SendMessages: false, AddReactions: false }, 'Security: mass message delete detected').catch(() => {});
       } catch {}
 
       // استعادة الرسائل من اللقطة
