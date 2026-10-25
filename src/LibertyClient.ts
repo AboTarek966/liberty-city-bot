@@ -32,6 +32,7 @@ import {
   EconomyHandler,
   GameHandler,
   MusicHandler,
+  DashboardCommandWorker,
 } from './handlers';
 import mongoose from 'mongoose';
 import express, { Express, Request, Response } from 'express';
@@ -64,6 +65,7 @@ export class LibertyClient extends Client {
   public economyHandler: EconomyHandler;
   public gameHandler: GameHandler;
   public musicHandler: MusicHandler;
+  public dashboardCommandWorker: DashboardCommandWorker;
 
   // Express server for Dashboard API
   public expressApp: Express;
@@ -126,6 +128,7 @@ export class LibertyClient extends Client {
     this.economyHandler = new EconomyHandler(this);
     this.gameHandler = new GameHandler(this);
     this.musicHandler = new MusicHandler(this);
+    this.dashboardCommandWorker = new DashboardCommandWorker(this);
   }
 
   private setupExpress(): void {
@@ -168,6 +171,22 @@ export class LibertyClient extends Client {
       } catch (error) {
         logger.error('Failed to update guild settings:', error);
         res.status(500).json({ error: 'Failed to update settings' });
+      }
+    });
+
+    // Guild roles (for the members-page role manager)
+    router.get('/guilds/:guildId/roles', async (req: Request, res: Response) => {
+      try {
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        const roles = guild.roles.cache
+          .filter(r => r.id !== guild.id)
+          .sort((a, b) => b.position - a.position)
+          .map(r => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position }));
+        res.json(roles);
+      } catch (error) {
+        logger.error('Failed to get guild roles:', error);
+        res.status(500).json({ error: 'Failed to get roles' });
       }
     });
 
@@ -254,7 +273,9 @@ export class LibertyClient extends Client {
           discriminator: m.user.discriminator,
           avatar: m.user.avatar,
           nickname: m.nickname,
-          roles: m.roles.cache.map(r => r.id).filter(r => r !== guild.id),
+          roles: m.roles.cache
+            .filter(r => r.id !== guild.id)
+            .map(r => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position })),
           joinedAt: m.joinedAt?.toISOString(),
           presence: m.presence?.status || 'offline',
           bot: m.user.bot,
@@ -585,6 +606,14 @@ export class LibertyClient extends Client {
 
       // Login to Discord
       await this.login(config.discord.token);
+
+      // أوامر لوحة التحكم عن بعد (طابور عبر MongoDB)
+      try {
+        this.dashboardCommandWorker.start();
+        logger.info('🖱️ Dashboard command worker started');
+      } catch (e) {
+        logger.warn('Dashboard command worker failed to start:', e);
+      }
 
       logger.info('✅ Liberty City Bot initialized successfully');
     } catch (error) {

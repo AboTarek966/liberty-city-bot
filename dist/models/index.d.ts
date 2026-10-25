@@ -619,6 +619,16 @@ export interface IUserAFK extends Document {
     reason: string;
     since: Date;
 }
+export interface IDashboardCommand extends Document {
+    guildId: string;
+    command: string;
+    payload: any;
+    status: 'pending' | 'running' | 'done' | 'failed';
+    result: any;
+    error: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
 export declare const GuildSettings: mongoose.Model<IGuildSettings, {}, {}, {}, mongoose.Document<unknown, {}, IGuildSettings, {}, {}> & IGuildSettings & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
@@ -660,6 +670,11 @@ export declare const MuteRole: mongoose.Model<IMuteRole, {}, {}, {}, mongoose.Do
     __v: number;
 }, any>;
 export declare const UserAFK: mongoose.Model<IUserAFK, {}, {}, {}, mongoose.Document<unknown, {}, IUserAFK, {}, {}> & IUserAFK & Required<{
+    _id: mongoose.Types.ObjectId;
+}> & {
+    __v: number;
+}, any>;
+export declare const DashboardCommand: mongoose.Model<IDashboardCommand, {}, {}, {}, mongoose.Document<unknown, {}, IDashboardCommand, {}, {}> & IDashboardCommand & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
     __v: number;

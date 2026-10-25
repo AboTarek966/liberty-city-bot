@@ -73,6 +73,7 @@ class LibertyClient extends discord_js_1.Client {
     economyHandler;
     gameHandler;
     musicHandler;
+    dashboardCommandWorker;
     // Express server for Dashboard API
     expressApp;
     // Cooldowns
@@ -129,6 +130,7 @@ class LibertyClient extends discord_js_1.Client {
         this.economyHandler = new handlers_1.EconomyHandler(this);
         this.gameHandler = new handlers_1.GameHandler(this);
         this.musicHandler = new handlers_1.MusicHandler(this);
+        this.dashboardCommandWorker = new handlers_1.DashboardCommandWorker(this);
     }
     setupExpress() {
         this.expressApp.use((0, cors_1.default)({
@@ -167,6 +169,23 @@ class LibertyClient extends discord_js_1.Client {
             catch (error) {
                 logger.error('Failed to update guild settings:', error);
                 res.status(500).json({ error: 'Failed to update settings' });
+            }
+        });
+        // Guild roles (for the members-page role manager)
+        router.get('/guilds/:guildId/roles', async (req, res) => {
+            try {
+                const guild = this.guilds.cache.get(req.params.guildId);
+                if (!guild)
+                    return res.status(404).json({ error: 'Guild not found' });
+                const roles = guild.roles.cache
+                    .filter(r => r.id !== guild.id)
+                    .sort((a, b) => b.position - a.position)
+                    .map(r => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position }));
+                res.json(roles);
+            }
+            catch (error) {
+                logger.error('Failed to get guild roles:', error);
+                res.status(500).json({ error: 'Failed to get roles' });
             }
         });
         // Guild stats
@@ -246,7 +265,9 @@ class LibertyClient extends discord_js_1.Client {
                     discriminator: m.user.discriminator,
                     avatar: m.user.avatar,
                     nickname: m.nickname,
-                    roles: m.roles.cache.map(r => r.id).filter(r => r !== guild.id),
+                    roles: m.roles.cache
+                        .filter(r => r.id !== guild.id)
+                        .map(r => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position })),
                     joinedAt: m.joinedAt?.toISOString(),
                     presence: m.presence?.status || 'offline',
                     bot: m.user.bot,
@@ -572,6 +593,14 @@ class LibertyClient extends discord_js_1.Client {
             await this.loadHandlers();
             // Login to Discord
             await this.login(config_1.config.discord.token);
+            // أوامر لوحة التحكم عن بعد (طابور عبر MongoDB)
+            try {
+                this.dashboardCommandWorker.start();
+                logger.info('🖱️ Dashboard command worker started');
+            }
+            catch (e) {
+                logger.warn('Dashboard command worker failed to start:', e);
+            }
             logger.info('✅ Liberty City Bot initialized successfully');
         }
         catch (error) {

@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -643,6 +643,16 @@ const UserAFKSchema = new mongoose_1.Schema({
     since: { type: Date, default: Date.now },
 });
 UserAFKSchema.index({ guildId: 1, userId: 1 }, { unique: true });
+const DashboardCommandSchema = new mongoose_1.Schema({
+    guildId: { type: String, required: true, index: true },
+    command: { type: String, required: true },
+    payload: { type: mongoose_1.Schema.Types.Mixed, default: {} },
+    status: { type: String, enum: ['pending', 'running', 'done', 'failed'], default: 'pending', index: true },
+    result: { type: mongoose_1.Schema.Types.Mixed, default: null },
+    error: { type: String },
+    createdAt: { type: Date, default: Date.now, expires: 86400 },
+    updatedAt: { type: Date, default: Date.now },
+});
 // --------------------------------------------
 // Model Exports
 // --------------------------------------------
@@ -655,6 +665,7 @@ exports.AISession = mongoose_1.default.model('AISession', AISessionSchema);
 exports.UserProfile = mongoose_1.default.model('UserProfile', UserProfileSchema);
 exports.MuteRole = mongoose_1.default.model('MuteRole', MuteRoleSchema);
 exports.UserAFK = mongoose_1.default.model('UserAFK', UserAFKSchema);
+exports.DashboardCommand = mongoose_1.default.model('DashboardCommand', DashboardCommandSchema);
 // Re-export new models
 var CommandAlias_2 = require("./CommandAlias");
 Object.defineProperty(exports, "CommandAlias", { enumerable: true, get: function () { return CommandAlias_2.CommandAlias; } });

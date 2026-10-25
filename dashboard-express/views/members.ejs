@@ -68,7 +68,7 @@
       </select>
       <select class="form-select form-select-sm" id="memberRoleFilter" onchange="filterMembers()" style="width: auto; min-width: 200px;">
         <option value="">جميع الرولات</option>
-        <% if (guild?.roles) { guild.roles.cache.forEach(r => { if (r.id !== guild.id) { %>
+        <% if (locals.roles && roles.length) { roles.forEach(r => { %>
         <option value="<%= r.id %>"><%= r.name %></option>
         <% }) } %>
       </select>

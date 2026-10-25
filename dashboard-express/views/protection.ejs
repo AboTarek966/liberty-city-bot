@@ -1,4 +1,38 @@
 ﻿<%- include('layout-top', { title: 'الحماية', activePage: 'protection' }) %>
+<%
+  // Feature catalogs used throughout this view (declared early to avoid TDZ issues)
+  const basicFeatures = [
+    { id: 'antiRaid', name: 'Anti-Raid', desc: 'يحمي من الانضمام السريع والهجمات المنظمة', icon: 'bi-people', color: 'primary', actions: ['warn', 'kick', 'ban'] },
+    { id: 'antiSpam', name: 'Anti-Spam', desc: 'يوقف تكرار الرسائل والسبام', icon: 'bi-chat-text', color: 'success', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+    { id: 'antiLink', name: 'Anti-Link', desc: 'يمنع الروابط الخارجية المشبوهة', icon: 'bi-link-45deg', color: 'purple', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+    { id: 'antiInvite', name: 'Anti-Invite', desc: 'يمنع روابط الدعوة لخوادم أخرى', icon: 'bi-envelope', color: 'orange', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+    { id: 'antiMention', name: 'Anti-Mention', desc: 'يمنع المنشن الجماعي (@everyone/@here)', icon: 'bi-megaphone', color: 'danger', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+    { id: 'antiCaps', name: 'Anti-Caps', desc: 'يمنع الرسائل بحروف كبيرة مفرطة', icon: 'bi-type-bold', color: 'warning', actions: ['delete', 'warn', 'mute'] },
+    { id: 'antiEmoji', name: 'Anti-Emoji', desc: 'يمنع الإيموجي المتكرر في رسالة واحدة', icon: 'bi-emoji-smile', color: 'pink', actions: ['delete', 'warn', 'mute'] },
+    { id: 'antiZalgo', name: 'Anti-Zalgo', desc: 'يمنع نصوص Zalgo المزعجة', icon: 'bi-file-text', color: 'indigo', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+  ];
+  const advancedFeatures = [
+    { id: 'antiNuke', name: 'Anti-Nuke', desc: 'يوقف الحذف الجماعي ويعاقب المخالف فوراً', icon: 'bi-shield-exclamation', color: 'danger', config: { action: ['alert', 'strip', 'kick', 'ban'], logChannel: true } },
+    { id: 'antiBot', name: 'Anti-Bot', desc: 'يطرد البوتات غير المصرح بها فور الانضمام', icon: 'bi-robot', color: 'info', config: { whitelist: true, logChannel: true } },
+    { id: 'antiAdmin', name: 'Anti-Admin', desc: 'يمنع منح Administrator ويعاقب المانح', icon: 'bi-shield-lock', color: 'orange', config: { action: ['alert', 'kick', 'ban'], logChannel: true } },
+    { id: 'autoBackup', name: 'Auto-Backup', desc: 'نسخ احتياطي تلقائي للرولات والقنوات', icon: 'bi-hdd', color: 'primary', config: { interval: true, keep: true } },
+    { id: 'autoScan', name: 'Auto-Scan', desc: 'فحص دوري يكشف الرومات/الرولات المشبوهة', icon: 'bi-search', color: 'indigo', config: { interval: true } },
+    { id: 'scamFilter', name: 'Scam Filter', desc: 'يحذف روابط الصيد (نيترو مزيف، ستيم، إلخ)', icon: 'bi-shield-check', color: 'success', config: { action: ['delete', 'warn', 'mute', 'kick', 'ban'], logChannel: true } },
+    { id: 'antiAlt', name: 'Anti-Alt', desc: 'يكشف الحسابات البديلة (Alts)', icon: 'bi-person-badge', color: 'purple', config: { action: ['kick', 'ban', 'quarantine', 'log'], maxAccounts: true, creationDays: true, quarantineRole: true, logChannel: true } },
+    { id: 'inviteTracker', name: 'Invite Tracker', desc: 'يتتبع الدعوات ويكشف المشبوهة', icon: 'bi-link-45deg', color: 'cyan', config: { logChannel: true } },
+  ];
+  const aiFeatures = [
+    { id: 'aiAutoMod', name: 'AI Auto-Moderation', desc: 'يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال/تهديد', icon: 'bi-shield', color: 'purple', config: { sensitivity: true, maxActions: true, logChannel: true, ignoredChannels: true, ignoredRoles: true } },
+    { id: 'aiTicketAssistant', name: 'AI Ticket Assistant', desc: 'يستلم التذكرة، يحلل المشكلة، يقترح حل، يطلب موافقة', icon: 'bi-chat-dots', color: 'pink', config: { confidence: true, maxAutoActions: true, logChannel: true, ignoredChannels: true, ignoredRoles: true } },
+    { id: 'aiTranslator', name: 'AI Translator', desc: 'ترجمة فورية مع كشف اللغة التلقائي', icon: 'bi-translate', color: 'info', config: { targetLang: true, ignoredChannels: true } },
+  ];
+  function areAllBasicEnabled() {
+    return basicFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled);
+  }
+  function areAllAdvancedEnabled() {
+    return advancedFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled);
+  }
+%>
 
 <div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
   <div>
@@ -66,21 +100,8 @@
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <% 
-            const basicFeatures = [
-              { id: 'antiRaid', name: 'Anti-Raid', desc: 'يحمي من الانضمام السريع والهجمات المنظمة', icon: 'bi-people', color: 'primary', actions: ['warn', 'kick', 'ban', 'lockdown'] },
-              { id: 'antiSpam', name: 'Anti-Spam', desc: 'يوقف تكرار الرسائل والسبام', icon: 'bi-chat-text', color: 'success', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
-              { id: 'antiLink', name: 'Anti-Link', desc: 'يمنع الروابط الخارجية المشبوهة', icon: 'bi-link-45deg', color: 'purple', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
-              { id: 'antiInvite', name: 'Anti-Invite', desc: 'يمنع روابط الدعوة لخوادم أخرى', icon: 'bi-envelope', color: 'orange', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
-              { id: 'antiMention', name: 'Anti-Mention', desc: 'يمنع المنشن الجماعي (@everyone/@here)', icon: 'bi-megaphone', color: 'danger', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
-              { id: 'antiCaps', name: 'Anti-Caps', desc: 'يمنع الرسائل بحروف كبيرة مفرطة', icon: 'bi-type-bold', color: 'warning', actions: ['delete', 'warn', 'mute'] },
-              { id: 'antiEmoji', name: 'Anti-Emoji', desc: 'يمنع الإيموجي المتكرر في رسالة واحدة', icon: 'bi-emoji-smile', color: 'pink', actions: ['delete', 'warn', 'mute'] },
-              { id: 'antiZalgo', name: 'Anti-Zalgo', desc: 'يمنع نصوص Zalgo المزعجة', icon: 'bi-file-text', color: 'indigo', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
-            ];
-            function areAllBasicEnabled() {
-              return basicFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled);
-            }
-            basicFeatures.forEach(f => { 
+          <%
+            basicFeatures.forEach(f => {
               const s = settings?.protection?.[f.id] || {}; 
               const enabled = s.enabled !== false;
               const action = s.action || 'delete';
@@ -129,22 +150,9 @@
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <% 
-            const advancedFeatures = [
-              { id: 'antiNuke', name: 'Anti-Nuke', desc: 'يوقف الحذف الجماعي ويعاقب المخالف فوراً', icon: 'bi-shield-exclamation', color: 'danger', config: { action: ['alert', 'strip', 'kick', 'ban'], logChannel: true } },
-              { id: 'antiBot', name: 'Anti-Bot', desc: 'يطرد البوتات غير المصرح بها فور الانضمام', icon: 'bi-robot', color: 'info', config: { whitelist: true, logChannel: true } },
-              { id: 'antiAdmin', name: 'Anti-Admin', desc: 'يمنع منح Administrator ويعاقب المانح', icon: 'bi-shield-lock', color: 'orange', config: { action: ['alert', 'kick', 'ban'], logChannel: true } },
-              { id: 'autoBackup', name: 'Auto-Backup', desc: 'نسخ احتياطي تلقائي للرولات والقنوات', icon: 'bi-hdd', color: 'primary', config: { interval: true, keep: true } },
-              { id: 'autoScan', name: 'Auto-Scan', desc: 'فحص دوري يكشف الرومات/الرولات المشبوهة', icon: 'bi-search', color: 'indigo', config: { interval: true } },
-              { id: 'scamFilter', name: 'Scam Filter', desc: 'يحذف روابط الصيد (نيترو مزيف، ستيم، إلخ)', icon: 'bi-shield-check', color: 'success', config: { action: ['delete', 'warn', 'mute', 'kick', 'ban'], logChannel: true } },
-              { id: 'antiAlt', name: 'Anti-Alt', desc: 'يكشف الحسابات البديلة (Alts)', icon: 'bi-person-badge', color: 'purple', config: { action: ['kick', 'ban', 'quarantine', 'log'], maxAccounts: true, creationDays: true, quarantineRole: true, logChannel: true } },
-              { id: 'inviteTracker', name: 'Invite Tracker', desc: 'يتتبع الدعوات ويكشف المشبوهة', icon: 'bi-link-45deg', color: 'cyan', config: { logChannel: true } },
-            ];
-            function areAllAdvancedEnabled() {
-              return advancedFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled);
-            }
-            advancedFeatures.forEach(f => { 
-              const s = settings?.protection?.[f.id] || {}; 
+          <%
+            advancedFeatures.forEach(f => {
+              const s = settings?.protection?.[f.id] || {};
               const enabled = s.enabled !== false;
               const action = s.action || 'alert';
             %>
@@ -200,13 +208,8 @@
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <% 
-            const aiFeatures = [
-              { id: 'aiAutoMod', name: 'AI Auto-Moderation', desc: 'يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال/تهديد', icon: 'bi-shield', color: 'purple', config: { sensitivity: true, maxActions: true, logChannel: true, ignoredChannels: true, ignoredRoles: true } },
-              { id: 'aiTicketAssistant', name: 'AI Ticket Assistant', desc: 'يستلم التذكرة، يحلل المشكلة، يقترح حل، يطلب موافقة', icon: 'bi-chat-dots', color: 'pink', config: { confidence: true, maxAutoActions: true, logChannel: true, ignoredChannels: true, ignoredRoles: true } },
-              { id: 'aiTranslator', name: 'AI Translator', desc: 'ترجمة فورية مع كشف اللغة التلقائي', icon: 'bi-translate', color: 'info', config: { targetLang: true, ignoredChannels: true } },
-            ];
-            aiFeatures.forEach(f => { 
+          <%
+            aiFeatures.forEach(f => {
               const s = settings?.protection?.[f.id] || {}; 
               const enabled = s.enabled !== false;
               const sensitivity = s.sensitivity || 7;

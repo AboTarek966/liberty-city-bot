@@ -1338,6 +1338,33 @@ const UserAFKSchema = new Schema<IUserAFK>({
 UserAFKSchema.index({ guildId: 1, userId: 1 }, { unique: true });
 
 // --------------------------------------------
+// Dashboard Command Queue — أوامر لوحة التحكم عن بعد
+// لوحة التحكم المنشورة على استضافة خارجية تكتب أمراً هنا،
+// والبوت يقرأه وينفذه ثم يسجل النتيجة في نفس المستند.
+// --------------------------------------------
+export interface IDashboardCommand extends Document {
+  guildId: string;
+  command: string;
+  payload: any;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  result: any;
+  error: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const DashboardCommandSchema = new Schema<IDashboardCommand>({
+  guildId: { type: String, required: true, index: true },
+  command: { type: String, required: true },
+  payload: { type: Schema.Types.Mixed, default: {} },
+  status: { type: String, enum: ['pending', 'running', 'done', 'failed'], default: 'pending', index: true },
+  result: { type: Schema.Types.Mixed, default: null },
+  error: { type: String },
+  createdAt: { type: Date, default: Date.now, expires: 86400 },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+// --------------------------------------------
 // Model Exports
 // --------------------------------------------
 export const GuildSettings = mongoose.model<IGuildSettings>('GuildSettings', GuildSettingsSchema);
@@ -1349,6 +1376,7 @@ export const AISession = mongoose.model<IAISession>('AISession', AISessionSchema
 export const UserProfile = mongoose.model<IUserProfile>('UserProfile', UserProfileSchema);
 export const MuteRole = mongoose.model<IMuteRole>('MuteRole', MuteRoleSchema);
 export const UserAFK = mongoose.model<IUserAFK>('UserAFK', UserAFKSchema);
+export const DashboardCommand = mongoose.model<IDashboardCommand>('DashboardCommand', DashboardCommandSchema);
 
 // Re-export new models
 export { CommandAlias } from './CommandAlias';

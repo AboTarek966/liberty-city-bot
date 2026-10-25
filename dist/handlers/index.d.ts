@@ -18,4 +18,5 @@ export { AITranslator, TranslationResult, TranslatorConfig } from './AITranslato
 export { EconomyHandler, EconomyConfig } from './EconomyHandler';
 export { GameHandler, GameSession, GamePlayer, GameConfig } from './GameHandler';
 export { MusicHandler, Track, Queue } from './MusicHandler';
+export { DashboardCommandWorker } from './DashboardCommandWorker';
 //# sourceMappingURL=index.d.ts.map
