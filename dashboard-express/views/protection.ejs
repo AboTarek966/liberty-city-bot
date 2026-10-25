@@ -8,59 +8,105 @@
     </h1>
     <p class="text-muted mb-0">إدارة Anti-Raid، Anti-Spam، Anti-Nuke، وغيرها من أنظمة الأمان</p>
   </div>
-  <div class="d-flex gap-2 flex-wrap mt-3 mt-md-0">
+  <div class="d-flex gap-2 flex-wrap">
     <span class="badge bg-primary fs-6 px-3 py-2">
-      <%= Object.keys(settings?.protection || {}).filter(k => (settings.protection[k]?.enabled)).length %> مفعلة
+      <i class="bi bi-check-circle me-1"></i> <%= Object.keys(settings?.protection || {}).filter(k => (settings.protection[k]?.enabled)).length %> مفعلة
     </span>
     <span class="badge bg-secondary fs-6 px-3 py-2">
-      <%= Object.keys(settings?.protection || {}).length %> إجمالي
+      <i class="bi bi-grid me-1"></i> <%= Object.keys(settings?.protection || {}).length %> إجمالي
     </span>
+    <button class="btn btn-primary" onclick="saveAllProtection()">
+      <i class="bi bi-save me-1"></i> حفظ الكل
+    </button>
+  </div>
+</div>
+
+<!-- Protection Overview Stats -->
+<div class="grid-4 mb-4">
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--danger-bg);color:var(--danger);"><i class="bi bi-shield-exclamation"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">Anti-Nuke</div>
+      <div class="stat-value"><%= settings?.protection?.antiNuke?.enabled ? 'مفعل' : 'معطل' %></div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-robot"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">Anti-Bot</div>
+      <div class="stat-value"><%= settings?.protection?.antiBot?.enabled ? 'مفعل' : 'معطل' %></div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);"><i class="bi bi-shield-lock"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">Anti-Admin</div>
+      <div class="stat-value"><%= settings?.protection?.antiAdmin?.enabled ? 'مفعل' : 'معطل' %></div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-hdd"></i></div>
+    <div class="stat-info">
+      <div class="stat-label">Auto-Backup</div>
+      <div class="stat-value"><%= settings?.protection?.autoBackup?.enabled ? 'مفعل' : 'معطل' %></div>
+    </div>
   </div>
 </div>
 
 <div class="row g-4 mb-4">
-  <div class="col-12 col-md-6">
+  <!-- Basic Protections -->
+  <div class="col-12 col-lg-7">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i> الحماية الأساسية</h5>
+        <button class="btn btn-outline-secondary btn-sm" onclick="toggleAllBasic(!areAllBasicEnabled())">
+          <i class="bi bi-<%= areAllBasicEnabled() ? 'toggle-off' : 'toggle-on' %> me-1"></i>
+          <%= areAllBasicEnabled() ? 'إيقاف الكل' : 'تفعيل الكل' %>
+        </button>
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <% const basicFeatures = [
-            { id: 'antiRaid', name: 'Anti-Raid', desc: 'يحمي من الانضمام السريع', icon: 'bi-people', color: 'primary' },
-            { id: 'antiSpam', name: 'Anti-Spam', desc: 'يوقف تكرار الرسائل', icon: 'bi-chat-text', color: 'success' },
-            { id: 'antiLink', name: 'Anti-Link', desc: 'يمنع الروابط الخارجية', icon: 'bi-link-45deg', color: 'purple' },
-            { id: 'antiInvite', name: 'Anti-Invite', desc: 'يمنع روابط الدعوة', icon: 'bi-envelope', color: 'orange' },
-            { id: 'antiMention', name: 'Anti-Mention', desc: 'يمنع المنشن الجماعي', icon: 'bi-megaphone', color: 'danger' },
-            { id: 'antiCaps', name: 'Anti-Caps', desc: 'يمنع الحروف الكبيرة', icon: 'bi-type-bold', color: 'warning' },
-            { id: 'antiEmoji', name: 'Anti-Emoji', desc: 'يمنع الإيموجي المتكرر', icon: 'bi-emoji-smile', color: 'pink' }
-          ]; basicFeatures.forEach(f => { const s = settings?.protection?.[f.id] || {}; const enabled = s.enabled; const action = s.action || 'delete'; %>
+          <% 
+            const basicFeatures = [
+              { id: 'antiRaid', name: 'Anti-Raid', desc: 'يحمي من الانضمام السريع والهجمات المنظمة', icon: 'bi-people', color: 'primary', actions: ['warn', 'kick', 'ban', 'lockdown'] },
+              { id: 'antiSpam', name: 'Anti-Spam', desc: 'يوقف تكرار الرسائل والسبام', icon: 'bi-chat-text', color: 'success', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+              { id: 'antiLink', name: 'Anti-Link', desc: 'يمنع الروابط الخارجية المشبوهة', icon: 'bi-link-45deg', color: 'purple', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+              { id: 'antiInvite', name: 'Anti-Invite', desc: 'يمنع روابط الدعوة لخوادم أخرى', icon: 'bi-envelope', color: 'orange', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+              { id: 'antiMention', name: 'Anti-Mention', desc: 'يمنع المنشن الجماعي (@everyone/@here)', icon: 'bi-megaphone', color: 'danger', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+              { id: 'antiCaps', name: 'Anti-Caps', desc: 'يمنع الرسائل بحروف كبيرة مفرطة', icon: 'bi-type-bold', color: 'warning', actions: ['delete', 'warn', 'mute'] },
+              { id: 'antiEmoji', name: 'Anti-Emoji', desc: 'يمنع الإيموجي المتكرر في رسالة واحدة', icon: 'bi-emoji-smile', color: 'pink', actions: ['delete', 'warn', 'mute'] },
+              { id: 'antiZalgo', name: 'Anti-Zalgo', desc: 'يمنع نصوص Zalgo المزعجة', icon: 'bi-file-text', color: 'indigo', actions: ['delete', 'warn', 'mute', 'kick', 'ban'] },
+            ];
+            function areAllBasicEnabled() {
+              return basicFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled);
+            }
+            basicFeatures.forEach(f => { 
+              const s = settings?.protection?.[f.id] || {}; 
+              const enabled = s.enabled !== false;
+              const action = s.action || 'delete';
+              const threshold = s.threshold || 5;
+              const timeWindow = s.timeWindow || 5000;
+            %>
           <div class="col-12">
-            <div class="card border-0 bg-transparent">
-              <div class="card-body py-2">
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 40px; height: 40px; border-radius: 10px;">
-                      <i class="bi <%= f.icon %> fs-4"></i>
-                    </div>
-                    <div>
-                      <h6 class="mb-1 fw-bold"><%= f.name %></h6>
-                      <p class="text-muted small mb-0"><%= f.desc %></p>
-                    </div>
-                  </div>
-                  <div class="d-flex align-items-center gap-3">
-                    <select class="form-select form-select-sm" style="width: auto;" onchange="updateProtection('<%= f.id %>', 'action', this.value)" <%= !enabled ? 'disabled' : '' %>>
-                      <option value="delete" <%= action === 'delete' ? 'selected' : '' %>>حذف</option>
-                      <option value="warn" <%= action === 'warn' ? 'selected' : '' %>>تحذير</option>
-                      <option value="mute" <%= action === 'mute' ? 'selected' : '' %>>كتم</option>
-                      <option value="kick" <%= action === 'kick' ? 'selected' : '' %>>طرد</option>
-                      <option value="ban" <%= action === 'ban' ? 'selected' : '' %>>حظر</option>
-                    </select>
-                    <div class="toggle-switch">
-                      <input type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
-                      <span class="toggle-slider" for="prot-<%= f.id %>"></span>
-                    </div>
-                  </div>
+            <div class="switch-card <%= enabled ? 'enabled' : '' %>" id="card-<%= f.id %>">
+              <div class="d-flex align-items-center gap-3 flex-1">
+                <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 44px; height: 44px; border-radius: 10px;">
+                  <i class="bi <%= f.icon %> fs-4"></i>
+                </div>
+                <div class="flex-1">
+                  <h6 class="mb-1 fw-bold"><%= f.name %></h6>
+                  <p class="text-muted small mb-0"><%= f.desc %></p>
+                </div>
+              </div>
+              <div class="d-flex align-items-center gap-3 flex-wrap">
+                <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="updateProtection('<%= f.id %>', 'action', this.value)" <%= !enabled ? 'disabled' : '' %> id="action-<%= f.id %>">
+                  <% f.actions.forEach(a => { %>
+                  <option value="<%= a %>" <%= action === a ? 'selected' : '' %>><%= a === 'delete' ? 'حذف' : a === 'warn' ? 'تحذير' : a === 'mute' ? 'كتم' : a === 'kick' ? 'طرد' : a === 'ban' ? 'حظر' : a === 'lockdown' ? 'قفل' : a %></option>
+                  <% }) %>
+                </select>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
+                  <label class="form-check-label fw-bold" for="prot-<%= f.id %>"></label>
                 </div>
               </div>
             </div>
@@ -70,41 +116,69 @@
       </div>
     </div>
   </div>
-  
-  <div class="col-12 col-md-6">
+
+  <!-- Advanced Protections -->
+  <div class="col-12 col-lg-5">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i> الحماية المتقدمة</h5>
+        <button class="btn btn-outline-secondary btn-sm" onclick="toggleAllAdvanced(!areAllAdvancedEnabled())">
+          <i class="bi bi-<%= areAllAdvancedEnabled() ? 'toggle-off' : 'toggle-on' %> me-1"></i>
+          <%= areAllAdvancedEnabled() ? 'إيقاف الكل' : 'تفعيل الكل' %>
+        </button>
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <% const advancedFeatures = [
-            { id: 'antiNuke', name: 'Anti-Nuke', desc: 'يوقف الحذف الجماعي ويعاقب المخالف', icon: 'bi-shield-exclamation', color: 'danger' },
-            { id: 'antiBot', name: 'Anti-Bot', desc: 'يطرد البوتات غير المصرح بها', icon: 'bi-robot', color: 'info' },
-            { id: 'antiAdmin', name: 'Anti-Admin', desc: 'تنبيه فوري عند منح أدمن', icon: 'bi-shield-lock', color: 'orange' },
-            { id: 'autoBackup', name: 'Auto-Backup', desc: 'نسخ احتياطي تلقائي للرولات', icon: 'bi-hdd', color: 'primary' },
-            { id: 'autoScan', name: 'Auto-Scan', desc: 'فحص دوري للرومات/الرولات', icon: 'bi-search', color: 'indigo' },
-            { id: 'scamFilter', name: 'Scam Filter', desc: 'يحذف روابط الصيد', icon: 'bi-shield-check', color: 'success' }
-          ]; advancedFeatures.forEach(f => { const s = settings?.protection?.[f.id] || {}; const enabled = s.enabled; const action = s.action || 'alert'; %>
+          <% 
+            const advancedFeatures = [
+              { id: 'antiNuke', name: 'Anti-Nuke', desc: 'يوقف الحذف الجماعي ويعاقب المخالف فوراً', icon: 'bi-shield-exclamation', color: 'danger', config: { action: ['alert', 'strip', 'kick', 'ban'], logChannel: true } },
+              { id: 'antiBot', name: 'Anti-Bot', desc: 'يطرد البوتات غير المصرح بها فور الانضمام', icon: 'bi-robot', color: 'info', config: { whitelist: true, logChannel: true } },
+              { id: 'antiAdmin', name: 'Anti-Admin', desc: 'يمنع منح Administrator ويعاقب المانح', icon: 'bi-shield-lock', color: 'orange', config: { action: ['alert', 'kick', 'ban'], logChannel: true } },
+              { id: 'autoBackup', name: 'Auto-Backup', desc: 'نسخ احتياطي تلقائي للرولات والقنوات', icon: 'bi-hdd', color: 'primary', config: { interval: true, keep: true } },
+              { id: 'autoScan', name: 'Auto-Scan', desc: 'فحص دوري يكشف الرومات/الرولات المشبوهة', icon: 'bi-search', color: 'indigo', config: { interval: true } },
+              { id: 'scamFilter', name: 'Scam Filter', desc: 'يحذف روابط الصيد (نيترو مزيف، ستيم، إلخ)', icon: 'bi-shield-check', color: 'success', config: { action: ['delete', 'warn', 'mute', 'kick', 'ban'], logChannel: true } },
+              { id: 'antiAlt', name: 'Anti-Alt', desc: 'يكشف الحسابات البديلة (Alts)', icon: 'bi-person-badge', color: 'purple', config: { action: ['kick', 'ban', 'quarantine', 'log'], maxAccounts: true, creationDays: true, quarantineRole: true, logChannel: true } },
+              { id: 'inviteTracker', name: 'Invite Tracker', desc: 'يتتبع الدعوات ويكشف المشبوهة', icon: 'bi-link-45deg', color: 'cyan', config: { logChannel: true } },
+            ];
+            function areAllAdvancedEnabled() {
+              return advancedFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled);
+            }
+            advancedFeatures.forEach(f => { 
+              const s = settings?.protection?.[f.id] || {}; 
+              const enabled = s.enabled !== false;
+              const action = s.action || 'alert';
+            %>
           <div class="col-12">
-            <div class="card border-0 bg-transparent">
-              <div class="card-body py-2">
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 40px; height: 40px; border-radius: 10px;">
-                      <i class="bi <%= f.icon %> fs-4"></i>
-                    </div>
-                    <div>
-                      <h6 class="mb-1 fw-bold"><%= f.name %></h6>
-                      <p class="text-muted small mb-0"><%= f.desc %></p>
-                    </div>
-                  </div>
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="toggle-switch">
-                      <input type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
-                      <span class="toggle-slider" for="prot-<%= f.id %>"></span>
-                    </div>
-                  </div>
+            <div class="switch-card <%= enabled ? 'enabled' : '' %>" id="card-<%= f.id %>">
+              <div class="d-flex align-items-center gap-3 flex-1">
+                <div class="stat-icon bg-<%= f.color %> bg-opacity-20 text-<%= f.color %>" style="width: 44px; height: 44px; border-radius: 10px;">
+                  <i class="bi <%= f.icon %> fs-4"></i>
+                </div>
+                <div class="flex-1">
+                  <h6 class="mb-1 fw-bold"><%= f.name %></h6>
+                  <p class="text-muted small mb-0"><%= f.desc %></p>
+                </div>
+              </div>
+              <div class="d-flex align-items-center gap-3 flex-wrap">
+                <% if (f.config.action) { %>
+                <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="updateProtection('<%= f.id %>', 'action', this.value)" <%= !enabled ? 'disabled' : '' %> id="action-<%= f.id %>">
+                  <% f.config.action.forEach(a => { %>
+                  <option value="<%= a %>" <%= action === a ? 'selected' : '' %>><%= a === 'alert' ? 'تنبيه' : a === 'strip' ? 'سحب رولات' : a === 'kick' ? 'طرد' : a === 'ban' ? 'حظر' : a === 'quarantine' ? 'حجر' : a === 'log' ? 'تسجيل' : a %></option>
+                  <% }) %>
+                </select>
+                <% } %>
+                <% if (f.config.interval) { %>
+                <input type="number" class="form-control form-control-sm" style="width: 80px;" placeholder="ساعات" value="<%= s.interval || 6 %>" min="1" max="72" onchange="updateProtection('<%= f.id %>', 'interval', parseInt(this.value))" <%= !enabled ? 'disabled' : '' %>>
+                <% } %>
+                <% if (f.config.whitelist) { %>
+                <button class="btn btn-outline-secondary btn-sm" onclick="editWhitelist('<%= f.id %>')" <%= !enabled ? 'disabled' : '' %>><i class="bi bi-list-check"></i> القائمة البيضاء</button>
+                <% } %>
+                <% if (f.config.logChannel) { %>
+                <button class="btn btn-outline-secondary btn-sm" onclick="setLogChannel('<%= f.id %>')" <%= !enabled ? 'disabled' : '' %>><i class="bi bi-hash"></i> قروم السجل</button>
+                <% } %>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
+                  <label class="form-check-label fw-bold" for="prot-<%= f.id %>"></label>
                 </div>
               </div>
             </div>
@@ -116,20 +190,31 @@
   </div>
 </div>
 
-<div class="row g-4">
+<!-- AI Protections -->
+<div class="row g-4 mb-4">
   <div class="col-12">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-robot me-2"></i> أنظمة الذكاء الاصطناعي</h5>
+        <span class="badge bg-purple fs-6"><i class="bi bi-cpu me-1"></i> مدعوم بالذكاء الاصطناعي</span>
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <% const aiFeatures = [
-            { id: 'aiAutoMod', name: 'AI Auto-Moderation', desc: 'يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال', icon: 'bi-shield', color: 'purple' },
-            { id: 'aiTicketAssistant', name: 'AI Ticket Assistant', desc: 'يستلم التذكرة، يحلل، يحل، يطلب موافقة', icon: 'bi-chat-dots', color: 'pink' },
-            { id: 'aiTranslator', name: 'AI Translator', desc: 'ترجمة فورية مع كشف اللغة التلقائي', icon: 'bi-translate', color: 'info' }
-          ]; aiFeatures.forEach(f => { const s = settings?.protection?.[f.id] || {}; const enabled = s.enabled; const sensitivity = s.sensitivity || 7; %>
-          <div class="col-12 col-md-4">
+          <% 
+            const aiFeatures = [
+              { id: 'aiAutoMod', name: 'AI Auto-Moderation', desc: 'يقرأ كل رسالة ويقرر: سبام/سم/إباحي/احتيال/تهديد', icon: 'bi-shield', color: 'purple', config: { sensitivity: true, maxActions: true, logChannel: true, ignoredChannels: true, ignoredRoles: true } },
+              { id: 'aiTicketAssistant', name: 'AI Ticket Assistant', desc: 'يستلم التذكرة، يحلل المشكلة، يقترح حل، يطلب موافقة', icon: 'bi-chat-dots', color: 'pink', config: { confidence: true, maxAutoActions: true, logChannel: true, ignoredChannels: true, ignoredRoles: true } },
+              { id: 'aiTranslator', name: 'AI Translator', desc: 'ترجمة فورية مع كشف اللغة التلقائي', icon: 'bi-translate', color: 'info', config: { targetLang: true, ignoredChannels: true } },
+            ];
+            aiFeatures.forEach(f => { 
+              const s = settings?.protection?.[f.id] || {}; 
+              const enabled = s.enabled !== false;
+              const sensitivity = s.sensitivity || 7;
+              const confidence = s.confidence || 80;
+              const maxActions = s.maxAutoActions || 3;
+              const targetLang = s.targetLang || 'ar';
+            %>
+          <div class="col-12 col-lg-4">
             <div class="card border-0 bg-transparent h-100">
               <div class="card-body">
                 <div class="d-flex align-items-start gap-3">
@@ -142,22 +227,59 @@
                         <h6 class="fw-bold mb-1"><%= f.name %></h6>
                         <p class="text-muted small mb-2"><%= f.desc %></p>
                       </div>
-                      <div class="toggle-switch">
-                        <input type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
-                        <span class="toggle-slider" for="prot-<%= f.id %>"></span>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="prot-<%= f.id %>" <%= enabled ? 'checked' : '' %> onchange="toggleProtection('<%= f.id %>', this.checked)">
+                        <label class="form-check-label fw-bold" for="prot-<%= f.id %>"></label>
                       </div>
                     </div>
-                    <p class="text-muted small mb-2"><%= f.desc %></p>
                     <% if (enabled) { %>
-                      <div class="mt-2">
-                        <label class="form-label small text-muted">الحساسية</label>
-                        <input type="range" class="form-range" min="1" max="10" value="<%= sensitivity %>" onchange="updateProtection('<%= f.id %>', 'sensitivity', this.value)">
+                    <div class="mt-3 p-3" style="background: var(--bg-input); border-radius: var(--radius-sm);">
+                      <% if (f.config.sensitivity) { %>
+                      <div class="mb-3">
+                        <label class="form-label small text-muted">الحساسية (1-10)</label>
+                        <input type="range" class="form-range" min="1" max="10" value="<%= sensitivity %>" onchange="updateProtection('<%= f.id %>', 'sensitivity', parseInt(this.value))" id="sens-<%= f.id %>">
                         <div class="d-flex justify-content-between text-muted small mt-1">
                           <span>منخفضة</span>
-                          <span class="fw-bold"><%= sensitivity %></span>
+                          <span class="fw-bold" id="sensVal-<%= f.id %>"><%= sensitivity %></span>
                           <span>عالية</span>
                         </div>
                       </div>
+                      <% } %>
+                      <% if (f.config.confidence) { %>
+                      <div class="mb-3">
+                        <label class="form-label small text-muted">حد الثقة (%): <%= confidence %></label>
+                        <input type="range" class="form-range" min="50" max="100" value="<%= confidence %>" onchange="updateProtection('<%= f.id %>', 'confidence', parseInt(this.value))" id="conf-<%= f.id %>">
+                      </div>
+                      <% } %>
+                      <% if (f.config.maxActions) { %>
+                      <div class="mb-3">
+                        <label class="form-label small text-muted">الحد الأقصى للإجراءات التلقائية</label>
+                        <input type="number" class="form-control form-control-sm" min="1" max="10" value="<%= maxActions %>" onchange="updateProtection('<%= f.id %>', 'maxAutoActions', parseInt(this.value))">
+                      </div>
+                      <% } %>
+                      <% if (f.config.targetLang) { %>
+                      <div class="mb-3">
+                        <label class="form-label small text-muted">اللغة الهدف</label>
+                        <select class="form-select form-select-sm" onchange="updateProtection('<%= f.id %>', 'targetLang', this.value)">
+                          <option value="ar" <%= targetLang === 'ar' ? 'selected' : '' %>>العربية</option>
+                          <option value="en" <%= targetLang === 'en' ? 'selected' : '' %>>English</option>
+                          <option value="fr" <%= targetLang === 'fr' ? 'selected' : '' %>>Français</option>
+                          <option value="es" <%= targetLang === 'es' ? 'selected' : '' %>>Español</option>
+                          <option value="auto" <%= targetLang === 'auto' ? 'selected' : '' %>>تلقائي</option>
+                        </select>
+                      </div>
+                      <% } %>
+                      <% if (f.config.ignoredChannels || f.config.ignoredRoles) { %>
+                      <div class="d-flex gap-2 flex-wrap">
+                        <% if (f.config.ignoredChannels) { %>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="editIgnoredChannels('<%= f.id %>')"><i class="bi bi-hash me-1"></i> قنوات مستثناة</button>
+                        <% } %>
+                        <% if (f.config.ignoredRoles) { %>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="editIgnoredRoles('<%= f.id %>')"><i class="bi bi-shield me-1"></i> رولات مستثناة</button>
+                        <% } %>
+                      </div>
+                      <% } %>
+                    </div>
                     <% } %>
                   </div>
                 </div>
@@ -171,36 +293,169 @@
   </div>
 </div>
 
+<!-- Action Buttons -->
+<div class="d-flex gap-2 justify-content-end">
+  <button class="btn btn-outline-secondary" onclick="location.reload()"><i class="bi bi-arrow-clockwise me-1"></i> إعادة تعيين</button>
+  <button class="btn btn-primary" onclick="saveAllProtection()"><i class="bi bi-save me-1"></i> حفظ جميع التغييرات</button>
+</div>
+
 <script>
-async function toggleProtection(featureId, enabled) {
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ featureId, enabled })
-    });
-    if (!res.ok) {
-      alert('فشل التحديث');
+  async function toggleProtection(featureId, enabled) {
+    try {
+      const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ featureId, enabled })
+      });
+      if (!res.ok) {
+        showToast('فشل التحديث', 'danger');
+        location.reload();
+      } else {
+        const card = document.getElementById('card-' + featureId);
+        if (card) card.classList.toggle('enabled', enabled);
+        const actionSelect = document.getElementById('action-' + featureId);
+        if (actionSelect) actionSelect.disabled = !enabled;
+        showToast(enabled ? 'تم التفعيل ✅' : 'تم التعطيل ⏸️', enabled ? 'success' : 'warning');
+      }
+    } catch (e) {
+      showToast('خطأ في الاتصال', 'danger');
       location.reload();
     }
-  } catch (e) {
-    alert('خطأ في الاتصال');
-    location.reload();
   }
-}
 
-async function updateProtection(featureId, key, value) {
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ featureId, [key]: value })
-    });
-    if (!res.ok) location.reload();
-  } catch (e) {
-    location.reload();
+  async function updateProtection(featureId, key, value) {
+    try {
+      const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ featureId, [key]: value })
+      });
+      if (!res.ok) {
+        showToast('فشل التحديث', 'danger');
+        location.reload();
+      } else {
+        showToast('تم الحفظ ✅', 'success', 2000);
+      }
+    } catch (e) {
+      showToast('خطأ في الاتصال', 'danger');
+      location.reload();
+    }
   }
-}
+
+  async function saveAllProtection() {
+    const features = [
+      <%= JSON.stringify([...basicFeatures, ...advancedFeatures, ...aiFeatures].map(f => f.id)) %>
+    ];
+    showGlobalLoader(true);
+    try {
+      const protection = {};
+      for (const id of features) {
+        const checkbox = document.getElementById('prot-' + id);
+        const action = document.getElementById('action-' + id);
+        protection[id] = {};
+        if (checkbox) protection[id].enabled = checkbox.checked;
+        if (action) protection[id].action = action.value;
+      }
+      const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ protection })
+      });
+      if (res.ok) {
+        showToast('تم حفظ جميع إعدادات الحماية ✅', 'success');
+      } else {
+        showToast('فشل الحفظ', 'danger');
+      }
+    } catch (e) {
+      showToast('خطأ في الاتصال', 'danger');
+    } finally {
+      showGlobalLoader(false);
+    }
+  }
+
+  function areAllBasicEnabled() {
+    return <%= JSON.stringify(basicFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled)) %>;
+  }
+
+  function areAllAdvancedEnabled() {
+    return <%= JSON.stringify(advancedFeatures.every(f => (settings?.protection?.[f.id] || {}).enabled)) %>;
+  }
+
+  async function toggleAllBasic(enable) {
+    const features = <%= JSON.stringify(basicFeatures.map(f => f.id)) %>;
+    for (const id of features) {
+      const checkbox = document.getElementById('prot-' + id);
+      if (checkbox && checkbox.checked !== enable) {
+        checkbox.checked = enable;
+        await toggleProtection(id, enable);
+      }
+    }
+  }
+
+  async function toggleAllAdvanced(enable) {
+    const features = <%= JSON.stringify(advancedFeatures.map(f => f.id)) %>;
+    for (const id of features) {
+      const checkbox = document.getElementById('prot-' + id);
+      if (checkbox && checkbox.checked !== enable) {
+        checkbox.checked = enable;
+        await toggleProtection(id, enable);
+      }
+    }
+  }
+
+  async function editWhitelist(featureId) {
+    const s = <%= JSON.stringify(settings?.protection?.antiBot?.whitelist || []) %>;
+    const input = prompt('أدخل IDs البوتات المسموحة (أو User IDs للقوائم العامة، مفصولة بفاصلة):', s.join(','));
+    if (input !== null) {
+      const list = input.split(',').map(x => x.trim()).filter(x => x);
+      await updateProtection(featureId, 'whitelist', list);
+      showToast('تم تحديث القائمة البيضاء', 'success');
+    }
+  }
+
+  async function setLogChannel(featureId) {
+    const current = (currentFeatureSettings[featureId] || {}).logChannel || '';
+    const input = prompt('أدخل Channel ID لسجل هذه الحماية:', current);
+    if (input !== null) {
+      await updateProtection(featureId, 'logChannel', input.trim() || undefined);
+      showToast('تم تعيين قروم السجل', 'success');
+    }
+  }
+
+  async function editIgnoredChannels(featureId) {
+    const s = (currentFeatureSettings[featureId] || {}).ignoredChannels || [];
+    const input = prompt('أدخل Channel IDs المستثناة (مفصولة بفاصلة):', s.join(','));
+    if (input !== null) {
+      const list = input.split(',').map(x => x.trim()).filter(x => x);
+      await updateProtection(featureId, 'ignoredChannels', list);
+      showToast('تم تحديث القنوات المستثناة', 'success');
+    }
+  }
+
+  async function editIgnoredRoles(featureId) {
+    const s = (currentFeatureSettings[featureId] || {}).ignoredRoles || [];
+    const input = prompt('أدخل Role IDs المستثناة (مفصولة بفاصلة):', s.join(','));
+    if (input !== null) {
+      const list = input.split(',').map(x => x.trim()).filter(x => x);
+      await updateProtection(featureId, 'ignoredRoles', list);
+      showToast('تم تحديث الرولات المستثناة', 'success');
+    }
+  }
+
+  // Server-side snapshot of current per-feature settings
+  const currentFeatureSettings = {
+    <% Object.keys(settings?.protection || {}).forEach(k => { %>
+    <%= JSON.stringify(k) %>: <%= JSON.stringify(settings.protection[k] || {}) %>,
+    <% }) %>
+  };
+
+  // Update slider displays
+  document.querySelectorAll('input[type="range"]').forEach(input => {
+    input.addEventListener('input', () => {
+      const valEl = document.getElementById('sensVal-' + input.id.replace('sens-', '')) || document.getElementById('confVal-' + input.id.replace('conf-', ''));
+      if (valEl) valEl.textContent = input.value;
+    });
+  });
 </script>
 
 <%- include('layout-bottom') %>

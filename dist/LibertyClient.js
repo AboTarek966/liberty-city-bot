@@ -513,7 +513,30 @@ class LibertyClient extends discord_js_1.Client {
     async updateGuildSettings(guildId, updates) {
         const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
         const settings = await getGuildSettings(guildId);
-        Object.assign(settings, updates);
+        // Deep merge (up to 2 levels) so section updates like { protection: { antiRaid: {...} } }
+        // merge into the existing section instead of replacing it entirely.
+        for (const [key, value] of Object.entries(updates)) {
+            if (key.startsWith('$'))
+                continue;
+            const current = settings[key];
+            if (value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current)) {
+                for (const [subKey, subValue] of Object.entries(value)) {
+                    const subCurrent = current[subKey];
+                    if (subValue && typeof subValue === 'object' && !Array.isArray(subValue) && subCurrent && typeof subCurrent === 'object' && !Array.isArray(subCurrent)) {
+                        Object.assign(subCurrent, subValue);
+                    }
+                    else {
+                        current[subKey] = subValue;
+                    }
+                }
+            }
+            else {
+                settings[key] = value;
+            }
+        }
+        settings.markModified('protection');
+        settings.markModified('welcome');
+        settings.markModified('economy');
         await settings.save();
         return settings.toObject();
     }

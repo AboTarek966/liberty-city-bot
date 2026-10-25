@@ -326,7 +326,7 @@ app.get('/dashboard/:guildId/logs', requireAuth, (req, res) => guildPageData(req
 app.get('/dashboard/:guildId/economy', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'economy'));
 app.get('/dashboard/:guildId/welcome', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'welcome'));
 
-app.post('/api/guilds/:guildId/settings', requireAuth, async (req, res) => {
+async function settingsUpdateHandler(req, res) {
   const { guildId } = req.params;
   const guild = req.session.guilds.find(g => g.id === guildId);
   if (!guild) return res.status(403).json({ error: 'No access' });
@@ -339,6 +339,15 @@ app.post('/api/guilds/:guildId/settings', requireAuth, async (req, res) => {
     if (body._pushTag) { body.$push = { ...(body.$push||{}), tags: body._pushTag }; delete body._pushTag; }
     if (body._pullTag) { body.$pull = { ...(body.$pull||{}), tags: { name: body._pullTag } }; delete body._pullTag; }
 
+    // Handle feature-level updates: { featureId, ...keys } → { protection: { featureId: {...keys} } }
+    if (body.featureId) {
+      const featureId = body.featureId;
+      delete body.featureId;
+      const featureKeys = { ...body };
+      delete featureKeys.protection;
+      body.protection = { ...(body.protection || {}), [featureId]: featureKeys };
+    }
+
     const result = await saveSettings(guildId, body);
     if (result.ok) return res.json(result.data || { success: true });
     return res.status(500).json({ error: result.error || 'Failed to update' });
@@ -346,7 +355,10 @@ app.post('/api/guilds/:guildId/settings', requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
-});
+}
+
+app.post('/api/guilds/:guildId/settings', settingsUpdateHandler);
+app.patch('/api/guilds/:guildId/settings', settingsUpdateHandler);
 
 app.get('/api/user/guilds', requireAuth, (req, res) => {
   res.json({ guilds: req.session.guilds });

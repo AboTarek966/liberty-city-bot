@@ -522,7 +522,27 @@ export class LibertyClient extends Client {
   private async updateGuildSettings(guildId: string, updates: any): Promise<any> {
     const { getGuildSettings } = await import('./models');
     const settings = await getGuildSettings(guildId);
-    Object.assign(settings, updates);
+    // Deep merge (up to 2 levels) so section updates like { protection: { antiRaid: {...} } }
+    // merge into the existing section instead of replacing it entirely.
+    for (const [key, value] of Object.entries(updates)) {
+      if ((key as string).startsWith('$')) continue;
+      const current = (settings as any)[key];
+      if (value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current)) {
+        for (const [subKey, subValue] of Object.entries(value as Record<string, any>)) {
+          const subCurrent = current[subKey];
+          if (subValue && typeof subValue === 'object' && !Array.isArray(subValue) && subCurrent && typeof subCurrent === 'object' && !Array.isArray(subCurrent)) {
+            Object.assign(subCurrent, subValue);
+          } else {
+            current[subKey] = subValue;
+          }
+        }
+      } else {
+        (settings as any)[key] = value;
+      }
+    }
+    settings.markModified('protection');
+    settings.markModified('welcome');
+    settings.markModified('economy');
     await settings.save();
     return settings.toObject();
   }
