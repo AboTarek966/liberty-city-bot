@@ -105,7 +105,11 @@ async function exchangeCode(code) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params
   });
-  if (!res.ok) throw new Error('Token exchange failed');
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    console.error(`Token exchange failed: status=${res.status} body=${detail.slice(0, 400)} | secret_len=${(DISCORD_CLIENT_SECRET || '').length} | redirect_uri=${DISCORD_REDIRECT_URI} | code_len=${(code || '').length}`);
+    throw new Error(`Token exchange failed (status ${res.status})`);
+  }
   return res.json();
 }
 
@@ -148,10 +152,11 @@ app.get('/', (req, res) => {
   if (req.session.accessToken) {
     res.redirect('/dashboard');
   } else {
-    res.render('login', { 
+    res.render('login', {
       clientId: DISCORD_CLIENT_ID,
       redirectUri: DISCORD_REDIRECT_URI,
-      error: req.query.error || null
+      error: req.query.error || null,
+      detail: req.query.detail || null
     });
   }
 });
@@ -164,30 +169,38 @@ app.get('/auth/discord', (req, res) => {
 });
 
 app.get('/auth/callback', async (req, res) => {
-  const { code, state } = req.query;
-  if (!code || state !== req.session.oauthState) {
+  const { code, state, error: oauthError, error_description: oauthErrorDesc } = req.query;
+  if (oauthError) {
+    // Discord sent the user back with an OAuth-level error (access_denied, etc.)
+    const known = ['access_denied', 'invalid_state', 'auth_failed', 'missing_client'];
+    const key = known.includes(oauthError) ? oauthError : 'auth_failed';
+    console.error(`OAuth-level error from Discord: ${oauthError} — ${oauthErrorDesc || ''}`);
+    return res.redirect(`/?error=${key}&detail=${encodeURIComponent(oauthErrorDesc || oauthError)}`);
+  }
+  if (!code) return res.redirect('/?error=invalid_state');
+  if (state !== req.session.oauthState) {
     return res.redirect('/?error=invalid_state');
   }
   try {
     const tokens = await exchangeCode(code);
     const user = await fetchUserInfo(tokens.access_token);
     const guilds = await fetchUserGuilds(tokens.access_token);
-    
+
     // Filter guilds where user has admin perms or is owner
     const adminGuilds = guilds
       .filter(g => (g.permissions & 0x8) === 0x8 || g.owner)
       .map(g => ({ id: g.id, name: g.name, icon: g.icon, owner: g.owner }));
-    
+
     req.session.accessToken = tokens.access_token;
     req.session.refreshToken = tokens.refresh_token;
     req.session.user = user;
     req.session.guilds = adminGuilds;
     req.session.selectedGuild = adminGuilds[0]?.id || null;
     delete req.session.oauthState;
-    
+
     res.redirect('/dashboard');
   } catch (err) {
-    console.error('OAuth error:', err);
+    console.error('OAuth error:', err.message);
     res.redirect('/?error=auth_failed');
   }
 });

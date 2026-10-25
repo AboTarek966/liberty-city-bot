@@ -166,7 +166,9 @@
           else if (error === 'missing_client') msg = 'إعدادات الموقع ناقصة (Client ID/Secret) — راجع متغيرات البيئة في الاستضافة.';
         %>
         <%= msg %>
-        <div style="margin-top:6px;color:#fca5a5;font-size:12px;">💡 لو تكرر الخطأ: راجع رابط الرجوع في Discord Developer Portal → OAuth2 → Redirects لازم يطابق exactly رابط الموقع.</div>
+        <% if (detail) { %>
+        <div style="margin-top:6px;color:#fca5a5;font-size:11.5px;direction:ltr;text-align:right;">تفاصيل تقنية: <span style="font-family:monospace"><%= detail %></span></div>
+        <% } %>
       </div>
     </div>
   </div>
