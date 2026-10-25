@@ -54,6 +54,81 @@ function queueResponse(res, result, okMessage = 'تم التنفيذ') {
   return res.status(502).json({ error: result.error || 'fail' });
 }
 
+// ===== 🎯 دقة مطلقة لقائمة السيرفرات =====
+// القائمة الحية = (سيرفرات المستخدم التي يديرها) ∩ (سيرفرات البوت **الفعليّة الآن**)
+// مصدر الحقيقة: REST ديكسورد بتوكِن البوت إن وُجد، وإلا عبر طابور الأوامر من البوت نفسه.
+let botGuildsCache = { at: 0, map: null };
+
+async function getBotGuilds(force = false) {
+  if (!force && botGuildsCache.map && Date.now() - botGuildsCache.at < 60 * 1000) return botGuildsCache.map;
+  botGuildsCache.map = null;
+
+  // (1) REST مباشر بتوكِن البوت — الأدق
+  const token = process.env.DISCORD_TOKEN;
+  if (token) {
+    const out = new Map();
+    let after = '';
+    for (let page = 0; page < 3; page++) {
+      try {
+        const url = `https://discord.com/api/v10/users/@me/guilds?limit=200${after ? '&after=' + after : ''}`;
+        const r = await fetch(url, { headers: { Authorization: `Bot ${token}`, 'Cache-Control': 'no-cache' } });
+        if (!r.ok) break;
+        const batch = await r.json();
+        if (!Array.isArray(batch) || batch.length === 0) break;
+        for (const g of batch) out.set(String(g.id), { id: String(g.id), name: g.name, icon: g.icon ?? null });
+        after = String(batch[batch.length - 1].id);
+        if (batch.length < 200) break;
+      } catch { break; }
+    }
+    if (out.size > 0) {
+      botGuildsCache = { at: Date.now(), map: out };
+      return out;
+    }
+  }
+
+  // (2) عبر طابور الأوامر — البوت نفسه يخبرنا بسيرفراته الحالية
+  const result = await runCommand('global', 'bot_guilds', {}, 14000);
+  if (result.ok && Array.isArray(result.result?.guilds)) {
+    const out = new Map();
+    for (const g of result.result.guilds) out.set(String(g.id), g);
+    botGuildsCache = { at: Date.now(), map: out };
+    return out;
+  }
+  return null;
+}
+
+// Middleware: يعيد كتابة الجلسة بقائمة حية — يمحو السيرفرات التي خرج منها البوت
+// ويعرض tiles "أضف البوت" لأي سيرفر يديره المستخدم ولم يدخله البوت بعد.
+async function liveGuildsMiddleware(req, res, next) {
+  if (!req.session?.user || !Array.isArray(req.session.guilds)) return next();
+  try {
+    const adminSnapshot = req.session.guilds;
+    const botMap = await getBotGuilds();
+    if (!botMap) {
+      // لا مصدر موثوق لقائمة البوت (لا توكِن وبوت غير متصل) — نُبقي الجلسة كما هي
+      res.locals.needsBotInvite = [];
+      return next();
+    }
+    // الأدق: نتوسع بجَمْع سيرفرات المستخدم المدير من النظام الحي أيضاً (انضم المستخدم لسيرفر بعد اللوج)
+    const pending = adminSnapshot.filter(g => !botMap.has(g.id)); // سيرفرات مديرها المستخدم والبوت غير موجود بها
+    req.session.guilds = adminSnapshot.filter(g => botMap.has(g.id));
+    res.locals.pendingGuilds = pending;         // لوحات "أضف البوت"
+    res.locals.botListLive = true;              // القائمة تعمل — ليست snapshot قديمة
+    next();
+  } catch {
+    res.locals.pendingGuilds = [];
+    res.locals.botListLive = false;
+    next();
+  }
+}
+
+function botInviteLink() {
+  const base = process.env.DISCORD_CLIENT_ID || '';
+  return base
+    ? `https://discord.com/oauth2/authorize?client_id=${base}&permissions=1099584556791&scope=bot%20applications.commands`
+    : '/dashboard?err=no_client_id';
+}
+
 // NOTE: view data helpers re-exported for guildPageData
 
 if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
@@ -180,7 +255,13 @@ app.use(async (req, res, next) => {
   res.locals.selectedGuild = req.session.selectedGuild || null;
   res.locals.clientId = DISCORD_CLIENT_ID;
   res.locals.req = req;
-  next();
+  res.locals.botInviteLink = botInviteLink;
+  // 🎯 القائمة الحية: سيرفرات البوت الفعليّة فقط + بلاطات "أضف البوت" للناقص
+  await liveGuildsMiddleware(req, res, () => {
+    res.locals.guilds = req.session.guilds || [];
+    res.locals.pendingGuilds = res.locals.pendingGuilds || [];
+    next();
+  });
 });
 
 // Routes
@@ -256,12 +337,12 @@ app.get('/auth/dev', async (req, res) => {
     const user = { id: 'dev-user', username: 'Ahmad', discriminator: '0000', avatar: null };
     let guilds = [];
     try {
-      const r = await fetch('https://discord.com/api/v10/guilds', {
+      const r = await fetch('https://discord.com/api/v10/users/@me/guilds?limit=200', {
         headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
       });
       if (r.ok) {
         const raw = await r.json();
-        guilds = raw.map(g => ({ id: g.id, name: g.name, icon: g.icon, owner: false }));
+        if (Array.isArray(raw)) guilds = raw.map(g => ({ id: g.id, name: g.name, icon: g.icon, owner: false }));
       }
     } catch {}
     if (guilds.length === 0) {

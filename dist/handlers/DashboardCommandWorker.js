@@ -67,6 +67,21 @@ class DashboardCommandWorker {
         }
     }
     async execute(command, guildId, payload) {
+        // 🔄 مزامنة الإعدادات: مسح كاش الإعدادات فوراً بعد حفظ الداشبورد (لا يحتاج وجود البوت بالسيرفر)
+        if (command === 'settings_sync') {
+            (0, models_1.invalidateGuildSettings)(guildId);
+            return { ok: true, invalidated: true, at: new Date().toISOString() };
+        }
+        // 🎯 قائمة سيرفرات البوت الفعلية (لا يحتاج وجود بالسيرفر — أمر عام)
+        if (command === 'bot_guilds') {
+            const gl = this.client.guilds.cache.map((g) => ({
+                id: g.id,
+                name: g.name,
+                icon: typeof g.iconURL === 'function' ? g.iconURL({ size: 128 }) : null,
+                memberCount: g.memberCount ?? g.approximateMemberCount ?? null,
+            }));
+            return { ok: true, total: gl.length, guilds: gl };
+        }
         const guild = this.client.guilds.cache.get(guildId);
         if (!guild)
             throw new Error('البوت غير موجود في هذا السيرفر');

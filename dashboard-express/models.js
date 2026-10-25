@@ -132,7 +132,8 @@ async function getSettings(guildId) {
   }
 }
 
-// Deep-merge update on top of the stored settings document (2 levels, mirrors bot)
+// Deep-merge update on top of the stored settings document — RAW collection ops
+// (يمرّ فوق كل قيود الموديلات: نفس الكي هو اللي يقرأه البوت + بلا مشاكل strict/mixed)
 async function saveSettings(guildId, update = {}) {
   try {
     if (await botApiHealthy()) {
@@ -142,62 +143,99 @@ async function saveSettings(guildId, update = {}) {
         body: JSON.stringify(update),
         timeout: 5000
       });
-      if (r.ok) return { ok: true, data: await r.json() };
+      if (r.ok) {
+        await pushSyncCommand(guildId);
+        return { ok: true, data: await r.json() };
+      }
     }
   } catch {}
   try {
     if (!(await ensureConnected())) return { ok: false, error: 'Database unavailable' };
-    let doc = await GuildSettings.findOne({ guildId });
-    if (!doc) doc = new GuildSettings({ guildId });
-    const raw = doc;
+    const col = GuildSettings.collection;
+    const raw = await col.findOne({ guildId: String(guildId) });
+
+    // دمج عميق على مستوى JSON الخام — المفاتيح الغريبة تُستبدل كاملة
+    const doc = raw || { guildId: String(guildId), createdAt: new Date() };
     for (const [key, value] of Object.entries(update)) {
       if (key.startsWith('$')) continue;
-      // _direct:<path> → استبدال كامل للعنصر في المسار (للخرائط مثل leveling.levelRoles)
       if (key.startsWith('_direct:')) {
-        const path = key.slice(8).split('.');
-        let node = raw;
-        for (let i = 0; i < path.length - 1; i++) {
-          if (!node[path[i]] || typeof node[path[i]] !== 'object' || Array.isArray(node[path[i]])) node[path[i]] = {};
-          node = node[path[i]];
-        }
-        node[path[path.length - 1]] = value;
-        raw.markModified(path[0]);
+        setPath(doc, key.slice(8).split('.'), value);
         continue;
       }
-      const current = raw[key];
-      if (value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current)) {
-        for (const [subKey, subValue] of Object.entries(value)) {
-          const subCurrent = current[subKey];
-          if (subValue && typeof subValue === 'object' && !Array.isArray(subValue) && subCurrent && typeof subCurrent === 'object' && !Array.isArray(subCurrent)) {
-            raw[key][subKey] = { ...subCurrent, ...subValue };
-          } else {
-            raw[key][subKey] = subValue;
-          }
-        }
-        raw.markModified(key);
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const cur = doc[key];
+        if (!cur || typeof cur !== 'object' || Array.isArray(cur)) doc[key] = value;
+        else merged(doc[key], value);
       } else {
-        raw[key] = value;
+        doc[key] = value;
       }
     }
     if (update.$push) {
       for (const [k, v] of Object.entries(update.$push)) {
-        if (!Array.isArray(raw[k])) raw[k] = [];
-        raw[k].push(v);
-        raw.markModified(k);
+        const path = k.split('.');
+        const arr = getPath(doc, path);
+        if (Array.isArray(arr)) {
+          arr.push(v);
+          setPath(doc, path, arr);
+        } else setPath(doc, path, [v]);
       }
     }
     if (update.$pull) {
       for (const [k, cond] of Object.entries(update.$pull)) {
-        if (!Array.isArray(raw[k])) continue;
-        raw[k] = raw[k].filter(item => !Object.keys(cond).every(c => item[c] === cond[c]));
-        raw.markModified(k);
+        const path = k.split('.');
+        const arr = getPath(doc, path);
+        if (Array.isArray(arr)) {
+          setPath(doc, path, arr.filter(item => item && typeof item === 'object' && !Object.keys(cond).every(c => item[c] === cond[c])));
+        }
       }
     }
-    await raw.save();
-    return { ok: true, data: raw.toObject() };
+    doc.updatedAt = new Date();
+    await col.replaceOne({ guildId: String(guildId) }, doc, { upsert: true });
+
+    // 🔄 إبلاغ البوت فوراً (وإلا يظل يقرأ الكاش حتى 30 ثانية)
+    await pushSyncCommand(guildId);
+
+    return { ok: true, data: doc };
   } catch (err) {
     return { ok: false, error: err.message };
   }
+}
+
+function getPath(obj, path) {
+  let n = obj;
+  for (const p of path) {
+    if (!n || typeof n !== 'object') return undefined;
+    n = n[p];
+  }
+  return n;
+}
+
+function setPath(obj, path, value) {
+  let n = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    const p = path[i];
+    if (!n[p] || typeof n[p] !== 'object' || Array.isArray(n[p])) n[p] = /^\d+$/.test(path[i + 1]) ? [] : {};
+    n = n[p];
+  }
+  n[path[path.length - 1]] = value;
+}
+
+function merged(target, patch) {
+  for (const [k, v] of Object.entries(patch)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && target[k] && typeof target[k] === 'object' && !Array.isArray(target[k])) {
+      merged(target[k], v);
+    } else {
+      target[k] = v;
+    }
+  }
+}
+
+// 🔄 أمر مزامنة سريع — العامل يمسح كاش الإعدادات لدى البوت خلال ثوان (poll كل 4ث)
+async function pushSyncCommand(guildId) {
+  try {
+    await ensureConnected();
+    await DashboardCommand.create({ guildId: String(guildId), command: 'settings_sync', payload: {}, status: 'pending', createdAt: new Date(), updatedAt: new Date() });
+  } catch {}
 }
 
 module.exports = {

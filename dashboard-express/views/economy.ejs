@@ -97,6 +97,25 @@
       </div>
     </div>
   </div>
+
+  <div class="card mb-3">
+    <div class="card-head"><h3><i class="bi bi-bank"></i> البنك والسرقة والبقاشي</h3>
+      <div class="head-side">
+        <span class="chip <%= E.bankEnabled ? 'green' : '' %>"><%= E.bankEnabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="economy.bankEnabled" <%= E.bankEnabled ? 'checked' : '' %>><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-row-3">
+        <div class="field"><label>فائدة البنك يومياً %</label><input type="number" class="inp num" data-num="economy.bankInterestRate" value="<%= E.bankInterestRate ?? 5 %>" min="0" max="50"></div>
+        <div class="field"><label>أقصى إيداع بالبنك</label><input type="number" class="inp num" data-num="economy.bankMaxDeposit" value="<%= E.bankMaxDeposit ?? 100000 %>" min="0"></div>
+        <div class="field"><label>البقاشي — الحد الأدنى</label><input type="number" class="inp num" data-field="economy.begAmount.min" value="<%= E.begAmount?.min ?? 10 %>" min="0" max="10000"></div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>فترة انتظار السرقة (دقائق)</label><input type="number" class="inp num" data-num="economy.robCooldown" value="<%= Math.round((E.robCooldown ?? 300000) / 60000) %>" min="0" max="1440"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ════ المستويات ════ -->

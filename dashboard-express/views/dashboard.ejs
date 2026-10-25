@@ -12,7 +12,7 @@
   </div>
 </div>
 
-<% if (guilds.length === 0) { %>
+<% if (guilds.length === 0 && (pendingGuilds || []).length === 0) { %>
 <div class="card"><div class="card-body">
   <div class="empty">
     <i class="bi bi-emoji-frown"></i>
@@ -21,7 +21,8 @@
     <a class="btn primary mt-3" href="https://discord.com/oauth2/authorize?client_id=<%= clientId %>&permissions=1395867970447&scope=bot%20applications.commands" target="_blank"><i class="bi bi-plus-lg"></i> أضف البوت لسيرفر جديد</a>
   </div>
 </div></div>
-<% } else { %>
+<% } %>
+<% if (guilds.length > 0) { %>
 <div class="grid-guild">
   <% guilds.forEach(g => { %>
     <a class="gcard" href="/dashboard/<%= g.id %>">
@@ -36,15 +37,39 @@
       </div>
       <div class="g-meta">
         <% if (g.owner) { %><span class="chip green"><i class="bi bi-person-fill-gear"></i> مالك</span><% } %>
-        <span class="chip blue"><i class="bi bi-shield-check"></i> بوت موجود</span>
+        <span class="chip blue"><i class="bi bi-shield-check"></i> البوت موجود الآن</span>
       </div>
       <div class="enter"><i class="bi bi-arrow-left"></i> إدارة السيرفر</div>
     </a>
   <% }) %>
 </div>
 <% } %>
-<% if (guilds.length > 0 && !guilds.some(g => g.owner)) { %>
-<div class="banner blue mt-4"><i class="bi bi-info-circle"></i> يعمل لديك صلاحية إدارة على السيرفرات أدناه — تفعيل الحماية يتطلب صلاحيات البوت كاملة في سيرفرك.</div>
+
+<% if ((pendingGuilds || []).length > 0) { %>
+<div class="section-title mt-4" style="margin-bottom:8px;"><i class="bi bi-sliders2"></i> سيرفرات تملكها ولا يوجد بها البوت بعد</div>
+<div class="grid-guild">
+  <% pendingGuilds.forEach(g => { %>
+    <a class="gcard" style="opacity:.86;" href="<%= botInviteLink() %>" target="_blank" rel="noopener">
+      <% if (g.icon) { %>
+        <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png?size=128" alt="">
+      <% } else { %>
+        <div class="g-letter"><%= (g.name || '?').charAt(0) %></div>
+      <% } %>
+      <div>
+        <div class="g-name"><%= g.name %></div>
+        <div style="font-size:11px;color:var(--text-3);font-weight:700;margin-top:3px;"><code class="code-cell" style="color:var(--text-3);"><%= g.id %></code></div>
+      </div>
+      <div class="g-meta">
+        <span class="chip warn"><i class="bi bi-plug"></i> البوت غير موجود</span>
+      </div>
+      <div class="enter"><i class="bi bi-plus-circle"></i> أضف البوت إلى هذا السيرفر</div>
+    </a>
+  <% }) %>
+</div>
+<% } %>
+
+<% if (typeof botListLive !== 'undefined' && botListLive) { %>
+<div class="banner green mt-4"><i class="bi bi-patch-check"></i> القائمة الحية خاصة: تعرض فقط السيرفرات التي **يوجد بها البوت فعلياً الآن** — عند خروج البوت من سيرفر يختفي تلقائياً.</div>
 <% } %>
 
 <%- include('layout-bottom') %>

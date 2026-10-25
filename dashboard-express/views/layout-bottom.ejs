@@ -6,7 +6,12 @@
   </div>
 </div>
 
-<script src="/js/ui.js?v=21"></script>
+<script src="/js/ui.js?v=22"></script>
+<script>
+  // expose LC helpers as globals for page scripts ($ / $$ / esc / fmt)
+  window.$ = window.LC.$;
+  window.$$ = window.LC.$$;
+</script>
 <script>
   // Bot connection pill (nav) — checks the queue with a light ping
   (async () => {

@@ -49,6 +49,16 @@
             <span style="font-size:12.5px;font-weight:700;" class="text-mid">تشغيل الصوت في الرومات الصوتية</span>
             <label class="switch"><input type="checkbox" data-toggle="music.enabled" <%= S.music?.enabled ? 'checked' : '' %>><span class="track"></span></label>
           </div>
+          <div class="form-row-3 mt-3">
+            <div class="field"><label>الصوت الافتراضي %</label><input type="number" class="inp num" data-num="music.defaultVolume" value="<%= S.music?.defaultVolume ?? 60 %>" min="1" max="100"></div>
+            <div class="field"><label>طول قائمة الانتظار</label><input type="number" class="inp num" data-num="music.maxQueueSize" value="<%= S.music?.maxQueueSize ?? 100 %>" min="5" max="500"></div>
+            <div class="field">
+              <label>Autoplay بعد القائمة</label>
+              <label class="field-check"><input type="checkbox" data-toggle="music.autoplay" <%= S.music?.autoplay !== false ? 'checked' : '' %>><span>تابع التشغيل تلقائياً</span></label>
+              <div class="text-dim" style="font-size:10.5px;">يضيف مقاطع مشابهة للنهاية</div>
+            </div>
+          </div>
+          <label class="field-check mt-3" style="max-width:420px;"><input type="checkbox" data-toggle="music.allowDJ" <%= S.music?.allowDJ ? 'checked' : '' %>><span>رول DJ وحده يستطيع التحكم بالموسيقى (إلا فالجميع)</span></label>
         </div>
       </div>
 

@@ -39,6 +39,7 @@
         <div class="field"><label>عنوان الإندبيد</label><input class="inp" data-text="welcome.embedTitle" value="<%= W.embedTitle || 'أهلاً وسهلاً' %>"></div>
         <div class="field"><label>لون الإندبيد (HEX)</label><input class="inp code-cell" data-text="welcome.embedColor" value="<%= W.embedColor || '#7c5cff' %>" maxlength="8"></div>
       </div>
+      <div class="field mb-3"><label>صورة مصغرة للإندبيد (URL) <span class="hint">فارغ = بدون</span></label><input class="inp code-cell" data-text="welcome.embedThumbnail" value="<%= W.embedThumbnail || '' %>" placeholder="https://…"></div>
       <div class="sec-title"><i class="bi bi-envelope"></i> الرسالة الخاصة (DM)</div>
       <label class="field-check mb-3" style="max-width:380px;"><input type="checkbox" data-toggle="welcome.dmEnabled" <%= W.dmEnabled ? 'checked' : '' %>><span>أرسل رسالة خاصة للعضو الجديد</span></label>
       <div class="field">
@@ -50,6 +51,14 @@
       <div class="field">
         <label>رابط خلفية البطاقة <span class="hint">فارغ = خلفية افتراضية أنيقة</span></label>
         <input class="inp code-cell" data-text="welcome.card.backgroundUrl" value="<%= W.card?.backgroundUrl || '' %>" placeholder="https://…png">
+      </div>
+      <div class="form-row mb-3 mt-3">
+        <div class="field"><label>لون اسم العضو</label><input class="inp code-cell" data-text="welcome.card.nameColor" value="<%= W.card?.nameColor || '#ffffff' %>" maxlength="8"></div>
+        <div class="field"><label>لون رقم العضوية</label><input class="inp code-cell" data-text="welcome.card.countColor" value="<%= W.card?.countColor || '#ffffff' %>" maxlength="8"></div>
+      </div>
+      <div class="form-row mb-3">
+        <div class="field"><label>حجم خط الاسم</label><input type="number" class="inp num" data-num="welcome.card.nameSize" value="<%= W.card?.nameSize ?? 46 %>" min="10" max="120"></div>
+        <div class="field"><label>حجم خط رقم العضوية</label><input type="number" class="inp num" data-num="welcome.card.countSize" value="<%= W.card?.countSize ?? 26 %>" min="8" max="90"></div>
       </div>
     </div>
   </div>
