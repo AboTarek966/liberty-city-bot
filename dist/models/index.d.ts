@@ -63,6 +63,8 @@ export interface IGuildSettings extends Document {
             timeWindow: number;
             action: 'alert' | 'kick' | 'ban' | 'strip';
             logChannel?: string;
+            /** 🛡️ وضع الحماية: prevent = منع وقائي (حظر فوري + حجر) | react = استجابة بحسب الإجراء المحدد */
+            mode?: 'prevent' | 'react';
             /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
             autoRestore?: boolean;
             /** 👢 ربط المطرودين تلقائياً برابط الدعوة (الطرد لا يُلغى في ديسكورد) */

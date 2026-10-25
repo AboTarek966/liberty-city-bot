@@ -105,7 +105,8 @@
       ['sel', 'action', 'الإجراء', [['delete', 'حذف'], ['warn', 'تحذير'], ['mute', 'كتم']], 'delete'],
       ['chan', 'logChannel', 'قناة السجلات', ''],
     ]},
-    { id: 'antiNuke', icon: 'bomb', grad: 'linear-gradient(135deg,#ff5c7a,#9b7cff)', name: 'Anti-Nuke', desc: 'ضد حذف رومات/رولات جماعي', fields: [
+    { id: 'antiNuke', icon: 'bomb', grad: 'linear-gradient(135deg,#ff5c7a,#9b7cff)', name: 'Anti-Nuke', desc: 'ضد حذف رومات/رولات جماعي — وضع المنع يبطئ الهجوم من الأساس', fields: [
+      ['sel', 'mode', 'وضع الحماية', [['prevent', '🛡️ منع وقائي — حجر الصلاحيات + حظر فوري من أول عملية'], ['react', '👁️ استجابة — عقوبة الإجراء المحدد فقط']], 'prevent'],
       ['num', 'threshold', 'عدد عمليات الحذف المُحفِّزة', 5, 2, 50],
       ['num', 'timeWindow', 'النافذة (ثواني)', 60, 5, 600],
       ['sel', 'action', 'الإجراء', [['alert', 'تنبيه فقط'], ['kick', 'طرد الفاعل'], ['ban', 'حظر الفاعل'], ['strip', 'سلب الصلاحيات']], 'ban'],

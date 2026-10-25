@@ -82,6 +82,8 @@ export interface IGuildSettings extends Document {
       timeWindow: number;
       action: 'alert' | 'kick' | 'ban' | 'strip';
       logChannel?: string;
+      /** 🛡️ وضع الحماية: prevent = منع وقائي (حظر فوري + حجر) | react = استجابة بحسب الإجراء المحدد */
+      mode?: 'prevent' | 'react';
       /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
       autoRestore?: boolean;
       /** 👢 ربط المطرودين تلقائياً برابط الدعوة (الطرد لا يُلغى في ديسكورد) */
@@ -836,6 +838,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       timeWindow: { type: Number, default: 10000 },
       action: { type: String, enum: ['alert', 'kick', 'ban', 'strip'], default: 'kick' },
       logChannel: { type: String },
+      /** 🛡️ وضع الحماية: prevent = منع وقائي (حظر فوري + حجر الصلاحيات) | react = استجابة بحسب الإجراء المحدد */
+      mode: { type: String, enum: ['prevent', 'react'], default: 'prevent' },
       /** ♻️ إعادة بنية السيرفر تلقائياً بعد هجوم حذف مكثف */
       autoRestore: { type: Boolean, default: true },
       /** 👢 إرسال رابط الدعوة للمطرودين تلقائياً (الطرد لا يُلغى في ديسكورد) */

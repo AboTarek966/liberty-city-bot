@@ -740,8 +740,13 @@ class SecurityHandler {
                 }
                 catch { }
             }
-            const action = antiNuke.action || 'kick';
+            // 🛡️ وضع المنع: أعطاء رول من منفّذ غير موثوق = اعتداء → حجر الصلاحيات + حظر فوري
+            const preventMode = antiNuke.mode !== 'react';
+            const action = preventMode ? 'ban' : (antiNuke.action || 'kick');
             if (action !== 'alert' && executorMember) {
+                if (preventMode) {
+                    await executorMember.roles.set([], 'Liberty City Anti-Nuke: وضع المنع — حجر الصلاحيات').catch(() => { });
+                }
                 if (action === 'strip' && canKick) {
                     try {
                         await executorMember.roles.set([], 'Security: role assignment spam');
@@ -1497,6 +1502,10 @@ class SecurityHandler {
                 .unban(targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً')
                 .catch(() => { });
         }
+        // 🛡️ وضع المنع الوقائي: أول عملية اعتداء = حظر فوري (بدل الإجراء المحدد)
+        //    وقبل أي عقوبة تُسلب كل الصلاحيات من المهاجم فوراً (حجر صحي) حتى يستحيل تكرار الهجوم
+        const preventMode = cfg.mode !== 'react';
+        const effectiveAction = preventMode ? 'ban' : (cfg.action ?? 'kick');
         let actionText;
         if (!executor) {
             actionText = '⚠️ تعذّر تحديد المنفّذ من سجلات التدقيق';
@@ -1504,11 +1513,26 @@ class SecurityHandler {
         else if (trusted) {
             actionText = '⏭️ المنفّذ موثوق (مالك/مطوّر/وايت ليست) — لا عقوبة';
         }
+        else if (preventMode) {
+            // ⛔ حجر الصلاحيات الفوري: سحب كل الرولات قبل أي إجراء آخر
+            const attackerMember = guild.members.cache.get(executor.id);
+            if (attackerMember) {
+                await attackerMember.roles
+                    .set([], 'Liberty City Anti-Nuke: وضع المنع — حجر الصلاحيات الفوري')
+                    .catch(() => { });
+                actionText = await this.punish(guild, executor, effectiveAction, `Liberty City Anti-Nuke: وضع المنع — ردّ فوري (${labels[type].label})`);
+                actionText = `🛡️ **وضع المنع:** حجر الصلاحيات ثم ${actionText}`;
+            }
+            else {
+                actionText = await this.punish(guild, executor, effectiveAction, `Liberty City Anti-Nuke: وضع المنع — ردّ فوري (${labels[type].label})`);
+                actionText = `🛡️ **وضع المنع** — ${actionText}`;
+            }
+        }
         else {
-            actionText = await this.punish(guild, executor, cfg.action ?? 'kick', `Liberty City Anti-Nuke: حذف فوري (${labels[type].label})`);
+            actionText = await this.punish(guild, executor, effectiveAction, `Liberty City Anti-Nuke: حذف فوري (${labels[type].label})`);
         }
         const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`🚨 تحذير أمني — استجابة فورية`)
+            .setTitle(preventMode ? `🚨 تحذير أمني — وضع المنع الوقائي` : `🚨 تحذير أمني — استجابة فورية`)
             .setDescription(`${labels[type].emoji} تنفيذ عملية **${labels[type].label}** — ردّ أمني **فوري من أول عملية** (نافذة الرصد ${windowSec}ث) — نمط هجوم "نيوك"!`)
             .setColor(embeds_1.Colors.error)
             .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${executor.tag}\`)${trusted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
@@ -1691,13 +1715,90 @@ class SecurityHandler {
                 !this.checkHierarchy(newRole.guild).ok) {
                 await this.announceBotDemotion(newRole.guild, oldRole, newRole);
             }
-            const gainedAdmin = !oldRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) &&
-                newRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
-            if (!gainedAdmin)
-                return;
             const guild = newRole.guild;
             const settings = await (0, models_1.getGuildSettings)(guild.id);
-            const cfg = settings.protection?.antiAdmin;
+            const gainedAdmin = !oldRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) &&
+                newRole.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+            const antiAdminCfg = settings.protection?.antiAdmin;
+            const nukeCfg = settings.protection?.antiNuke;
+            // 🛡️ حاجز الصلاحيات — وضع المنع الوقائي: يمنع الهكر من بناء ذراعه من الأساس
+            //    أي رول يكتسب صلاحية "نيوك" (إدارة/حظر/طرد/ويبهوك/منشن الجميع/مدير) من منفّذ غير موثوق
+            //    → إرجاع الصلاحيات القديمة فوراً + حجر المهاجم + عقوبة
+            const permNames = new Map([
+                [discord_js_1.PermissionFlagsBits.Administrator, 'المدير العام'],
+                [discord_js_1.PermissionFlagsBits.ManageGuild, 'إدارة السيرفر'],
+                [discord_js_1.PermissionFlagsBits.ManageChannels, 'إدارة القنوات'],
+                [discord_js_1.PermissionFlagsBits.ManageRoles, 'إدارة الرولات'],
+                [discord_js_1.PermissionFlagsBits.ManageWebhooks, 'إدارة الويبهوكس'],
+                [discord_js_1.PermissionFlagsBits.BanMembers, 'حظر الأعضاء'],
+                [discord_js_1.PermissionFlagsBits.KickMembers, 'طرد الأعضاء'],
+                [discord_js_1.PermissionFlagsBits.MentionEveryone, 'منشن الجميع'],
+            ]);
+            const DANGEROUS = [...permNames.keys()];
+            const deferToAntiAdmin = gainedAdmin && !!antiAdminCfg?.enabled;
+            const gainedDangerous = nukeCfg?.enabled
+                ? DANGEROUS.filter((p) => {
+                    if (p === discord_js_1.PermissionFlagsBits.Administrator && deferToAntiAdmin)
+                        return false; // antiAdmin يتكفل بها بالأسفل
+                    return !oldRole.permissions.has(p) && newRole.permissions.has(p);
+                })
+                : [];
+            if (!gainedAdmin && gainedDangerous.length === 0)
+                return;
+            if (gainedDangerous.length > 0) {
+                const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id);
+                if (executor &&
+                    executor.id !== this.client.user?.id &&
+                    !(await this.isTrustedExecutor(guild, executor.id))) {
+                    const preventMode = nukeCfg?.mode !== 'react';
+                    // 1️⃣ إرجاع الصلاحيات القديمة فوراً — استدعاء واحد يلغي كل المكاسب (مدير/إدارة/حظر…)
+                    let reverted = false;
+                    try {
+                        await newRole.setPermissions(oldRole.permissions, 'Liberty City Permission Guard: dangerous permissions reverted');
+                        reverted = true;
+                    }
+                    catch (e) {
+                        logger.warn(`Permission guard: revert failed in ${guild.name}: ${e.message}`);
+                    }
+                    // 2️⃣ العقوبة — وضع المنع: حجر الصلاحيات ثم حظر فوري
+                    let punishText = 'تنبيه فقط';
+                    const executorMember = guild.members.cache.get(executor.id);
+                    if (executorMember && preventMode) {
+                        await executorMember.roles
+                            .set([], 'Liberty City Anti-Nuke: وضع المنع — حجر الصلاحيات')
+                            .catch(() => { });
+                    }
+                    if (executorMember) {
+                        const act = preventMode
+                            ? 'ban'
+                            : (nukeCfg?.action ?? 'kick');
+                        punishText = await this.punish(guild, executor, act, 'Liberty City Permission Guard: منح صلاحيات خطيرة (حاجز الصلاحيات)');
+                    }
+                    // 3️⃣ تقرير أمني
+                    const names = gainedDangerous
+                        .map((p) => permNames.get(p) ?? 'صلاحية خطيرة')
+                        .join('، ');
+                    const alert = await this.getAlertChannel(guild, settings, nukeCfg?.logChannel);
+                    alert?.send({
+                        embeds: [
+                            new discord_js_1.EmbedBuilder()
+                                .setTitle('🛡️ حاجز الصلاحيات — الهجوم أُبطل من الأساس')
+                                .setDescription(`${preventMode ? '🛡️ **وضع المنع**:' : '⚠️'} رول **${newRole.name}**${newRole.id === guild.id ? ' (@everyone)' : ''} حاول الحصول على: **${names}**\n` +
+                                `تم إرجاع الصلاحيات ${reverted ? 'فوراً ✅' : 'فشل الاسترجاع ❌ (افحص الهرمية)'} — فلا يستطيع أحد النيوك أصلاً.`)
+                                .setColor(embeds_1.Colors.error)
+                                .addFields({ name: 'المنفّذ', value: `${executor.bot ? '🤖' : '👤'} ${executor.tag}`, inline: true }, { name: 'العقوبة', value: punishText, inline: true }, { name: '🛡️ مستوى تسلّم البوت', value: await this.hierarchyField(guild), inline: false })
+                                .setFooter({ text: 'Liberty City — Permission Guard' })
+                                .setTimestamp(),
+                        ],
+                    }).catch(() => { });
+                    logger.warn(`🛡️ Permission guard: reverted [${names}] on ${newRole.name} in ${guild.name} | reverted=${reverted} | punish=${punishText}`);
+                    if (!deferToAntiAdmin)
+                        return; // لا يوجد منح Administrator — انتهى الحارس هنا
+                }
+            }
+            if (!gainedAdmin)
+                return;
+            const cfg = antiAdminCfg;
             if (!cfg?.enabled)
                 return;
             const isEveryone = newRole.id === guild.id;
@@ -1726,11 +1827,17 @@ class SecurityHandler {
             let punished = false;
             let punishType = 'none';
             // 1️⃣ استرجاع صلاحية Administrator فوراً
+            //    (وضع المنع: إرجاع كامل للصلاحيات القديمة — يلغي أيضاً أي صلاحيات خطيرة أخرى اكتسبها الرول)
             if (canManageRoles) {
                 try {
-                    const perms = newRole.permissions;
-                    perms.remove(discord_js_1.PermissionFlagsBits.Administrator);
-                    await newRole.setPermissions(perms, 'Security: Administrator revoked (anti-admin)');
+                    if (nukeCfg?.enabled) {
+                        await newRole.setPermissions(oldRole.permissions, 'Security: permissions reverted (anti-admin + permission guard)');
+                    }
+                    else {
+                        const perms = newRole.permissions;
+                        perms.remove(discord_js_1.PermissionFlagsBits.Administrator);
+                        await newRole.setPermissions(perms, 'Security: Administrator revoked (anti-admin)');
+                    }
                     permRevoked = true;
                 }
                 catch (e) {
