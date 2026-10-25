@@ -1,155 +1,165 @@
 ﻿<%- include('layout-top', { title: 'نظرة عامة', activePage: 'guild' }) %>
 
-<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-  <div>
-    <h1><i class="bi bi-grid-1x2"></i> <%= guild.name %></h1>
-    <p>نظرة عامة على السيرفر والبوت — آخر تحديث الآن</p>
+<% const live = stats?.source === 'bot'; %>
+<div class="hero">
+  <% if (guild.icon) { %>
+    <img class="h-logo" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png?size=128" alt="">
+  <% } else { %>
+    <div class="h-logo" style="background:linear-gradient(135deg,var(--primary),var(--cyan));display:grid;place-items:center;font-size:24px;"><%= (guild.name||'?').charAt(0) %></div>
+  <% } %>
+  <div style="min-width:230px;">
+    <div class="h-title">
+      <%= guild.name %>
+      <% if (live) { %><span class="chip green"><i class="bi bi-broadcast"></i> بيانات حية</span><% } %>
+      <% if (guild.owner) { %><span class="chip green"><i class="bi bi-person-fill-gear"></i> مالك</span><% } %>
+    </div>
+    <div class="h-desc">
+      <% if (stats?.ownerTag) { %>👑 <%= stats.ownerTag %> · <% } %>
+      <code class="code-cell"><%= guild.id %></code>
+      <% if (stats?.createdAt) { %> · تأسس <%= new Date(stats.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' }) %><% } %>
+    </div>
+    <div class="h-chips">
+      <span class="chip <%= live ? 'green' : 'amber' %>"><i class="bi bi-activity"></i> <%= live ? 'مباشر من البوت' : 'وضع احتياطي (قاعدة البيانات)' %></span>
+      <% if (stats?.boostLevel > 0) { %><span class="chip pink"><i class="bi bi-rocket-takeoff"></i> <%= ['','مستوى 1','مستوى 2','مستوى 3'][stats.boostLevel] || stats.boostLevel %> · <%= stats.boosts %> بوست</span><% } %>
+    </div>
   </div>
-  <div class="btn-group">
-    <a href="/dashboard/<%= guild.id %>/settings" class="btn btn-outline-secondary"><i class="bi bi-gear"></i> الإعدادات</a>
-    <button class="btn btn-primary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> تحديث</button>
+  <div class="h-actions btn-group">
+    <a href="/dashboard/<%= guild.id %>/protection" class="btn"><i class="bi bi-shield-check"></i> الحماية</a>
+    <a href="/dashboard/<%= guild.id %>/settings" class="btn"><i class="bi bi-sliders"></i> إعدادات</a>
   </div>
 </div>
 
-<!-- Stats -->
-<div class="grid-4 mb-4">
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-people"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">الأعضاء</div>
-      <div class="stat-value"><%= (stats?.memberCount || 0).toLocaleString('en-US') %></div>
+<% if (!live && (stats?.workerAlive === false)) { %>
+<div class="banner warn"><i class="bi bi-plug"></i> البوت على FadeHost غير متصل الآن — سترى آخر قيم محفوظة. الأرقام الحية ستعود تلقائياً عند عودته.</div>
+<% } %>
+
+<div class="tiles">
+  <div class="tile">
+    <div class="t-ico" style="background:var(--blue-soft);color:var(--blue);"><i class="bi bi-people"></i></div>
+    <div>
+      <div class="t-label">إجمالي الأعضاء</div>
+      <div class="t-value num"><%= stats?.memberCount != null ? stats.memberCount.toLocaleString('en-US') : '—' %></div>
+      <div class="t-note"><% if (stats?.profilesCount != null) { %><%= stats.profilesCount %> ملف في القاعدة<% } %></div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-hash"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">القنوات</div>
-      <div class="stat-value"><%= stats?.channelCount || 0 %></div>
+  <div class="tile">
+    <div class="t-ico" style="background:var(--green-soft);color:var(--green);"><i class="bi bi-broadcast-pin"></i></div>
+    <div>
+      <div class="t-label">أعضاء متصلون</div>
+      <div class="t-value num"><%= stats?.onlineCount != null ? stats.onlineCount.toLocaleString('en-US') : '—' %></div>
+      <div class="t-note"><% if (stats?.botCount != null) { %><%= stats.botCount %> بوت<% } %></div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-person-badge"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">الرولات</div>
-      <div class="stat-value"><%= stats?.roleCount || 0 %></div>
+  <div class="tile">
+    <div class="t-ico" style="background:var(--primary-soft);color:var(--primary-2);"><i class="bi bi-collection-play"></i></div>
+    <div>
+      <div class="t-label">القنوات</div>
+      <div class="t-value num"><%= stats?.channelCount != null ? stats.channelCount.toLocaleString('en-US') : '—' %></div>
+      <div class="t-note"><% if (stats?.textChannelCount != null) { %>نصية <%= stats.textChannelCount %> · صوتية <%= stats.voiceChannelCount %><% } %></div>
     </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);"><i class="bi bi-ticket-perforated"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">تذاكر مفتوحة</div>
-      <div class="stat-value"><%= Array.isArray(tickets) ? tickets.filter(t => t.status === 'open').length : 0 %></div>
+  <div class="tile">
+    <div class="t-ico" style="background:var(--amber-soft);color:var(--amber);"><i class="bi bi-person-badge"></i></div>
+    <div>
+      <div class="t-label">الرولات</div>
+      <div class="t-value num"><%= stats?.roleCount != null ? stats.roleCount.toLocaleString('en-US') : '—' %></div>
+      <div class="t-note">تظهر في صفحة الأعضاء للإدارة</div>
     </div>
   </div>
 </div>
 
-<!-- Quick actions -->
-<div class="grid-3 mb-4">
-  <a href="/dashboard/<%= guild.id %>/protection" class="guild-card text-decoration-none">
-    <div class="cat-icon" style="background:var(--danger-bg);color:var(--danger);"><i class="bi bi-shield-check" style="font-size:20px;"></i></div>
-    <div class="guild-title">الحماية</div>
-    <div class="guild-meta">Anti-Raid، Anti-Spam، فلتر الروابط، حماية الرولات والقنوات</div>
-    <span class="badge <%= settings?.protection?.antiRaid?.enabled || settings?.protection?.antiSpam?.enabled ? 'bg-success' : 'bg-secondary' %>">
-      <%= settings?.protection?.antiRaid?.enabled || settings?.protection?.antiSpam?.enabled ? 'مفعّلة' : 'معطّلة' %>
-    </span>
-  </a>
-  <a href="/dashboard/<%= guild.id %>/ai" class="guild-card text-decoration-none">
-    <div class="cat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-robot" style="font-size:20px;"></i></div>
-    <div class="guild-title">الذكاء الاصطناعي</div>
-    <div class="guild-meta">أوتومود بالـ AI، مساعد التذاكر، المترجم، الردود الذكية</div>
-    <span class="badge <%= settings?.protection?.aiModerator?.enabled ? 'bg-success' : 'bg-secondary' %>">
-      <%= settings?.protection?.aiModerator?.enabled ? 'مفعّل' : 'معطّل' %>
-    </span>
-  </a>
-  <a href="/dashboard/<%= guild.id %>/welcome" class="guild-card text-decoration-none">
-    <div class="cat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-door-open" style="font-size:20px;"></i></div>
-    <div class="guild-title">الترحيب</div>
-    <div class="guild-meta">رسائل ترحيب ومغادرة مع بطاقة مرّسومة وDM</div>
-    <span class="badge <%= settings?.welcome?.enabled ? 'bg-success' : 'bg-secondary' %>">
-      <%= settings?.welcome?.enabled ? 'مفعّل' : 'معطّل' %>
-    </span>
-  </a>
-</div>
-
-<div class="row g-4">
-  <!-- Status of systems -->
-  <div class="col-12 col-lg-7">
-    <div class="card h-100">
-      <div class="card-header">
-        <h5><i class="bi bi-list-check"></i> حالة الأنظمة</h5>
+<div class="row-split mb-4">
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-ui-checks"></i> تفعيلات الأنظمة — بمسة واحدة</h3>
+      <div class="head-side"><span class="chip cyan">حفظ فوري</span></div>
+    </div>
+    <div class="card-body tight" id="systemsList">
+      <%
+        const feats = [
+          { id: 'protection', icon: 'shield-fill-check', name: 'الحماية المتقدمة', desc: 'Anti-Raid · Spam · Links · Nuke', on: !!(settings?.protection?.antiRaid?.enabled || settings?.protection?.antiSpam?.enabled), key: 'protection.antiRaid.enabled', cur: !!settings?.protection?.antiRaid?.enabled, page: 'protection' },
+          { id: 'welcome', icon: 'door-open', name: 'الترحيب والمغادرة', desc: 'رسائل + بطاقة + DM', on: !!settings?.welcome?.enabled, key: 'welcome.enabled', cur: !!settings?.welcome?.enabled, page: 'welcome' },
+          { id: 'tickets', icon: 'lifebuoy', name: 'نظام التذاكر', desc: 'بانل + استلام + محفوظات', on: (settings?.tickets?.panels || []).length > 0 || !!settings?.tickets?.autoMessageEnabled, page: 'tickets' },
+          { id: 'logging', icon: 'journal-text', name: 'السجلات', desc: 'توثيق كل الأحدث بلوق', on: !!settings?.logging?.enabled, key: 'logging.enabled', cur: !!settings?.logging?.enabled, page: 'logs' },
+          { id: 'leveling', icon: 'graph-up-arrow', name: 'المستويات والخبرة', desc: 'XP per رسالة + مكافآت', on: !!settings?.leveling?.enabled, key: 'leveling.enabled', cur: !!settings?.leveling?.enabled, page: 'economy' },
+          { id: 'economy', icon: 'coin', name: 'الاقتصاد', desc: 'رصيد · بنك · متجر · مقامرة', on: !!settings?.economy?.enabled, key: 'economy.enabled', cur: !!settings?.economy?.enabled, page: 'economy' },
+          { id: 'verification', icon: 'patch-check', name: 'التوثيق', desc: 'زر توثيق للأعضاء', on: !!settings?.verification?.enabled, key: 'verification.enabled', cur: !!settings?.verification?.enabled, page: 'settings' },
+          { id: 'autorole', icon: 'person-fill-add', name: 'رول تلقائي', desc: 'يُعطى عند الانضمام', on: !!settings?.autorole?.enabled, key: 'autorole.enabled', cur: !!settings?.autorole?.enabled, page: 'settings' },
+        ];
+      %>
+      <% feats.forEach(f => { %>
+      <div class="feat">
+        <div class="f-ico" style="background:<%= f.on ? 'var(--green-soft)' : 'var(--panel-2)' %>;color:<%= f.on ? 'var(--green)' : 'var(--text-3)' %>;border:1px solid <%= f.on ? 'rgba(45,212,167,.2)' : 'var(--line)' %>;"><i class="bi bi-<%= f.icon %>"></i></div>
+        <div class="f-info">
+          <div class="f-name"><%= f.name %></div>
+          <div class="f-desc"><%= f.desc %></div>
+        </div>
+        <div class="f-actions">
+          <% if (f.key) { %>
+          <label class="switch"><input type="checkbox" data-toggle="<%= f.key %>" <%= f.cur ? 'checked' : '' %>><span class="track"></span></label>
+          <% } else { %><span class="chip <%= f.on ? 'green' : '' %>"><%= f.on ? 'مفعّل' : 'غير مضبوط' %></span><% } %>
+          <a class="btn sm" href="/dashboard/<%= guild.id %>/<%= f.page %>"><i class="bi bi-gear"></i> تخصيص</a>
+        </div>
       </div>
-      <div class="card-body p-0">
-        <%
-          const systems = [
-            { name: 'نظام التذاكر', icon: 'ticket-perforated', on: settings?.tickets?.enabled !== false, page: 'tickets' },
-            { name: 'الترحيب والمغادرة', icon: 'door-open', on: !!settings?.welcome?.enabled, page: 'welcome' },
-            { name: 'المستويات والخبرة', icon: 'graph-up', on: settings?.leveling?.enabled !== false, page: 'settings' },
-            { name: 'الاقتصاد', icon: 'coin', on: settings?.economy?.enabled !== false, page: 'economy' },
-            { name: 'أوتومود', icon: 'shield', on: settings?.automod?.enabled !== false, page: 'settings' },
-            { name: 'التوثيق', icon: 'patch-check', on: !!settings?.verification?.enabled, page: 'settings' },
-            { name: 'السجلات', icon: 'journal-text', on: settings?.logging?.enabled !== false, page: 'logs' },
-            { name: 'الرول التلقائي', icon: 'person-plus', on: !!settings?.autorole?.enabled, page: 'settings' },
-          ];
-        %>
-        <% systems.forEach(s => { %>
-        <div class="switch-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
-          <div class="switch-info d-flex align-items-center gap-3">
-            <div class="cat-icon" style="background:<%= s.on ? 'var(--success-bg)' : 'rgba(90,101,133,0.12)' %>;color:<%= s.on ? 'var(--success)' : 'var(--text-muted)' %>;">
-              <i class="bi bi-<%= s.icon %>"></i>
-            </div>
-            <div>
-              <h6><%= s.name %></h6>
-              <p><%= s.on ? 'مفعّل ويعمل' : 'معطّل' %></p>
-            </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-clock-history"></i> آخر إجراءات الإشراف</h3>
+      <div class="head-side"><a href="/dashboard/<%= guild.id %>/logs" class="btn sm">عرض الكل</a></div>
+    </div>
+    <div class="card-body tight">
+      <% const typesMap = { ban: ['hammer', 'red'], kick: ['door-open', 'amber'], warn: ['exclamation-triangle', 'amber'], mute: ['mic-mute', 'blue'], unmute: ['mic', 'green'], timeout: ['hourglass-split', 'amber'], untimeout: ['arrow-counterclockwise', 'green'], softban: ['brush', 'amber'], note: ['sticky', 'cyan'], role_add: ['person-plus', 'green'], role_remove: ['person-dash', 'red'] }; %>
+      <% const recentLogs = ((logs && logs.logs) ? logs.logs : []).slice(0, 7); %>
+      <% if (!recentLogs.length) { %>
+        <div class="empty"><i class="bi bi-inbox"></i><h4>لا إجراءات بعد</h4><p>تحذيرات وأطفال البوت ستظهر هنا فور تنفيذها من أي مكان.</p></div>
+      <% } else { %>
+        <% recentLogs.forEach(l => { const t = typesMap[l.type] || ['shield', 'cyan']; %>
+        <div class="feat">
+          <div class="f-ico" style="background:var(--<%= t[1] %>-soft);color:var(--<%= t[1] %>);"><i class="bi bi-<%= t[0] %>"></i></div>
+          <div class="f-info">
+            <div class="f-name">كيس #<%= l.caseId || '—' %> · <%= l.type %></div>
+            <div class="f-desc"><%= (l.reason || 'بدون سبب').slice(0, 60) %></div>
           </div>
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge <%= s.on ? 'bg-success' : 'bg-secondary' %>"><%= s.on ? '● يعمل' : '○ متوقف' %></span>
-            <a href="/dashboard/<%= guild.id %>/<%= s.page %>" class="btn btn-outline-secondary btn-sm">إعدادات</a>
-          </div>
+          <small class="text-dim" style="font-size:10.5px;"><%= l.createdAt ? new Date(l.createdAt).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }) : '' %></small>
         </div>
         <% }) %>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recent activity -->
-  <div class="col-12 col-lg-5">
-    <div class="card h-100">
-      <div class="card-header">
-        <h5><i class="bi bi-clock-history"></i> آخر الأنشطة</h5>
-        <a href="/dashboard/<%= guild.id %>/logs" class="btn btn-outline-secondary btn-sm">الكل</a>
-      </div>
-      <div class="card-body p-0">
-        <%
-          const recentLogs = (logs && logs.logs) ? logs.logs.slice(0, 8) : (Array.isArray(logs) ? logs.slice(0, 8) : []);
-        %>
-        <% if (recentLogs.length === 0) { %>
-          <div class="empty-state" style="padding:40px 20px;">
-            <i class="bi bi-inbox"></i>
-            <h5>لا توجد أنشطة</h5>
-            <p>ستظهر هنا إجراءات الإشراف الأخيرة (تحذيرات، طرود، حظر...)</p>
-          </div>
-        <% } else { %>
-          <% recentLogs.forEach(l => { %>
-          <div class="switch-card" style="border-radius:0;border-left:none;border-right:none;border-top:none;">
-            <div class="switch-info d-flex align-items-center gap-3">
-              <div class="cat-icon" style="background:var(--info-bg);color:var(--info);">
-                <i class="bi bi-<%= l.type === 'ban' ? 'x-circle' : l.type === 'kick' ? 'door-open' : l.type === 'warn' ? 'exclamation-triangle' : 'shield' %>"></i>
-              </div>
-              <div>
-                <h6 style="font-size:13px;">
-                  <%= l.type === 'ban' ? 'حظر' : l.type === 'kick' ? 'طرد' : l.type === 'warn' ? 'تحذير' : l.type %>
-                </h6>
-                <p style="font-size:11.5px;"><code><%= l.targetId %></code> — <%= l.reason || 'بدون سبب' %></p>
-              </div>
-            </div>
-            <small class="text-muted"><%= l.createdAt ? new Date(l.createdAt).toLocaleDateString('ar-SA') : '' %></small>
-          </div>
-          <% }) %>
-        <% } %>
-      </div>
+      <% } %>
     </div>
   </div>
 </div>
+
+<div class="card">
+  <div class="card-head"><h3><i class="bi bi-bolt"></i> إجراءات سريعة</h3></div>
+  <div class="card-body">
+    <div class="grid-3">
+      <a class="btn w-100" href="/dashboard/<%= guild.id %>/members" style="flex-direction:column;padding:20px;gap:8px;"><i class="bi bi-people" style="font-size:22px;color:var(--blue);"></i> <span>إدارة الأعضاء</span><small class="text-dim">طرد · حظر · رولات · توقيت</small></a>
+      <a class="btn w-100" href="/dashboard/<%= guild.id %>/tickets" style="flex-direction:column;padding:20px;gap:8px;"><i class="bi bi-lifebuoy" style="font-size:22px;color:var(--green);"></i> <span>لوحة التذاكر</span><small class="text-dim">فحص · ردود · إغلاق</small></a>
+      <button class="btn w-100" onclick="unlockdown(this)" style="flex-direction:column;padding:20px;gap:8px;"><i class="bi bi-unlock" id="ldIcon" style="font-size:22px;color:<%= settings?.protection?.lockdown ? 'var(--red)' : 'var(--amber)' %>;"></i>
+        <span>وضع الطوارئ (Lockdown)</span>
+        <small class="text-dim">حالة: <b id="ldState"><%= settings?.protection?.lockdown ? 'مُفعّل — القنوات مقفلة!' : 'غير مفعّل' %></b></small>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const GID = '<%= guild.id %>';
+  const LC2 = window.LC;
+  async function unlockdown(btn) {
+    const cur = '<%= settings?.protection?.lockdown ? '1' : '0' %>';
+    const target = cur === '1';
+    const yes = await LC2.confirmBox('وضع الطوارئ', target
+      ? 'سيعاد فتح الكتابة والدخول في كل القنوات — تأكيد؟'
+      : 'سيُقفل كتابة الدخول في جميع القنوات فوراً (وضع الطوارئ) — تأكيد؟', { danger: !target, okLabel: 'نعم، نفّذ' });
+    if (!yes) return;
+    const ok = await LC2.saveSetting(GID, { protection: { lockdown: !target } }, btn);
+    if (ok) {
+      document.getElementById('ldState').textContent = !target ? 'مُفعّل — القنوات مقفلة!' : 'غير مفعّل';
+      document.getElementById('ldIcon').style.color = !target ? 'var(--red)' : 'var(--amber)';
+      LC2.toast(!target ? 'وضع الطوارئ مُفعّل' : 'فُتح السيرفر — انتهى الطوارئ', !target ? 'warn' : 'success');
+    }
+  }
+</script>
 
 <%- include('layout-bottom') %>

@@ -1,493 +1,133 @@
 ﻿<%- include('layout-top', { title: 'التذاكر', activePage: 'tickets' }) %>
 
-<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+<% const GID = guild.id; const list = (Array.isArray(tickets) ? tickets : []); const openCnt = list.filter(t => t.status === 'open').length; const claimed = list.filter(t => t.status === 'claimed').length; %>
+
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;font-size:26px;"><i class="bi bi-lifebuoy"></i></div>
   <div>
-    <h1 class="h3 fw-bold mb-1">
-      <i class="bi bi-ticket-perforated me-2 text-primary"></i>
-      إدارة التذاكر
-    </h1>
-    <p class="text-muted mb-0">عرض، استلام، إغلاق، تصفية التذاكر</p>
+    <div class="h-title">لوحة التذاكر
+      <span class="chip green"><%= openCnt %> مفتوحة</span>
+      <% if (claimed) { %><span class="chip blue"><%= claimed %> مُستلمة</span><% } %>
+    </div>
+    <div class="h-desc">تابع تذاكر السيرفر — استلم، رد، أغلق، أو امسح — كل إجراء ينفذه البوت مباشرة في Discord</div>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
-    <button class="btn btn-primary" onclick="refreshTickets()">
-      <i class="bi bi-arrow-clockwise me-1"></i> تحديث
-    </button>
-    <button class="btn btn-outline-secondary" onclick="exportTickets()">
-      <i class="bi bi-download me-1"></i> تصدير CSV
-    </button>
+  <div class="h-actions btn-group">
+    <button class="btn" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> تحديث</button>
   </div>
 </div>
 
-<!-- Ticket Stats -->
-<div class="grid-5 mb-4">
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-ticket-perforated"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">مفتوحة</div>
-      <div class="stat-value" id="statOpen"><%= tickets?.filter(t=>t.status==='open').length || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);"><i class="bi bi-person-check"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">مستلمة</div>
-      <div class="stat-value" id="statClaimed"><%= tickets?.filter(t=>t.status==='claimed').length || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-clock-history"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">بانتظار</div>
-      <div class="stat-value" id="statWaiting"><%= tickets?.filter(t=>t.status==='waiting').length || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--secondary-bg);color:var(--text-muted);"><i class="bi bi-x-circle"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">مغلقة</div>
-      <div class="stat-value" id="statClosed"><%= tickets?.filter(t=>t.status==='closed').length || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-clock"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">متوسط الاستجابة</div>
-      <div class="stat-value" id="statAvgResponse"><%= stats?.avgResponseTime || '—' %></div>
-    </div>
-  </div>
-</div>
-
-<!-- Filters -->
-<div class="card mb-4">
-  <div class="card-body">
-    <div class="filter-bar">
-      <select class="form-select form-select-sm" id="statusFilter" onchange="filterTickets()" style="width: auto; min-width: 180px;">
-        <option value="">جميع الحالات</option>
-        <option value="open">🟢 مفتوحة</option>
-        <option value="claimed">🟡 مستلمة</option>
-        <option value="waiting">⏳ بانتظار</option>
-        <option value="closed">🔴 مغلقة</option>
-      </select>
-      <select class="form-select form-select-sm" id="typeFilter" onchange="filterTickets()" style="width: auto; min-width: 180px;">
-        <option value="">جميع الأنواع</option>
-        <option value="support">🛟 دعم فني</option>
-        <option value="report">🚨 تقرير</option>
-        <option value="appeal">⚖️ استئناف</option>
-        <option value="general">📋 عام</option>
-      </select>
-      <input type="text" class="form-control form-control-sm" id="searchFilter" placeholder="بحث بالمستخدم، النوع، أو السبب..." oninput="filterTickets()" style="flex: 1; min-width: 200px;">
-      <div class="d-flex gap-2">
-        <select class="form-select form-select-sm" id="sortFilter" onchange="filterTickets()" style="width: auto;">
-          <option value="newest">الأحدث أولاً</option>
-          <option value="oldest">الأقدم أولاً</option>
-          <option value="priority">الأولوية</option>
-        </select>
-        <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()"><i class="bi bi-x-circle"></i> مسح</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Tickets Table -->
 <div class="card">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table mb-0" id="ticketsTable">
-        <thead>
-          <tr>
-            <th style="width: 50px;">#</th>
-            <th style="width: 80px;">الحالة</th>
-            <th>النوع</th>
-            <th>المستخدم</th>
-            <th>السبب / الملخص</th>
-            <th>المستلم</th>
-            <th>الأولوية</th>
-            <th style="width: 140px;">التاريخ</th>
-            <th style="width: 160px;">الإجراءات</th>
-          </tr>
-        </thead>
-        <tbody id="ticketsBody">
-          <% if (!tickets || tickets.length === 0) { %>
-          <tr>
-            <td colspan="9" class="text-center py-5">
-              <div class="empty-state" style="padding: 40px 20px;">
-                <i class="bi bi-ticket-perforated"></i>
-                <h5>لا توجد تذاكر</h5>
-                <p class="text-muted">لم يتم فتح أي تذاكر بعد في هذا السيرفر.</p>
-              </div>
-            </td>
-          </tr>
-          <% } else { 
-            let displayNum = 1;
-            tickets.forEach(t => { 
-              const statusClass = 'ticket-status-' + t.status;
-              const priorityClass = t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'info';
-              const priorityLabel = t.priority === 'high' ? '🔴 عالية' : t.priority === 'medium' ? '🟡 متوسطة' : '🟢 منخفضة';
-          %>
-          <tr data-id="<%= t.id %>" data-status="<%= t.status %>" data-type="<%= t.type %>" data-user="<%= t.user?.username || t.userId %>" data-priority="<%= t.priority %>">
-            <td class="fw-bold text-muted">#<%= displayNum++ %></td>
-            <td>
-              <span class="badge <%= statusClass === 'ticket-status-open' ? 'bg-success' : statusClass === 'ticket-status-claimed' ? 'bg-warning' : statusClass === 'ticket-status-waiting' ? 'bg-info' : 'bg-secondary' %> px-3 py-2 fs-6">
-                <%= t.status === 'open' ? 'مفتوحة' : t.status === 'claimed' ? 'مستلمة' : t.status === 'waiting' ? 'بانتظار' : 'مغلقة' %>
-              </span>
-            </td>
-            <td>
-              <span class="badge bg-<%= t.type === 'report' ? 'danger' : t.type === 'appeal' ? 'purple' : t.type === 'support' ? 'info' : 'secondary' %> px-2 py-1">
-                <i class="bi bi-<%= t.type === 'report' ? 'flag' : t.type === 'appeal' ? 'gavel' : t.type === 'support' ? 'headset' : 'chat' %> me-1"></i>
-                <%= t.type === 'report' ? 'تقرير' : t.type === 'appeal' ? 'استئناف' : t.type === 'support' ? 'دعم' : 'عام' %>
-              </span>
-            </td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <% if (t.user?.avatar) { %>
-                  <img src="https://cdn.discordapp.com/avatars/<%= t.userId %>/<%= t.user.avatar %>.png?size=32" class="avatar avatar-sm" alt="">
-                <% } else { %>
-                  <div class="avatar avatar-sm" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;"><%= (t.user?.username || 'U').charAt(0) %></div>
-                <% } %>
-                <div>
-                  <div class="fw-medium"><%= t.user?.username || 'مستخدم مجهول' %></div>
-                  <small class="text-muted"><%= t.userId %></small>
-                </div>
-              </div>
-            </td>
-            <td class="text-truncate" style="max-width: 300px;" title="<%= (t.reason || t.summary || '—').replace(/"/g, '"') %>">
-              <%= t.reason || t.summary || '—' %>
-            </td>
-            <td>
-              <% if (t.claimedBy) { %>
-                <div class="d-flex align-items-center gap-2">
-                  <% if (t.claimedByAvatar) { %>
-                    <img src="https://cdn.discordapp.com/avatars/<%= t.claimedById %>/<%= t.claimedByAvatar %>.png?size=24" class="avatar avatar-sm" alt="" style="width:24px;height:24px;">
-                  <% } else { %>
-                    <div class="avatar avatar-sm" style="width:24px;height:24px;font-size:10px;background:var(--success-bg);color:var(--success);"><i class="bi bi-person"></i></div>
-                  <% } %>
-                  <span class="fw-medium text-success"><%= t.claimedBy %></span>
-                </div>
-              <% } else { %>
-                <span class="text-muted">—</span>
-              <% } %>
-            </td>
-            <td>
-              <span class="badge bg-<%= priorityClass %>"><%= priorityLabel %></span>
-            </td>
-            <td class="text-muted small"><%= t.createdAt ? new Date(t.createdAt).toLocaleString('ar-SA') : '—' %></td>
-            <td>
-              <div class="btn-group btn-group-sm" role="group">
-                <% if (t.status === 'open') { %>
-                  <button class="btn btn-outline-primary" onclick="claimTicket('<%= t.id %>')" title="استلام"><i class="bi bi-person-check"></i></button>
-                <% } else if (t.status === 'claimed') { %>
-                  <button class="btn btn-outline-warning" onclick="unclaimTicket('<%= t.id %>')" title="إلغاء الاستلام"><i class="bi bi-person-x"></i></button>
-                  <button class="btn btn-outline-success" onclick="closeTicket('<%= t.id %>')" title="إغلاق"><i class="bi bi-check-lg"></i></button>
-                <% } else if (t.status === 'waiting') { %>
-                  <button class="btn btn-outline-success" onclick="closeTicket('<%= t.id %>')" title="إغلاق"><i class="bi bi-check-lg"></i></button>
-                <% } %>
-                <button class="btn btn-outline-info" onclick="viewTicket('<%= t.id %>')" title="عرض"><i class="bi bi-eye"></i></button>
-                <% if (t.status !== 'closed') { %>
-                  <button class="btn btn-outline-danger" onclick="deleteTicket('<%= t.id %>')" title="حذف"><i class="bi bi-trash"></i></button>
-                <% } %>
-              </div>
-            </td>
-          </tr>
-          <% }) }
-          %>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <% if (tickets && tickets.length > 20) { %>
-    <div class="card-footer d-flex justify-content-between align-items-center">
-      <div class="text-muted small">إجمالي: <%= tickets.length %> تذكرة</div>
-      <nav>
-        <ul class="pagination pagination-sm mb-0" id="ticketsPagination">
-          <!-- Generated by JS -->
-        </ul>
-      </nav>
-    </div>
+  <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);">
+    <input id="tSearch" class="inp" style="max-width:300px;" placeholder="🔎 بحث بموضوع / معرف المستخدم…">
+    <select id="tFilter" class="inp" style="max-width:170px;">
+      <option value="">كل الحالات</option>
+      <option value="open">مفتوحة</option>
+      <option value="claimed">مُستلمة</option>
+      <option value="closed">مغلقة</option>
+    </select>
+    <span class="chip purple" style="margin-inline-start:auto;"><%= list.length %> تذكرة</span>
+  </div>
+  <div class="card-body tight">
+    <% const S = { open: ['مفتوحة', 'green'], claimed: ['مُستلمة', 'blue'], closed: ['مغلقة', ''], deleted: ['محذوفة', 'red'] }; %>
+    <% if (!list.length) { %>
+      <div class="empty"><i class="bi bi-lifebuoy"></i><h4>لا تذاكر بعد</h4><p>عند أنشاء تذكرة بالسيرفر ستظهر هنا فوراً (مباشر من قاعدة البيانات المشتركة)</p></div>
+    <% } else { %>
+      <% list.forEach((t, i) => { const st = S[t.status] || ['?', '']; %>
+      <div class="feat tk-row" data-search="<%= (((t.subject || '') + ' ' + (t.userId || ''))).toLowerCase() %>" data-status="<%= t.status || '' %>">
+        <div class="f-ico" style="background:var(--<%= st[1] ? st[1] : 'purple' %>-soft);color:var(--<%= st[1] ? st[1] : 'primary-2' %>);"><i class="bi bi-ticket-perforated"></i></div>
+        <div class="f-info">
+          <div class="f-name">
+            #<%= (t.number || list.length - i) %> — <%= (t.subject || t.type || 'تذكرة').slice(0, 44) %>
+            <span class="chip <%= st[1] %>"><%= st[0] %></span>
+          </div>
+          <div class="f-desc">صاحبها <code class="code-cell"><%= t.userId || '؟' %></code>
+            <% if (t.claimedBy) { %> · مستلمها <b class="text-mid"><%= t.claimedBy %></b><% } %>
+            · <%= t.createdAt ? new Date(t.createdAt).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '' %>
+          </div>
+        </div>
+        <div class="f-actions">
+          <% if (t.status !== 'closed') { %>
+            <% if (!t.claimedBy) { %><button class="btn sm green" onclick="act('<%= t._id || t.channelId %>', 'claim')"><i class="bi bi-hand-thumbs-up"></i> استلام</button><% } else { %><button class="btn sm" onclick="act('<%= t._id || t.channelId %>', 'unclaim')"><i class="bi bi-arrow-counterclockwise"></i> رجوع</button><% } %>
+            <button class="btn sm" onclick="openTicket('<%= t._id || t.channelId %>')"><i class="bi bi-chat-dots"></i> فتح</button>
+            <button class="btn sm warn" onclick="act('<%= t._id || t.channelId %>', 'close')"><i class="bi bi-lock"></i> إغلاق</button>
+          <% } else { %>
+            <button class="btn sm" onclick="openTicket('<%= t._id || t.channelId %>')">عرض الخلصة</button>
+          <% } %>
+          <button class="btn sm danger" onclick="act('<%= t._id || t.channelId %>', 'delete')"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+      <% }) %>
     <% } %>
   </div>
 </div>
 
-<!-- Ticket Detail Modal -->
-<div class="modal fade" id="ticketModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="ticketModalTitle">تفاصيل التذكرة</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="ticketModalBody">
-        <div class="text-center py-4">
-          <div class="spinner-border text-primary"></div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
-  let allTickets = <%= JSON.stringify(tickets || []) %>;
-  let currentPage = 1;
-  const perPage = 20;
+  const GID = '<%= GID %>';
 
-  function filterTickets() {
-    const status = document.getElementById('statusFilter').value;
-    const type = document.getElementById('typeFilter').value;
-    const search = document.getElementById('searchFilter').value.toLowerCase();
-    const sort = document.getElementById('sortFilter').value;
+  async function act(id, action) {
+    let body = {};
+    if (action === 'close' && !await LC.confirmBox('إغلاق التذكرة', 'سيُغلق روم التذكرة ويُحفظ الخلصة — متأكد؟')) return;
+    if (action === 'delete' && !await LC.confirmBox('حذف التذكرة', 'حذف نهائي لسجل التذكرة + رومها — متأكد؟')) return;
+    if (action === 'claim') body.actor = '<%= user?.username || 'لوحة التحكم' %>';
+    if (action === 'reply') {
+      const content = prompt('اكتب رسالتك للصاحب:');
+      if (!content) return;
+      body.content = content;
+    }
+    try {
+      await LC.api(`/api/guilds/${GID}/tickets/${id}/${action}`, { method: 'POST', body });
+      LC.toast('تم التنفيذ عبر البوت ✅');
+      setTimeout(() => location.reload(), 800);
+    } catch (e) { LC.toast('فشل: ' + e.message, 'error', 6000); }
+  }
 
-    let filtered = allTickets.filter(t => {
-      if (status && t.status !== status) return false;
-      if (type && t.type !== type) return false;
-      if (search) {
-        const user = (t.user?.username || '').toLowerCase();
-        const reason = (t.reason || t.summary || '').toLowerCase();
-        if (!user.includes(search) && !reason.includes(search) && !t.type.includes(search)) return false;
-      }
-      return true;
+  async function openTicket(id) {
+    const m = LC.modal({
+      title: 'تفاصيل التذكرة', wide: true,
+      body: '<div class="flex"><span class="spinner"></span> <span class="text-dim" style="font-weight:700;">جاري الجلب…</span></div>',
+      actions: [],
     });
-
-    if (sort === 'newest') filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    else if (sort === 'oldest') filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    else if (sort === 'priority') filtered.sort((a, b) => { const p = { high: 3, medium: 2, low: 1 }; return p[b.priority] - p[a.priority]; });
-
-    currentPage = 1;
-    renderTickets(filtered);
-    updateStats(filtered);
-  }
-
-  function renderTickets(tickets) {
-    const tbody = document.getElementById('ticketsBody');
-    const start = (currentPage - 1) * perPage;
-    const pageTickets = tickets.slice(start, start + perPage);
-
-    if (pageTickets.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5"><div class="empty-state"><i class="bi bi-search"></i><h5>لا توجد نتائج</h5><p>جرب تغيير الفلاتر</p></div></td></tr>`;
-    } else {
-      let displayNum = start + 1;
-      tbody.innerHTML = pageTickets.map(t => {
-        const statusClass = 'ticket-status-' + t.status;
-        const statusBadge = t.status === 'open' ? 'bg-success' : t.status === 'claimed' ? 'bg-warning' : t.status === 'waiting' ? 'bg-info' : 'bg-secondary';
-        const statusText = t.status === 'open' ? 'مفتوحة' : t.status === 'claimed' ? 'مستلمة' : t.status === 'waiting' ? 'بانتظار' : 'مغلقة';
-        const typeBadge = t.type === 'report' ? 'danger' : t.type === 'appeal' ? 'purple' : t.type === 'support' ? 'info' : 'secondary';
-        const typeIcon = t.type === 'report' ? 'flag' : t.type === 'appeal' ? 'gavel' : t.type === 'support' ? 'headset' : 'chat';
-        const typeText = t.type === 'report' ? 'تقرير' : t.type === 'appeal' ? 'استئناف' : t.type === 'support' ? 'دعم' : 'عام';
-        const priorityClass = t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'info';
-        const priorityLabel = t.priority === 'high' ? '🔴 عالية' : t.priority === 'medium' ? '🟡 متوسطة' : '🟢 منخفضة';
-
-        return `
-          <tr data-id="${t.id}" data-status="${t.status}" data-type="${t.type}" data-user="${(t.user?.username || t.userId).toLowerCase()}" data-priority="${t.priority}">
-            <td class="fw-bold text-muted">#${displayNum++}</td>
-            <td><span class="badge ${statusBadge} px-3 py-2 fs-6">${statusText}</span></td>
-            <td><span class="badge bg-${typeBadge} px-2 py-1"><i class="bi bi-${typeIcon} me-1"></i> ${typeText}</span></td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                ${t.user?.avatar ? `<img src="https://cdn.discordapp.com/avatars/${t.userId}/${t.user.avatar}.png?size=32" class="avatar avatar-sm" alt="">` : `<div class="avatar avatar-sm" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;">${(t.user?.username || 'U').charAt(0)}</div>`}
-                <div><div class="fw-medium">${t.user?.username || 'مستخدم مجهول'}</div><small class="text-muted">${t.userId}</small></div>
-              </div>
-            </td>
-            <td class="text-truncate" style="max-width: 300px;" title="${(t.reason || t.summary || '—').replace(/"/g, '"')}">${t.reason || t.summary || '—'}</td>
-            <td>${t.claimedBy ? `<div class="d-flex align-items-center gap-2">${t.claimedByAvatar ? `<img src="https://cdn.discordapp.com/avatars/${t.claimedById}/${t.claimedByAvatar}.png?size=24" class="avatar avatar-sm" alt="" style="width:24px;height:24px;">` : `<div class="avatar avatar-sm" style="width:24px;height:24px;font-size:10px;background:var(--success-bg);color:var(--success);"><i class="bi bi-person"></i></div>`}<span class="fw-medium text-success">${t.claimedBy}</span></div>` : '<span class="text-muted">—</span>'}</td>
-            <td><span class="badge bg-${priorityClass}">${priorityLabel}</span></td>
-            <td class="text-muted small">${t.createdAt ? new Date(t.createdAt).toLocaleString('ar-SA') : '—'}</td>
-            <td>
-              <div class="btn-group btn-group-sm">
-                ${t.status === 'open' ? `<button class="btn btn-outline-primary" onclick="claimTicket('${t.id}')" title="استلام"><i class="bi bi-person-check"></i></button>` : ''}
-                ${t.status === 'claimed' ? `<button class="btn btn-outline-warning" onclick="unclaimTicket('${t.id}')" title="إلغاء الاستلام"><i class="bi bi-person-x"></i></button><button class="btn btn-outline-success" onclick="closeTicket('${t.id}')" title="إغلاق"><i class="bi bi-check-lg"></i></button>` : ''}
-                ${t.status === 'waiting' ? `<button class="btn btn-outline-success" onclick="closeTicket('${t.id}')" title="إغلاق"><i class="bi bi-check-lg"></i></button>` : ''}
-                <button class="btn btn-outline-info" onclick="viewTicket('${t.id}')" title="عرض"><i class="bi bi-eye"></i></button>
-                ${t.status !== 'closed' ? `<button class="btn btn-outline-danger" onclick="deleteTicket('${t.id}')" title="حذف"><i class="bi bi-trash"></i></button>` : ''}
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-    renderPagination(tickets.length);
-  }
-
-  function renderPagination(total) {
-    const totalPages = Math.ceil(total / perPage);
-    const pagination = document.getElementById('ticketsPagination');
-    if (!pagination) return;
-    if (totalPages <= 1) { pagination.innerHTML = ''; return; }
-    
-    let html = '';
-    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;"><i class="bi bi-chevron-right"></i></a></li>`;
-    for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-        html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a></li>`;
-      } else if (i === currentPage - 2 || i === currentPage + 2) {
-        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-      }
-    }
-    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;"><i class="bi bi-chevron-left"></i></a></li>`;
-    pagination.innerHTML = html;
-  }
-
-  function changePage(page) {
-    currentPage = page;
-    filterTickets();
-  }
-
-  function clearFilters() {
-    document.getElementById('statusFilter').value = '';
-    document.getElementById('typeFilter').value = '';
-    document.getElementById('searchFilter').value = '';
-    document.getElementById('sortFilter').value = 'newest';
-    filterTickets();
-  }
-
-  function updateStats(tickets) {
-    document.getElementById('statOpen').textContent = tickets.filter(t => t.status === 'open').length;
-    document.getElementById('statClaimed').textContent = tickets.filter(t => t.status === 'claimed').length;
-    document.getElementById('statWaiting').textContent = tickets.filter(t => t.status === 'waiting').length;
-    document.getElementById('statClosed').textContent = tickets.filter(t => t.status === 'closed').length;
-  }
-
-  async function claimTicket(id) {
-    await ticketAction(id, 'claim', 'تم استلام التذكرة ✅');
-  }
-
-  async function unclaimTicket(id) {
-    await ticketAction(id, 'unclaim', 'تم إلغاء الاستلام');
-  }
-
-  async function closeTicket(id) {
-    const reason = prompt('سبب الإغلاق (اختياري):');
-    await ticketAction(id, 'close', 'تم إغلاق التذكرة ✅', { reason });
-  }
-
-  async function deleteTicket(id) {
-    if (!confirm('هل أنت متأكد من حذف هذه التذكرة؟ لا يمكن التراجع.')) return;
-    await ticketAction(id, 'delete', 'تم حذف التذكرة');
-  }
-
-  async function ticketAction(id, action, successMsg, extra = {}) {
     try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/tickets/' + id + '/' + action, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(extra)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(successMsg, 'success');
-        refreshTickets();
-      } else {
-        showToast(data.error || 'فشلت العملية', 'danger');
-      }
-    } catch (e) {
-      showToast('البوت غير متصل', 'danger');
-    }
-  }
-
-  async function viewTicket(id) {
-    const modal = new bootstrap.Modal(document.getElementById('ticketModal'));
-    const body = document.getElementById('ticketModalBody');
-    body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
-    modal.show();
-
-    try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/tickets/' + id);
-      const ticket = await res.json();
-      
-      const messagesHtml = (ticket.messages || []).map(m => `
-        <div class="mb-3 p-3 rounded" style="background: ${m.authorId === ticket.userId ? 'var(--info-bg)' : 'var(--bg-card)'};">
-          <div class="d-flex justify-content-between mb-1">
-            <span class="fw-bold">${m.author?.username || m.authorId}</span>
-            <small class="text-muted">${new Date(m.createdAt).toLocaleString('ar-SA')}</small>
+      const t = await LC.api(`/api/guilds/${GID}/tickets/${id}`);
+      const st = (t.status || '').replace('claimed', 'مُستلمة').replace('open', 'مفتوحة').replace('closed', 'مغلقة');
+      const fields = (t.fields || []).map(f => `<div style="margin-bottom:8px;"><div class="text-dim" style="font-size:10.5px;font-weight:800;">${LC.esc(f.label || '')}</div><div style="font-size:12.5px;font-weight:600;">${LC.esc(f.value || '')}</div></div>`).join('');
+      const msg = (t.transcript || '').split('\n').map(LC.esc).join('<br>');
+      m.querySelector('.modal-body').innerHTML = `
+        <div class="spread mb-3">
+          <div>
+            <div class="fw800" style="font-size:15px;">${LC.esc(t.subject || t.type || 'تذكرة')} <span class="chip blue">${st}</span></div>
+            <div class="text-dim" style="font-size:11.5px;">من ${LC.esc(t.userId || '؟')} · ${t.createdAt ? new Date(t.createdAt).toLocaleString('ar-EG') : ''} · ${LC.esc(t.priority || '')}</div>
           </div>
-          <div>${m.content}</div>
-          ${m.attachments?.length ? `<div class="mt-2">${m.attachments.map(a => `<a href="${a.url}" target="_blank" class="btn btn-outline-secondary btn-sm me-1"><i class="bi bi-file-earmark me-1"></i>${a.name}</a>`).join('')}</div>` : ''}
+          ${t.channelId ? `<a class="btn sm" target="_blank" href="https://discord.com/channels/${GID}/${t.channelId}"><i class="bi bi-box-arrow-up-right"></i> رومها</a>` : ''}
         </div>
-      `).join('');
-
-      body.innerHTML = `
-        <div class="row g-3 mb-3">
-          <div class="col-12 col-md-6"><strong>الحالة:</strong> <span class="badge bg-${ticket.status === 'open' ? 'success' : ticket.status === 'claimed' ? 'warning' : ticket.status === 'waiting' ? 'info' : 'secondary'}">${ticket.status === 'open' ? 'مفتوحة' : ticket.status === 'claimed' ? 'مستلمة' : ticket.status === 'waiting' ? 'بانتظار' : 'مغلقة'}</span></div>
-          <div class="col-12 col-md-6"><strong>النوع:</strong> <span class="badge bg-${ticket.type === 'report' ? 'danger' : ticket.type === 'appeal' ? 'purple' : ticket.type === 'support' ? 'info' : 'secondary'}">${ticket.type === 'report' ? 'تقرير' : ticket.type === 'appeal' ? 'استئناف' : ticket.type === 'support' ? 'دعم' : 'عام'}</span></div>
-          <div class="col-12 col-md-6"><strong>المستخدم:</strong> ${ticket.user?.username} (<code>${ticket.userId}</code>)</div>
-          <div class="col-12 col-md-6"><strong>المستلم:</strong> ${ticket.claimedBy || '—'}</div>
-          <div class="col-12 col-md-6"><strong>الأولوية:</strong> <span class="badge bg-${ticket.priority === 'high' ? 'danger' : ticket.priority === 'medium' ? 'warning' : 'info'}">${ticket.priority === 'high' ? 'عالية' : ticket.priority === 'medium' ? 'متوسطة' : 'منخفضة'}</span></div>
-          <div class="col-12 col-md-6"><strong>السبب:</strong> ${ticket.reason || '—'}</div>
-        </div>
-        <hr>
-        <h6>الرسائل:</h6>
-        <div style="max-height: 400px; overflow-y: auto;">${messagesHtml || '<p class="text-muted text-center">لا توجد رسائل</p>'}</div>
-        <hr>
-        <div class="input-group">
-          <input type="text" class="form-control" id="ticketReplyInput" placeholder="رد على التذكرة...">
-          <button class="btn btn-primary" onclick="replyToTicket('${id}')"><i class="bi bi-send"></i> إرسال</button>
-        </div>
-      `;
-      document.getElementById('ticketModalTitle').textContent = 'تذكرة #' + id;
+        ${fields ? `<div class="card mb-3" style="box-shadow:none;"><div class="card-body" style="padding:13px;font-size:12.5px;">${fields}</div></div>` : ''}
+        ${t.claimedBy ? `<div class="chip blue mb-3"><i class="bi bi-person-check"></i> مستلمها ${LC.esc(t.claimedBy)}</div>` : ''}
+        ${msg ? `<div style="background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:260px;overflow:auto;font-size:12.5px;line-height:1.8;">${msg || '<span class="text-dim">لا محتوى محفوظ</span>'}</div>` : '<div class="text-dim" style="font-size:12px;">لا محتوى/خلصة محفوظة بعد</div>'}
+        ${t.status !== 'closed' ? `<div class="mt-3 flex"><input id="tkReply" class="inp" placeholder="اكتب رداً يظهر في روم التذكرة…"><button class="btn primary" onclick="replyNow('${id}')"><i class="bi bi-send"></i> إرسال</button></div>` : ''}`;
     } catch (e) {
-      body.innerHTML = '<div class="alert alert-danger">فشل تحميل التفاصيل</div>';
+      m.querySelector('.modal-body').innerHTML = `<div class="empty"><i class="bi bi-slash-circle"></i><h4>تعذر</h4><p>${LC.esc(e.message)}</p></div>`;
     }
   }
-
-  async function replyToTicket(id) {
-    const input = document.getElementById('ticketReplyInput');
-    const content = input.value.trim();
-    if (!content) return;
-    
+  async function replyNow(id) {
+    const content = document.getElementById('tkReply').value.trim();
+    if (!content) return LC.toast('اكتب شيئاً', 'warn');
     try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/tickets/' + id + '/reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
-      });
-      if (res.ok) {
-        input.value = '';
-        viewTicket(id);
-        showToast('تم الإرسال ✅', 'success');
-      }
-    } catch (e) {
-      showToast('فشل الإرسال', 'danger');
-    }
+      await LC.api(`/api/guilds/${GID}/tickets/${id}/reply`, { method: 'POST', body: { content, actor: '<%= user?.username || 'لوحة التحكم' %>' } });
+      LC.toast('أُرسل الرد إلى روم التذكرة ✅'); LC.close();
+    } catch (e) { LC.toast(e.message, 'error'); }
   }
 
-  async function refreshTickets() {
-    showGlobalLoader(true);
-    try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/tickets');
-      allTickets = await res.json();
-      filterTickets();
-    } catch (e) {
-      showToast('فشل التحديث', 'danger');
-    } finally {
-      showGlobalLoader(false);
-    }
+  document.getElementById('tSearch').addEventListener('input', applyFilter);
+  document.getElementById('tFilter').addEventListener('change', applyFilter);
+  function applyFilter() {
+    const q = document.getElementById('tSearch').value.trim().toLowerCase();
+    const f = document.getElementById('tFilter').value;
+    $$('.tk-row').forEach(r => {
+      const okQ = !q || r.dataset.search.includes(q);
+      const okF = !f || r.dataset.status === f;
+      r.style.display = okQ && okF ? '' : 'none';
+    });
   }
-
-  function exportTickets() {
-    const headers = ['#', 'الحالة', 'النوع', 'المستخدم', 'User ID', 'السبب', 'المستلم', 'الأولوية', 'التاريخ'];
-    const rows = allTickets.map((t, i) => [
-      i + 1,
-      t.status,
-      t.type,
-      t.user?.username || t.userId,
-      t.userId,
-      t.reason || t.summary || '',
-      t.claimedBy || '',
-      t.priority,
-      t.createdAt ? new Date(t.createdAt).toLocaleString('ar-SA') : ''
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'tickets-<%= guild.id %>-' + new Date().toISOString().slice(0,10) + '.csv';
-    link.click();
-    showToast('تم التصدير ✅', 'success');
-  }
-
-  // Initial render
-  filterTickets();
 </script>
 
 <%- include('layout-bottom') %>

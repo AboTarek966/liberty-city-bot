@@ -1,592 +1,204 @@
 ﻿<%- include('layout-top', { title: 'الأعضاء', activePage: 'members' }) %>
 
-<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+<% const GID = guild.id; %>
+
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,var(--blue),var(--cyan));display:grid;place-items:center;font-size:26px;"><i class="bi bi-people"></i></div>
   <div>
-    <h1 class="h3 fw-bold mb-1">
-      <i class="bi bi-people me-2 text-primary"></i>
-      إدارة الأعضاء
-    </h1>
-    <p class="text-muted mb-0">بحث، فلترة، إجراءات جماعية على الأعضاء</p>
+    <div class="h-title">إدارة الأعضاء
+      <span class="chip blue"><span class="num"><%= members?.total ?? '—' %></span> عضو</span>
+    </div>
+    <div class="h-desc">قائمة حية من البوت + إجراءات فورية: تحذير · كتم · طرد · حظر · رولات</div>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
-    <button class="btn btn-primary" onclick="refreshMembers()"><i class="bi bi-arrow-clockwise me-1"></i> تحديث</button>
-    <button class="btn btn-outline-secondary" onclick="exportMembers()"><i class="bi bi-download me-1"></i> تصدير CSV</button>
-    <button class="btn btn-outline-warning" onclick="showBulkActions()"><i class="bi bi-people-fill me-1"></i> إجراءات جماعية</button>
+  <div class="h-actions btn-group">
+    <button class="btn primary" id="refreshBtn" onclick="loadMembers()"><i class="bi bi-arrow-repeat"></i> تحديث حي من البوت</button>
   </div>
 </div>
 
-<!-- Member Stats -->
-<div class="grid-5 mb-4">
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-people"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">إجمالي الأعضاء</div>
-      <div class="stat-value" id="statTotal"><%= members?.total || stats?.memberCount || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-person-check"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">أونلاين</div>
-      <div class="stat-value" id="statOnline"><%= members?.online || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);"><i class="bi bi-clock"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">بوتات</div>
-      <div class="stat-value" id="statBots"><%= members?.bots || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--danger-bg);color:var(--danger);"><i class="bi bi-shield-exclamation"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">معزولون (Quarantine)</div>
-      <div class="stat-value" id="statQuarantine"><%= members?.quarantined || 0 %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-graph-up"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">مستوى متوسط</div>
-      <div class="stat-value" id="statAvgLevel"><%= stats?.avgLevel || '—' %></div>
-    </div>
-  </div>
-</div>
+<% if (botOnline !== true) { %>
+<div class="banner warn"><i class="bi bi-wifi-off"></i> البيانات الحية تأتي من طوابير الأوامر — لو حملت القائمة فاضية اضغط «تحديث حي» أو تأكد أن البوت متصل.</div>
+<% } %>
 
-<!-- Filters -->
-<div class="card mb-4">
-  <div class="card-body">
-    <div class="filter-bar">
-      <input type="text" class="form-control form-control-sm" id="memberSearch" placeholder="بحث بالاسم، المعرف، أو اليوزر..." oninput="debounce(filterMembers, 300)()" style="flex: 1; min-width: 250px;">
-      <select class="form-select form-select-sm" id="memberStatusFilter" onchange="filterMembers()" style="width: auto; min-width: 150px;">
-        <option value="">جميع الحالات</option>
-        <option value="online">🟢 أونلاين</option>
-        <option value="idle">🟡 بعيد</option>
-        <option value="dnd">🔴 لا تزعج</option>
-        <option value="offline">⚫ أوفلاين</option>
-      </select>
-      <select class="form-select form-select-sm" id="memberRoleFilter" onchange="filterMembers()" style="width: auto; min-width: 200px;">
-        <option value="">جميع الرولات</option>
-        <% if (locals.roles && roles.length) { roles.forEach(r => { %>
-        <option value="<%= r.id %>"><%= r.name %></option>
-        <% }) } %>
-      </select>
-      <select class="form-select form-select-sm" id="memberSortFilter" onchange="filterMembers()" style="width: auto;">
-        <option value="joined">تاريخ الانضمام (جديد → قديم)</option>
-        <option value="joined_asc">تاريخ الانضمام (قديم → جديد)</option>
-        <option value="level">المستوى (عالي → منخفض)</option>
-        <option value="xp">الخبرة (عالي → منخفض)</option>
-        <option value="name">الأبجدي</option>
-      </select>
-      <button class="btn btn-outline-secondary btn-sm" onclick="clearMemberFilters()"><i class="bi bi-x-circle"></i> مسح</button>
-    </div>
-  </div>
-</div>
-
-<!-- Members Table -->
 <div class="card">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table mb-0" id="membersTable">
-        <thead>
-          <tr>
-            <th style="width: 40px;"><input type="checkbox" id="selectAllMembers" onchange="toggleSelectAll(this)"></th>
-            <th style="width: 60px;">#</th>
-            <th>العضو</th>
-            <th>الرولات</th>
-            <th>الحالة</th>
-            <th>تاريخ الانضمام</th>
-            <th>المستوى / XP</th>
-            <th style="width: 160px;">الإجراءات</th>
-          </tr>
-        </thead>
-        <tbody id="membersBody">
-          <% if (!members || !members.list || members.list.length === 0) { %>
-          <tr>
-            <td colspan="8" class="text-center py-5">
-              <div class="empty-state" style="padding: 40px 20px;">
-                <i class="bi bi-people"></i>
-                <h5>لا توجد أعضاء للعرض</h5>
-                <p class="text-muted">قد يكون البوت غير متصل أو لا توجد بيانات.</p>
-              </div>
-            </td>
-          </tr>
-          <% } else { 
-            let displayNum = 1;
-            members.list.forEach(m => { 
-              const statusClass = m.presence === 'online' ? 'success' : m.presence === 'idle' ? 'warning' : m.presence === 'dnd' ? 'danger' : 'secondary';
-              const statusText = m.presence === 'online' ? 'أونلاين' : m.presence === 'idle' ? 'بعيد' : m.presence === 'dnd' ? 'مشغول' : 'أوفلاين';
-              const rolesHtml = m.roles?.slice(0, 3).map(r => `<span class="badge bg-secondary me-1" style="background:${r.color}">${r.name}</span>`).join('') + (m.roles?.length > 3 ? `<span class="badge bg-info">+${m.roles.length - 3}</span>` : '');
-          %>
-          <tr data-id="<%= m.id %>" data-name="<%= (m.username || '').toLowerCase() %>" data-status="<%= m.presence %>" data-roles="<%= m.roles?.map(r=>r.id).join(',') || '' %>" data-joined="<%= m.joinedAt %>" data-level="<%= m.level || 0 %>" data-xp="<%= m.xp || 0 %>">
-            <td><input type="checkbox" class="member-checkbox" value="<%= m.id %>"></td>
-            <td class="fw-bold text-muted">#<%= displayNum++ %></td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <% if (m.avatar) { %>
-                  <img src="https://cdn.discordapp.com/avatars/<%= m.id %>/<%= m.avatar %>.png?size=40" class="avatar" alt="">
-                <% } else { %>
-                  <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;"><%= (m.username || 'U').charAt(0) %></div>
-                <% } %>
-                <div>
-                  <div class="fw-medium"><%= m.username %></div>
-                  <small class="text-muted"><%= m.id %> <%= m.bot ? '<span class="badge bg-info ms-1">بوت</span>' : '' %></small>
-                </div>
-              </div>
-            </td>
-            <td><%= rolesHtml || '<span class="text-muted">—</span>' %></td>
-            <td><span class="badge bg-<%= statusClass %>"><%= statusText %></span></td>
-            <td class="text-muted small"><%= m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('ar-SA') : '—' %></td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-purple"><%= m.level || 0 %></span>
-                <span class="text-muted small"><%= (m.xp || 0).toLocaleString() %> XP</span>
-                <div class="progress flex-1" style="max-width: 100px; height: 6px;">
-                  <div class="progress-bar" style="width: <%= m.levelProgress || 0 %>%"></div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <div class="btn-group btn-group-sm" role="group">
-                <button class="btn btn-outline-info" onclick="viewMember('<%= m.id %>')" title="عرض الملف"><i class="bi bi-eye"></i></button>
-                <button class="btn btn-outline-primary" onclick="manageRoles('<%= m.id %>')" title="إدارة الرولات"><i class="bi bi-shield"></i></button>
-                <% if (!m.bot) { %>
-                  <button class="btn btn-outline-warning" onclick="timeoutMember('<%= m.id %>')" title="توقيت"><i class="bi bi-clock"></i></button>
-                  <button class="btn btn-outline-danger" onclick="kickMember('<%= m.id %>')" title="طرد"><i class="bi bi-box-arrow-right"></i></button>
-                  <button class="btn btn-danger" onclick="banMember('<%= m.id %>')" title="حظر"><i class="bi bi-x-circle"></i></button>
-                <% } %>
-              </div>
-            </td>
-          </tr>
-          <% }) }
-          %>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <div class="card-footer d-flex justify-content-between align-items-center">
-      <div class="d-flex align-items-center gap-3">
-        <span class="text-muted small" id="memberCountText">إجمالي: <%= members?.total || 0 %></span>
-        <select class="form-select form-select-sm" id="memberPerPage" onchange="filterMembers()" style="width: auto;">
-          <option value="25">25</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
-        </select>
-      </div>
-      <nav>
-        <ul class="pagination pagination-sm mb-0" id="membersPagination"></ul>
-      </nav>
-    </div>
+  <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);">
+    <input id="mSearch" class="inp" style="max-width:320px;" placeholder="🔎 بحث باسم العضو…">
+    <select id="mFilter" class="inp" style="max-width:190px;">
+      <option value="">الكل</option>
+      <option value="human">أعضاء (بدون بوتات)</option>
+      <option value="bot">بوتات</option>
+      <option value="online">متصلون</option>
+    </select>
+    <span class="chip cyan" id="mCount" style="margin-inline-start:auto;">—</span>
   </div>
-</div>
-
-<!-- Member Detail Modal -->
-<div class="modal fade" id="memberModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="memberModalTitle">ملف العضو</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="memberModalBody">
-        <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
-      </div>
-    </div>
+  <div class="card-body tight" id="mList">
+    <% (members?.list || []).slice(0, 60).forEach(m => { %>
+      <div class="member-row skeleton-row skel"><div class="avatar-wrap"></div><div class="m-info"><div class="m-name">تحميل…</div></div></div>
+    <% }) %>
+    <% if (!(members?.list || []).length) { %>
+      <div class="empty"><i class="bi bi-people"></i><h4>قائمة فارغة</h4><p>اضغط «تحديث حي من البوت» لطلب قائمة الأعضاء عبر طابور الأوامر</p></div>
+    <% } %>
   </div>
-</div>
-
-<!-- Bulk Actions Modal -->
-<div class="modal fade" id="bulkModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i> إجراءات جماعية</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p id="bulkCount" class="fw-bold mb-4">تم اختيار <span id="selectedCount">0</span> عضو</p>
-        <div class="d-grid gap-2">
-          <button class="btn btn-outline-primary" onclick="bulkAction('addRole')"><i class="bi bi-plus-circle me-2"></i> إضافة رول</button>
-          <button class="btn btn-outline-warning" onclick="bulkAction('removeRole')"><i class="bi bi-dash-circle me-2"></i> إزالة رول</button>
-          <button class="btn btn-outline-danger" onclick="bulkAction('timeout')"><i class="bi bi-clock me-2"></i> توقيت (دقائق)</button>
-          <button class="btn btn-danger" onclick="bulkAction('kick')"><i class="bi bi-box-arrow-right me-2"></i> طرد</button>
-          <button class="btn btn-danger" onclick="bulkAction('ban')"><i class="bi bi-x-circle me-2"></i> حظر</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Role Management Modal -->
-<div class="modal fade" id="roleModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-shield me-2"></i> إدارة الرولات</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="roleModalBody">
-        <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
-      </div>
-    </div>
+  <div style="padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;">
+    <button class="btn" id="moreBtn">عرض المزيد</button>
+    <span class="text-dim" style="font-size:11.5px;">يُعرض 60 عضواً لكل مجموعة ثم «عرض المزيد»</span>
   </div>
 </div>
 
 <script>
-  let allMembers = <%= JSON.stringify(members?.list || []) %>;
-  let currentMemberPage = 1;
-  let memberPerPage = 50;
+  const GID = '<%= GID %>';
+  let all = [];
+  let shown = 0;
+  const PAGE = 60;
 
-  function filterMembers() {
-    const search = document.getElementById('memberSearch').value.toLowerCase();
-    const status = document.getElementById('memberStatusFilter').value;
-    const role = document.getElementById('memberRoleFilter').value;
-    const sort = document.getElementById('memberSortFilter').value;
-    memberPerPage = parseInt(document.getElementById('memberPerPage').value);
-
-    let filtered = allMembers.filter(m => {
-      if (search) {
-        const name = (m.username || '').toLowerCase();
-        const id = m.id;
-        if (!name.includes(search) && !id.includes(search)) return false;
-      }
-      if (status && m.presence !== status) return false;
-      if (role && !m.roles?.some(r => r.id === role)) return false;
-      return true;
-    });
-
-    if (sort === 'joined') filtered.sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt));
-    else if (sort === 'joined_asc') filtered.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
-    else if (sort === 'level') filtered.sort((a, b) => (b.level || 0) - (a.level || 0));
-    else if (sort === 'xp') filtered.sort((a, b) => (b.xp || 0) - (a.xp || 0));
-    else if (sort === 'name') filtered.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
-
-    currentMemberPage = 1;
-    renderMembers(filtered);
-    document.getElementById('memberCountText').textContent = `إجمالي: ${filtered.length} / ${allMembers.length}`;
-    updateSelectedCount();
+  function avatarUrl(m) { return m.avatar ? `https://cdn.discordapp.com/avatars/${m.id}/${m.avatar}.png?size=64` : null; }
+  function presenceClass(p) { return ['online', 'idle', 'dnd'].includes(p) ? p : 'offline'; }
+  function presenceText(p) { return { online: 'متصل', idle: 'خامل', dnd: 'مشغول', offline: 'غير متصل' }[p] || 'غير معروف'; }
+  function timeAgo(d) {
+    if (!d) return '—';
+    const s = Math.floor((Date.now() - new Date(d)) / 1000);
+    const u = [['سنة', 31536000], ['شهر', 2592000], ['يوم', 86400], ['ساعة', 3600], ['دقيقة', 60]];
+    for (const [lbl, sec] of u) { if (s >= sec) return `منذ ${Math.floor(s / sec)} ${lbl}`; }
+    return 'الآن';
   }
 
-  function renderMembers(members) {
-    const tbody = document.getElementById('membersBody');
-    const start = (currentMemberPage - 1) * memberPerPage;
-    const pageMembers = members.slice(start, start + memberPerPage);
-
-    if (pageMembers.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="empty-state"><i class="bi bi-search"></i><h5>لا توجد نتائج</h5></div></td></tr>`;
-    } else {
-      let displayNum = start + 1;
-      tbody.innerHTML = pageMembers.map(m => {
-        const statusClass = m.presence === 'online' ? 'success' : m.presence === 'idle' ? 'warning' : m.presence === 'dnd' ? 'danger' : 'secondary';
-        const statusText = m.presence === 'online' ? 'أونلاين' : m.presence === 'idle' ? 'بعيد' : m.presence === 'dnd' ? 'مشغول' : 'أوفلاين';
-        const rolesHtml = m.roles?.slice(0, 3).map(r => `<span class="badge bg-secondary me-1" style="background:${r.color}">${r.name}</span>`).join('') + (m.roles?.length > 3 ? `<span class="badge bg-info">+${m.roles.length - 3}</span>` : '');
-
-        return `
-          <tr data-id="${m.id}" data-name="${(m.username || '').toLowerCase()}" data-status="${m.presence}" data-roles="${m.roles?.map(r=>r.id).join(',') || ''}" data-joined="${m.joinedAt}" data-level="${m.level || 0}" data-xp="${m.xp || 0}">
-            <td><input type="checkbox" class="member-checkbox" value="${m.id}"></td>
-            <td class="fw-bold text-muted">#${displayNum++}</td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                ${m.avatar ? `<img src="https://cdn.discordapp.com/avatars/${m.id}/${m.avatar}.png?size=40" class="avatar" alt="">` : `<div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;">${(m.username || 'U').charAt(0)}</div>`}
-                <div><div class="fw-medium">${m.username}</div><small class="text-muted">${m.id} ${m.bot ? '<span class="badge bg-info ms-1">بوت</span>' : ''}</small></div>
-              </div>
-            </td>
-            <td>${rolesHtml || '<span class="text-muted">—</span>'}</td>
-            <td><span class="badge bg-${statusClass}">${statusText}</span></td>
-            <td class="text-muted small">${m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('ar-SA') : '—'}</td>
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-purple">${m.level || 0}</span>
-                <span class="text-muted small">${(m.xp || 0).toLocaleString()} XP</span>
-                <div class="progress flex-1" style="max-width: 100px; height: 6px;"><div class="progress-bar" style="width: ${m.levelProgress || 0}%"></div></div>
-              </div>
-            </td>
-            <td>
-              <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-info" onclick="viewMember('${m.id}')" title="عرض الملف"><i class="bi bi-eye"></i></button>
-                <button class="btn btn-outline-primary" onclick="manageRoles('${m.id}')" title="إدارة الرولات"><i class="bi bi-shield"></i></button>
-                ${!m.bot ? `<button class="btn btn-outline-warning" onclick="timeoutMember('${m.id}')" title="توقيت"><i class="bi bi-clock"></i></button><button class="btn btn-outline-danger" onclick="kickMember('${m.id}')" title="طرد"><i class="bi bi-box-arrow-right"></i></button><button class="btn btn-danger" onclick="banMember('${m.id}')" title="حظر"><i class="bi bi-x-circle"></i></button>` : ''}
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-    renderMemberPagination(members.length);
+  function row(m) {
+    const roll = (m.roles || []);
+    const rolesHtml = roll.slice(0, 4).map(r => `<span class="mini-role" style="${r.color && r.color !== '#000000' ? `color:${r.color}` : ''}">${LC.esc(r.name)}</span>`).join('') +
+      (roll.length > 4 ? `<span class="mini-role more">+${roll.length - 4}</span>` : '');
+    return `
+    <div class="member-row" data-id="${m.id}">
+      <div class="avatar-wrap">
+        ${m.avatar ? `<img src="${avatarUrl(m)}" loading="lazy">` : `<div class="m-letter">${LC.esc((m.username || '?').charAt(0).toUpperCase())}</div>`}
+        <span class="presence ${presenceClass(m.presence)}"></span>
+      </div>
+      <div class="m-info">
+        <div class="m-name">${LC.esc(m.nickname || m.username || m.id)} ${m.bot ? '<span class="bot-tag">BOT</span>' : ''} <span class="code-cell" style="color:var(--text-3);font-size:10.5px;">${m.id}</span></div>
+        <div class="m-sub"><i class="bi bi-circle-fill" style="color:${m.presence === 'online' ? 'var(--green)' : 'var(--text-3)'};font-size:6px;"></i> ${presenceText(m.presence)} · انضم ${timeAgo(m.joinedAt)}${m.dbProfile ? ' · من القاعدة' : ''}</div>
+        <div class="m-roles">${rolesHtml}</div>
+      </div>
+      <button class="btn sm" onclick="openMember('${m.id}')"><i class="bi bi-eye"></i> بروفايل</button>
+    </div>`;
   }
 
-  function renderMemberPagination(total) {
-    const totalPages = Math.ceil(total / memberPerPage);
-    const pagination = document.getElementById('membersPagination');
-    if (!pagination) return;
-    if (totalPages <= 1) { pagination.innerHTML = ''; return; }
-    
-    let html = '';
-    html += `<li class="page-item ${currentMemberPage === 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changeMemberPage(${currentMemberPage - 1}); return false;"><i class="bi bi-chevron-right"></i></a></li>`;
-    for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= currentMemberPage - 1 && i <= currentMemberPage + 1)) {
-        html += `<li class="page-item ${i === currentMemberPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeMemberPage(${i}); return false;">${i}</a></li>`;
-      } else if (i === currentMemberPage - 2 || i === currentMemberPage + 2) {
-        html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-      }
-    }
-    html += `<li class="page-item ${currentMemberPage === totalPages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changeMemberPage(${currentMemberPage + 1}); return false;"><i class="bi bi-chevron-left"></i></a></li>`;
-    pagination.innerHTML = html;
+  function render(reset = true) {
+    const q = document.getElementById('mSearch').value.trim().toLowerCase();
+    const f = document.getElementById('mFilter').value;
+    let list = all;
+    if (f === 'bot') list = list.filter(m => m.bot);
+    if (f === 'human') list = list.filter(m => !m.bot);
+    if (f === 'online') list = list.filter(m => ['online', 'idle', 'dnd'].includes(m.presence));
+    if (q) list = list.filter(m => (m.username || '').toLowerCase().includes(q) || String(m.id).includes(q));
+    const slice = reset ? list.slice(0, PAGE) : list.slice(0, shown + PAGE);
+    shown = slice.length;
+    document.getElementById('mList').innerHTML = slice.length ? slice.map(row).join('') :
+      `<div class="empty"><i class="bi bi-search"></i><h4>لا نتائج</h4><p>جرّب بحثاً آخر أو أزل الفلاتر</p></div>`;
+    document.getElementById('mCount').textContent = `${list.length} نتيجة · معروض ${slice.length}`;
+    document.getElementById('moreBtn').style.display = shown < list.length ? 'inline-flex' : 'none';
   }
 
-  function changeMemberPage(page) {
-    currentMemberPage = page;
-    filterMembers();
-  }
+  // initial DB profile render (offline quick load)
+  const initial = <%= JSON.stringify((members?.list || []).slice(0, 60).map(m => ({ id: m.id, username: m.username, avatar: m.avatar, presence: m.presence, roles: m.roles, joinedAt: m.joinedAt, bot: m.bot, dbProfile: m.dbProfile }))) %>;
+  if (initial.length) { all = initial; render(); }
 
-  function clearMemberFilters() {
-    document.getElementById('memberSearch').value = '';
-    document.getElementById('memberStatusFilter').value = '';
-    document.getElementById('memberRoleFilter').value = '';
-    document.getElementById('memberSortFilter').value = 'joined';
-    filterMembers();
-  }
-
-  function toggleSelectAll(checkbox) {
-    document.querySelectorAll('.member-checkbox').forEach(cb => { cb.checked = checkbox.checked; });
-    updateSelectedCount();
-  }
-
-  function updateSelectedCount() {
-    const count = document.querySelectorAll('.member-checkbox:checked').length;
-    document.getElementById('selectedCount').textContent = count;
-    document.getElementById('selectAllMembers').checked = count > 0 && count === document.querySelectorAll('.member-checkbox').length;
-  }
-
-  function showBulkActions() {
-    updateSelectedCount();
-    const count = document.querySelectorAll('.member-checkbox:checked').length;
-    if (count === 0) { showToast('اختر أعضاء أولاً', 'warning'); return; }
-    new bootstrap.Modal(document.getElementById('bulkModal')).show();
-  }
-
-  async function bulkAction(action) {
-    const selected = Array.from(document.querySelectorAll('.member-checkbox:checked')).map(cb => cb.value);
-    if (selected.length === 0) return;
-
-    let extra = {};
-    if (action === 'addRole' || action === 'removeRole') {
-      const roleId = prompt('أدخل Role ID:');
-      if (!roleId) return;
-      extra.roleId = roleId;
-    } else if (action === 'timeout') {
-      const minutes = prompt('مدة التوقيت بالدقائق:');
-      if (!minutes) return;
-      extra.duration = parseInt(minutes) * 60 * 1000;
-    } else if (action === 'kick' || action === 'ban') {
-      const reason = prompt('السبب (اختياري):');
-      if (reason) extra.reason = reason;
-      if (!confirm(`⚠️ تأكيد ${action === 'kick' ? 'طرد' : 'حظر'} ${selected.length} عضو؟`)) return;
-    }
-
+  async function loadMembers() {
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> جاري الحصول على الأعضاء…';
     try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/members/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, userIds: selected, ...extra })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(`تم ${action} لـ ${data.success} عضو${data.failed ? ` (فشل ${data.failed})` : ''}`, 'success');
-        refreshMembers();
-        bootstrap.Modal.getInstance(document.getElementById('bulkModal'))?.hide();
-      } else {
-        showToast(data.error || 'فشلت العملية', 'danger');
-      }
+      const data = await LC.api(`/api/guilds/${GID}/members`);
+      all = data.list || [];
+      LC.toast(`تم تحميل ${all.length} عضو مباشرة من البوت ✅`);
+      render();
     } catch (e) {
-      showToast('البوت غير متصل', 'danger');
-    }
-  }
-
-  async function viewMember(id) {
-    const modal = new bootstrap.Modal(document.getElementById('memberModal'));
-    const body = document.getElementById('memberModalBody');
-    body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
-    modal.show();
-
-    try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/members/' + id);
-      const m = await res.json();
-      
-      const rolesHtml = m.roles?.map(r => `<span class="badge bg-secondary me-1 mb-1" style="background:${r.color}">${r.name} <small>(${r.id})</small></span>`).join('') || '<span class="text-muted">—</span>';
-      const warningsHtml = (m.warnings || []).map(w => `
-        <div class="border-bottom pb-2 mb-2">
-          <div class="d-flex justify-content-between"><strong>${w.reason}</strong><small class="text-muted">${new Date(w.createdAt).toLocaleString('ar-SA')}</small></div>
-          <small class="text-muted">بواسطة: ${w.moderator?.username || w.moderatorId}</small>
-        </div>
-      `).join('') || '<p class="text-muted text-center">لا توجد تحذيرات</p>';
-
-      body.innerHTML = `
-        <div class="text-center mb-4">
-          ${m.avatar ? `<img src="https://cdn.discordapp.com/avatars/${m.id}/${m.avatar}.png?size=128" class="rounded-circle mb-2" style="width:100px;height:100px;">` : `<div class="avatar avatar-lg mx-auto mb-2" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;font-size:40px;">${(m.username || 'U').charAt(0)}</div>`}
-          <h4>${m.username} ${m.bot ? '<span class="badge bg-info ms-2">بوت</span>' : ''}</h4>
-          <code class="text-muted">${m.id}</code>
-        </div>
-        <div class="row g-3 mb-4">
-          <div class="col-6"><strong>الحالة:</strong><br><span class="badge bg-${m.presence === 'online' ? 'success' : m.presence === 'idle' ? 'warning' : m.presence === 'dnd' ? 'danger' : 'secondary'}">${m.presence === 'online' ? 'أونلاين' : m.presence === 'idle' ? 'بعيد' : m.presence === 'dnd' ? 'مشغول' : 'أوفلاين'}</span></div>
-          <div class="col-6"><strong>الانضمام:</strong><br>${m.joinedAt ? new Date(m.joinedAt).toLocaleString('ar-SA') : '—'}</div>
-          <div class="col-6"><strong>إنشاء الحساب:</strong><br>${m.createdAt ? new Date(m.createdAt).toLocaleString('ar-SA') : '—'}</div>
-          <div class="col-6"><strong>المستوى:</strong><br><span class="badge bg-purple">${m.level || 0}</span> (${(m.xp || 0).toLocaleString()} XP)</div>
-        </div>
-        <hr>
-        <h6>الرولات (<span id="roleCount">${m.roles?.length || 0}</span>):</h6>
-        <div>${rolesHtml}</div>
-        <hr>
-        <h6>التحذيرات (<span id="warnCount">${m.warnings?.length || 0}</span>):</h6>
-        <div>${warningsHtml}</div>
-      `;
-      document.getElementById('memberModalTitle').textContent = m.username;
-    } catch (e) {
-      body.innerHTML = '<div class="alert alert-danger">فشل تحميل الملف</div>';
-    }
-  }
-
-  async function manageRoles(id) {
-    const modal = new bootstrap.Modal(document.getElementById('roleModal'));
-    const body = document.getElementById('roleModalBody');
-    body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
-    modal.show();
-
-    try {
-      const [memberRes, rolesRes] = await Promise.all([
-        fetch('/api/guilds/<%= guild.id %>/members/' + id),
-        fetch('/api/guilds/<%= guild.id %>/roles')
-      ]);
-      const m = await memberRes.json();
-      const roles = await rolesRes.json();
-
-      const memberRoles = m.roles?.map(r => r.id) || [];
-      body.innerHTML = `
-        <div class="mb-3">
-          <label class="form-label">بحث الرولات</label>
-          <input type="text" class="form-control form-control-sm" id="roleSearch" placeholder="ابحث بالاسم..." oninput="filterRoles(this.value)">
-        </div>
-        <div style="max-height: 400px; overflow-y: auto;">
-          ${roles.filter(r => r.id !== '<%= guild.id %>').map(r => `
-            <div class="form-check form-switch mb-2">
-              <input class="form-check-input" type="checkbox" id="role-${r.id}" value="${r.id}" ${memberRoles.includes(r.id) ? 'checked' : ''} onchange="toggleMemberRole('${id}', '${r.id}', this.checked)" style="background:${r.color};">
-              <label class="form-check-label d-flex align-items-center gap-2" for="role-${r.id}">
-                <span class="badge" style="background:${r.color};width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;">${r.position}</span>
-                ${r.name} <small class="text-muted">(${r.id})</small>
-              </label>
-            </div>
-          `).join('')}
-        </div>
-      `;
-      document.getElementById('roleModalTitle').textContent = `إدارة رولات: ${m.username}`;
-    } catch (e) {
-      body.innerHTML = '<div class="alert alert-danger">فشل تحميل الرولات</div>';
-    }
-  }
-
-  function filterRoles(query) {
-    document.querySelectorAll('#roleModalBody .form-check').forEach(el => {
-      const label = el.querySelector('label').textContent.toLowerCase();
-      el.style.display = label.includes(query.toLowerCase()) ? '' : 'none';
-    });
-  }
-
-  async function toggleMemberRole(memberId, roleId, add) {
-    try {
-      await fetch('/api/guilds/<%= guild.id %>/members/' + memberId + '/roles', {
-        method: add ? 'POST' : 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roleId })
-      });
-      showToast(add ? 'تمت إضافة الرول ✅' : 'تمت إزالة الرول', 'success');
-    } catch (e) {
-      showToast('فشل تحديث الرول', 'danger');
-    }
-  }
-
-  async function timeoutMember(id) {
-    const minutes = prompt('مدة التوقيت بالدقائق (0 للإلغاء):');
-    if (minutes === null) return;
-    const duration = parseInt(minutes) * 60 * 1000;
-    await memberAction(id, 'timeout', { duration }, 'تم التوقيت ✅');
-  }
-
-  async function kickMember(id) {
-    if (!confirm('⚠️ تأكيد طرد هذا العضو؟')) return;
-    const reason = prompt('السبب (اختياري):');
-    await memberAction(id, 'kick', { reason }, 'تم الطرد ✅');
-  }
-
-  async function banMember(id) {
-    if (!confirm('⚠️ تأكيد حظر هذا العضو؟')) return;
-    const reason = prompt('السبب (اختياري):');
-    await memberAction(id, 'ban', { reason }, 'تم الحظر ✅');
-  }
-
-  async function memberAction(id, action, extra, successMsg) {
-    try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/members/' + id + '/' + action, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(extra)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(successMsg, 'success');
-        refreshMembers();
-      } else {
-        showToast(data.error || 'فشلت العملية', 'danger');
-      }
-    } catch (e) {
-      showToast('البوت غير متصل', 'danger');
-    }
-  }
-
-  async function refreshMembers() {
-    showGlobalLoader(true);
-    try {
-      const res = await fetch('/api/guilds/<%= guild.id %>/members');
-      const data = await res.json();
-      allMembers = data.list || [];
-      filterMembers();
-    } catch (e) {
-      showToast('فشل التحديث', 'danger');
+      LC.toast('تعذر الحصول من البوت: ' + e.message, 'error', 6000);
     } finally {
-      showGlobalLoader(false);
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> تحديث حي من البوت';
     }
   }
 
-  function exportMembers() {
-    const headers = ['#', 'اليوزر', 'User ID', 'رول علوي', 'الحالة', 'الانضمام', 'المستوى', 'XP', 'بوت'];
-    const rows = allMembers.map((m, i) => [
-      i + 1,
-      m.username,
-      m.id,
-      m.roles?.[0]?.name || '',
-      m.presence,
-      m.joinedAt ? new Date(m.joinedAt).toLocaleString('ar-SA') : '',
-      m.level || 0,
-      m.xp || 0,
-      m.bot ? 'نعم' : 'لا'
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'members-<%= guild.id %>-' + new Date().toISOString().slice(0,10) + '.csv';
-    link.click();
-    showToast('تم التصدير ✅', 'success');
+  document.getElementById('mSearch').addEventListener('input', () => render());
+  document.getElementById('mFilter').addEventListener('change', () => render());
+  document.getElementById('moreBtn').addEventListener('click', () => render(false));
+
+  async function openMember(id) {
+    const m = LC.modal({
+      title: 'بروفايل العضو',
+      body: `<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;">
+        <div class="spinner"></div><span class="text-dim" style="font-weight:700;">جاري الجلب من البوت…</span></div>`,
+      actions: [],
+    });
+    try {
+      const p = await LC.api(`/api/guilds/${GID}/members/${id}`);
+      const warn = p.warnings || [];
+      const roles = p.roles || [];
+      m.querySelector('.modal-body').innerHTML = `
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">
+          ${p.avatar ? `<img src="https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=80" style="width:64px;height:64px;border-radius:50%;">` : `<div class="m-letter" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--cyan));display:grid;place-items:center;font-size:24px;font-weight:900;">${LC.esc((p.username || '?').charAt(0))}</div>`}
+          <div>
+            <div class="fw800" style="font-size:16px;">${LC.esc(p.username || id)} ${p.bot ? '<span class="bot-tag">BOT</span>' : ''}</div>
+            <div class="text-dim" style="font-size:11.5px;">انضم ${timeAgo(p.joinedAt)} · أنشأ الحساب ${timeAgo(p.createdAt)} · الحالة: ${presenceText(p.presence)}</div>
+            <div class="code-cell" style="font-size:10.5px;color:var(--text-3);">${p.id}</div>
+          </div>
+        </div>
+        ${roles.length ? `<div class="mb-3"><div class="text-mid fw800" style="font-size:12px;margin-bottom:6px;">الرولات (${roles.length})</div><div class="flex flex-wrap">${roles.map(r => `<span class="mini-role" style="${r.color && r.color !== '#000000' ? `color:${r.color}` : ''}">${LC.esc(r.name)}</span>`).join('')}</div></div>` : ''}
+        <div class="mb-3">
+          <div class="text-mid fw800" style="font-size:12px;margin-bottom:6px;">التحذيرات (${warn.length})</div>
+          ${warn.length ? warn.slice(0, 4).map(w => `<div style="font-size:11.5px;color:var(--text-2);border-inline-start:2px solid var(--amber);padding-inline-start:9px;margin-bottom:5px;">⚠️ ${LC.esc(w.reason || 'بدون سبب')} <small class="text-dim">— ${timeAgo(w.createdAt)}</small></div>`).join('') : '<div class="text-dim" style="font-size:11.5px;">نظيف بدون تحذيرات ✨</div>'}
+        </div>
+        <div class="sec-title"><i class="bi bi-plus-slash-minus"></i> إدارة الرولات</div>
+        <div class="flex" style="gap:8px;">
+          <select id="r_sel" class="inp" style="max-width:220px;" placeholder="اختر رول"></select>
+          <button class="btn sm green" onclick="giveRole('${id}')"><i class="bi bi-plus-lg"></i> إضافة</button>
+          <button class="btn sm danger" onclick="takeRole('${id}')"><i class="bi bi-dash-lg"></i> إزالة</button>
+        </div>
+        <div class="sec-title"><i class="bi bi-hammer"></i> إجراءات الإشراف</div>
+        <div class="flex flex-wrap" style="gap:8px;">
+          <button class="btn sm warn" onclick="warnUser('${id}')"><i class="bi bi-exclamation-square"></i> تحذير</button>
+          <button class="btn sm" onclick="timeoutUser('${id}')"><i class="bi bi-hourglass-split"></i> توقيت</button>
+          <button class="btn sm danger" onclick="kickUser('${id}')"><i class="bi bi-door-open"></i> طرد</button>
+          <button class="btn sm danger" onclick="banUser('${id}')"><i class="bi bi-hammer"></i> حظر</button>
+        </div>`;
+      LC.loadRoles(GID, ['r_sel']);
+    } catch (e) {
+      m.querySelector('.modal-body').innerHTML = `<div class="empty"><i class="bi bi-slash-circle"></i><h4>تعذر الجلب</h4><p>${LC.esc(e.message)} — تأكد أن البوت متصل</p></div>`;
+    }
   }
 
-  // Initial
-  filterMembers();
+  async function giveRole(id) {
+    const roleId = document.getElementById('r_sel').value;
+    if (!roleId) return LC.toast('اختر رولاً أولاً', 'warn');
+    try { await LC.api(`/api/guilds/${GID}/members/${id}/roles`, { method: 'POST', body: { roleId } }); LC.toast('أُضيف الرول ✅'); openMemberRefresh(id); }
+    catch (e) { LC.toast(e.message, 'error'); }
+  }
+  async function takeRole(id) {
+    const roleId = document.getElementById('r_sel').value;
+    if (!roleId) return LC.toast('اختر رولاً أولاً', 'warn');
+    try { await LC.api(`/api/guilds/${GID}/members/${id}/roles`, { method: 'DELETE', body: { roleId } }); LC.toast('أزيل الرول ✅'); openMemberRefresh(id); }
+    catch (e) { LC.toast(e.message, 'error'); }
+  }
+  function openMemberRefresh(id) { LC.close(); setTimeout(() => openMember(id), 350); }
 
-  // Checkbox change listener
-  document.getElementById('membersBody')?.addEventListener('change', e => {
-    if (e.target.classList.contains('member-checkbox')) updateSelectedCount();
-  });
+  async function warnUser(id) {
+    const reason = prompt('سبب التحذير:', '');
+    if (reason === null) return;
+    try { await LC.api(`/api/guilds/${GID}/members/${id}/warn`, { method: 'POST', body: { reason } }); LC.toast('أُرسل التحذير ✅'); openMemberRefresh(id); }
+    catch (e) { LC.toast(e.message, 'error'); }
+  }
+  async function timeoutUser(id) {
+    const mins = prompt('مدة التوقيت بالدقائق (0 = إلغاء):', '60');
+    if (mins === null) return;
+    try { await LC.api(`/api/guilds/${GID}/members/${id}/timeout`, { method: 'POST', body: { duration: Number(mins) * 60000 } }); LC.toast('تم ⏱'); openMemberRefresh(id); }
+    catch (e) { LC.toast(e.message, 'error'); }
+  }
+  async function kickUser(id) {
+    if (!await LC.confirmBox('طرد عضو', 'سيفقد هذا العضو دخوله للسيرفر — تأكيد؟')) return;
+    try { await LC.api(`/api/guilds/${GID}/members/${id}/kick`, { method: 'POST', body: { reason: 'طرد من لوحة التحكم' } }); LC.toast('تم الطرد'); LC.close(); }
+    catch (e) { LC.toast(e.message, 'error'); }
+  }
+  async function banUser(id) {
+    if (!await LC.confirmBox('حظر عضو', 'الحظر يمنعه نهائياً من السيرفر — تأكيد؟')) return;
+    try { await LC.api(`/api/guilds/${GID}/members/${id}/ban`, { method: 'POST', body: { reason: 'حظر من لوحة التحكم' } }); LC.toast('تم الحظر'); LC.close(); }
+    catch (e) { LC.toast(e.message, 'error'); }
+  }
 </script>
 
 <%- include('layout-bottom') %>

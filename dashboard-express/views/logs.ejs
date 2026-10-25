@@ -1,147 +1,67 @@
-﻿<%- include('layout-top', { title: 'السجلات', activePage: 'logs' }) %>
+﻿<%- include('layout-top', { title: 'السجلات الإشرافية', activePage: 'logs' }) %>
 
-<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+<% const GID = guild.id; const allCases = (logs && logs.logs) ? logs.logs : []; %>
+
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,var(--red),var(--blue));display:grid;place-items:center;font-size:26px;"><i class="bi bi-journal-text"></i></div>
   <div>
-    <h1 class="h3 fw-bold mb-1">
-      <i class="bi bi-file-text me-2 text-primary"></i>
-      سجل الإشراف
-    </h1>
-    <p class="text-muted mb-0">سجل جميع إجراءات الإشراف: تحذيرات، طرود، حظر، إلخ</p>
-  </div>
-  <div class="d-flex gap-2 flex-wrap">
-    <select class="form-select form-select-sm" style="width: auto;" id="logTypeFilter" onchange="filterLogs()">
-      <option value="">جميع الأنواع</option>
-      <option value="warn">تحذير ⚠️</option>
-      <option value="kick">طرد 🚪</option>
-      <option value="ban">حظر 🚫</option>
-      <option value="unban">فك الحظر ✅</option>
-      <option value="mute">كتم 🔇</option>
-      <option value="unmute">فك الكتم 🔊</option>
-      <option value="timeout">مهلة ⏱️</option>
-      <option value="softban">حظر مؤقت 🔄</option>
-      <option value="note">ملاحظة 📝</option>
-    </select>
-    <input type="text" class="form-control form-control-sm" style="width: 200px;" id="logSearch" placeholder="بحث بالمستخدم..." oninput="filterLogs()">
-    <button class="btn btn-primary btn-sm" onclick="refreshLogs()">
-      <i class="bi bi-arrow-clockwise me-1"></i> تحديث
-    </button>
-  </div>
-</div>
-
-<!-- Stats Cards -->
-<div class="row g-4 mb-4">
-  <% const stats = { warn: 0, kick: 0, ban: 0 }; (logs?.logs || []).forEach(l => { if (stats[l.type] !== undefined) stats[l.type]++; }); %>
-  <div class="col-12 col-md-4">
-    <div class="card stat-card">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="stat-icon bg-warning bg-opacity-20 text-warning" style="width: 50px; height: 50px; border-radius: 12px;">
-          <i class="bi bi-exclamation-triangle fs-3"></i>
-        </div>
-        <div>
-          <div class="text-muted small">تحذيرات</div>
-          <div class="fw-bold fs-4"><%= stats.warn %></div>
-        </div>
-      </div>
+    <div class="h-title">السجلات الإشرافية
+      <span class="chip purple"><%= allCases.length %> إجراء مسجل</span>
     </div>
-  </div>
-  <div class="col-12 col-md-4">
-    <div class="card stat-card">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="stat-icon bg-danger bg-opacity-20 text-danger" style="width: 50px; height: 50px; border-radius: 12px;">
-          <i class="bi bi-door-open fs-3"></i>
-        </div>
-        <div>
-          <div class="text-muted small">طرود</div>
-          <div class="fw-bold fs-4"><%= stats.kick %></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-12 col-md-4">
-    <div class="card stat-card">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="stat-icon bg-dark bg-opacity-20 text-dark" style="width: 50px; height: 50px; border-radius: 12px;">
-          <i class="bi bi-x-circle fs-3"></i>
-        </div>
-        <div>
-          <div class="text-muted small">حظر</div>
-          <div class="fw-bold fs-4"><%= stats.ban %></div>
-        </div>
-      </div>
-    </div>
+    <div class="h-desc">كل تحذير/طرد/حظر/كتم مسجل مع الكيس والسبب — من أي مكان نُفذ (بوت/لوحة)</div>
   </div>
 </div>
 
 <div class="card">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0" id="logsTable">
-        <thead>
-          <tr>
-            <th style="width: 70px;">الرقم</th>
-            <th style="width: 90px;">النوع</th>
-            <th>الهدف</th>
-            <th>المشرف</th>
-            <th>السبب</th>
-            <th style="width: 160px;">التاريخ</th>
-          </tr>
+  <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);">
+    <input id="lSearch" class="inp" style="max-width:300px;" placeholder="🔎 بحث بمعرف المستخدم/السبب…">
+    <select id="lType" class="inp" style="max-width:170px;">
+      <option value="">كل الأنواع</option>
+      <% [['warn', 'تحذير'], ['kick', 'طرد'], ['ban', 'حظر'], ['softban', 'ناعم'], ['mute', 'كتم'], ['timeout', 'توقيت'], ['note', 'ملاحظة'], ['role_add', 'إضافة رول'], ['role_remove', 'إزالة رول']].forEach(t => { %><option value="<%= t[0] %>"><%= t[1] %></option><% }) %>
+    </select>
+    <span class="chip cyan" style="margin-inline-start:auto;" id="lCount"><%= allCases.length %></span>
+  </div>
+  <div style="overflow:auto;">
+    <% if (!allCases.length) { %>
+      <div class="empty"><i class="bi bi-journal"></i><h4>لا سجلات بعد</h4><p>سيُسجل البوت كل إجراء إشرافي هنا تلقائياً</p></div>
+    <% } else { %>
+      <table class="tbl" id="logTable">
+        <thead><tr>
+          <th>الكيس</th><th>النوع</th><th>الهدف</th><th>المراقب</th><th>السبب</th><th>التاريخ</th><th>الحالة</th>
         </thead>
         <tbody>
-          <% const logsList = logs?.logs || logs || []; const typeIcons = { warn: 'exclamation-triangle text-warning', kick: 'door-open text-danger', ban: 'x-circle text-dark', unban: 'check-circle text-success', mute: 'volume-mute text-info', unmute: 'volume-up text-success', timeout: 'clock text-warning', softban: 'arrow-repeat text-secondary', note: 'sticky text-primary', role_add: 'person-plus text-success', role_remove: 'person-dash text-danger' }; const typeLabels = { warn: 'تحذير', kick: 'طرد', ban: 'حظر', unban: 'فك حظر', mute: 'كتم', unmute: 'فك كتم', timeout: 'مهلة', softban: 'حظر مؤقت', note: 'ملاحظة', role_add: 'إضافة رول', role_remove: 'حذف رول' }; %>
-          <% if (logsList.length > 0) { logsList.forEach((l, i) => { %>
-          <tr data-type="<%= l.type %>" data-target="<%= l.targetId %>">
-            <td class="fw-bold">#<%= l.caseId || i + 1 %></td>
-            <td>
-              <span class="badge bg-transparent border">
-                <i class="bi bi-<%= (typeIcons[l.type] || 'circle').split(' ')[0] %> <%= (typeIcons[l.type] || '').split(' ')[1] %> me-1"></i>
-                <%= typeLabels[l.type] || l.type %>
-              </span>
-            </td>
-            <td><code class="small"><%= l.targetId %></code></td>
-            <td><code class="small"><%= l.moderatorId %></code></td>
-            <td class="small"><%= l.reason || '—' %></td>
-            <td class="small"><%= l.createdAt ? new Date(l.createdAt).toLocaleString('ar-SA') : '—' %></td>
+          <% const T = { warn: ['exclamation-triangle', 'amber'], kick: ['door-open', 'amber'], ban: ['hammer', 'red'], softban: ['brush', 'amber'], mute: ['mic-mute', 'blue'], unmute: ['mic', 'green'], timeout: ['hourglass-split', 'amber'], untimeout: ['arrow-counterclockwise', 'green'], note: ['sticky', 'cyan'], role_add: ['person-plus', 'green'], role_remove: ['person-dash', 'red'] }; %>
+          <% allCases.slice(0, 300).forEach(c => { const tg = T[c.type] || ['shield', 'cyan']; %>
+          <tr data-search="<%= ((c.targetId || '') + ' ' + (c.reason || '')).toLowerCase() %>" data-type="<%= c.type || '' %>">
+            <td class="num text-dim">#<%= c.caseId ?? '—' %></td>
+            <td><span class="chip <%= tg[1] %>"><i class="bi bi-<%= tg[0] %>"></i> <%= c.type %></span></td>
+            <td><span class="u-cell"><code class="code-cell"><%= c.targetId || '—' %></code></span></td>
+            <td class="code-cell"><%= c.moderatorId || '—' %></td>
+            <td style="max-width:250px;"><%= (c.reason || 'بدون سبب') %></td>
+            <td class="text-dim" style="white-space:nowrap;"><%= c.createdAt ? new Date(c.createdAt).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' %></td>
+            <td><span class="chip <%= c.active ? 'green' : '' %>"><%= c.active ? 'نشط' : 'انتهى' %></span></td>
           </tr>
-          <% }) } else { %>
-          <tr><td colspan="6" class="text-center py-5 text-muted">
-            <i class="bi bi-file-text" style="font-size: 2rem;"></i>
-            <p class="mt-2">لا توجد سجلات</p>
-          </td></tr>
-          <% } %>
+          <% }) %>
         </tbody>
       </table>
-    </div>
+    <% } %>
   </div>
 </div>
 
-<% if (logs?.pages > 1) { %>
-<div class="d-flex justify-content-center mt-4">
-  <nav>
-    <ul class="pagination">
-      <% for (let p = 1; p <= logs.pages; p++) { %>
-      <li class="page-item <%= p === logs.page ? 'active' : '' %>">
-        <a class="page-link" href="?page=<%= p %>"><%= p %></a>
-      </li>
-      <% } %>
-    </ul>
-  </nav>
-</div>
-<% } %>
-
 <script>
-function filterLogs() {
-  const type = document.getElementById('logTypeFilter').value;
-  const search = document.getElementById('logSearch').value.toLowerCase();
-  const rows = document.querySelectorAll('#logsTable tbody tr');
-  rows.forEach(row => {
-    const rowType = row.dataset.type;
-    const rowTarget = (row.dataset.target || '').toLowerCase();
-    const matchType = !type || rowType === type;
-    const matchSearch = !search || rowTarget.includes(search);
-    row.style.display = (matchType && matchSearch) ? '' : 'none';
-  });
-}
-async function refreshLogs() { location.reload(); }
+  document.getElementById('lSearch').addEventListener('input', apply);
+  document.getElementById('lType').addEventListener('change', apply);
+  function apply() {
+    const q = document.getElementById('lSearch').value.trim().toLowerCase();
+    const t = document.getElementById('lType').value;
+    let vis = 0;
+    $$('#logTable tbody tr').forEach(tr => {
+      const ok = (!q || tr.dataset.search.includes(q)) && (!t || tr.dataset.type === t);
+      tr.style.display = ok ? '' : 'none';
+      if (ok) vis++;
+    });
+    document.getElementById('lCount').textContent = vis;
+  }
 </script>
 
 <%- include('layout-bottom') %>

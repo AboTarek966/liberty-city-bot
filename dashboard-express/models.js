@@ -152,6 +152,18 @@ async function saveSettings(guildId, update = {}) {
     const raw = doc;
     for (const [key, value] of Object.entries(update)) {
       if (key.startsWith('$')) continue;
+      // _direct:<path> → استبدال كامل للعنصر في المسار (للخرائط مثل leveling.levelRoles)
+      if (key.startsWith('_direct:')) {
+        const path = key.slice(8).split('.');
+        let node = raw;
+        for (let i = 0; i < path.length - 1; i++) {
+          if (!node[path[i]] || typeof node[path[i]] !== 'object' || Array.isArray(node[path[i]])) node[path[i]] = {};
+          node = node[path[i]];
+        }
+        node[path[path.length - 1]] = value;
+        raw.markModified(path[0]);
+        continue;
+      }
       const current = raw[key];
       if (value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current)) {
         for (const [subKey, subValue] of Object.entries(value)) {

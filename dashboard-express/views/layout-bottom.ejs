@@ -1,75 +1,39 @@
-</main>
+    </main>
+
+    <footer style="padding:22px 26px;color:var(--text-3);font-size:11.5px;font-weight:600;text-align:center;">
+      Liberty City © 2026 — بوابة القنصل · متصلة بقاعدة بيانات مشتركة مع البوت
+    </footer>
   </div>
+</div>
 
-  <div class="toast-container" id="toastContainer"></div>
+<script src="/js/ui.js?v=21"></script>
+<script>
+  // Bot connection pill (nav) — checks the queue with a light ping
+  (async () => {
+    const pill = document.getElementById('connPill');
+    const text = document.getElementById('connText');
+    if (!pill) return;
+    const guildId = '<%= locals.guild?.id || '' %>';
+    const check = async (silent = false) => {
+      try {
+        const r = await LC.api('/api/bot/status' + (guildId ? `?guildId=${guildId}` : ''));
+        if (r.online) { pill.className = 'conn ok'; text.textContent = 'البوت متصل الآن'; return true; }
+        pill.className = 'conn bad'; text.textContent = 'البوت غير متصل — الأوامر تنتظر أوتاً';
+        return false;
+      } catch { pill.className = 'conn bad'; text.textContent = 'تعذر فحص حالة البوت'; return false; }
+    };
+    let ok = await check();
+    if (!ok) // one quick retry after boot
+      setTimeout(() => { if (!pill.classList.contains('ok')) check(); }, 12000);
+  })();
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    // Global utilities
-    function showToast(message, type = 'info', duration = 4000) {
-      const container = document.getElementById('toastContainer');
-      if (!container) return;
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type} show`;
-      toast.role = 'alert';
-      toast.innerHTML = `
-        <div class="toast-header" style="background:var(--bg-card);border-bottom:1px solid var(--border);">
-          <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'danger' ? 'x-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} me-2" style="color:var(--${type === 'info' ? 'info' : type})"></i>
-          <strong class="me-auto">Liberty City</strong>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-        </div>
-        <div class="toast-body" style="background:var(--bg-secondary);">${message}</div>
-      `;
-      container.appendChild(toast);
-      setTimeout(() => { if (toast.parentNode) toast.remove(); }, duration);
-    }
-
-    function showGlobalLoader(show) {
-      document.getElementById('globalLoader').style.display = show ? 'flex' : 'none';
-    }
-
-    function saveWith(btn, action) {
-      const original = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري الحفظ...';
-      return action().finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = original;
-      });
-    }
-
-    // Handle sidebar collapse icon
-    const collapseBtn = document.querySelector('.sidebar-toggle[onclick*="collapsed"]');
-    const collapseIcon = document.getElementById('collapseIcon');
-    if (collapseBtn && collapseIcon) {
-      collapseBtn.addEventListener('click', () => {
-        collapseIcon.classList.toggle('bi-chevron-double-left');
-        collapseIcon.classList.toggle('bi-chevron-double-right');
-      });
-    }
-
-    // Auto-dismiss alerts
-    document.querySelectorAll('.alert:not(.alert-dismissible)').forEach(alert => {
-      setTimeout(() => {
-        if (alert.parentNode) alert.style.display = 'none';
-      }, 8000);
-    });
-
-    // Confirm dangerous actions
-    document.querySelectorAll('[data-confirm]').forEach(el => {
-      el.addEventListener('click', e => {
-        if (!confirm(el.dataset.confirm)) e.preventDefault();
-      });
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        const saveBtn = document.querySelector('[onclick*="saveAllSettings"], [onclick*="saveSettings"]');
-        if (saveBtn) saveBtn.click();
-      }
-    });
-  </script>
+  // wire auto-saving switches with the current guild (when present)
+  document.addEventListener('DOMContentLoaded', () => {
+    LC.initTabs();
+    const gid = '<%= locals.guild?.id || '' %>';
+    if (gid) LC.wireSwitches(gid);
+  });
+</script>
+<%- locals.tail || '' %>
 </body>
 </html>

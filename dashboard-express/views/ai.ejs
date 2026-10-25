@@ -1,268 +1,186 @@
 ﻿<%- include('layout-top', { title: 'الذكاء الاصطناعي', activePage: 'ai' }) %>
 
-<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+<% const P = settings?.protection || {}; const A = settings?.ai || {}; const GID = guild.id; %>
+
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,var(--primary),var(--cyan));display:grid;place-items:center;font-size:26px;"><i class="bi bi-stars"></i></div>
   <div>
-    <h1 class="h3 fw-bold mb-1">
-      <i class="bi bi-robot me-2 text-primary"></i>
-      أنظمة الذكاء الاصطناعي
-    </h1>
-    <p class="text-muted mb-0">إدارة Auto-Moderation، Ticket Assistant، Translator</p>
-  </div>
-  <div class="d-flex gap-2">
-    <span class="badge bg-purple fs-6 px-3 py-2 align-self-center">
-      <i class="bi bi-cpu me-1"></i> مدعوم بـ AI
-    </span>
-    <button class="btn btn-primary" onclick="saveAllAI()">
-      <i class="bi bi-save me-1"></i> حفظ الكل
-    </button>
-  </div>
-</div>
-
-<!-- AI Status Overview -->
-<div class="grid-3 mb-4">
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-shield"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">AI Auto-Moderation</div>
-      <div class="stat-value"><%= (settings?.protection?.aiAutoMod?.enabled ? 'مفعل' : 'معطل') %></div>
-      <div class="stat-change"><%= (settings?.protection?.aiAutoMod?.sensitivity || 7) %>/10 حساسية</div>
+    <div class="h-title">الذكاء الاصطناعي
+      <span class="chip <%= A.enabled || P.aiAutoMod?.enabled ? 'green' : '' %>"><%= A.enabled || P.aiAutoMod?.enabled ? 'نشط' : 'معطّل' %></span>
     </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--pink-bg);color:var(--pink);"><i class="bi bi-chat-dots"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">AI Ticket Assistant</div>
-      <div class="stat-value"><%= (settings?.protection?.aiTicketAssistant?.enabled ? 'مفعل' : 'معطل') %></div>
-      <div class="stat-change"><%= (settings?.protection?.aiTicketAssistant?.confidence || 80) %>% ثقة</div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-translate"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">AI Translator</div>
-      <div class="stat-value"><%= (settings?.protection?.aiTranslator?.enabled ? 'مفعل' : 'معطل') %></div>
-      <div class="stat-change"><%= settings?.protection?.aiTranslator?.targetLang === 'auto' ? 'تلقائي' : settings?.protection?.aiTranslator?.targetLang || 'ar' %></div>
+    <div class="h-desc">الردود الذكية، منع المحتوى الضار تلقائياً، مردّد التذاكر والمترجم الفوري — عقل للسيرفر</div>
+    <div class="h-chips">
+      <span class="chip purple"><i class="bi bi-cpu"></i> <%= A.model || 'موديل افتراضي' %></span>
+      <% if (A.enabled) { %><span class="chip green"><i class="bi bi-chat-dots"></i> الردود مفعّلة</span><% } else { %><span class="chip"><i class="bi bi-chat"></i> الردود معطّلة</span><% } %>
     </div>
   </div>
 </div>
 
-<div class="row g-4 mb-4">
-  <!-- AI Auto-Moderation -->
-  <div class="col-12 col-lg-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-shield me-2 text-purple"></i> AI Auto-Moderation</h5>
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="aiAutoModEnabled" <%= (settings?.protection?.aiAutoMod?.enabled ? 'checked' : '') %> onchange="toggleAI('aiAutoMod', this.checked)">
-          <label class="form-check-label fw-bold" for="aiAutoModEnabled"></label>
-        </div>
-      </div>
-      <div class="card-body" id="aiAutoModBody" style="<%= (settings?.protection?.aiAutoMod?.enabled ? '' : 'opacity:0.5;pointer-events:none;') %>">
-        <div class="mb-4">
-          <label class="form-label fw-bold">الحساسية (1-10)</label>
-          <input type="range" class="form-range" min="1" max="10" value="<%= settings?.protection?.aiAutoMod?.sensitivity || 7 %>" id="aiAutoModSensitivity" onchange="updateAI('aiAutoMod', 'sensitivity', parseInt(this.value))">
-          <div class="d-flex justify-content-between text-muted small mt-1">
-            <span>منخفضة (أقل حذف)</span>
-            <span class="fw-bold" id="aiAutoModSensVal"><%= settings?.protection?.aiAutoMod?.sensitivity || 7 %></span>
-            <span>عالية (أكثر صرامة)</span>
-          </div>
-        </div>
+<% if (!settings?.ai || !A.enabled) { %>
+<div class="banner warn"><i class="bi bi-plug"></i> نظام الردود الذكية غير مفعّل — فعّل "الردود العامة" أدناه، وسيستخدم البوت مفاتيح Groq من ملفاته (مفتاح Groq مجاني). الحماية بالذكاء الاصطناعي مستقلة عنه.</div>
+<% } %>
 
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-6">
-            <label class="form-label">الإجراء الافتراضي</label>
-            <select class="form-select" id="aiAutoModAction" onchange="updateAI('aiAutoMod', 'action', this.value)">
-              <option value="delete" <%= (settings?.protection?.aiAutoMod?.action === 'delete' ? 'selected' : '') %>>حذف الرسالة</option>
-              <option value="warn" <%= (settings?.protection?.aiAutoMod?.action === 'warn' ? 'selected' : '') %>>تحذير</option>
-              <option value="mute" <%= (settings?.protection?.aiAutoMod?.action === 'mute' ? 'selected' : '') %>>كتم</option>
-              <option value="kick" <%= (settings?.protection?.aiAutoMod?.action === 'kick' ? 'selected' : '') %>>طرد</option>
-              <option value="ban" <%= (settings?.protection?.aiAutoMod?.action === 'ban' ? 'selected' : '') %>>حظر</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label">الحد الأقصى للإجراءات التلقائية/ساعة</label>
-            <input type="number" class="form-control" min="1" max="50" value="<%= settings?.protection?.aiAutoMod?.maxAutoActions || 10 %>" onchange="updateAI('aiAutoMod', 'maxAutoActions', parseInt(this.value))">
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">الفئات المفعلة</label>
-          <div class="d-flex flex-wrap gap-2">
-            <% const categories = [
-              { id: 'spam', name: 'سبام', icon: 'bi-chat-text', color: 'success' },
-              { id: 'toxicity', name: 'سمية/إهانة', icon: 'bi-emoji-angry', color: 'danger' },
-              { id: 'sexual', name: 'محتوى جنسي', icon: 'bi-eye-slash', color: 'pink' },
-              { id: 'scam', name: 'احتيال/تصيد', icon: 'bi-shield-exclamation', color: 'warning' },
-              { id: 'threat', name: 'تهديد/عنف', icon: 'bi-lightning', color: 'dark' },
-              { id: 'pii', name: 'بيانات شخصية', icon: 'bi-person-lock', color: 'info' },
-            ];
-            categories.forEach(c => {
-              const enabled = settings?.protection?.aiAutoMod?.categories?.[c.id] !== false;
-            %>
-            <label class="btn btn-outline-<%= c.color %> btn-sm <%= enabled ? 'active' : '' %>" style="border-radius: 20px;">
-              <input type="checkbox" <%= enabled ? 'checked' : '' %> onchange="updateAICategory('aiAutoMod', '<%= c.id %>', this.checked)" style="display:none;">
-              <i class="bi <%= c.icon %> me-1"></i> <%= c.name %>
-            </label>
-            <% }) %>
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">قنوات مستثناة</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="aiAutoModIgnoredChannels" value="<%= (settings?.protection?.aiAutoMod?.ignoredChannels || []).join(', ') %>" placeholder="Channel IDs مفصولة بفاصلة" readonly>
-            <button class="btn btn-outline-secondary" type="button" onclick="editIgnoredChannels('aiAutoMod')"><i class="bi bi-pencil"></i> تعديل</button>
-          </div>
-          <div class="form-text">الرسائل في هذه القنوات لن تُفحص بالذكاء الاصطناعي</div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">رولات مستثناة</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="aiAutoModIgnoredRoles" value="<%= (settings?.protection?.aiAutoMod?.ignoredRoles || []).join(', ') %>" placeholder="Role IDs مفصولة بفاصلة" readonly>
-            <button class="btn btn-outline-secondary" type="button" onclick="editIgnoredRoles('aiAutoMod')"><i class="bi bi-pencil"></i> تعديل</button>
-          </div>
-          <div class="form-text">أعضاء هذه الرولات معفيون من AI Auto-Moderation</div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">قروم السجل</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="aiAutoModLogChannel" value="<%= settings?.protection?.aiAutoMod?.logChannel || '' %>" placeholder="Channel ID">
-            <button class="btn btn-outline-secondary" type="button" onclick="setAILogChannel('aiAutoMod')"><i class="bi bi-hash"></i> تعيين</button>
-          </div>
-        </div>
-
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle me-2"></i>
-          <strong>كيف يعمل:</strong> الذكاء الاصطناعي يحلل كل رسالة في الوقت الفعلي ويصنفها. إذا تجاوزت درجة الثقة العتبة المحددة، يتم تنفيذ الإجراء تلقائياً. القرارات تظهر في قروم السجل للمراجعة.
-        </div>
+<div class="grid-2 mb-4">
+  <!-- الردود العامة -->
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-chat-dots"></i> الردود العامة</h3>
+      <div class="head-side">
+        <span class="chip <%= A.enabled ? 'green' : '' %>"><%= A.enabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="ai.enabled" <%= A.enabled ? 'checked' : '' %>><span class="track"></span></label>
       </div>
     </div>
-  </div>
-
-  <!-- AI Ticket Assistant -->
-  <div class="col-12 col-lg-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-chat-dots me-2" style="color:var(--pink)"></i> AI Ticket Assistant</h5>
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="aiTicketEnabled" <%= (settings?.protection?.aiTicketAssistant?.enabled ? 'checked' : '') %> onchange="toggleAI('aiTicketAssistant', this.checked)">
-          <label class="form-check-label fw-bold" for="aiTicketEnabled"></label>
-        </div>
-      </div>
-      <div class="card-body" id="aiTicketBody" style="<%= (settings?.protection?.aiTicketAssistant?.enabled ? '' : 'opacity:0.5;pointer-events:none;') %>">
-        <div class="mb-4">
-          <label class="form-label">حد الثقة (%): <%= settings?.protection?.aiTicketAssistant?.confidence || 80 %></label>
-          <input type="range" class="form-range" min="50" max="100" value="<%= settings?.protection?.aiTicketAssistant?.confidence || 80 %>" id="aiTicketConfidence" onchange="updateAI('aiTicketAssistant', 'confidence', parseInt(this.value)); document.getElementById('aiTicketConfVal').textContent=this.value+'%'">
-          <div class="form-text">فوق هذه النسبة: البوت ينفذ الإجراء تلقائياً. تحتها: يطلب موافقة المشرف.</div>
-        </div>
-
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-6">
-            <label class="form-label">الحد الأقصى للإجراءات التلقائية/تذكرة</label>
-            <input type="number" class="form-control" min="1" max="10" value="<%= settings?.protection?.aiTicketAssistant?.maxAutoActions || 3 %>" onchange="updateAI('aiTicketAssistant', 'maxAutoActions', parseInt(this.value))">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label">قروم السجل</label>
-            <div class="input-group">
-              <input type="text" class="form-control" id="aiTicketLogChannel" value="<%= settings?.protection?.aiTicketAssistant?.logChannel || '' %>" placeholder="Channel ID">
-              <button class="btn btn-outline-secondary" type="button" onclick="setAILogChannel('aiTicketAssistant')"><i class="bi bi-hash"></i></button>
-            </div>
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">قنوات مستثناة</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="aiTicketIgnoredChannels" value="<%= (settings?.protection?.aiTicketAssistant?.ignoredChannels || []).join(', ') %>" placeholder="Channel IDs" readonly>
-            <button class="btn btn-outline-secondary" type="button" onclick="editIgnoredChannels('aiTicketAssistant')"><i class="bi bi-pencil"></i> تعديل</button>
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">رولات مستثناة</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="aiTicketIgnoredRoles" value="<%= (settings?.protection?.aiTicketAssistant?.ignoredRoles || []).join(', ') %>" placeholder="Role IDs" readonly>
-            <button class="btn btn-outline-secondary" type="button" onclick="editIgnoredRoles('aiTicketAssistant')"><i class="bi bi-pencil"></i> تعديل</button>
-          </div>
-        </div>
-
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle me-2"></i>
-          <strong>سير العمل:</strong> عند فتح تذكرة، الذكاء الاصطناعي يقرأ الرسالة الأولى ويحدد نوع المشكلة. إذا كانت الثقة عالية، ينفذ الحل (مثل: إعطاء رول، إرسال رد جاهز، إغلاق). إذا كانت منخفضة، ينبه المشرفين للمراجعة.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- AI Translator -->
-  <div class="col-12 col-lg-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-translate me-2" style="color:var(--info)"></i> AI Translator</h5>
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="aiTranslatorEnabled" <%= (settings?.protection?.aiTranslator?.enabled ? 'checked' : '') %> onchange="toggleAI('aiTranslator', this.checked)">
-          <label class="form-check-label fw-bold" for="aiTranslatorEnabled"></label>
-        </div>
-      </div>
-      <div class="card-body" id="aiTranslatorBody" style="<%= (settings?.protection?.aiTranslator?.enabled ? '' : 'opacity:0.5;pointer-events:none;') %>">
-        <div class="mb-4">
-          <label class="form-label">اللغة الهدف للترجمة</label>
-          <select class="form-select" onchange="updateAI('aiTranslator', 'targetLang', this.value)">
-            <option value="auto" <%= (settings?.protection?.aiTranslator?.targetLang === 'auto' ? 'selected' : '') %>>تلقائي (كشف اللغة والترجمة للعربية)</option>
-            <option value="ar" <%= (settings?.protection?.aiTranslator?.targetLang === 'ar' ? 'selected' : '') %>>العربية 🇸🇦</option>
-            <option value="en" <%= (settings?.protection?.aiTranslator?.targetLang === 'en' ? 'selected' : '') %>>English 🇬🇧</option>
-            <option value="fr" <%= (settings?.protection?.aiTranslator?.targetLang === 'fr' ? 'selected' : '') %>>Français 🇫🇷</option>
-            <option value="es" <%= (settings?.protection?.aiTranslator?.targetLang === 'es' ? 'selected' : '') %>>Español 🇪🇸</option>
-            <option value="de" <%= (settings?.protection?.aiTranslator?.targetLang === 'de' ? 'selected' : '') %>>Deutsch 🇩🇪</option>
-            <option value="tr" <%= (settings?.protection?.aiTranslator?.targetLang === 'tr' ? 'selected' : '') %>>Türkçe 🇹🇷</option>
-            <option value="ru" <%= (settings?.protection?.aiTranslator?.targetLang === 'ru' ? 'selected' : '') %>>Русский 🇷🇺</option>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="field">
+          <label>المزوّد</label>
+          <select class="inp" data-text="ai.provider">
+            <% [['openai', 'OpenAI (GPT)'], ['anthropic', 'Anthropic (Claude)'], ['both', 'تحكيم بالاثنين']].forEach(o => { %><option value="<%= o[0] %>" <%= A.provider === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
           </select>
         </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-bold">قنوات مستثناة</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="aiTranslatorIgnoredChannels" value="<%= (settings?.protection?.aiTranslator?.ignoredChannels || []).join(', ') %>" placeholder="Channel IDs" readonly>
-            <button class="btn btn-outline-secondary" type="button" onclick="editIgnoredChannels('aiTranslator')"><i class="bi bi-pencil"></i> تعديل</button>
-          </div>
+        <div class="field">
+          <label>لغة الرد</label>
+          <select class="inp" data-text="ai.responseLanguage">
+            <% [['ar', 'العربية'], ['en', 'English'], ['auto', 'تلقائي (لغة السؤال)']].forEach(o => { %><option value="<%= o[0] %>" <%= A.responseLanguage === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
+          </select>
         </div>
-
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle me-2"></i>
-          <strong>الاستخدام:</strong> اكتب <code>/translate</code> أو تفاعل بـ 🌐 على أي رسالة لترجمتها. الترجمة التلقائية تعمل في القنوات المحددة.
+      </div>
+      <div class="form-row-3 mt-3">
+        <div class="field"><label>درجة الإبداع (Temperature)</label>
+          <input type="range" class="range" min="0" max="10" value="<%= Math.round((A.temperature ?? 0.7) * 10) %>" oninput="this.nextElementSibling.textContent=(this.value/10).toFixed(1)" onchange="LC.saveSetting('<%= GID %>', { ai: { temperature: this.value/10 } })">
+          <span class="chip cyan num"><%= (A.temperature ?? 0.7).toFixed(1) %></span>
         </div>
+        <div class="field"><label>أقصى طول الرد (توكنز)</label><input type="number" class="inp num" data-num="ai.maxTokens" value="<%= A.maxTokens || 800 %>" min="100" max="4000"></div>
+        <div class="field"><label>الانتظار بين الردود (ثواني)</label><input type="number" class="inp num" data-num="ai.cooldown" value="<%= Math.round((A.cooldown || 3)) %>" min="0" max="600"></div>
+      </div>
+      <div class="field mt-3">
+        <label>شخصية البوت (System Prompt) <span class="hint">تحدد سلوك رده</span></label>
+        <textarea class="inp" data-text="ai.systemPrompt" placeholder="أنت مساعد ذكي ودود في سيرفر Liberty City..."><%= A.systemPrompt || '' %></textarea>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>قنوات مسموحة <span class="hint">فارغ = الكل</span></label><input class="inp" data-array="ai.allowedChannels" value="<%= (A.allowedChannels || []).join(',') %>" placeholder="ID, ID"></div>
+        <div class="field"><label>رولات مسموحة <span class="hint">فارغ = الكل</span></label><input class="inp" data-array="ai.allowedRoles" value="<%= (A.allowedRoles || []).join(',') %>" placeholder="ID, ID"></div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>قنوات مستثناة</label><input class="inp" data-array="ai.ignoredChannels" value="<%= (A.ignoredChannels || []).join(',') %>" placeholder="ID, ID"></div>
+        <div class="field"><label>رولات مستثناة</label><input class="inp" data-array="ai.ignoredRoles" value="<%= (A.ignoredRoles || []).join(',') %>" placeholder="ID, ID"></div>
       </div>
     </div>
   </div>
 
-  <!-- AI Stats / Usage -->
-  <div class="col-12 col-lg-6">
-    <div class="card h-100">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-graph-up me-2"></i> إحصائيات الاستخدام</h5></div>
-      <div class="card-body">
-        <div class="row g-3 text-center">
-          <div class="col-6">
-            <div class="stat-value text-purple"><%= (stats?.aiModerated || 0).toLocaleString() %></div>
-            <div class="text-muted">رسائل مُفحوصة (AI Mod)</div>
-          </div>
-          <div class="col-6">
-            <div class="stat-value text-pink"><%= (stats?.aiTickets || 0).toLocaleString() %></div>
-            <div class="text-muted">تذاكر معالجتها</div>
-          </div>
-          <div class="col-6">
-            <div class="stat-value text-info"><%= (stats?.aiTranslations || 0).toLocaleString() %></div>
-            <div class="text-muted">ترجمات منجزة</div>
-          </div>
-          <div class="col-6">
-            <div class="stat-value text-success"><%= (stats?.aiAutoActions || 0).toLocaleString() %></div>
-            <div class="text-muted">إجراءات تلقائية</div>
-          </div>
+  <!-- مودريتور AI -->
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-shield-exclamation"></i> رقيب المحتوى (AI AutoMod)</h3>
+      <div class="head-side">
+        <span class="chip <%= P.aiAutoMod?.enabled ? 'green' : '' %>"><%= P.aiAutoMod?.enabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="protection.aiAutoMod.enabled" <%= P.aiAutoMod?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="field mb-3">
+        <label>الحساسية <span class="hint">أعلى = تدقيق أكثر</span></label>
+        <input type="range" class="range" min="1" max="10" value="<%= P.aiAutoMod?.sensitivity || 7 %>" oninput="this.nextElementSibling.textContent=this.value" onchange="LC.saveSetting('<%= GID %>', { protection: { aiAutoMod: { sensitivity: Number(this.value) } } })">
+        <span class="chip cyan num"><%= P.aiAutoMod?.sensitivity || 7 %></span>
+      </div>
+      <div class="sec-title"><i class="bi bi-list-check"></i> التصنيفات — تفعيل + إجراء لكل نوع</div>
+      <div id="aiModGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <% const CAT = [['spam', 'سبام'], ['toxicity', 'إساءة'], ['nsfw', 'إباحي'], ['scam', 'احتيال'], ['threat', 'تهديد'], ['pii', 'بيانات شخصية'], ['raid', 'رايد لغوي'], ['selfharm', 'إيذاء الذات']];
+           const ACTS = [['delete', 'حذف'], ['warn', 'تحذير'], ['mute', 'كتم'], ['ban', 'حظر'], ['resources', 'موارد مساعدة']];
+           const cs = P.aiAutoMod?.categories || {}; const acts = P.aiAutoMod?.actions || {}; %>
+        <% CAT.forEach(([id, lb]) => { const on = cs[id] !== false; %>
+        <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;flex:1;">
+            <input type="checkbox" data-toggle="protection.aiAutoMod.categories.<%= id %>" <%= on ? 'checked' : '' %> style="width:16px;height:16px;accent-color:var(--primary);">
+            <span style="font-size:12px;font-weight:700;"><%= lb %></span>
+          </label>
+          <select style="background:var(--bg-soft);border:1px solid var(--line);color:var(--text-2);border-radius:8px;padding:3px 8px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;" data-cat-act="<%= id %>">
+            <% const selfharmOpts = id === 'selfharm' ? ACTS : ACTS.filter(a => a[0] !== 'resources'); %>
+            <% selfharmOpts.forEach(a => { %><option value="<%= a[0] %>" <%= (acts[id] || (id === 'spam' ? 'delete' : 'mute')) === a[0] ? 'selected' : '' %>><%= a[1] %></option><% }) %>
+          </select>
         </div>
-        <hr>
-        <div class="text-center">
-          <a href="/dashboard/<%= guild.id %>/logs?type=ai" class="btn btn-outline-primary">عرض سجلات الذكاء الاصطناعي الكاملة</a>
+        <% }) %>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>مدة الكتم الافتراضية للربيب (ثواني)</label><input type="number" class="inp num" data-num="protection.aiAutoMod.muteDuration" value="<%= P.aiAutoMod?.muteDuration || 600 %>" min="60"></div>
+        <div class="field"><label>قناة سجلات الرقيب</label><select class="inp chan-sel" data-text="protection.aiAutoMod.logChannel" data-types="0,5" data-value="<%= P.aiAutoMod?.logChannel || '' %>"></select></div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>قنوات مستثناة</label><input class="inp" data-array="protection.aiAutoMod.ignoredChannels" value="<%= (P.aiAutoMod?.ignoredChannels || []).join(',') %>" placeholder="ID, ID"></div>
+        <div class="field"><label>رولات مستثناة</label><input class="inp" data-array="protection.aiAutoMod.ignoredRoles" value="<%= (P.aiAutoMod?.ignoredRoles || []).join(',') %>"></div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>قناة سجلات الرقيب</label><select class="inp chan-sel" data-text="protection.aiAutoMod.logChannel" data-types="0,5" data-value="<%= P.aiAutoMod?.logChannel || '' %>"></select></div>
+        <div class="field">
+          <label>تصعيد التكرارات (Escalation)</label>
+          <label class="field-check"><input type="checkbox" data-toggle="protection.aiAutoMod.escalation" <%= P.aiAutoMod?.escalation ? 'checked' : '' %>><span>فعّل التصعيد بعد تحذيرات متكررة</span></label>
+        </div>
+      </div>
+      <div class="field"><label>عدد داخل التصعيد (تحذيرات)</label><input type="number" class="inp num" data-num="protection.aiAutoMod.maxWarningsBeforeEscalation" value="<%= P.aiAutoMod?.maxWarningsBeforeEscalation || 3 %>" min="1" max="20"></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- مساعد التذاكر -->
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-ticket-detailed"></i> مساعد التذاكر (AI)</h3>
+      <div class="head-side">
+        <span class="chip <%= P.aiTicketAssistant?.enabled ? 'green' : '' %>"><%= P.aiTicketAssistant?.enabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="protection.aiTicketAssistant.enabled" <%= P.aiTicketAssistant?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="grid-2" style="gap:8px;">
+        <label class="field-check"><input type="checkbox" data-toggle="protection.aiTicketAssistant.autoClaim" <%= P.aiTicketAssistant?.autoClaim ? 'checked' : '' %>><span>استلام تلقائي للتذاكر</span></label>
+        <label class="field-check"><input type="checkbox" data-toggle="protection.aiTicketAssistant.analyzeOnCreate" <%= P.aiTicketAssistant?.analyzeOnCreate ? 'checked' : '' %>><span>تحليل عند الإنشاء</span></label>
+        <label class="field-check"><input type="checkbox" data-toggle="protection.aiTicketAssistant.requireAdminApprovalForRoles" <%= P.aiTicketAssistant?.requireAdminApprovalForRoles ? 'checked' : '' %>><span>إذن إداري لتغيير الرولات</span></label>
+        <label class="field-check"><input type="checkbox" data-toggle="protection.aiTicketAssistant.requireAdminApprovalForBans" <%= P.aiTicketAssistant?.requireAdminApprovalForBans ? 'checked' : '' %>><span>إذن إداري للحظر</span></label>
+        <label class="field-check"><input type="checkbox" data-toggle="protection.aiTicketAssistant.requireAdminApprovalForPermissions" <%= P.aiTicketAssistant?.requireAdminApprovalForPermissions ? 'checked' : '' %>><span>إذن إداري لتغيير الصلاحيات</span></label>
+        <label class="field-check"><input type="checkbox" data-toggle="protection.aiTicketAssistant.notifyAdminsOnFailure" <%= P.aiTicketAssistant?.notifyAdminsOnFailure ? 'checked' : '' %>><span>تنبيه الإدارة عند فشله</span></label>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>حد الثقة (%)</label>
+          <input class="inp num" type="number" min="50" max="100" id="aiConf" value="<%= Math.round(((P.aiTicketAssistant?.confidenceThreshold ?? 0.8) <= 1 ? P.aiTicketAssistant?.confidenceThreshold ?? 0.8 : 0.8) * 100) %>">
+          <div class="text-dim" style="font-size:10.5px;">يستلم تلقائياً فقط إذا وثقته فوق هذا الحد</div>
+        </div>
+        <div class="field"><label>أقصى إجراءات لكل تذكرة</label><input type="number" class="inp num" data-num="protection.aiTicketAssistant.maxAutoActionsPerTicket" value="<%= P.aiTicketAssistant?.maxAutoActionsPerTicket || 3 %>" min="1" max="10"></div>
+      </div>
+      <div class="field mt-3"><label>قناة سجلات المساعد</label><select class="inp chan-sel" data-text="protection.aiTicketAssistant.logChannel" data-types="0,5" data-value="<%= P.aiTicketAssistant?.logChannel || '' %>"></select></div>
+    </div>
+  </div>
+
+  <!-- المترجم -->
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-translate"></i> المترجم الفوري (AI Translator)</h3>
+      <div class="head-side">
+        <span class="chip <%= P.aiTranslator?.enabled ? 'green' : '' %>"><%= P.aiTranslator?.enabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="protection.aiTranslator.enabled" <%= P.aiTranslator?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="field">
+          <label>لغة الترجمة الافتراضية</label>
+          <select class="inp" data-text="protection.aiTranslator.defaultTargetLang">
+            <% [['ar', 'العربية'], ['en', 'English'], ['fr', 'الفرنسية']].forEach(o => { %><option value="<%= o[0] %>" <%= (P.aiTranslator?.defaultTargetLang || 'ar') === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
+          </select>
+        </div>
+        <div class="field"><label>أقصى طول للترجمة</label><input type="number" class="inp num" data-num="protection.aiTranslator.maxLength" value="<%= P.aiTranslator?.maxLength || 1000 %>" min="100"></div>
+      </div>
+      <div class="label mt-3" style="font-size:12px;font-weight:800;color:var(--text-2);">قنوات الترجمة التلقائية <span class="hint" style="font-weight:600;color:var(--text-3);">فارغ = متوقف الترجمات التلقائية</span></label>
+      <input class="inp" data-array="protection.aiTranslator.autoTranslateChannels" value="<%= (P.aiTranslator?.autoTranslateChannels || []).join(',') %>" placeholder="ID, ID">
+      <div class="form-row mt-3">
+        <div class="field"><label>قنوات مستثناة</label><input class="inp" data-array="protection.aiTranslator.ignoredChannels" value="<%= (P.aiTranslator?.ignoredChannels || []).join(',') %>"></div>
+        <div class="field"><label>رولات مستثناة</label><input class="inp" data-array="protection.aiTranslator.ignoredRoles" value="<%= (P.aiTranslator?.ignoredRoles || []).join(',') %>"></div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>قناة سجلات المترجم</label><select class="inp chan-sel" data-text="protection.aiTranslator.logChannel" data-types="0,5" data-value="<%= P.aiTranslator?.logChannel || '' %>"></select></div>
+        <div class="field">
+          <label>إظهار النص الأصلي أسفل الترجمة</label>
+          <label class="field-check"><input type="checkbox" data-toggle="protection.aiTranslator.showOriginal" <%= P.aiTranslator?.showOriginal ? 'checked' : '' %>><span>فعّل</span></label>
         </div>
       </div>
     </div>
@@ -270,79 +188,33 @@
 </div>
 
 <script>
-  function toggleAI(featureId, enabled) {
-    const body = document.getElementById(featureId + 'Body');
-    if (body) body.style.cssText = enabled ? '' : 'opacity:0.5;pointer-events:none;';
-    
-    fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ featureId, enabled })
-    }).then(res => {
-      if (!res.ok) { showToast('فشل التحديث', 'danger'); location.reload(); }
-      else showToast(enabled ? 'تم تفعيل ' + featureId : 'تم تعطيل ' + featureId, enabled ? 'success' : 'warning');
-    }).catch(() => { showToast('خطأ في الاتصال', 'danger'); location.reload(); });
-  }
-
-  function updateAI(featureId, key, value) {
-    fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ featureId, [key]: value })
-    }).then(res => {
-      if (!res.ok) location.reload();
-      else showToast('تم الحفظ ✅', 'success', 2000);
-    }).catch(() => location.reload());
-  }
-
-  function updateAICategory(featureId, category, enabled) {
-    const current = <%= JSON.stringify(settings?.protection?.aiAutoMod?.categories || {}) %>;
-    current[category] = enabled;
-    updateAI(featureId, 'categories', current);
-    showToast('تم تحديث الفئة: ' + category, 'success', 2000);
-  }
-
-  function editIgnoredChannels(featureId) {
-    const current = document.getElementById(featureId + 'IgnoredChannels').value;
-    const input = prompt('أدخل Channel IDs المستثناة (مفصولة بفاصلة):', current);
-    if (input !== null) {
-      const list = input.split(',').map(x => x.trim()).filter(x => x);
-      document.getElementById(featureId + 'IgnoredChannels').value = list.join(', ');
-      updateAI(featureId, 'ignoredChannels', list);
-      showToast('تم تحديث القنوات المستثناة', 'success');
-    }
-  }
-
-  function editIgnoredRoles(featureId) {
-    const current = document.getElementById(featureId + 'IgnoredRoles').value;
-    const input = prompt('أدخل Role IDs المستثناة (مفصولة بفاصلة):', current);
-    if (input !== null) {
-      const list = input.split(',').map(x => x.trim()).filter(x => x);
-      document.getElementById(featureId + 'IgnoredRoles').value = list.join(', ');
-      updateAI(featureId, 'ignoredRoles', list);
-      showToast('تم تحديث الرولات المستثناة', 'success');
-    }
-  }
-
-  function setAILogChannel(featureId) {
-    const input = prompt('أدخل Channel ID لسجل هذه الميزة:');
-    if (input !== null) {
-      document.getElementById(featureId + 'LogChannel').value = input.trim();
-      updateAI(featureId, 'logChannel', input.trim() || undefined);
-      showToast('تم تعيين قروم السجل', 'success');
-    }
-  }
-
-  function saveAllAI() {
-    showToast('يتم الحفظ تلقائياً عند كل تغيير ✅', 'info');
-  }
-
-  // Update slider display
-  document.getElementById('aiAutoModSensitivity')?.addEventListener('input', (e) => {
-    document.getElementById('aiAutoModSensVal').textContent = e.target.value;
-  });
-  document.getElementById('aiTicketConfidence')?.addEventListener('input', (e) => {
-    document.getElementById('aiTicketConfVal').textContent = e.target.value + '%';
+  const GID = '<%= GID %>';
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LC.loadChannels(GID, $$('.chan-sel'));
+    // arrays with live endpoints fall back to plain comma inputs — auto-PATCH on change
+    $$('.inp[data-array]').forEach(el => {
+      el.addEventListener('change', async () => {
+        const path = el.dataset.array.split('.');
+        const arr = el.value.split(',').map(s => s.trim()).filter(Boolean);
+        const payload = {}; let node = payload;
+        path.slice(0, -1).forEach(k => { node[k] = node[k] || {}; node = node[k]; });
+        node[path[path.length - 1]] = arr;
+        await LC.saveSetting(GID, payload, null);
+      });
+    });
+    // per-category action selects
+    $$('select[data-cat-act]').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const cat = sel.dataset.catAct;
+        await LC.saveSetting(GID, { protection: { aiAutoMod: { actions: { [cat]: sel.value } } } });
+      });
+    });
+    // confidence slider (0..1 semantics)
+    const conf = document.getElementById('aiConf');
+    conf?.addEventListener('change', async () => {
+      const pct = Math.min(100, Math.max(50, Number(conf.value || 80)));
+      await LC.saveSetting(GID, { protection: { aiTicketAssistant: { confidenceThreshold: pct / 100 } } });
+    });
   });
 </script>
 

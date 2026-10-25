@@ -1,199 +1,50 @@
 <%- include('layout-top', { title: 'سيرفراتي', activePage: 'dashboard' }) %>
 
-<div class="page-header">
-  <h1><i class="bi bi-server"></i> سيرفراتي</h1>
-  <p>اختر السيرفر الذي تريد إدارته — <%= guilds.length %> <%= guilds.length === 1 ? 'سيرفر' : 'سيرفرات' %> متاح<%= (locals.user || {}).id === '1557735350464417822' ? ' (أنت المطور)' : '' %></p>
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,var(--primary),var(--cyan));display:grid;place-items:center;font-size:28px;"><i class="bi bi-collection"></i></div>
+  <div>
+    <div class="h-title">سيرفراتي</div>
+    <div class="h-desc">إختر سيرفراً لإدارة الحماية والأنظمة والأعضاء — عائلك الإداري في مكان واحد</div>
+    <div class="h-chips">
+      <span class="chip purple"><i class="bi bi-collection"></i> <%= guilds.length %> سيرفر</span>
+      <span class="chip blue"><i class="bi bi-robot"></i> البوت يعمل</span>
+    </div>
+  </div>
 </div>
 
-<% if (!botStats || !botStats.totalGuilds) { %>
-<div class="alert alert-warning mb-4 d-flex align-items-center gap-3">
-  <i class="bi bi-exclamation-triangle fs-3 text-warning"></i>
-  <div>
-    <strong>البوت غير متصل حالياً</strong>
-    <p class="mb-0 text-secondary">قد لا تُعرض بعض البيانات الحيّة. الإعدادات المحفوظة ستظل متاحة وتظهر عند عودة البوت.</p>
+<% if (guilds.length === 0) { %>
+<div class="card"><div class="card-body">
+  <div class="empty">
+    <i class="bi bi-emoji-frown"></i>
+    <h4>لا توجد سيرفرات بصلاحية إدارة</h4>
+    <p>تحتاج صلاحية "Manage Server" أو تملك السيرفر لظهوره هنا. أضف البوت لسيرفرك ثم أعد الدخول.</p>
+    <a class="btn primary mt-3" href="https://discord.com/oauth2/authorize?client_id=<%= clientId %>&permissions=1395867970447&scope=bot%20applications.commands" target="_blank"><i class="bi bi-plus-lg"></i> أضف البوت لسيرفر جديد</a>
   </div>
+</div></div>
+<% } else { %>
+<div class="grid-guild">
+  <% guilds.forEach(g => { %>
+    <a class="gcard" href="/dashboard/<%= g.id %>">
+      <% if (g.icon) { %>
+        <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png?size=128" alt="">
+      <% } else { %>
+        <div class="g-letter"><%= (g.name || '?').charAt(0) %></div>
+      <% } %>
+      <div>
+        <div class="g-name"><%= g.name %></div>
+        <div style="font-size:11px;color:var(--text-3);font-weight:700;margin-top:3px;"><code class="code-cell" style="color:var(--text-3);"><%= g.id %></code></div>
+      </div>
+      <div class="g-meta">
+        <% if (g.owner) { %><span class="chip green"><i class="bi bi-person-fill-gear"></i> مالك</span><% } %>
+        <span class="chip blue"><i class="bi bi-shield-check"></i> بوت موجود</span>
+      </div>
+      <div class="enter"><i class="bi bi-arrow-left"></i> إدارة السيرفر</div>
+    </a>
+  <% }) %>
 </div>
 <% } %>
-
-<!-- Bot Status Cards -->
-<div class="grid-4 mb-4">
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--info-bg);color:var(--info);"><i class="bi bi-hdd-rack"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">سيرفرات البوت</div>
-      <div class="stat-value"><%= botStats?.totalGuilds || guilds.length %></div>
-      <div class="stat-change up"><i class="bi bi-arrow-up"></i> <%= botStats?.totalGuilds ? '+' + (botStats.totalGuilds - guilds.length) : '0' %> غير مدارة</div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-people"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">إجمالي الأعضاء</div>
-      <div class="stat-value"><%= (botStats?.totalUsers || 0).toLocaleString('en-US') %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:var(--purple-bg);color:var(--purple);"><i class="bi bi-hash"></i></div>
-    <div class="stat-info">
-      <div class="stat-label">إجمالي القنوات</div>
-      <div class="stat-value"><%= (botStats?.totalChannels || 0).toLocaleString('en-US') %></div>
-    </div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:<%= botStats?.totalGuilds ? 'var(--success-bg)' : 'var(--warning-bg)' %>;color:<%= botStats?.totalGuilds ? 'var(--success)' : 'var(--warning)' %>;">
-      <i class="bi bi-<%= botStats?.totalGuilds ? 'wifi' : 'wifi-off' %>"></i>
-    </div>
-    <div class="stat-info">
-      <div class="stat-label">حالة الاتصال</div>
-      <div class="stat-value" style="font-size:18px;"><%= botStats?.totalGuilds ? 'متصل ●' : 'غير متصل ○' %></div>
-      <div class="stat-change"><%= botStats?.totalGuilds ? 'جميع الأنظمة تعمل' : 'في انتظار البوت...' %></div>
-    </div>
-  </div>
-</div>
-
-<!-- Quick Actions -->
-<div class="card mb-4">
-  <div class="card-header">
-    <h5 class="mb-0"><i class="bi bi-lightning me-2"></i> إجراءات سريعة</h5>
-  </div>
-  <div class="card-body">
-    <div class="btn-group">
-      <a href="/auth/discord" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> تحديث قائمة السيرفرات</a>
-      <a href="https://discord.com/oauth2/authorize?client_id=1557735350464417822&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn btn-outline-primary"><i class="bi bi-plus-circle"></i> دعوة البوت لسيرفر جديد</a>
-      <a href="https://discord.gg/libertycity" target="_blank" class="btn btn-outline-secondary"><i class="bi bi-discord"></i> سيرفر الدعم</a>
-    </div>
-  </div>
-</div>
-
-<!-- Guild Cards -->
-<div class="card">
-  <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-    <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> السيرفرات التي تملك فيها صلاحية الإدارة</h5>
-    <div class="d-flex gap-2">
-      <select class="form-select form-select-sm" style="width:auto;" id="guildFilter">
-        <option value="all">الكل</option>
-        <option value="owner">ملكي فقط 👑</option>
-        <option value="admin">إدارة فقط</option>
-      </select>
-      <input type="text" class="form-control form-control-sm" style="width:220px;" id="guildSearch" placeholder="ابحث باسم السيرفر...">
-    </div>
-  </div>
-  <div class="card-body p-0">
-    <% if (guilds.length === 0) { %>
-      <div class="empty-state" style="padding: 60px 20px;">
-        <i class="bi bi-emoji-frown"></i>
-        <h5>لا توجد سيرفرات</h5>
-        <p>لم نعثر على أي سيرفر تملك فيه صلاحية الإدارة. تأكد أنك مدير في السيرفر أو مالكه.</p>
-        <a href="https://discord.com/oauth2/authorize?client_id=1557735350464417822&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn btn-primary mt-3"><i class="bi bi-plus-circle me-1"></i> إضافة البوت لسيرفر</a>
-      </div>
-    <% } else { %>
-      <div class="grid-4 p-4" id="guildGrid">
-        <% guilds.forEach(g => { %>
-        <div class="guild-card" data-name="<%= g.name.toLowerCase() %>" data-owner="<%= g.owner ? 'true' : 'false' %>" data-id="<%= g.id %>">
-          <% if (g.icon) { %>
-            <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png?size=128" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-          <% } else { %>
-            <div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;font-size:26px;display:flex;"><%= g.name.charAt(0) %></div>
-          <% } %>
-          <div>
-            <div class="guild-title"><%= g.name %></div>
-            <div class="guild-meta">
-              <% if (g.owner) { %><span class="badge bg-warning me-1">👑 مالك</span><% } else { %><span class="badge bg-secondary me-1">إدارة</span><% } %>
-              <code style="font-size:11px;"><%= g.id %></code>
-            </div>
-            <div class="guild-meta mt-1">
-              <span class="badge bg-info"><%= (g.approximateMemberCount || g.memberCount || '?').toLocaleString() %> عضو</span>
-            </div>
-          </div>
-          <div class="guild-actions">
-            <a href="/dashboard/<%= g.id %>" class="manage-btn text-decoration-none">إدارة</a>
-            <button class="leave-btn" onclick="leaveGuild('<%= g.id %>', '<%= g.name.replace(/'/g, "\\'") %>')">مغادرة</button>
-          </div>
-        </div>
-        <% }) %>
-      </div>
-    <% } %>
-  </div>
-</div>
-
-<!-- Bot Info Card -->
-<div class="card mt-4">
-  <div class="card-header"><h5 class="mb-0"><i class="bi bi-info-circle me-2"></i> معلومات البوت</h5></div>
-  <div class="card-body">
-    <div class="row g-4">
-      <div class="col-12 col-md-3 text-center">
-        <div class="stat-value" style="font-size:28px;"><%= botStats?.version || '2.0.0' %></div>
-        <div class="text-muted">الإصدار</div>
-      </div>
-      <div class="col-12 col-md-3 text-center">
-        <div class="stat-value" style="font-size:28px;"><%= botStats?.uptime || '—' %></div>
-        <div class="text-muted">العمل المتواصل</div>
-      </div>
-      <div class="col-12 col-md-3 text-center">
-        <div class="stat-value" style="font-size:28px;"><%= botStats?.nodeVersion || process.version %></div>
-        <div class="text-muted">Node.js</div>
-      </div>
-      <div class="col-12 col-md-3 text-center">
-        <div class="stat-value" style="font-size:28px;"><%= botStats?.memoryUsage ? (botStats.memoryUsage / 1024 / 1024).toFixed(1) + ' MB' : '—' %></div>
-        <div class="text-muted">الذاكرة</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  // Search & Filter
-  const searchInput = document.getElementById('guildSearch');
-  const filterSelect = document.getElementById('guildFilter');
-  const cards = document.querySelectorAll('#guildGrid .guild-card');
-  
-  function filterCards() {
-    const query = searchInput.value.toLowerCase();
-    const filter = filterSelect.value;
-    cards.forEach(card => {
-      const name = card.dataset.name;
-      const isOwner = card.dataset.owner === 'true';
-      const matchesSearch = name.includes(query);
-      const matchesFilter = filter === 'all' || (filter === 'owner' && isOwner) || (filter === 'admin' && !isOwner);
-      card.style.display = (matchesSearch && matchesFilter) ? 'flex' : 'none';
-    });
-  }
-  
-  searchInput.addEventListener('input', filterCards);
-  filterSelect.addEventListener('change', filterCards);
-
-  // Leave Guild
-  async function leaveGuild(id, name) {
-    if (!confirm(`⚠️ هل أنت متأكد من إخراج البوت من "${name}"؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)) return;
-    
-    const btn = event.target;
-    const original = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    
-    try {
-      const res = await fetch('/api/guilds/' + id + '/leave', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-      const data = await res.json();
-      if (res.ok) { 
-        showToast('تمت المغادرة بنجاح ✅', 'success');
-        setTimeout(() => location.reload(), 1200);
-      } else { 
-        showToast(data.error || 'فشلت العملية — تأكد أن البوت متصل', 'danger');
-      }
-    } catch (e) {
-      showToast('البوت غير متصل حالياً', 'danger');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = original;
-    }
-  }
-
-  // Initialize tooltips
-  document.querySelectorAll('[title]').forEach(el => new bootstrap.Tooltip(el));
-</script>
+<% if (guilds.length > 0 && !guilds.some(g => g.owner)) { %>
+<div class="banner blue mt-4"><i class="bi bi-info-circle"></i> يعمل لديك صلاحية إدارة على السيرفرات أدناه — تفعيل الحماية يتطلب صلاحيات البوت كاملة في سيرفرك.</div>
+<% } %>
 
 <%- include('layout-bottom') %>

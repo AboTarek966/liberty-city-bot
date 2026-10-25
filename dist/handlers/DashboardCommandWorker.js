@@ -244,6 +244,103 @@ class DashboardCommandWorker {
                 await channel.send({ content: `✉️ **${payload.actor || 'لوحة التحكم'}**: ${payload.content || ''}` });
                 return { success: true };
             }
+            // ------------- إحصائيات وقنوات -------------
+            case 'ping': {
+                return { pong: true, at: new Date().toISOString() };
+            }
+            case 'guild_stats': {
+                const members = await guild.members.fetch();
+                const list = Array.from(members.values());
+                const isOnline = (m) => ['online', 'idle', 'dnd'].includes(m.presence?.status || 'offline');
+                return {
+                    memberCount: guild.memberCount,
+                    fetched: list.length,
+                    onlineCount: list.filter(isOnline).length,
+                    botCount: list.filter((m) => m.user?.bot).length,
+                    ownerTag: (await guild.fetchOwner().catch(() => null))?.user?.tag || null,
+                    roleCount: guild.roles.cache.size,
+                    channelCount: guild.channels.cache.size,
+                    textChannelCount: guild.channels.cache.filter((c) => c.type === 0).size,
+                    voiceChannelCount: guild.channels.cache.filter((c) => c.type === 2).size,
+                    categoryCount: guild.channels.cache.filter((c) => c.type === 4).size,
+                    boosts: guild.premiumSubscriptionCount || 0,
+                    boostLevel: guild.premiumTier ?? 0,
+                    icon: guild.icon || null,
+                    banner: guild.banner || null,
+                    createdAt: guild.createdAt?.toISOString() || null,
+                };
+            }
+            case 'channels_list': {
+                const channels = guild.channels.cache
+                    .sort((a, b) => (a.rawPosition - b.rawPosition))
+                    .map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type, // 0=text 2=voice 4=category 5=announcement 13=stage 15=forum
+                    parentId: c.parentId || null,
+                    position: c.rawPosition,
+                }));
+                return { channels };
+            }
+            case 'welcome_test': {
+                const channel = guild.channels.cache.get(payload.channelId);
+                if (!channel?.isTextBased())
+                    throw new Error('القناة غير موجودة');
+                const { GuildSettings } = require('../models');
+                const doc = await GuildSettings.findOne({ guildId }).lean();
+                const welcome = doc?.welcome || {};
+                const template = payload.message || welcome.message || 'أهلاً بك {member} في {server} 🎉';
+                const content = template
+                    .replace(/\{member\}/g, `@${payload.actor || 'عضو جديد'}`)
+                    .replace(/\{user\}/g, `@${payload.actor || 'عضو جديد'}`)
+                    .replace(/\{server\}/g, guild.name)
+                    .replace(/\{count\}/g, String(guild.memberCount));
+                await channel.send({ content: `🧪 **تجربة رسالة الترحيب:**\n${content}` });
+                return { success: true };
+            }
+            case 'broadcast': {
+                // إعلان جماعي — DM للكل أو رسالة في القنوات العامة
+                const { GuildSettings } = require('../models');
+                const dc = await GuildSettings.findOne({ guildId }).lean();
+                const type = payload.type === 'channel' ? 'channel' : 'dm';
+                const content = String(payload.content || '').slice(0, 1500);
+                if (!content)
+                    throw new Error('لا يوجد محتوى للإعلان');
+                let sent = 0, failed = 0;
+                const push = async (fid, at, sentBy, ok) => {
+                    await GuildSettings.updateOne({ guildId }, { $push: { 'protection.announcements.history': { type, content, at: at || new Date(), sentBy, sent: ok } } }).catch(() => { });
+                };
+                const at = new Date(), sentBy = payload.actor || 'لوحة التحكم';
+                if (type === 'dm') {
+                    const members = await guild.members.fetch();
+                    const targets = Array.from(members.filter((m) => !m.user?.bot).values());
+                    for (const m of targets) {
+                        try {
+                            await m.send({ content });
+                            sent++;
+                        }
+                        catch {
+                            failed++;
+                        }
+                        await new Promise((r) => setTimeout(r, 250)); // rate-limit آمن
+                    }
+                }
+                else {
+                    const chans = guild.channels.cache.filter((c) => c.type === 0 && c.permissionsFor(guild.members.me)?.has('SendMessages'));
+                    for (const [, c] of chans) {
+                        try {
+                            await c.send({ content });
+                            sent++;
+                        }
+                        catch {
+                            failed++;
+                        }
+                        await new Promise((r) => setTimeout(r, 400));
+                    }
+                }
+                await push(guildId, at, sentBy, true);
+                return { success: true, sent, failed, type };
+            }
             // ------------- أخرى -------------
             case 'guild_leave': {
                 await guild.leave();

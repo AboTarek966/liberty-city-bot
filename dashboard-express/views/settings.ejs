@@ -1,956 +1,308 @@
-﻿<%- include('layout-top', { title: 'الإعدادات', activePage: 'settings' }) %>
+﻿<%- include('layout-top', { title: 'الإعدادات العامة', activePage: 'settings' }) %>
 
-<div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+<% const S = settings || {}; const GID = guild.id; %>
+
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,var(--amber),var(--primary));display:grid;place-items:center;font-size:26px;"><i class="bi bi-sliders"></i></div>
   <div>
-    <h1 class="h3 fw-bold mb-1">
-      <i class="bi bi-gear me-2 text-primary"></i>
-      الإعدادات العامة
-    </h1>
-    <p class="text-muted mb-0">إعدادات البوت الأساسية للسيرفر</p>
+    <div class="h-title">الإعدادات العامة</div>
+    <div class="h-desc">هوية البوت والأنظمة الصغيرة — الجيل، السجن، التوثيق، الرول التلقائي، السجلات، الأوامر المخصصة</div>
+    <div class="h-chips">
+      <span class="chip purple"><i class="bi bi-command"></i> البادئة: <%= S.prefix || 'lb' %></span>
+      <span class="chip cyan"><i class="bi bi-person-lock"></i> توثيق: <%= S.verification?.enabled ? 'ON' : 'OFF' %></span>
+    </div>
   </div>
-  <button class="btn btn-primary btn-lg" onclick="saveAllSettings()">
-    <i class="bi bi-check-lg me-1"></i> حفظ جميع التغييرات
-  </button>
 </div>
 
-<ul class="nav nav-pills flex-wrap mb-4" role="tablist">
-  <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-general"><i class="bi bi-sliders me-1"></i> عام</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-automod"><i class="bi bi-shield me-1"></i> أوتومود</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-leveling"><i class="bi bi-graph-up me-1"></i> المستويات</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-verification"><i class="bi bi-patch-check me-1"></i> التوثيق</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-logging"><i class="bi bi-journal-text me-1"></i> السجلات</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-music"><i class="bi bi-music-note me-1"></i> الموسيقى</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-warnroles"><i class="bi bi-exclamation-circle me-1"></i> رولات التحذير</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-tickets"><i class="bi bi-ticket-perforated me-1"></i> التذاكر</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-commands"><i class="bi bi-terminal me-1"></i> أوامر مخصصة</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-ai"><i class="bi bi-robot me-1"></i> الذكاء الاصطناعي</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-backup"><i class="bi bi-hdd me-1"></i> النسخ الاحتياطي</button></li>
-</ul>
+<div class="tabs" data-group="set">
+  <button class="tab active" data-target="pane-general"><i class="bi bi-gear"></i> عام</button>
+  <button class="tab" data-target="pane-logging"><i class="bi bi-journal-text"></i> السجلات</button>
+  <button class="tab" data-target="pane-systems"><i class="bi bi-ui-checks"></i> أنظمة</button>
+  <button class="tab" data-target="pane-warn"><i class="bi bi-exclamation-square"></i> التحذيرات</button>
+  <button class="tab" data-target="pane-custom"><i class="bi bi-terminal"></i> أوامر ووسوم</button>
+</div>
 
-<div class="tab-content">
-  <!-- General Tab -->
-  <div class="tab-pane fade show active" id="tab-general">
-    <%
-      const genPrefix = settings?.prefix || 'lc!';
-      const genLang = settings?.language || 'ar';
-      const genTz = settings?.timezone || 'Asia/Riyadh';
-    %>
-    <div class="row g-4">
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-sliders me-2"></i> الإعدادات العامة</h5></div>
-          <div class="card-body">
-            <div class="mb-3">
-              <label class="form-label fw-bold">البادئة (Prefix)</label>
-              <input type="text" class="form-control" id="genPrefix" value="<%= genPrefix %>" maxlength="5">
-              <div class="form-text">البادئة المستخدمة للأوامر النصية</div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-bold">اللغة</label>
-              <select class="form-select" id="genLang">
-                <option value="ar" <%= genLang === 'ar' ? 'selected' : '' %>>العربية 🇸🇦</option>
-                <option value="en" <%= genLang === 'en' ? 'selected' : '' %>>English 🇬🇧</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-bold">المنطقة الزمنية</label>
-              <select class="form-select" id="genTz">
-                <option value="Asia/Riyadh" <%= genTz === 'Asia/Riyadh' ? 'selected' : '' %>>الرياض (GMT+3)</option>
-                <option value="Asia/Dubai" <%= genTz === 'Asia/Dubai' ? 'selected' : '' %>>دبي (GMT+4)</option>
-                <option value="Africa/Cairo" <%= genTz === 'Africa/Cairo' ? 'selected' : '' %>>القاهرة (GMT+2)</option>
-                <option value="Europe/London" <%= genTz === 'Europe/London' ? 'selected' : '' %>>لندن (GMT+0)</option>
-              </select>
-            </div>
+<div>
+<!-- ══════ عام ══════ -->
+<div class="tabpane active" data-group="set" id="pane-general">
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-sliders2"></i> الهوية العامة</h3></div>
+    <div class="card-body">
+      <div class="form-row-3">
+        <div class="field"><label>بادئة الأوامر</label><input class="inp" data-text="prefix" value="<%= S.prefix || 'lb' %>" maxlength="5"></div>
+        <div class="field"><label>لغة البوت</label>
+          <select class="inp" data-text="language">
+            <% [['ar', 'العربية'], ['en', 'English']].forEach(l => { %><option value="<%= l[0] %>" <%= (S.language || 'ar') === l[0] ? 'selected' : '' %>><%= l[1] %></option><% }) %>
+          </select>
+        </div>
+        <div class="field"><label>المنطقة الزمنية</label>
+          <select class="inp" data-text="timezone">
+            <% [['Asia/Riyadh', 'الرياض'], ['Africa/Cairo', 'القاهرة'], ['Asia/Dubai', 'دبي'], ['Asia/Baghdad', 'بغداد'], ['UTC', 'UTC']].forEach(t => { %><option value="<%= t[0] %>" <%= (S.timezone || 'Asia/Riyadh') === t[0] ? 'selected' : '' %>><%= t[1] %></option><% }) %>
+          </select>
+        </div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>⛽ كلمة مرور الإعدادات (بالبوت)</label><input class="inp" data-text="settingsPassword" value="<%= S.settingsPassword || '' %>" maxlength="12" placeholder="7421"></div>
+        <div class="field">
+          <label>🎤 نظام موسيقى</label>
+          <div class="spread" style="background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 13px;">
+            <span style="font-size:12.5px;font-weight:700;" class="text-mid">تشغيل الصوت في الرومات الصوتية</span>
+            <label class="switch"><input type="checkbox" data-toggle="music.enabled" <%= S.music?.enabled ? 'checked' : '' %>><span class="track"></span></label>
           </div>
         </div>
       </div>
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-info-circle me-2"></i> معلومات السيرفر</h5></div>
-          <div class="card-body">
-            <% const g = guild; %>
-            <div class="mb-3">
-              <label class="form-label small">اسم السيرفر</label>
-              <input type="text" class="form-control" value="<%= g?.name || '—' %>" disabled>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small">سيرفر ID</label>
-              <input type="text" class="form-control" value="<%= g?.id || '—' %>" disabled>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small">عدد الأعضاء</label>
-              <input type="text" class="form-control" value="<%= stats?.memberCount || '—' %>" disabled>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small">عدد القنوات</label>
-              <input type="text" class="form-control" value="<%= stats?.channelCount || '—' %>" disabled>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small">عدد الرولات</label>
-              <input type="text" class="form-control" value="<%= stats?.roleCount || '—' %>" disabled>
-            </div>
-          </div>
-        </div>
-      </div>
+
+      <div class="sec-title"><i class="bi bi-broadcast"></i> التدفق المباشر (Snipe)</div>
+      <label class="field-check" style="max-width:420px;"><input type="checkbox" data-toggle="snipe.enabled" <%= S.snipe?.enabled !== false ? 'checked' : '' %>><span>سنايب — استرجاع آخر رسالة محذوفة بأمر /snipe</span></label>
     </div>
   </div>
+</div>
 
-  <!-- AutoMod Tab -->
-  <div class="tab-pane fade" id="tab-automod">
-    <%
-      const am = settings?.automod || {};
-    %>
+<!-- ══════ السجلات ══════ -->
+<div class="tabpane" data-group="set" id="pane-logging">
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-journal-text"></i> السجلات</h3>
+      <div class="head-side">
+        <span class="chip <%= S.logging?.enabled ? 'green' : '' %>"><%= S.logging?.enabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="logging.enabled" <%= S.logging?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="field"><label>القناة الرئيسية <span class="hint">كل الأحداث بدون قناة مخصصة</span></label>
+          <select class="inp chan-sel" data-text="logging.channelId" data-types="0,5" data-value="<%= S.logging?.channelId || '' %>"></select>
+        </div>
+      </div>
+      <div class="sec-title"><i class="bi bi-diagram-3"></i> تقسيم: كل نوع حدث في قناته</div>
+      <div class="form-row-3">
+        <% const LOG_TYPES = [['messages', 'الرسائل', 'chat-right'], ['members', 'الأعضاء (دخول/خروج)', 'people'], ['roles', 'الرولات', 'person-badge'], ['channels', 'الرومات', 'hash'], ['voice', 'الصوتي', 'mic'], ['moderation', 'الإشراف', 'hammer'], ['tickets', 'التذاكر', 'lifebuoy'], ['economy', 'الاقتصاد', 'coin'], ['server', 'السيرفر', 'hdd'], ['ai', 'الذكاء الاصطناعي', 'stars']]; %>
+        <% LOG_TYPES.forEach(t => { const cur = (S.logging?.channels || {})[t[0]] || ''; %>
+        <div class="field"><label><i class="bi bi-<%= t[2] %>"></i> <%= t[1] %></label>
+          <select class="inp chan-sel" data-text="logging.channels.<%= t[0] %>" data-types="0,5" data-value="<%= cur %>"></select>
+        </div>
+        <% }) %>
+      </div>
+      <div class="label" style="font-size:11px;color:var(--text-3);font-weight:600;margin-top:12px;">تركها فارغة = تذهب للقناة الرئيسية. الأحداث تُرسل فور واقعها.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ أنظمة ══════ -->
+<div class="tabpane" data-group="set" id="pane-systems">
+  <div class="grid-2 mb-3">
     <div class="card">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-shield me-2"></i> أوتومود — الفلترة التلقائية</h5></div>
+      <div class="card-head">
+        <h3><i class="bi bi-person-fill-add"></i> الرول التلقائي (Autorole)</h3>
+        <div class="head-side">
+          <span class="chip <%= S.autorole?.enabled ? 'green' : '' %>"><%= S.autorole?.enabled ? 'ON' : 'OFF' %></span>
+          <label class="switch"><input type="checkbox" data-toggle="autorole.enabled" <%= S.autorole?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+        </div>
+      </div>
       <div class="card-body">
-        <div class="form-check form-switch mb-4">
-          <input class="form-check-input" type="checkbox" id="amEnabled" <%= am.enabled !== false ? 'checked' : '' %>>
-          <label class="form-check-label fw-bold fs-5" for="amEnabled">تفعيل أوتومود</label>
-        </div>
-        <div class="mb-4">
-          <label class="form-label fw-bold">الكلمات المحظورة</label>
-          <textarea class="form-control" id="amBadWords" rows="3" placeholder="كلمة1&#10;كلمة2&#10;كلمة3"><%= (am.badWords || []).join('\n') %></textarea>
-          <div class="form-text">كل كلمة في سطر مستقل</div>
-        </div>
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-4">
-            <label class="form-label">إجراء الكلمات المحظورة</label>
-            <select class="form-select" id="amBadWordsAction">
-              <option value="delete" <%= am.badWordsAction === 'delete' ? 'selected' : '' %>>حذف</option>
-              <option value="warn" <%= am.badWordsAction === 'warn' ? 'selected' : '' %>>تحذير</option>
-              <option value="mute" <%= am.badWordsAction === 'mute' ? 'selected' : '' %>>كتم</option>
-              <option value="kick" <%= am.badWordsAction === 'kick' ? 'selected' : '' %>>طرد</option>
-              <option value="ban" <%= am.badWordsAction === 'ban' ? 'selected' : '' %>>حظر</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">مدة الكتم (مللي ثانية)</label>
-            <input type="number" class="form-control" id="amBadWordsDuration" value="<%= am.badWordsDuration || 600000 %>" min="0">
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="form-check form-switch mt-4">
-              <input class="form-check-input" type="checkbox" id="amZalgo" <%= am.zalgoEnabled !== false ? 'checked' : '' %>>
-              <label class="form-check-label" for="amZalgo">مكافحة Zalgo</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">إجراء Zalgo</label>
-            <select class="form-select" id="amZalgoAction">
-              <option value="delete" <%= am.zalgoAction === 'delete' ? 'selected' : '' %>>حذف</option>
-              <option value="warn" <%= am.zalgoAction === 'warn' ? 'selected' : '' %>>تحذير</option>
-              <option value="mute" <%= am.zalgoAction === 'mute' ? 'selected' : '' %>>كتم</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">رولات مستثناة (IDs مفصولة بفاصلة)</label>
-            <input type="text" class="form-control" id="amIgnoredRoles" value="<%= (am.ignoredRoles || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">قنوات مستثناة (IDs مفصولة بفاصلة)</label>
-            <input type="text" class="form-control" id="amIgnoredChannels" value="<%= (am.ignoredChannels || []).join(',') %>" placeholder="123,456">
-          </div>
+        <div class="field"><label>الرول الذي يُعطى عند الانضمام</label>
+          <select class="inp role-sel" data-text="autorole.roleId" data-value="<%= S.autorole?.roleId || '' %>"></select>
+          <div class="text-dim" style="font-size:10.5px;">أنشئه على البوت أعلى من جميع الرولات لتعمل بدون مشاكل</div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Leveling Tab -->
-  <div class="tab-pane fade" id="tab-leveling">
-    <%
-      const lv = settings?.leveling || {};
-    %>
-    <div class="row g-4">
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-graph-up me-2"></i> إعدادات المستويات</h5></div>
-          <div class="card-body">
-            <div class="form-check form-switch mb-3">
-              <input class="form-check-input" type="checkbox" id="lvEnabled" <%= lv.enabled !== false ? 'checked' : '' %>>
-              <label class="form-check-label fw-bold" for="lvEnabled">تفعيل نظام المستويات</label>
-            </div>
-            <div class="row g-3 mb-3">
-              <div class="col-6">
-                <label class="form-label">خبرة لكل رسالة</label>
-                <input type="number" class="form-control" id="lvXpPerMsg" value="<%= lv.xpPerMessage || 15 %>" min="0">
-              </div>
-              <div class="col-6">
-                <label class="form-label">مهلة الخبرة (مللي ثانية)</label>
-                <input type="number" class="form-control" id="lvXpCooldown" value="<%= lv.xpCooldown || 60000 %>" min="0">
-              </div>
-              <div class="col-6">
-                <label class="form-label">مضاعف الخبرة</label>
-                <input type="number" class="form-control" id="lvMultiplier" value="<%= lv.xpGainMultiplier || 1 %>" step="0.1" min="0">
-              </div>
-              <div class="col-6">
-                <label class="form-label">خبرة الصوت/دقيقة</label>
-                <input type="number" class="form-control" id="lvVoiceXp" value="<%= lv.voiceXpPerMinute || 10 %>" min="0">
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">قناة الترقية (اختياري)</label>
-              <input type="text" class="form-control" id="lvLevelChannel" value="<%= lv.levelUpChannelId || '' %>" placeholder="Channel ID">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">رسالة الترقية</label>
-              <textarea class="form-control" id="lvLevelMsg" rows="2"><%= lv.levelUpMessage || 'تهانينا {user}! لقد وصلت للمستوى {level} 🎉' %></textarea>
-              <div class="form-text">المتغيرات: {user} {level}</div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">نمط رسالة الترقية</label>
-              <select class="form-select" id="lvLevelStyle">
-                <option value="embed" <%= lv.levelUpStyle === 'embed' ? 'selected' : '' %>>Embed احترافي</option>
-                <option value="text" <%= lv.levelUpStyle === 'text' ? 'selected' : '' %>>نص عادي</option>
-              </select>
-            </div>
-            <div class="row g-3">
-              <div class="col-6">
-                <label class="form-label">عنوان الإمبد</label>
-                <input type="text" class="form-control" id="lvLevelTitle" value="<%= lv.levelUpTitle || '🎉 ترقية جديدة!' %>">
-              </div>
-              <div class="col-6">
-                <label class="form-label">لون الإمبد</label>
-                <input type="color" class="form-control form-control-color" id="lvLevelColor" value="<%= lv.levelUpColor || '#e67e22' %>">
-              </div>
-            </div>
-            <div class="mt-3">
-              <label class="form-label">قنوات مستثناة (IDs مفصولة بفاصلة)</label>
-              <input type="text" class="form-control" id="lvIgnoredChannels" value="<%= (lv.ignoredChannels || []).join(',') %>" placeholder="123,456">
-            </div>
-            <div class="mt-3">
-              <label class="form-label">رولات مستثناة (IDs مفصولة بفاصلة)</label>
-              <input type="text" class="form-control" id="lvIgnoredRoles" value="<%= (lv.ignoredRoles || []).join(',') %>" placeholder="123,456">
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-trophy me-2"></i> مكافآت المستويات</h5>
-          </div>
-          <div class="card-body">
-            <div id="levelRewards">
-              <% const rewards = lv.levelRewards || []; %>
-              <% if (rewards.length > 0) { rewards.forEach((r, i) => { %>
-              <div class="input-group mb-2" data-idx="<%= i %>">
-                <span class="input-group-text">المستوى</span>
-                <input type="number" class="form-control" style="width: 80px;" value="<%= r.level %>" min="1" data-field="level">
-                <span class="input-group-text">الرول</span>
-                <input type="text" class="form-control" value="<%= r.roleId %>" placeholder="Role ID" data-field="roleId">
-                <button class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()"><i class="bi bi-trash"></i></button>
-              </div>
-              <% }) } %>
-            </div>
-            <button class="btn btn-outline-primary w-100 mt-2" onclick="addLevelReward()">
-              <i class="bi bi-plus-circle me-1"></i> إضافة مكافأة
-            </button>
-            <hr>
-            <h6 class="fw-bold mb-3">رول الترحيب (Autorole)</h6>
-            <%
-              const ar = settings?.autorole || {};
-            %>
-            <div class="form-check form-switch mb-2">
-              <input class="form-check-input" type="checkbox" id="arEnabled" <%= ar.enabled ? 'checked' : '' %>>
-              <label class="form-check-label" for="arEnabled">تفعيل الرول التلقائي عند الانضمام</label>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">الرول (Role ID)</label>
-              <input type="text" class="form-control" id="arRoleId" value="<%= ar.roleId || '' %>" placeholder="123456789">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Verification Tab -->
-  <div class="tab-pane fade" id="tab-verification">
-    <%
-      const ver = settings?.verification || {};
-    %>
-    <div class="row g-4">
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-patch-check me-2"></i> نظام التوثيق</h5></div>
-          <div class="card-body">
-            <div class="form-check form-switch mb-4">
-              <input class="form-check-input" type="checkbox" id="verEnabled" <%= ver.enabled ? 'checked' : '' %>>
-              <label class="form-check-label fw-bold fs-5" for="verEnabled">تفعيل التوثيق</label>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">قناة التوثيق (Channel ID)</label>
-              <input type="text" class="form-control" id="verChannel" value="<%= ver.channelId || '' %>" placeholder="123456789">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">رول التوثيق (Role ID)</label>
-              <input type="text" class="form-control" id="verRole" value="<%= ver.roleId || '' %>" placeholder="123456789">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">العنوان</label>
-              <input type="text" class="form-control" id="verTitle" value="<%= ver.title || '✅ توثيق العضوية' %>">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">الوصف</label>
-              <textarea class="form-control" id="verDesc" rows="3"><%= ver.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو والقدرة على التفاعل في السيرفر' %></textarea>
-            </div>
-            <div class="row g-3">
-              <div class="col-6">
-                <label class="form-label">نص الزر</label>
-                <input type="text" class="form-control" id="verBtnLabel" value="<%= ver.buttonLabel || 'توثيق' %>">
-              </div>
-              <div class="col-6">
-                <label class="form-label">إيموجي الزر</label>
-                <input type="text" class="form-control" id="verBtnEmoji" value="<%= ver.buttonEmoji || '✅' %>" maxlength="4">
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-eye me-2"></i> معاينة</h5></div>
-          <div class="card-body d-flex align-items-center justify-content-center">
-            <div class="card text-center" style="max-width: 400px;">
-              <div class="card-body">
-                <h5 class="fw-bold mb-2"><%= ver.title || '✅ توثيق العضوية' %></h5>
-                <p class="text-muted mb-3"><%= ver.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو' %></p>
-                <button class="btn btn-primary"><%= ver.buttonEmoji || '✅' %> <%= ver.buttonLabel || 'توثيق' %></button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Logging Tab -->
-  <div class="tab-pane fade" id="tab-logging">
-    <%
-      const lg = settings?.logging || {};
-      const allTypes = ['messageDelete', 'messageEdit', 'memberJoin', 'memberLeave', 'memberBan', 'memberUnban', 'memberKick', 'memberMute', 'roleCreate', 'roleDelete', 'roleUpdate', 'channelCreate', 'channelDelete', 'channelUpdate', 'emojiCreate', 'emojiDelete', 'voiceJoin', 'voiceLeave', 'voiceMove', 'nicknameChange', 'avatarChange', 'nameChange', 'prune', 'inviteCreate', 'inviteDelete'];
-      const activeTypes = lg.types || [];
-    %>
     <div class="card">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-journal-text me-2"></i> إعدادات السجلات</h5></div>
+      <div class="card-head">
+        <h3><i class="bi bi-person-rolodex"></i> التوثيق (Verification)</h3>
+        <div class="head-side">
+          <span class="chip <%= S.verification?.enabled ? 'green' : '' %>"><%= S.verification?.enabled ? 'ON' : 'OFF' %></span>
+          <label class="switch"><input type="checkbox" data-toggle="verification.enabled" <%= S.verification?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+        </div>
+      </div>
       <div class="card-body">
-        <div class="form-check form-switch mb-4">
-          <input class="form-check-input" type="checkbox" id="lgEnabled" <%= lg.enabled !== false ? 'checked' : '' %>>
-          <label class="form-check-label fw-bold fs-5" for="lgEnabled">تفعيل السجلات</label>
+        <div class="form-row">
+          <div class="field"><label>قناة التوثيق</label><select class="inp chan-sel" data-text="verification.channelId" data-types="0,5" data-value="<%= S.verification?.channelId || '' %>"></select></div>
+          <div class="field"><label>الرول بعد التوثيق</label><select class="inp role-sel" data-text="verification.roleId" data-value="<%= S.verification?.roleId || '' %>"></select></div>
         </div>
-        <div class="mb-4">
-          <label class="form-label fw-bold">القناة الرئيسية للسجلات</label>
-          <input type="text" class="form-control" id="lgChannel" value="<%= lg.channelId || '' %>" placeholder="Channel ID">
+        <div class="form-row mt-3">
+          <div class="field"><label>عنوان البانل</label><input class="inp" data-text="verification.title" value="<%= S.verification?.title || 'توثيق الهوية' %>"></div>
+          <div class="field"><label>نص زر التوثيق</label><input class="inp" data-text="verification.buttonLabel" value="<%= S.verification?.buttonLabel || '✅ توثيق' %>"></div>
         </div>
-        <h6 class="fw-bold mb-3">أنواع الأحداث المُسجلة:</h6>
-        <div class="row g-2">
-          <% allTypes.forEach(t => { %>
-          <div class="col-12 col-md-6 col-lg-4">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="<%= t %>" id="lg_<%= t %>" <%= activeTypes.includes(t) ? 'checked' : '' %>>
-              <label class="form-check-label small" for="lg_<%= t %>"><%= t %></label>
-            </div>
-          </div>
-          <% }) %>
-        </div>
-        <div class="mt-4 row g-3">
-          <div class="col-12 col-md-6">
-            <label class="form-label">قنوات مستثناة (IDs مفصولة بفاصلة)</label>
-            <input type="text" class="form-control" id="lgIgnoredChannels" value="<%= (lg.ignoredChannels || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label">رولات مستثناة (IDs مفصولة بفاصلة)</label>
-            <input type="text" class="form-control" id="lgIgnoredRoles" value="<%= (lg.ignoredRoles || []).join(',') %>" placeholder="123,456">
-          </div>
-        </div>
+        <div class="field mt-3"><label>وصف البانل</label><textarea class="inp" style="min-height:64px;" data-text="verification.description" placeholder="اضغط الزر أدناه للحصول على صلاحيات الكتابة"><%= S.verification?.description || '' %></textarea></div>
+        <div class="text-dim" style="font-size:11.5px;">للتطبيق النهائي: أعد نشر البانل بالبوت (/setup verification)</div>
       </div>
     </div>
   </div>
 
-  <!-- Music Tab -->
-  <div class="tab-pane fade" id="tab-music">
-    <%
-      const mu = settings?.music || {};
-    %>
+  <div class="card mb-3">
+    <div class="card-head">
+      <h3><i class="bi bi-lock"></i> السجن (Jail)</h3>
+      <div class="head-side">
+        <span class="chip <%= S.jail?.enabled ? 'green' : '' %>"><%= S.jail?.enabled ? 'ON' : 'OFF' %></span>
+        <label class="switch"><input type="checkbox" data-toggle="jail.enabled" <%= S.jail?.enabled ? 'checked' : '' %>><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="field"><label>روم السجن <span class="hint">اكتب هنا فقط المسجون</span></label><select class="inp chan-sel" data-text="jail.channelId" data-types="0" data-value="<%= S.jail?.channelId || '' %>"></select></div>
+        <div class="field"><label>رول السجن <span class="hint">يدخل في القناة المسجونين فقط</span></label><select class="inp role-sel" data-text="jail.jailRoleId" data-value="<%= S.jail?.jailRoleId || '' %>"></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-tags"></i> التفاعل السريع — قوائم الرتب (اقرأ فقط)</h3></div>
+    <div class="card-body tight">
+      <% const rr = S.reactionRoles || []; const rm = S.roleMenus || []; %>
+      <% if (!rr.length && !rm.length) { %>
+        <div class="empty"><i class="bi bi-tags2"></i><h4>لا قوائم رتب بعد</h4><p>سبق أن أنشأتها بالبوت (+reaction) — ستظهر هنا للمراجعة</p></div>
+      <% } else { %>
+        <% rr.forEach(r => { %>
+          <div class="feat"><div class="f-ico" style="background:var(--blue-soft);color:var(--blue);"><i class="bi bi-hand-index-thumb"></i></div>
+            <div class="f-info"><div class="f-name">قائمة رتب بالتفاعل</div><div class="f-desc"><code class="code-cell">#<%= r.channelId %></code> · رسالة <code class="code-cell"><%= r.messageId %></code> · <%= (r.roles||[]).length %> رول</div></div>
+            <a class="btn sm" target="_blank" href="https://discord.com/channels/<%= GID %>/<%= r.channelId %>/<%= r.messageId %>"><i class="bi bi-box-arrow-up-right"></i></a>
+          </div>
+        <% }) %>
+        <% rm.forEach(r => { %>
+          <div class="feat"><div class="f-ico" style="background:var(--purple-soft);color:var(--primary-2);"><i class="bi bi-menu-button"></i></div>
+            <div class="f-info"><div class="f-name">قائمة رولات بالأزرار: <%= r.title %></div><div class="f-desc"><code class="code-cell">#<%= r.channelId %></code> · <%= (r.roleIds||[]).length %> رول</div></div>
+            <a class="btn sm" target="_blank" href="https://discord.com/channels/<%= GID %>/<%= r.channelId %>/<%= r.messageId %>"><i class="bi bi-box-arrow-up-right"></i></a>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ التحذيرات ══════ -->
+<div class="tabpane" data-group="set" id="pane-warn">
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-exclamation-square"></i> رولات التحذيرات</h3></div>
+    <div class="card-body">
+      <div class="form-row-3">
+        <div class="field"><label>تحذير الإداري الأول</label><select class="inp role-sel" data-text="warnRoles.adminSequential.role1Id" data-value="<%= S.warnRoles?.adminSequential?.role1Id || '' %>"></select></div>
+        <div class="field"><label>التحذير الثاني</label><select class="inp role-sel" data-text="warnRoles.adminSequential.role2Id" data-value="<%= S.warnRoles?.adminSequential?.role2Id || '' %>"></select></div>
+        <div class="field"><label>التحذير الثالث</label><select class="inp role-sel" data-text="warnRoles.adminSequential.role3Id" data-value="<%= S.warnRoles?.adminSequential?.role3Id || '' %>"></select></div>
+      </div>
+      <div class="form-row mt-3">
+        <div class="field"><label>رولات تحذير الأعضاء (سنبل بفاصلة)</label><input class="inp" data-array="warnRoles.memberIds" value="<%= (S.warnRoles?.memberIds || []).join(',') %>" placeholder="ID, ID"></div>
+        <div class="field"><label>رولات تحذير الإداريين (توافق قديم)</label><input class="inp" data-array="warnRoles.adminIds" value="<%= (S.warnRoles?.adminIds || []).join(',') %>"></div>
+      </div>
+      <div class="text-dim mt-3" style="font-size:11.5px;">عند /warn يعرض البوت اختيار رول التحذير — النظام التسلسلي يلحق رول الثالث، نهايته بالحظر.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ أوامر ووسوم ══════ -->
+<div class="tabpane" data-group="set" id="pane-custom">
+  <div class="grid-2">
     <div class="card">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-music-note me-2"></i> نظام الموسيقى</h5></div>
-      <div class="card-body">
-        <div class="form-check form-switch mb-4">
-          <input class="form-check-input" type="checkbox" id="muEnabled" <%= mu.enabled !== false ? 'checked' : '' %>>
-          <label class="form-check-label fw-bold fs-5" for="muEnabled">تفعيل الموسيقى</label>
-        </div>
-        <div class="row g-3 mb-3">
-          <div class="col-12 col-md-4">
-            <label class="form-label">مستوى الصوت الافتراضي</label>
-            <input type="range" class="form-range" min="1" max="200" value="<%= mu.defaultVolume || 100 %>" id="muVolume" oninput="document.getElementById('muVolumeVal').textContent=this.value">
-            <div class="text-center"><span class="fw-bold" id="muVolumeVal"><%= mu.defaultVolume || 100 %></span>%</div>
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">حد أقصى لطابور التشغيل</label>
-            <input type="number" class="form-control" id="muMaxQueue" value="<%= mu.maxQueueSize || 50 %>" min="1" max="500">
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="form-check form-switch mt-4">
-              <input class="form-check-input" type="checkbox" id="muAutoplay" <%= mu.autoplay ? 'checked' : '' %>>
-              <label class="form-check-label" for="muAutoplay">التشغيل التلقائي</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="muAllowDJ" <%= mu.allowDJ ? 'checked' : '' %>>
-              <label class="form-check-label" for="muAllowDJ">رول DJ خاص</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">رول DJ (Role ID)</label>
-            <input type="text" class="form-control" id="muDjRole" value="<%= mu.djRoleId || '' %>" placeholder="123456789" <%= !mu.allowDJ ? 'disabled' : '' %>>
-          </div>
-        </div>
+      <div class="card-head">
+        <h3><i class="bi bi-terminal"></i> أوامر مخصصة</h3>
+        <div class="head-side"><button class="btn sm primary" onclick="newCmd()"><i class="bi bi-plus-lg"></i> جديدة</button></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Warn Roles Tab -->
-  <div class="tab-pane fade" id="tab-warnroles">
-    <%
-      const wr = settings?.warnRoles || {};
-      const adminSeq = wr.adminSequential || {};
-    %>
-    <div class="row g-4">
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-exclamation-circle me-2"></i> رولات تحذير الأعضاء</h5></div>
-          <div class="card-body">
-            <p class="text-muted small">الرولات التي تظهر عند تحذير عضو عادي</p>
-            <div id="memberWarnRoles">
-              <% const memberRoles = wr.memberIds || []; memberRoles.forEach((r, i) => { %>
-              <div class="input-group mb-2">
-                <input type="text" class="form-control" value="<%= r %>" placeholder="Role ID" data-field="memberIds">
-                <button class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()"><i class="bi bi-trash"></i></button>
-              </div>
-              <% }) %>
+      <div class="card-body tight" id="cmdList">
+        <% const cmds = S.customCommands || []; %>
+        <% if (!cmds.length) { %><div class="empty" style="padding:26px;"><i class="bi bi-terminal"></i><h4>لا أوامر مخصصة</h4><p>أضف أمراً مثل /lb قوانين يعطي رداً جاهزاً</p></div><% } %>
+        <% cmds.forEach(c => { %>
+          <div class="feat" data-cmd="<%= c.name %>">
+            <div class="f-ico" style="background:var(--cyan-soft);color:var(--cyan);"><i class="bi bi-slash-square"></i></div>
+            <div class="f-info">
+              <div class="f-name"><span class="code-cell">/<%= c.name %></span> <span class="chip <%= c.scope === 'admin' || c.embed ? 'blue' : '' %>"><%= c.scope === 'admin' ? 'إداريون' : 'الجميع' %></span></div>
+              <div class="f-desc"><%= (c.content || '').slice(0, 60) %></div>
             </div>
-            <button class="btn btn-outline-primary w-100 mt-2" onclick="addWarnRole('memberIds')"><i class="bi bi-plus-circle me-1"></i> إضافة رول</button>
+            <button class="btn sm danger" onclick="delCmd('<%= c.name %>')"><i class="bi bi-trash"></i></button>
           </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i> رولات تحذير الإداريين (التسلسلي)</h5></div>
-          <div class="card-body">
-            <p class="text-muted small">رولات تُضاف تسلسلياً: تحذير 1 → رول 1، تحذير 2 → رول 2، تحذير 3 → رول 3</p>
-            <div class="mb-3">
-              <label class="form-label">رول التحذير الأول</label>
-              <input type="text" class="form-control" id="wrRole1" value="<%= adminSeq.role1Id || '' %>" placeholder="Role ID">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">رول التحذير الثاني</label>
-              <input type="text" class="form-control" id="wrRole2" value="<%= adminSeq.role2Id || '' %>" placeholder="Role ID">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">رول التحذير الثالث</label>
-              <input type="text" class="form-control" id="wrRole3" value="<%= adminSeq.role3Id || '' %>" placeholder="Role ID">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tickets Tab -->
-  <div class="tab-pane fade" id="tab-tickets">
-    <%
-      const tk = settings?.tickets || {};
-    %>
-    <div class="card">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-ticket-perforated me-2"></i> إعدادات التذاكر</h5></div>
-      <div class="card-body">
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-4">
-            <label class="form-label">التصنيف (Category ID)</label>
-            <input type="text" class="form-control" id="tkCategory" value="<%= tk.categoryId || '' %>" placeholder="123456789">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">قناة السجل (Log Channel ID)</label>
-            <input type="text" class="form-control" id="tkLogChannel" value="<%= tk.logChannelId || '' %>" placeholder="123456789">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">قناة النسخ (Transcript ID)</label>
-            <input type="text" class="form-control" id="tkTranscript" value="<%= tk.transcriptChannelId || '' %>" placeholder="123456789">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">رولات الدعم (IDs مفصولة بفاصلة)</label>
-            <input type="text" class="form-control" id="tkSupportRoles" value="<%= (tk.supportRoleIds || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">رولات الإدارة العليا</label>
-            <input type="text" class="form-control" id="tkAdminRoles" value="<%= (tk.adminRoleIds || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">حد التذاكر لكل مستخدم</label>
-            <input type="number" class="form-control" id="tkMaxPerUser" value="<%= tk.maxPerUser || 3 %>" min="1" max="20">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">إغلاق تلقائي بعد (ساعات)</label>
-            <input type="number" class="form-control" id="tkAutoClose" value="<%= tk.autoCloseHours || 24 %>" min="1" max="720">
-          </div>
-        </div>
-        <div class="row g-3">
-          <div class="col-12 col-md-6 col-lg-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="tkSurvey" <%= tk.surveyEnabled !== false ? 'checked' : '' %>>
-              <label class="form-check-label" for="tkSurvey">استبيان الرضا (نجوم)</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-6 col-lg-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="tkLockClaim" <%= tk.lockUntilClaim ? 'checked' : '' %>>
-              <label class="form-check-label" for="tkLockClaim">قفل حتى الاستلام</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-6 col-lg-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="tkWelcome" <%= tk.welcomeEnabled ? 'checked' : '' %>>
-              <label class="form-check-label" for="tkWelcome">رسالة ترحيب داخل التذكرة</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-6 col-lg-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="tkAutoMsg" <%= tk.autoMessageEnabled ? 'checked' : '' %>>
-              <label class="form-check-label" for="tkAutoMsg">رسالة تلقائية</label>
-            </div>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">الرسالة التلقائية</label>
-          <textarea class="form-control" id="tkAutoMsgText" rows="3"><%= tk.autoMessage || '' %></textarea>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Custom Commands Tab -->
-  <div class="tab-pane fade" id="tab-commands">
-    <div class="card mb-4">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-terminal me-2"></i> الأوامر المخصصة</h5>
-        <button class="btn btn-primary btn-sm" onclick="showAddCmdModal()"><i class="bi bi-plus-circle me-1"></i> إضافة أمر</button>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0" id="cmdTable">
-            <thead>
-              <tr><th>الأمر</th><th>المحتوى</th><th>النوع</th><th>المستخدمات</th><th style="width:100px;">إجراءات</th></tr>
-            </thead>
-            <tbody>
-              <% const cmds = settings?.customCommands || []; %>
-              <% if (cmds.length > 0) { cmds.forEach(c => { %>
-              <tr>
-                <td><code class="fw-bold"><%= settings?.prefix || 'lc!' %><%= c.name %></code></td>
-                <td class="small text-truncate" style="max-width: 300px;"><%= c.content %></td>
-                <td><span class="badge bg-<%= c.embed ? 'info' : 'secondary' %>"><%= c.embed ? 'Embed' : 'نص' %></span></td>
-                <td><%= c.uses || 0 %></td>
-                <td>
-                  <button class="btn btn-outline-danger btn-sm" onclick="deleteCmd('<%= c.name %>')"><i class="bi bi-trash"></i></button>
-                </td>
-              </tr>
-              <% }) } else { %>
-              <tr><td colspan="5" class="text-center py-4 text-muted">لا توجد أوامر مخصصة</td></tr>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
+        <% }) %>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-tag me-2"></i> التاجات (Tags)</h5>
-        <button class="btn btn-primary btn-sm" onclick="showAddTagModal()"><i class="bi bi-plus-circle me-1"></i> إضافة تاج</button>
+      <div class="card-head">
+        <h3><i class="bi bi-bookmark-star"></i> الوسوم (Tags)</h3>
+        <div class="head-side"><button class="btn sm primary" onclick="newTag()"><i class="bi bi-plus-lg"></i> جديد</button></div>
       </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0" id="tagTable">
-            <thead><tr><th>الاسم</th><th>المحتوى</th><th>المستخدمات</th><th style="width:100px;">إجراءات</th></tr></thead>
-            <tbody>
-              <% const tags = settings?.tags || []; %>
-              <% if (tags.length > 0) { tags.forEach(t => { %>
-              <tr>
-                <td><code class="fw-bold"><%= t.name %></code></td>
-                <td class="small text-truncate" style="max-width: 300px;"><%= t.content %></td>
-                <td><%= t.uses || 0 %></td>
-                <td><button class="btn btn-outline-danger btn-sm" onclick="deleteTag('<%= t.name %>')"><i class="bi bi-trash"></i></button></td>
-              </tr>
-              <% }) } else { %>
-              <tr><td colspan="4" class="text-center py-4 text-muted">لا توجد تاجات</td></tr>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Command Modal -->
-    <div class="modal fade" id="addCmdModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">إضافة أمر مخصص</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-          <div class="modal-body">
-            <div class="mb-3"><label class="form-label">اسم الأمر</label><input type="text" class="form-control" id="cmdName" placeholder="مرحبا"></div>
-            <div class="mb-3"><label class="form-label">المحتوى</label><textarea class="form-control" id="cmdContent" rows="4" placeholder="مرحباً {user}! 👋"></textarea></div>
-            <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="cmdEmbed"><label class="form-check-label" for="cmdEmbed">إرسال كـ Embed</label></div>
+      <div class="card-body tight" id="tagList">
+        <% const tags = S.tags || []; %>
+        <% if (!tags.length) { %><div class="empty" style="padding:26px;"><i class="bi bi-tags2"></i><h4>لا وسوم بعد</h4><p>وسم = رد سريع باسم مثل «قوانين»</p></div><% } %>
+        <% tags.forEach(t => { %>
+          <div class="feat" data-tag="<%= t.name %>">
+            <div class="f-ico" style="background:var(--purple-soft);color:var(--primary-2);"><i class="bi bi-bookmark"></i></div>
+            <div class="f-info"><div class="f-name"><%= t.name %> <span class="chip">استُخدم <%= t.uses || 0 %></span></div><div class="f-desc"><%= (t.content || '').slice(0, 60) %></div></div>
+            <button class="btn sm danger" onclick="delTag('<%= t.name %>')"><i class="bi bi-trash"></i></button>
           </div>
-          <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" onclick="addCmd()">إضافة</button></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Tag Modal -->
-    <div class="modal fade" id="addTagModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title">إضافة تاج</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-          <div class="modal-body">
-            <div class="mb-3"><label class="form-label">اسم التاج</label><input type="text" class="form-control" id="tagName" placeholder="قوانين"></div>
-            <div class="mb-3"><label class="form-label">المحتوى</label><textarea class="form-control" id="tagContent" rows="4" placeholder="قوانين السيرفر..."></textarea></div>
-          </div>
-          <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" onclick="addTag()">إضافة</button></div>
-        </div>
+        <% }) %>
       </div>
     </div>
   </div>
-
-  <!-- AI Tab -->
-  <div class="tab-pane fade" id="tab-ai">
-    <%
-      const ai = settings?.ai || {};
-    %>
-    <div class="card">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-robot me-2"></i> إعدادات الذكاء الاصطناعي</h5></div>
-      <div class="card-body">
-        <div class="form-check form-switch mb-4">
-          <input class="form-check-input" type="checkbox" id="aiEnabled" <%= ai.enabled !== false ? 'checked' : '' %>>
-          <label class="form-check-label fw-bold fs-5" for="aiEnabled">تفعيل الذكاء الاصطناعي</label>
-        </div>
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-bold">المزود</label>
-            <select class="form-select" id="aiProvider">
-              <option value="openai" <%= ai.provider === 'openai' ? 'selected' : '' %>>OpenAI</option>
-              <option value="anthropic" <%= ai.provider === 'anthropic' ? 'selected' : '' %>>Anthropic</option>
-              <option value="both" <%= ai.provider === 'both' ? 'selected' : '' %>>الاثنان معاً</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-bold">النموذج</label>
-            <select class="form-select" id="aiModel">
-              <option value="gpt-4-turbo-preview" <%= ai.model === 'gpt-4-turbo-preview' ? 'selected' : '' %>>GPT-4 Turbo</option>
-              <option value="gpt-4o" <%= ai.model === 'gpt-4o' ? 'selected' : '' %>>GPT-4o</option>
-              <option value="gpt-3.5-turbo" <%= ai.model === 'gpt-3.5-turbo' ? 'selected' : '' %>>GPT-3.5 Turbo</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-bold">لغة الرد</label>
-            <select class="form-select" id="aiResponseLang">
-              <option value="ar" <%= ai.responseLanguage === 'ar' ? 'selected' : '' %>>العربية</option>
-              <option value="en" <%= ai.responseLanguage === 'en' ? 'selected' : '' %>>English</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-bold">مهلة التبريد (مللي ثانية)</label>
-            <input type="number" class="form-control" id="aiCooldown" value="<%= ai.cooldown || 3000 %>" min="0">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-bold">درجة الحرارة (0-2)</label>
-            <input type="range" class="form-range" min="0" max="2" step="0.1" value="<%= ai.temperature || 0.7 %>" id="aiTemp" oninput="document.getElementById('aiTempVal').textContent=this.value">
-            <div class="text-center"><span class="fw-bold" id="aiTempVal"><%= ai.temperature || 0.7 %></span></div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-bold">حد التوكنات</label>
-            <input type="number" class="form-control" id="aiMaxTokens" value="<%= ai.maxTokens || 2000 %>" min="100" max="128000">
-          </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">التعليمات النظامية (System Prompt)</label>
-          <textarea class="form-control" id="aiSystemPrompt" rows="5"><%= ai.systemPrompt || 'أنت مساعد ذكي لبوت Liberty City. أنت ودود، مفيد، وتتكلم العربية بطلاقة.' %></textarea>
-        </div>
-        <div class="row g-3">
-          <div class="col-12 col-md-6">
-            <label class="form-label">قنوات مسموح بها (IDs مفصولة بفاصلة — فارغة = الكل)</label>
-            <input type="text" class="form-control" id="aiAllowedChannels" value="<%= (ai.allowedChannels || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label">رولات مسموح بها (IDs مفصولة بفاصلة — فارغة = الكل)</label>
-            <input type="text" class="form-control" id="aiAllowedRoles" value="<%= (ai.allowedRoles || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label">قنوات مستثناة</label>
-            <input type="text" class="form-control" id="aiIgnoredChannels" value="<%= (ai.ignoredChannels || []).join(',') %>" placeholder="123,456">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label">رولات مستثناة</label>
-            <input type="text" class="form-control" id="aiIgnoredRoles" value="<%= (ai.ignoredRoles || []).join(',') %>" placeholder="123,456">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Backup Tab -->
-  <div class="tab-pane fade" id="tab-backup">
-    <%
-      const bk = settings?.protection?.autoBackup || {};
-      const sc = settings?.protection?.autoScan || {};
-    %>
-    <div class="row g-4">
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-hdd me-2"></i> النسخ الاحتياطي التلقائي</h5></div>
-          <div class="card-body">
-            <div class="form-check form-switch mb-4">
-              <input class="form-check-input" type="checkbox" id="bkEnabled" <%= bk.enabled !== false ? 'checked' : '' %>>
-              <label class="form-check-label fw-bold fs-5" for="bkEnabled">تفعيل النسخ التلقائي</label>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">الفترة (ساعات)</label>
-              <input type="number" class="form-control" id="bkInterval" value="<%= bk.interval || 6 %>" min="1" max="168">
-              <div class="form-text">كم ساعة بين كل نسخة؟</div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">عدد النسخ المحفوظة</label>
-              <input type="number" class="form-control" id="bkKeep" value="<%= bk.keep || 5 %>" min="1" max="50">
-              <div class="form-text">كم نسخة تحفظ قبل حذف الأقدم؟</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-6">
-        <div class="card h-100">
-          <div class="card-header"><h5 class="mb-0"><i class="bi bi-search me-2"></i> الفحص الدوري</h5></div>
-          <div class="card-body">
-            <div class="form-check form-switch mb-4">
-              <input class="form-check-input" type="checkbox" id="scEnabled" <%= sc.enabled !== false ? 'checked' : '' %>>
-              <label class="form-check-label fw-bold fs-5" for="scEnabled">تفعيل الفحص الدوري</label>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">الفترة (ساعات)</label>
-              <input type="number" class="form-control" id="scInterval" value="<%= sc.interval || 6 %>" min="1" max="168">
-              <div class="form-text">يمسح رولات/رومات الهاكر ويرجّع الناقص</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+</div>
 </div>
 
 <script>
-async function saveAllSettings() {
-  const data = {};
-  // General
-  data.prefix = document.getElementById('genPrefix').value;
-  data.language = document.getElementById('genLang').value;
-  data.timezone = document.getElementById('genTz').value;
-  // AutoMod
-  data.automod = {
-    enabled: document.getElementById('amEnabled').checked,
-    badWords: document.getElementById('amBadWords').value.split('\n').map(x=>x.trim()).filter(x=>x),
-    badWordsAction: document.getElementById('amBadWordsAction').value,
-    badWordsDuration: +document.getElementById('amBadWordsDuration').value,
-    zalgoEnabled: document.getElementById('amZalgo').checked,
-    zalgoAction: document.getElementById('amZalgoAction').value,
-    ignoredRoles: document.getElementById('amIgnoredRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-    ignoredChannels: document.getElementById('amIgnoredChannels').value.split(',').map(x=>x.trim()).filter(x=>x),
-  };
-  // Leveling
-  const rewards = [];
-  document.querySelectorAll('#levelRewards .input-group').forEach(el => {
-    const level = el.querySelector('[data-field="level"]').value;
-    const roleId = el.querySelector('[data-field="roleId"]').value;
-    if (level && roleId) rewards.push({ level: +level, roleId });
+  const GID = '<%= GID %>';
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LC.loadChannels(GID, $$('.chan-sel'));
+    await LC.loadRoles(GID, $$('.role-sel'));
+    $$('.inp[data-array]').forEach(el => el.addEventListener('change', async () => {
+      const path = el.dataset.array.split('.');
+      const arr = el.value.split(',').map(s => s.trim()).filter(Boolean);
+      const payload = {}; let node = payload;
+      path.slice(0, -1).forEach(k => { node[k] = node[k] || {}; node = node[k]; });
+      node[path[path.length - 1]] = arr;
+      await LC.saveSetting(GID, payload, null);
+    }));
   });
-  data.leveling = {
-    enabled: document.getElementById('lvEnabled').checked,
-    xpPerMessage: +document.getElementById('lvXpPerMsg').value,
-    xpCooldown: +document.getElementById('lvXpCooldown').value,
-    xpGainMultiplier: +document.getElementById('lvMultiplier').value,
-    voiceXpPerMinute: +document.getElementById('lvVoiceXp').value,
-    levelUpChannelId: document.getElementById('lvLevelChannel').value,
-    levelUpMessage: document.getElementById('lvLevelMsg').value,
-    levelUpStyle: document.getElementById('lvLevelStyle').value,
-    levelUpTitle: document.getElementById('lvLevelTitle').value,
-    levelUpColor: document.getElementById('lvLevelColor').value,
-    levelRewards: rewards,
-    ignoredChannels: document.getElementById('lvIgnoredChannels').value.split(',').map(x=>x.trim()).filter(x=>x),
-    ignoredRoles: document.getElementById('lvIgnoredRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-  };
-  data.autorole = {
-    enabled: document.getElementById('arEnabled').checked,
-    roleId: document.getElementById('arRoleId').value,
-  };
-  // Verification
-  data.verification = {
-    enabled: document.getElementById('verEnabled').checked,
-    channelId: document.getElementById('verChannel').value,
-    roleId: document.getElementById('verRole').value,
-    title: document.getElementById('verTitle').value,
-    description: document.getElementById('verDesc').value,
-    buttonLabel: document.getElementById('verBtnLabel').value,
-    buttonEmoji: document.getElementById('verBtnEmoji').value,
-  };
-  // Logging
-  const logTypes = [];
-  document.querySelectorAll('[id^="lg_"]').forEach(el => { if (el.checked) logTypes.push(el.value); });
-  data.logging = {
-    enabled: document.getElementById('lgEnabled').checked,
-    channelId: document.getElementById('lgChannel').value,
-    types: logTypes,
-    ignoredChannels: document.getElementById('lgIgnoredChannels').value.split(',').map(x=>x.trim()).filter(x=>x),
-    ignoredRoles: document.getElementById('lgIgnoredRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-  };
-  // Music
-  data.music = {
-    enabled: document.getElementById('muEnabled').checked,
-    defaultVolume: +document.getElementById('muVolume').value,
-    maxQueueSize: +document.getElementById('muMaxQueue').value,
-    autoplay: document.getElementById('muAutoplay').checked,
-    allowDJ: document.getElementById('muAllowDJ').checked,
-    djRoleId: document.getElementById('muDjRole').value,
-  };
-  // Warn Roles
-  const memberIds = [];
-  document.querySelectorAll('[data-field="memberIds"]').forEach(el => { if (el.value) memberIds.push(el.value); });
-  data.warnRoles = {
-    memberIds,
-    adminSequential: {
-      role1Id: document.getElementById('wrRole1').value,
-      role2Id: document.getElementById('wrRole2').value,
-      role3Id: document.getElementById('wrRole3').value,
-    }
-  };
-  // Tickets
-  data.tickets = {
-    categoryId: document.getElementById('tkCategory').value,
-    logChannelId: document.getElementById('tkLogChannel').value,
-    transcriptChannelId: document.getElementById('tkTranscript').value,
-    supportRoleIds: document.getElementById('tkSupportRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-    adminRoleIds: document.getElementById('tkAdminRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-    maxPerUser: +document.getElementById('tkMaxPerUser').value,
-    autoCloseHours: +document.getElementById('tkAutoClose').value,
-    surveyEnabled: document.getElementById('tkSurvey').checked,
-    lockUntilClaim: document.getElementById('tkLockClaim').checked,
-    welcomeEnabled: document.getElementById('tkWelcome').checked,
-    autoMessageEnabled: document.getElementById('tkAutoMsg').checked,
-    autoMessage: document.getElementById('tkAutoMsgText').value,
-  };
-  // AI
-  data.ai = {
-    enabled: document.getElementById('aiEnabled').checked,
-    provider: document.getElementById('aiProvider').value,
-    model: document.getElementById('aiModel').value,
-    responseLanguage: document.getElementById('aiResponseLang').value,
-    cooldown: +document.getElementById('aiCooldown').value,
-    temperature: +document.getElementById('aiTemp').value,
-    maxTokens: +document.getElementById('aiMaxTokens').value,
-    systemPrompt: document.getElementById('aiSystemPrompt').value,
-    allowedChannels: document.getElementById('aiAllowedChannels').value.split(',').map(x=>x.trim()).filter(x=>x),
-    allowedRoles: document.getElementById('aiAllowedRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-    ignoredChannels: document.getElementById('aiIgnoredChannels').value.split(',').map(x=>x.trim()).filter(x=>x),
-    ignoredRoles: document.getElementById('aiIgnoredRoles').value.split(',').map(x=>x.trim()).filter(x=>x),
-  };
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+
+  function newCmd() {
+    LC.modal({
+      title: 'أمر مخصص جديد',
+      body: `
+        <div class="field mb-3"><label>الاسم (بالإنجليزية بدون مسافات)</label><input id="nc_name" class="inp" placeholder="rules"></div>
+        <div class="field"><label>الرد</label><textarea id="nc_content" class="inp" placeholder="النص أو الإندبيد"></textarea></div>
+        <div class="flex mt-3">
+          <label class="field-check"><input type="checkbox" id="nc_embed"><span>إندبيد</span></label>
+          <label class="field-check"><input type="checkbox" id="nc_admin"><span>إداريون فقط</span></label>
+        </div>`,
+      actions: [
+        { label: 'إنشاء', cls: 'primary', icon: 'plus-lg', onclick: async (m) => {
+          const name = document.getElementById('nc_name').value.trim();
+          const content = document.getElementById('nc_content').value.trim();
+          if (!name || !content) { LC.toast('أكمل الاسم والرد', 'warn'); throw new Error('skip'); }
+          const cmd = { name, content, embed: !!document.getElementById('nc_embed').checked, scope: document.getElementById('nc_admin').checked ? 'admin' : 'public', createdBy: '<%= user?.username || 'لوحة التحكم' %>', createdAt: new Date().toISOString(), uses: 0 };
+          const ok = await LC.saveSetting(GID, { _pushCmd: cmd }, null);
+          if (ok && !window.__saved) setTimeout(() => location.reload(), 700);
+        }},
+        { label: 'إلغاء', cls: 'ghost' },
+      ],
     });
-    if (res.ok) showToast('تم حفظ جميع الإعدادات ✅', 'success');
-    else showToast('فشل الحفظ ❌', 'danger');
-  } catch (e) { showToast('خطأ في الاتصال', 'danger'); }
-}
-
-function addLevelReward() {
-  const div = document.createElement('div');
-  div.className = 'input-group mb-2';
-  div.innerHTML = `
-    <span class="input-group-text">المستوى</span>
-    <input type="number" class="form-control" style="width: 80px;" min="1" data-field="level">
-    <span class="input-group-text">الرول</span>
-    <input type="text" class="form-control" placeholder="Role ID" data-field="roleId">
-    <button class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()"><i class="bi bi-trash"></i></button>
-  `;
-  document.getElementById('levelRewards').appendChild(div);
-}
-
-function addWarnRole(field) {
-  const container = field === 'memberIds' ? 'memberWarnRoles' : 'adminWarnRoles';
-  const div = document.createElement('div');
-  div.className = 'input-group mb-2';
-  div.innerHTML = `
-    <input type="text" class="form-control" placeholder="Role ID" data-field="${field}">
-    <button class="btn btn-outline-danger" onclick="this.closest('.input-group').remove()"><i class="bi bi-trash"></i></button>
-  `;
-  document.getElementById(container)?.appendChild(div);
-}
-
-function showAddCmdModal() { new bootstrap.Modal(document.getElementById('addCmdModal')).show(); }
-function showAddTagModal() { new bootstrap.Modal(document.getElementById('addTagModal')).show(); }
-
-async function addCmd() {
-  const name = document.getElementById('cmdName').value.trim();
-  const content = document.getElementById('cmdContent').value.trim();
-  const embed = document.getElementById('cmdEmbed').checked;
-  if (!name || !content) { showToast('املأ جميع الحقول', 'warning'); return; }
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ _pushCmd: { name, content, embed, createdBy: '<%= user.id %>', createdAt: new Date(), uses: 0 } })
+  }
+  function newTag() {
+    LC.modal({
+      title: 'وسم جديد',
+      body: `
+        <div class="field mb-3"><label>الاسم</label><input id="nt_name" class="inp" placeholder="قوانين"></div>
+        <div class="field"><label>المحتوى</label><textarea id="nt_content" class="inp"></textarea></div>`,
+      actions: [
+        { label: 'إنشاء', cls: 'primary', icon: 'plus-lg', onclick: async (m) => {
+          const name = document.getElementById('nt_name').value.trim();
+          const content = document.getElementById('nt_content').value.trim();
+          if (!name || !content) { LC.toast('أكمل', 'warn'); throw new Error('skip'); }
+          const tag = { name, content, createdBy: '<%= user?.username || 'لوحة التحكم' %>', createdAt: new Date().toISOString(), uses: 0 };
+          const ok = await LC.saveSetting(GID, { _pushTag: tag }, null);
+          if (ok) setTimeout(() => location.reload(), 700);
+        }},
+        { label: 'إلغاء', cls: 'ghost' },
+      ],
     });
-    if (res.ok) { showToast('تمت الإضافة ✅', 'success'); location.reload(); }
-    else showToast('فشل الإضافة', 'danger');
-  } catch (e) { showToast('خطأ', 'danger'); }
-}
-
-async function deleteCmd(name) {
-  if (!confirm('حذف الأمر ' + name + '؟')) return;
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ _pullCmd: name })
+  }
+  function delCmd(name) {
+    LC.confirmBox('حذف أمر', `حذف الأمر /${name}؟`, {}).then(async ok => {
+      if (!ok) return;
+      if (await LC.saveSetting(GID, { _pullCmd: name }, null)) setTimeout(() => location.reload(), 700);
     });
-    if (res.ok) { showToast('تم الحذف ✅', 'success'); location.reload(); }
-    else showToast('فشل الحذف', 'danger');
-  } catch (e) { showToast('خطأ', 'danger'); }
-}
-
-async function addTag() {
-  const name = document.getElementById('tagName').value.trim();
-  const content = document.getElementById('tagContent').value.trim();
-  if (!name || !content) { showToast('املأ جميع الحقول', 'warning'); return; }
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ _pushTag: { name, content, createdBy: '<%= user.id %>', createdAt: new Date(), uses: 0 } })
+  }
+  function delTag(name) {
+    LC.confirmBox('حذف وسم', `حذف الوسم ${name}؟`, {}).then(async ok => {
+      if (!ok) return;
+      if (await LC.saveSetting(GID, { _pullTag: name }, null)) setTimeout(() => location.reload(), 700);
     });
-    if (res.ok) { showToast('تمت الإضافة ✅', 'success'); location.reload(); }
-    else showToast('فشل الإضافة', 'danger');
-  } catch (e) { showToast('خطأ', 'danger'); }
-}
-
-async function deleteTag(name) {
-  if (!confirm('حذف التاج ' + name + '؟')) return;
-  try {
-    const res = await fetch('/api/guilds/<%= guild.id %>/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ _pullTag: name })
-    });
-    if (res.ok) { showToast('تم الحذف ✅', 'success'); location.reload(); }
-    else showToast('فشل الحذف', 'danger');
-  } catch (e) { showToast('خطأ', 'danger'); }
-}
+  }
 </script>
 
 <%- include('layout-bottom') %>

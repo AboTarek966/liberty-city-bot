@@ -179,6 +179,7 @@ app.use(async (req, res, next) => {
   res.locals.guilds = req.session.guilds || [];
   res.locals.selectedGuild = req.session.selectedGuild || null;
   res.locals.clientId = DISCORD_CLIENT_ID;
+  res.locals.req = req;
   next();
 });
 
@@ -276,23 +277,46 @@ app.get('/auth/dev', async (req, res) => {
   }
 });
 
-app.get('/dashboard', requireAuth, async (req, res) => {
-  try {
-    // Fetch bot stats
-    let botStats = { totalGuilds: 0, totalUsers: 0 };
-    try {
-      const res = await fetch(`${BOT_API_URL}/api/dashboard/stats`);
-      if (res.ok) botStats = await res.json();
-    } catch {}
-    
-    res.render('dashboard', { botStats, activePage: 'dashboard' });
-  } catch (err) {
-    console.error(err);
-    res.render('dashboard', { botStats: { totalGuilds: 0, totalUsers: 0 }, activePage: 'dashboard' });
-  }
+app.get('/dashboard', requireAuth, (req, res) => {
+  res.render('dashboard', { admins: req.session.guilds || [], guilds: req.session.guilds || [], activePage: 'dashboard' });
 });
 
 app.get('/dashboard/:guildId', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'guild'));
+
+// ===== Live data helpers (command queue with short-TTL cache) =====
+const statsCache = new Map(); // guildId -> { at, data }
+
+async function getLiveStats(guildId) {
+  const hit = statsCache.get(guildId);
+  if (hit && Date.now() - hit.at < 45 * 1000) return hit.data;
+  let data = null;
+  const result = await runCommand(guildId, 'guild_stats', {}, 22000);
+  if (result.ok) {
+    const r = result.result || {};
+    data = {
+      memberCount: r.memberCount ?? null,
+      onlineCount: r.onlineCount ?? null,
+      botCount: r.botCount ?? null,
+      ownerTag: r.ownerTag ?? null,
+      channelCount: r.channelCount ?? null,
+      textChannelCount: r.textChannelCount ?? null,
+      voiceChannelCount: r.voiceChannelCount ?? null,
+      categoryCount: r.categoryCount ?? null,
+      roleCount: r.roleCount ?? null,
+      boosts: r.boosts ?? null,
+      boostLevel: r.boostLevel ?? null,
+      createdAt: r.createdAt ?? null,
+      source: 'bot',
+    };
+  } else {
+    // تقدير شفاف من قاعدة البيانات فقط — بدون أرقام وهمية
+    const approximate = dbReady() ? await UserProfile.countDocuments({ guildId }) : 0;
+    const workerAlive = (await runCommand(guildId, 'ping', {}, 9000)).ok;
+    data = { memberCount: null, profilesCount: approximate, onlineCount: null, channelCount: null, roleCount: null, boosts: null, source: 'db', workerAlive };
+  }
+  statsCache.set(guildId, { at: Date.now(), data });
+  return data;
+}
 
 // Helper: fetch settings/stats for guild sub-pages (bot API if online, else DB-direct)
 async function guildPageData(req, res, guildId, page) {
@@ -308,6 +332,8 @@ async function guildPageData(req, res, guildId, page) {
     if (online) {
       const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/stats`, { timeout: 4000 });
       if (r.ok) stats = await r.json();
+    } else if (dbReady()) {
+      stats = await getLiveStats(guildId);
     }
   } catch {}
 
@@ -534,6 +560,29 @@ app.get('/api/guilds/:guildId/roles', requireAuth, async (req, res) => {
   return res.status(502).json({ error: result.error });
 });
 
+// ===== Live channels via the queue (channel selectors across the UI) =====
+app.get('/api/guilds/:guildId/channels', requireAuth, async (req, res) => {
+  const result = await runCommand(req.params.guildId, 'channels_list', {}, 20000);
+  if (result.ok) return res.json(result.result.channels || result.result || []);
+  return res.status(502).json({ error: result.error });
+});
+
+// ===== Live stats (refresh button on every page) =====
+app.get('/api/guilds/:guildId/stats', requireAuth, async (req, res) => {
+  statsCache.delete(req.params.guildId);
+  const stats = await getLiveStats(req.params.guildId);
+  res.json(stats);
+});
+
+// ===== Bot connection probe (nav pill) =====
+app.get('/api/bot/status', requireAuth, async (req, res) => {
+  const guildId = req.query.guildId || req.session.selectedGuild || (req.session.guilds || [])[0]?.id;
+  if (!guildId) return res.json({ online: false, reason: 'no-guild' });
+  const t0 = Date.now();
+  const result = await runCommand(guildId, 'ping', {}, 8000);
+  res.json(result.ok ? { online: true, latency: Date.now() - t0 } : { online: false, error: result.error });
+});
+
 // Economy: reads + give/reset directly from the shared database
 app.get('/api/guilds/:guildId/economy', requireAuth, async (req, res) => {
   try {
@@ -605,6 +654,15 @@ app.delete('/api/guilds/:guildId/shop/:itemId', requireAuth, async (req, res) =>
 // Bot leave guild — via queue
 app.post('/api/guilds/:guildId/leave', requireAuth, async (req, res) => {
   queueResponse(res, await runCommand(req.params.guildId, 'guild_leave', {}));
+});
+
+// Generic safe command executor for the UI (whitelist)
+const UI_COMMANDS = new Set(['welcome_test', 'broadcast', 'announce_panel']);
+app.post('/api/guilds/:guildId/command', requireAuth, async (req, res) => {
+  const { command, payload = {} } = req.body || {};
+  if (!command || !UI_COMMANDS.has(command)) return res.status(400).json({ error: 'أمر غير مسموح' });
+  payload.actor = (req.session.user || {}).username || 'لوحة التحكم';
+  queueResponse(res, await runCommand(req.params.guildId, command, payload, 45000), 'أُرسل أمر البوت');
 });
 
 // Health probe for the client UI (is the reachable bot online?)
