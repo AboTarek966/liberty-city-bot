@@ -257,6 +257,10 @@ export class SecurityHandler {
         this.nukeTracker.delete(guildId);
       }
     }
+    // Cleanup audit log cache (older than 10 seconds)
+    for (const [key, val] of this.auditLogCache) {
+      if (now - val.at > 10000) this.auditLogCache.delete(key);
+    }
   }
 
   // --------------------------------------------
@@ -294,18 +298,41 @@ export class SecurityHandler {
     );
   }
 
-  // تحديد المنفّذ من سجلات التدقيق
+  // كاش سجلات التدقيق — 3 ثوانٍ TTL (يتجنب جلب متكرر لنفس الحدث)
+  private auditLogCache = new Map<string, { at: number; entries: any[] }>();
+
+  private async getCachedAuditLogs(guild: Guild, type: AuditLogEvent, limit = 1): Promise<any[]> {
+    const key = `${guild.id}:${type}`;
+    const hit = this.auditLogCache.get(key);
+    if (hit && Date.now() - hit.at < 3000) return hit.entries;
+    const logs = await guild.fetchAuditLogs({ type, limit });
+    const entries = [...logs.entries];
+    this.auditLogCache.set(key, { at: Date.now(), entries });
+    return entries;
+  }
+
+  // تحديد المنفّذ من سجلات التدقيق — سريع: يجلب 1 فقط + كاش 3ث
   private async findExecutor(guild: Guild, type: AuditLogEvent, targetId?: string): Promise<User | null> {
     try {
-      const logs = await guild.fetchAuditLogs({ type, limit: 5 });
-      const recent = logs.entries.filter(e => Date.now() - e.createdTimestamp < 20000);
-      const entry = (targetId ? recent.find(e => e.targetId === targetId) : undefined) ?? recent.first();
-      const executor = entry?.executor;
-      return executor ? (executor as User) : null;
+      const entries = await this.getCachedAuditLogs(guild, type, 1);
+      const entry = targetId
+        ? entries.find(e => e.targetId === targetId)
+        : entries[0];
+      return entry?.executor ? (entry.executor as User) : null;
     } catch (error: any) {
       logger.warn(`fetchAuditLogs failed in ${guild.name}: ${error.message}`);
       return null;
     }
+  }
+
+  // يبحث في سجلات التدقيق عن أمر طرد يستهدف هذا العضو — محاولتان بـ 150ms فقط
+  private async findKickExecutor(guild: Guild, targetId: string): Promise<User | null> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const executor = await this.findExecutor(guild, AuditLogEvent.MemberKick, targetId);
+      if (executor) return executor;
+      if (attempt < 1) await sleep(150);
+    }
+    return null;
   }
 
   // معاقبة المخالف (تجاهل: المالك، البوت نفسه، غير الموجود)
@@ -1371,17 +1398,6 @@ export class SecurityHandler {
     }
   }
 
-  // يبحث في سجلات التدقيق عن أمر طرد يستهدف هذا العضو → يعيد المنفّذ
-  // (سجلات التدقيق تتأخر ثانية أو ثانيتين، فنحاول ٣ مرات)
-  private async findKickExecutor(guild: Guild, targetId: string): Promise<User | null> {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const executor = await this.findExecutor(guild, AuditLogEvent.MemberKick, targetId);
-      if (executor) return executor;
-      if (attempt < 2) await sleep(600);
-    }
-    return null;
-  }
-
   // يجمّع عدة طرود في محاولة استعادة واحدة (مؤجّل ٦ ثوانٍ)
   private scheduleKickedRecovery(guild: Guild, settings: any): void {
     if (settings?.protection?.antiNuke?.autoDmRecovery === false) return;
@@ -1575,46 +1591,41 @@ export class SecurityHandler {
     const executor = await this.findExecutor(guild, auditType, targetId);
     const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
 
-    // ⏱ استجابة فورية — لكن صامتة لو المنفّذ هو البوت نفسه (إغلاق تذكرة/تنظيف داخلي ليس هجوماً)
+    // ⏱ استجابة فورية — لكن صامتة لو المنفّذ هو البوت نفسه
     if (executor && executor.id === this.client.user?.id) {
       logger.info(`⏭️ Anti-Nuke: تخطّي — المنفّذ هو البوت نفسه (${type} في ${guild.name})`);
       return;
     }
 
-    // 👑 ثقة: المالك + مطوّر البوت + القائمة البيضاء → لا عقوبة ولا استعادة (الباقي: رد فوري كامل)
+    // 👑 ثقة: المالك + مطوّر البوت + القائمة البيضاء
     const trusted = executor ? await this.isTrustedExecutor(guild, executor.id) : false;
 
-    // 🔨 الحظر يُلغى فوراً عن الضحية — "مايقدر اساسا يبندهم"
+    // 🔨 الحظر يُلغى فوراً عن الضحية
     if (type === 'ban' && targetId && executor && !trusted) {
-      await guild.members
-        .unban(targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً')
-        .catch(() => {});
+      await guild.members.unban(targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً').catch(() => {});
     }
 
-    // 🛡️ وضع المنع الوقائي: أول عملية اعتداء = حظر فوري (بدل الإجراء المحدد)
-    //    وقبل أي عقوبة تُسلب كل الصلاحيات من المهاجم فوراً (حجر صحي) حتى يستحيل تكرار الهجوم
+    // 🛡️ وضع المنع الوقائي: أول عملية اعتداء = حظر فوري
     const preventMode = cfg.mode !== 'react';
     const effectiveAction: 'alert' | 'kick' | 'ban' | 'strip' = preventMode ? 'ban' : (cfg.action ?? 'kick');
 
     let actionText: string;
+
     if (!executor) {
       actionText = '⚠️ تعذّر تحديد المنفّذ من سجلات التدقيق';
     } else if (trusted) {
       actionText = '⏭️ المنفّذ موثوق (مالك/مطوّر/وايت ليست) — لا عقوبة';
     } else if (preventMode) {
-      // ⛔ حجر الصلاحيات الفوري: سحب كل الرولات قبل أي إجراء آخر
-      const attackerMember = guild.members.cache.get(executor.id);
+      // ⛔ حجر الصلاحيات الفوري: نجلب العضو (كاش أو fetch) ونبدأ الحجر بالتوازي مع أي شيء
+      const cached = guild.members.cache.get(executor!.id);
+      const attackerMember = cached ?? await guild.members.fetch(executor!.id).catch(() => null);
+
       if (attackerMember) {
-        await attackerMember.roles
-          .set([], 'Liberty City Anti-Nuke: وضع المنع — حجر الصلاحيات الفوري')
-          .catch(() => {});
-        actionText = await this.punish(
-          guild,
-          executor,
-          effectiveAction,
-          `Liberty City Anti-Nuke: وضع المنع — ردّ فوري (${labels[type].label})`
-        );
-        actionText = `🛡️ **وضع المنع:** حجر الصلاحيات ثم ${actionText}`;
+        // ⚡ تنفيذ متوازي: حجر + عقوبة — نطلقهما معاً لا ننتظر أحدهما الآخر
+        const quarantinePromise = attackerMember.roles.set([], 'Liberty City Anti-Nuke: وضع المنع — حجر الصلاحيات الفوري').catch(() => {});
+        const punishPromise = this.punish(guild, executor, effectiveAction, `Liberty City Anti-Nuke: وضع المنع — ردّ فوري (${labels[type].label})`);
+        await Promise.allSettled([quarantinePromise, punishPromise]);
+        actionText = `🛡️ **وضع المنع:** حجر الصلاحيات + ${effectiveAction === 'ban' ? 'حظر' : effectiveAction === 'kick' ? 'طرد' : effectiveAction}`;
       } else {
         actionText = await this.punish(
           guild,

@@ -43,7 +43,10 @@ export declare class SecurityHandler {
     clearGuild(guildId: string): void;
     cleanup(): void;
     private getAlertChannel;
+    private auditLogCache;
+    private getCachedAuditLogs;
     private findExecutor;
+    private findKickExecutor;
     private punish;
     private track;
     checkHierarchy(guild: Guild): HierarchyStatus;
@@ -79,7 +82,6 @@ export declare class SecurityHandler {
     onRoleDelete(role: any): Promise<void>;
     onBanAdd(ban: any): Promise<void>;
     onMemberKick(member: GuildMember): Promise<void>;
-    private findKickExecutor;
     private scheduleKickedRecovery;
     private flushKickedRecovery;
     /**
