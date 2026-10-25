@@ -91,6 +91,57 @@ async function fetchUserInfo(accessToken) {
   return res.json();
 }
 
+// --------------------------------------------
+// Discord token endpoint — robust caller
+// بعض بروتوكول Cloudflare يحجب IP بداتاسنتر عند POST /oauth2/token (429 blocked)
+// الحل: رؤوس شبيهة بالمتصفح + إعادة محاولات + مضيف بديل
+// --------------------------------------------
+const TOKEN_ENDPOINTS = [
+  'https://discord.com/api',
+  'https://discordapp.com/api',
+];
+
+const OAUTH_HEADERS = {
+  'Content-Type': 'application/x-www-form-urlencoded',
+  'Accept': 'application/json',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+};
+
+const waitMs = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function discordTokenCall(logTag, params) {
+  for (const [hostIdx, base] of TOKEN_ENDPOINTS.entries()) {
+    const maxTries = hostIdx === 0 ? 3 : 2;
+    for (let attempt = 1; attempt <= maxTries; attempt++) {
+      try {
+        const res = await fetch(`${base}/oauth2/token`, {
+          method: 'POST',
+          headers: OAUTH_HEADERS,
+          body: params
+        });
+        if (res.ok) return res.json();
+        const bodyTxt = await res.text().catch(() => '');
+        console.error(`Token ${logTag} blocked/failed: host=${base} attempt=${attempt}/${maxTries} status=${res.status} body=${bodyTxt.slice(0, 220).replace(/\s+/g, ' ')}`);
+        // 429 / 5xx → قابلة لإعادة المحاولة. 4xx الأخرى خطأ دائم — أبلغ فورًا
+        if (res.status === 429 || res.status >= 500) {
+          if (attempt < maxTries) { await waitMs(2000 * attempt); continue; }
+          break; // جرب المضيف التالي
+        }
+        const err = new Error(`Discord ${logTag} error ${res.status}`);
+        err.discordBody = bodyTxt.slice(0, 250);
+        throw err;
+      } catch (e) {
+        if (e.discordBody) throw e;
+        if (hostIdx === TOKEN_ENDPOINTS.length - 1 && attempt === maxTries) {
+          throw new Error(`Token ${logTag} failed after all attempts — Cloudflare/Fetch blocked (try again shortly): ${e.message}`);
+        }
+      }
+    }
+  }
+  throw new Error(`Token ${logTag} blocked by Cloudflare on all endpoints — أعد المحاولة بعد قليل`);
+}
+
 // Helper: exchange code for tokens
 async function exchangeCode(code) {
   const params = new URLSearchParams({
@@ -100,17 +151,7 @@ async function exchangeCode(code) {
     code,
     redirect_uri: DISCORD_REDIRECT_URI
   });
-  const res = await fetch('https://discord.com/api/oauth2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    console.error(`Token exchange failed: status=${res.status} body=${detail.slice(0, 400)} | secret_len=${(DISCORD_CLIENT_SECRET || '').length} | redirect_uri=${DISCORD_REDIRECT_URI} | code_len=${(code || '').length}`);
-    throw new Error(`Token exchange failed (status ${res.status})`);
-  }
-  return res.json();
+  return discordTokenCall('exchange', params);
 }
 
 // Helper: refresh access token
@@ -121,13 +162,7 @@ async function refreshToken(refreshToken) {
     grant_type: 'refresh_token',
     refresh_token: refreshToken
   });
-  const res = await fetch('https://discord.com/api/oauth2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params
-  });
-  if (!res.ok) throw new Error('Token refresh failed');
-  return res.json();
+  return discordTokenCall('refresh', params);
 }
 
 // Middleware: require auth
@@ -200,8 +235,9 @@ app.get('/auth/callback', async (req, res) => {
 
     res.redirect('/dashboard');
   } catch (err) {
-    console.error('OAuth error:', err.message);
-    res.redirect('/?error=auth_failed');
+    console.error('OAuth error:', err.message, err.discordBody ? `| body=${err.discordBody}` : '');
+    const detail = (err.discordBody || err.message || 'unknown').slice(0, 180);
+    res.redirect(`/?error=auth_failed&detail=${encodeURIComponent(detail)}`);
   }
 });
 
