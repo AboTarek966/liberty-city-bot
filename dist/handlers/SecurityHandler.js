@@ -112,6 +112,8 @@ class SecurityHandler {
     handledTargets = new Map();
     // 🤖 حارس البوتات الخطرة (يفحص البوتات الموجودة كل 30 ثانية)
     botGuardTimers = new Map();
+    // ⏳ تهدئة حارس البوتات: البوت الذي فشل تحييده لا يُعاد فحصه إلا بعد 10 دقائق
+    botGuardBackoff = new Map();
     // ⚡ منع تكرار عقوبة نفس الحساب خلال دقيقة (تفادي أخطاء "محظور مسبقاً" وتوفير REST)
     recentBans = new Map();
     recentKicks = new Map();
@@ -174,6 +176,9 @@ class SecurityHandler {
         for (const key of this.recentKicks.keys())
             if (key.startsWith(`${guildId}:`))
                 this.recentKicks.delete(key);
+        for (const key of this.botGuardBackoff.keys())
+            if (key.startsWith(`${guildId}:`))
+                this.botGuardBackoff.delete(key);
         logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
     }
     cleanup() {
@@ -250,6 +255,10 @@ class SecurityHandler {
         for (const [key, at] of this.recentKicks) {
             if (now - at > 60000)
                 this.recentKicks.delete(key);
+        }
+        for (const [key, at] of this.botGuardBackoff) {
+            if (now >= at)
+                this.botGuardBackoff.delete(key);
         }
         for (const [guildId, inc] of this.activeIncidents) {
             if (now > inc.expires)
@@ -667,7 +676,7 @@ class SecurityHandler {
                 ?.send({
                 content: `🚨 **بوت تخريب — تم احتواءه فوراً**\n` +
                     `🤖 البوت: ${this.userLabel(executor)} (\`${executor.id}\`)\n` +
-                    `${banned ? '🔨 حظر فوري ✅' : '⚠️ تعذّر الحظر — ارفع رول البوت'}\n` +
+                    `${banned ? '🔨 حظر فوري ✅' : '⚠️ تعذّر الحظر'}\n` +
                     `🧹 حُذف ${purged} من آثاره (قنوات/رولات/ويب هوكس)`,
             })
                 .catch(() => { }))
@@ -813,18 +822,30 @@ class SecurityHandler {
                 return;
             const names = [];
             for (const member of dangerous) {
+                const backoffKey = `${guild.id}:${member.id}`;
+                const retryAt = this.botGuardBackoff.get(backoffKey);
+                if (retryAt && Date.now() < retryAt)
+                    continue; // صامت: لا إعادة محاولة الآن
                 this.startIncident(guild.id, member.id);
                 const ok = await this.banUserById(guild, member.id, 'Liberty City — بوت خطِر غير مصرح (حارس البوتات)');
-                if (ok)
+                if (ok) {
+                    this.botGuardBackoff.delete(backoffKey);
                     names.push(`${member.user.tag} (حظر)`);
+                }
                 else {
                     const stripped = await member.roles
                         .set([], 'Liberty City — سحب صلاحيات بوت خطِر')
                         .then(() => true)
                         .catch(() => false);
-                    names.push(stripped
-                        ? `${member.user.tag} (سحب رولات)`
-                        : `${member.user.tag} (⚠️ فشل — رول البوت أدنى من رول البوت الخطر)`);
+                    if (stripped) {
+                        this.botGuardBackoff.delete(backoffKey);
+                        names.push(`${member.user.tag} (سحب رولات)`);
+                    }
+                    else {
+                        // 🔕 فشل بسبب التسلّم → صامت تماماً + تهدئة 10 دقائق (بدون أي رسالة)
+                        this.botGuardBackoff.set(backoffKey, Date.now() + 10 * 60 * 1000);
+                        logger.warn(`Bot guard could not neutralize ${member.user.tag} in ${guild.name} (hierarchy)`);
+                    }
                 }
                 await this.purgeAttackerArtifacts(guild, member.id, false).catch(() => 0);
             }

@@ -46,6 +46,7 @@ export declare class SecurityHandler {
     private createTracker;
     private handledTargets;
     private botGuardTimers;
+    private botGuardBackoff;
     private recentBans;
     private recentKicks;
     constructor(client: Client);
