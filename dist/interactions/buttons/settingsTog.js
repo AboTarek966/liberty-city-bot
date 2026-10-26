@@ -215,7 +215,8 @@ const handler = {
                 return;
         }
         await settings.save();
-        // Invalidate logging cache when logging toggled
+        // ♻️ أبطِل كاش الإعدادات فوراً حتى يُطبَّق التبديل في كل معالجات الحماية بلا تأخير
+        (0, models_1.invalidateGuildSettings)(interaction.guild.id);
         if (section === 'logging') {
             const client = interaction.client;
             client.loggingHandler?.invalidateCache?.(interaction.guild.id);

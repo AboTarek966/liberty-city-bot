@@ -11,7 +11,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { LibertyClient } from '../../LibertyClient';
 import { Colors } from '../../utils/embeds';
-import { getGuildSettings } from '../../models';
+import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { gateProtectionOff } from '../../utils/ownerApproval';
 
 const command: Command = {
@@ -370,6 +370,7 @@ async function configureAntiRaid(interaction: ChatInputCommandInteraction, setti
   if (action) settings.protection.antiRaid.action = action;
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const embed = new EmbedBuilder()
     .setTitle('🚨 مضاد الغارات')
@@ -398,6 +399,7 @@ async function configureAntiSpam(interaction: ChatInputCommandInteraction, setti
   if (action) settings.protection.antiSpam.action = action;
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const embed = new EmbedBuilder()
     .setTitle('💬 مضاد السبام')
@@ -426,6 +428,7 @@ async function configureAntiLink(interaction: ChatInputCommandInteraction, setti
   if (action) settings.protection.antiLink.action = action;
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const embed = new EmbedBuilder()
     .setTitle('🔗 مضاد الروابط')
@@ -458,6 +461,7 @@ async function configureAntiInvite(interaction: ChatInputCommandInteraction, set
   if (action) settings.protection.antiInvite.action = action;
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const embed = new EmbedBuilder()
     .setTitle('📨 مضاد الدعوات')
@@ -494,6 +498,7 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
   }
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const n = settings.protection.antiNuke;
 
@@ -626,6 +631,7 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
   }
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const whitelistText =
     wl.length > 0
@@ -656,6 +662,7 @@ async function configureAntiAdmin(interaction: ChatInputCommandInteraction, sett
   settings.protection.antiAdmin.enabled = enabled;
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const embed = new EmbedBuilder()
     .setTitle('⚠️ مراقبة منح صلاحية Administrator')
@@ -694,6 +701,7 @@ async function configureAutoBackup(interaction: ChatInputCommandInteraction, set
   if (!settings.protection.autoBackup.keep) settings.protection.autoBackup.keep = 5;
 
   await settings.save();
+  invalidateGuildSettings(interaction.guildId!);
 
   const lc = interaction.client as LibertyClient;
   await lc.securityHandler.syncAutoBackup(interaction.guild!, false);

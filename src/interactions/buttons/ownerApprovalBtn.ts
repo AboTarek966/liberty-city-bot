@@ -6,7 +6,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { getGuildSettings } from '../../models';
+import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { takePending, PROTECTION_LABELS } from '../../utils/ownerApproval';
 import { isBotOwner } from '../../utils/botOwner';
@@ -67,8 +67,8 @@ const handler: ButtonHandler = {
         prot[field].enabled = false;
       }
       await settings.save();
-
-      // 💾 مزامنة مؤقتات خاصة فور الإطفاء (نفس ما تفعله أزرار اللوحة بعد الحفظ)
+      // ♻️ إبطال الكاش فوراً — الإطفاء يُطبَّق مباشرة على كل معالجات الحماية
+      invalidateGuildSettings(interaction.guild.id);
       const client = interaction.client as LibertyClient;
       if (field === 'autoBackup') {
         await client.securityHandler?.syncAutoBackup(interaction.guild, false).catch(() => {});

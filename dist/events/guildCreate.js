@@ -23,6 +23,7 @@ const guildCreateEvent = {
             await client.securityHandler.syncAutoScan(guild);
             client.securityHandler.startMessageSnapshotter(guild);
             client.securityHandler.startStickyRoleWatchdog(guild);
+            client.securityHandler.startDangerousBotWatchdog(guild);
         }
         catch (error) {
             logger.warn(`Security setup failed in ${guild.id}:`, error);

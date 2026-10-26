@@ -48,7 +48,22 @@ const event: Event = {
   async execute(message: Message) {
     const client = message.client as LibertyClient;
 
-    // Ignore bots and webhooks
+    // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
+    //    (الويب هوك سبام والبوتات المخربة أخطر من البشر — لا يجوز تجاهلها)
+    if (message.guild) {
+      if (message.webhookId) {
+        void client.securityHandler.onWebhookMessage(message).catch(() => {});
+        // تحقق الحماية القديم (احتياطي)
+        void client.protectionHandler.checkMessage(message).catch(() => {});
+        return;
+      }
+      if (message.author.bot) {
+        void client.securityHandler.onBotMessage(message).catch(() => {});
+        return;
+      }
+    }
+
+    // Ignore bots and webhooks (لم يتبقَّ سوى بشر هنا)
     if (message.author.bot) return;
     if (message.webhookId) return;
 

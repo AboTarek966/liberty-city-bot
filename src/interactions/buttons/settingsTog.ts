@@ -5,7 +5,7 @@
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerificationPanel, buildShop, sendWelcomeCardPanel, SettingsCategory } from '../../utils/settingsPanel';
-import { getGuildSettings, AIConfig } from '../../models';
+import { getGuildSettings, invalidateGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
 import { setLockdown } from '../../utils/lockdown';
 import { gateProtectionOff } from '../../utils/ownerApproval';
@@ -214,8 +214,8 @@ const handler: ButtonHandler = {
     }
 
     await settings.save();
-
-    // Invalidate logging cache when logging toggled
+    // ♻️ أبطِل كاش الإعدادات فوراً حتى يُطبَّق التبديل في كل معالجات الحماية بلا تأخير
+    invalidateGuildSettings(interaction.guild.id);
     if (section === 'logging') {
       const client = interaction.client as LibertyClient;
       client.loggingHandler?.invalidateCache?.(interaction.guild.id);

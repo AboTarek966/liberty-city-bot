@@ -59,7 +59,21 @@ const event = {
     name: 'messageCreate',
     async execute(message) {
         const client = message.client;
-        // Ignore bots and webhooks
+        // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
+        //    (الويب هوك سبام والبوتات المخربة أخطر من البشر — لا يجوز تجاهلها)
+        if (message.guild) {
+            if (message.webhookId) {
+                void client.securityHandler.onWebhookMessage(message).catch(() => { });
+                // تحقق الحماية القديم (احتياطي)
+                void client.protectionHandler.checkMessage(message).catch(() => { });
+                return;
+            }
+            if (message.author.bot) {
+                void client.securityHandler.onBotMessage(message).catch(() => { });
+                return;
+            }
+        }
+        // Ignore bots and webhooks (لم يتبقَّ سوى بشر هنا)
         if (message.author.bot)
             return;
         if (message.webhookId)

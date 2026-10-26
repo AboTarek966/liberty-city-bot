@@ -39,14 +39,50 @@ export declare class SecurityHandler {
     private kickedTimers;
     private topWatchdogs;
     private nukeTracker;
+    private auditStream;
+    private attackerArtifacts;
+    private activeIncidents;
+    private messageRate;
+    private createTracker;
+    private handledTargets;
+    private botGuardTimers;
+    private recentBans;
+    private recentKicks;
     constructor(client: Client);
     clearGuild(guildId: string): void;
     cleanup(): void;
     private getAlertChannel;
     private auditLogCache;
+    private static readonly TRUSTED_BOT_IDS;
+    /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
+    ingestAuditEntry(entry: any, guildId?: string): void;
     private getCachedAuditLogs;
     private findExecutor;
     private findKickExecutor;
+    private findAuditCreator;
+    private recordArtifact;
+    private startIncident;
+    private isActiveAttacker;
+    private markHandled;
+    private botWhitelist;
+    private banUserById;
+    private punishById;
+    /**
+     * 🧹 حذف كل ما أنشأه المهاجم (قنوات/رولات/ويب هوكس).
+     * يعمل من الذاكرة أولاً ثم من سجلات التدقيق بفلتر user_id — حتى لو فاتتنا الأحداث.
+     */
+    private purgeAttackerArtifacts;
+    /** بوت غير مصرح قام بفعل خطير → حظر فوري + حذف ما أنشأه + حادث نشط */
+    private handleRogueBot;
+    /** يمنع أي بوت غير مصرح من الدخول — حظر فوري بالمعرّف */
+    private guardBotJoin;
+    /** يستقبل كل سجل تدقيق من Gateway — يستخدمه للكشف الفوري الاستباقي */
+    onAuditEntry(entry: any, guildArg?: Guild): Promise<void>;
+    startDangerousBotWatchdog(guild: Guild): void;
+    auditDangerousBots(guild: Guild): Promise<void>;
+    onWebhookMessage(message: any): Promise<boolean>;
+    onBotMessage(message: any): Promise<boolean>;
+    private cleanupChannelMessages;
     private punish;
     private track;
     checkHierarchy(guild: Guild): HierarchyStatus;
@@ -57,7 +93,12 @@ export declare class SecurityHandler {
     ensureHierarchyAlert(guild: Guild): Promise<HierarchyStatus>;
     private isWhitelisted;
     private isTrustedExecutor;
+    /** هل المنفّذ بوت؟ — يعمل حتى لو كان كائن المستخدم جزئياً (من سجلات التدقيق) */
+    private executorIsBot;
+    /** اسم مقروء للمنفّذ حتى لو كان جزئياً */
+    private userLabel;
     onChannelCreate(channel: any): Promise<void>;
+    private trackCreate;
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
     cleanupSuspicious(guild: Guild): Promise<number>;

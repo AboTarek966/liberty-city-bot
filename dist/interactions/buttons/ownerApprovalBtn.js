@@ -60,7 +60,8 @@ const handler = {
                 prot[field].enabled = false;
             }
             await settings.save();
-            // 💾 مزامنة مؤقتات خاصة فور الإطفاء (نفس ما تفعله أزرار اللوحة بعد الحفظ)
+            // ♻️ إبطال الكاش فوراً — الإطفاء يُطبَّق مباشرة على كل معالجات الحماية
+            (0, models_1.invalidateGuildSettings)(interaction.guild.id);
             const client = interaction.client;
             if (field === 'autoBackup') {
                 await client.securityHandler?.syncAutoBackup(interaction.guild, false).catch(() => { });

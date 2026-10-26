@@ -253,6 +253,7 @@ async function configureAntiRaid(interaction, settings) {
     if (action)
         settings.protection.antiRaid.action = action;
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('🚨 مضاد الغارات')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
@@ -274,6 +275,7 @@ async function configureAntiSpam(interaction, settings) {
     if (action)
         settings.protection.antiSpam.action = action;
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('💬 مضاد السبام')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
@@ -295,6 +297,7 @@ async function configureAntiLink(interaction, settings) {
     if (action)
         settings.protection.antiLink.action = action;
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('🔗 مضاد الروابط')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
@@ -319,6 +322,7 @@ async function configureAntiInvite(interaction, settings) {
     if (action)
         settings.protection.antiInvite.action = action;
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('📨 مضاد الدعوات')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
@@ -352,6 +356,7 @@ async function configureAntiNuke(interaction, settings) {
         settings.protection.antiNuke.autoRestore = true; // الافتراضي: مفعّل
     }
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const n = settings.protection.antiNuke;
     // 🛡️ قراءة تسلّم البوت — أهم مؤشر يحدّد إن كانت العقوبة ستنجح أصلاً
     const hierarchy = interaction.guild
@@ -455,6 +460,7 @@ async function configureAntiBot(interaction, settings) {
             wl.splice(idx, 1);
     }
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const whitelistText = wl.length > 0
         ? wl.map(id => `• <@${id}> (\`${id}\`)`).join('\n')
         : 'لا يوجد — أي بوت جديد سيتم طرده عند التفعيل';
@@ -475,6 +481,7 @@ async function configureAntiAdmin(interaction, settings) {
         settings.protection.antiAdmin = {};
     settings.protection.antiAdmin.enabled = enabled;
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('⚠️ مراقبة منح صلاحية Administrator')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
@@ -506,6 +513,7 @@ async function configureAutoBackup(interaction, settings) {
     if (!settings.protection.autoBackup.keep)
         settings.protection.autoBackup.keep = 5;
     await settings.save();
+    (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const lc = interaction.client;
     await lc.securityHandler.syncAutoBackup(interaction.guild, false);
     let backupLine = '—';

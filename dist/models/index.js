@@ -194,7 +194,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             autoDmRecovery: { type: Boolean, default: true },
         },
         antiBot: {
-            enabled: { type: Boolean, default: false },
+            enabled: { type: Boolean, default: true },
             whitelist: [{ type: String }],
             logChannel: { type: String },
         },

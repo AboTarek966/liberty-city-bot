@@ -60,6 +60,8 @@ const event: Event = {
         lc.securityHandler.startStickyRoleWatchdog(guild);
         // 📸 بدء مراقبة الحذف الجماعي للرسائل (Snapshotter)
         lc.securityHandler.startMessageSnapshotter(guild);
+        // 🕵️ حارس البوتات الخطرة — فحص كل 30 ثانية
+        lc.securityHandler.startDangerousBotWatchdog(guild);
       }, delay);
     });
 
