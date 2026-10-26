@@ -108,6 +108,8 @@ class SecurityHandler {
     messageRate = new Map();
     // 📈 معدل إنشاء القنوات/الرولات لكل منفّذ (key → timestamps)
     createTracker = new Map();
+    // 📈 معدل الحظر/الطرد لكل منفّذ — لا نخلط بين مشرفين مختلفين
+    actionTracker = new Map();
     // 🧹 منع تكرار معالجة نفس الهدف/المنفّذ خلال ثوانٍ
     handledTargets = new Map();
     // 🤖 حارس البوتات الخطرة (يفحص البوتات الموجودة كل 30 ثانية)
@@ -244,6 +246,13 @@ class SecurityHandler {
             else
                 this.createTracker.delete(key);
         }
+        for (const [key, arr] of this.actionTracker) {
+            const fresh = arr.filter(t => now - t <= 60000);
+            if (fresh.length)
+                this.actionTracker.set(key, fresh);
+            else
+                this.actionTracker.delete(key);
+        }
         for (const [key, at] of this.handledTargets) {
             if (now - at > 30000)
                 this.handledTargets.delete(key);
@@ -342,31 +351,57 @@ class SecurityHandler {
         this.auditLogCache.set(key, { at: Date.now(), entries });
         return entries;
     }
-    // تحديد المنفّذ — أولاً من بثّ Gateway (فوري)، ثم REST كاحتياطي
-    async findExecutor(guild, type, targetId) {
+    // يبحث عن سجل تدقيق محدد في البثّ الفوري فقط (بدون REST)
+    findStreamedEntry(guildId, type, targetId, maxAgeMs = 20000) {
         const now = Date.now();
-        const streamed = (this.auditStream.get(guild.id) || []).filter(e => e.action === type && now - (e.createdTimestamp ?? now) < 20000);
-        let entry = targetId ? streamed.find(e => e.targetId === targetId) : undefined;
-        if (!entry)
-            entry = streamed[0];
-        if (entry?.executor)
-            return entry.executor;
+        const streamed = (this.auditStream.get(guildId) || []).filter(e => e.action === type && now - (e.createdTimestamp ?? now) < maxAgeMs);
+        const matches = targetId
+            ? streamed.filter(e => e.targetId === targetId)
+            : streamed;
+        if (!matches.length)
+            return undefined;
+        // ⚡ نفضّل سجل المهاجم على سجل البوت نفسه (البوت قد يكون أعاد الاسم/القناة للتو)
+        const nonSelf = matches.filter(e => e.executor?.id && e.executor.id !== this.client.user?.id);
+        return nonSelf[0] ?? matches[0];
+    }
+    /**
+     * ⚡ انتظار سجل التدقيق من Gateway (حتى 1.5 ثانية) ثم REST كاحتياطي.
+     * Discord يرسل سجل التدقيق بعد الحدث أحياناً بمئات الأجزاء من الثانية،
+     * وكان الكود القديم يستسلم فوراً → تفوت العقوبة. هذا الانتظار القصير يحل المشكلة.
+     */
+    async findAuditEntry(guild, type, targetId, waitMs = 1500, maxAgeMs = 30000) {
+        const deadline = Date.now() + waitMs;
+        while (true) {
+            const streamed = this.findStreamedEntry(guild.id, type, targetId, maxAgeMs);
+            if (streamed)
+                return streamed;
+            if (Date.now() >= deadline)
+                break;
+            await sleep(50);
+        }
         try {
-            const entries = await this.getCachedAuditLogs(guild, type, 5);
-            const recent = entries.filter(e => now - (e.createdTimestamp ?? now) < 20000);
-            // لو الهدف غير مطابق (تأخّر السجل) نأخذ أحدث سجل حديث — التعافي أهم من التطابق الدقيق
-            const found = (targetId ? recent.find(e => e.targetId === targetId) : undefined) ?? recent[0];
-            return found?.executor ? found.executor : null;
+            const entries = await this.getCachedAuditLogs(guild, type, 20);
+            const recent = entries.filter(e => Date.now() - (e.createdTimestamp ?? Date.now()) < maxAgeMs);
+            const matches = targetId ? recent.filter(e => e.targetId === targetId) : recent;
+            if (!matches.length)
+                return null;
+            const nonSelf = matches.filter(e => e.executor?.id && e.executor.id !== this.client.user?.id);
+            return nonSelf[0] ?? matches[0];
         }
         catch (error) {
             logger.warn(`fetchAuditLogs failed in ${guild.name}: ${error.message}`);
             return null;
         }
     }
+    // تحديد المنفّذ — أولاً من بثّ Gateway (فوري)، ثم REST كاحتياطي
+    async findExecutor(guild, type, targetId, waitMs = 1500, maxAgeMs = 30000) {
+        const entry = await this.findAuditEntry(guild, type, targetId, waitMs, maxAgeMs);
+        return entry?.executor ? entry.executor : null;
+    }
     // يبحث في سجلات التدقيق عن أمر طرد يستهدف هذا العضو — بثّ فوري + 3 محاولات سريعة
     async findKickExecutor(guild, targetId) {
         for (let attempt = 0; attempt < 3; attempt++) {
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.MemberKick, targetId);
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.MemberKick, targetId, attempt === 0 ? 400 : 250);
             if (executor)
                 return executor;
             if (attempt < 2)
@@ -376,17 +411,23 @@ class SecurityHandler {
     }
     // يبحث في سجلات التدقيق عن منفّذ أنشأ هدفاً محدداً — بدون شرط الحداثة (للويب هوك)
     async findAuditCreator(guild, type, targetId) {
-        const now = Date.now();
-        const streamed = (this.auditStream.get(guild.id) || []).find(e => e.action === type && e.targetId === targetId);
-        if (streamed?.executor)
-            return streamed.executor;
+        const deadline = Date.now() + 1200;
+        while (true) {
+            const streamed = this.findStreamedEntry(guild.id, type, targetId, 24 * 60 * 60 * 1000);
+            if (streamed?.executor)
+                return streamed.executor;
+            if (Date.now() >= deadline)
+                break;
+            await sleep(50);
+        }
         try {
-            const logs = await guild.fetchAuditLogs({ type, limit: 50 });
-            const found = [...logs.entries.values()].find((e) => e.targetId === targetId);
-            if (found && now - (found.createdTimestamp ?? now) < 24 * 60 * 60 * 1000 && found.executor) {
-                return found.executor;
-            }
-            return null;
+            const logs = await guild.fetchAuditLogs({ type, limit: 100 });
+            const matches = [...logs.entries.values()].filter((e) => e.targetId === targetId &&
+                Date.now() - (e.createdTimestamp ?? Date.now()) < 24 * 60 * 60 * 1000 &&
+                e.executor);
+            const nonSelf = matches.filter((e) => e.executor.id !== this.client.user?.id);
+            const found = nonSelf[0] ?? matches[0];
+            return found ? found.executor : null;
         }
         catch {
             return null;
@@ -499,11 +540,128 @@ class SecurityHandler {
             return `⚠️ فشل سحب الرولات (${error.message})`;
         }
     }
+    /** سحب كل رولات حساب بالمعرّف — يعمل حتى لو لم يكن العضو في الكاش */
+    async stripRolesById(guild, userId, reason) {
+        if (!userId || userId === guild.ownerId || userId === this.client.user?.id)
+            return false;
+        const member = guild.members.cache.get(userId) ||
+            (await guild.members.fetch(userId).catch(() => null));
+        if (!member)
+            return false;
+        try {
+            await member.roles.set([], reason);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    /**
+     * 🛡️ تحييد فوري: حظر بالمعرّف، ولو فشل (هرمية/صلاحيات) يسحب كل رولاته،
+     *    ولو فشل الاثنان يرجع نتيجة صريحة بدل السكوت.
+     */
+    async neutralizeById(guild, executor, cfg, reason, forceBan = false) {
+        this.startIncident(guild.id, executor.id);
+        const action = forceBan || cfg?.mode !== 'react' ? 'ban' : (cfg?.action ?? 'ban');
+        if (action === 'alert')
+            return '🔔 تنبيه فقط';
+        if (action === 'strip') {
+            return (await this.stripRolesById(guild, executor.id, reason))
+                ? '🗡️ سُحبت كل رولاته — لا يستطيع فعل أي شيء'
+                : '⚠️ تعذّر سحب الرولات';
+        }
+        if (action === 'kick') {
+            return this.punishById(guild, executor, 'kick', reason);
+        }
+        // ban: أسرع مسار — بالمعرّف مباشرة
+        if (await this.banUserById(guild, executor.id, reason)) {
+            return '🔨 حظر فوري ✅';
+        }
+        // احتياطي: سحب الرولات حتى لو تعذّر الحظر بسبب الهرمية
+        if (await this.stripRolesById(guild, executor.id, reason)) {
+            return '🗡️ سُحبت كل رولاته (تعذّر الحظر — غالباً بسبب الهرمية)';
+        }
+        return '⚠️ تعذّر الحظر وسحب الرولات — راجع رتبة البوت';
+    }
+    /** ردّ فوري على أي اعتداء من إنسان أو بوت (يُستدعى من بثّ سجلات التدقيق) */
+    async handleInstantViolation(guild, executor, settings, cfg, label, opts = {}) {
+        const reason = `Liberty City — ${label} (Anti-Nuke — ردّ فوري)`;
+        const text = await this.neutralizeById(guild, executor, cfg, reason, opts.forceBan ?? false);
+        // احذف الهدف الذي أنشأه للتو (قناة/رول)
+        if (opts.targetId && opts.deleteTargetKind) {
+            if (opts.deleteTargetKind === 'channel') {
+                this.recordArtifact(guild.id, executor.id, 'channels', opts.targetId);
+                guild.channels.cache
+                    .get(opts.targetId)
+                    ?.delete('Liberty City — أداة تخريب: هدف أُنشئ أثناء الهجوم')
+                    .catch(() => { });
+            }
+            else {
+                this.recordArtifact(guild.id, executor.id, 'roles', opts.targetId);
+                const role = guild.roles.cache.get(opts.targetId);
+                if (role && role.id !== guild.id && !role.managed) {
+                    role.delete('Liberty City — أداة تخريب: دور أُنشئ أثناء الهجوم').catch(() => { });
+                }
+            }
+        }
+        void this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
+        // تنبيه واحد فقط لكل مهاجم خلال 15 ثانية — حتى لا يغرق السيرفر
+        const alertKey = `${guild.id}:violation-alert:${executor.id}`;
+        if (!this.markHandled(alertKey)) {
+            const ch = await this.getAlertChannel(guild, settings, cfg?.logChannel);
+            ch?.send({
+                content: `🚨 **حماية فورية — ${label}**\n` +
+                    `👤 المنفّذ: ${executor} (\`${this.userLabel(executor)}\`)\n` +
+                    `${text}`,
+            }).catch(() => { });
+        }
+        logger.warn(`🚨 Instant guard: ${label} in ${guild.name} | executor=${this.userLabel(executor)} | ${text}`);
+    }
+    /** عدّاد تغيير أسماء القنوات السريع */
+    trackRename(guildId, userId, windowMs) {
+        const key = `${guildId}:${userId}`;
+        const now = Date.now();
+        const arr = (this.renameTracker.get(key) || []).filter(t => now - t <= windowMs);
+        arr.push(now);
+        this.renameTracker.set(key, arr);
+        return arr.length;
+    }
+    /** هل يملك هذا العضو صلاحيات تخريبية فعلية؟ */
+    hasDangerousPermissions(member) {
+        const p = member.permissions;
+        return (p.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+            p.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+            p.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+            p.has(discord_js_1.PermissionFlagsBits.ManageRoles) ||
+            p.has(discord_js_1.PermissionFlagsBits.ManageWebhooks) ||
+            p.has(discord_js_1.PermissionFlagsBits.BanMembers) ||
+            p.has(discord_js_1.PermissionFlagsBits.KickMembers));
+    }
     /**
      * 🧹 حذف كل ما أنشأه المهاجم (قنوات/رولات/ويب هوكس).
      * يعمل من الذاكرة أولاً ثم من سجلات التدقيق بفلتر user_id — حتى لو فاتتنا الأحداث.
+     * ⚡ مُجمَّع: لا نطلق عملية تطهير جديدة لنفس المهاجم أثناء عمل واحدة (يمنع عاصفة REST).
      */
+    purgeInFlight = new Map();
     async purgeAttackerArtifacts(guild, attackerId, scheduleRetry = true) {
+        const key = `${guild.id}:${attackerId}`;
+        if (scheduleRetry) {
+            const running = this.purgeInFlight.get(key);
+            if (running)
+                return running;
+        }
+        const task = this.doPurgeAttackerArtifacts(guild, attackerId, scheduleRetry);
+        if (scheduleRetry)
+            this.purgeInFlight.set(key, task);
+        try {
+            return await task;
+        }
+        finally {
+            if (this.purgeInFlight.get(key) === task)
+                this.purgeInFlight.delete(key);
+        }
+    }
+    async doPurgeAttackerArtifacts(guild, attackerId, scheduleRetry = true) {
         let deleted = 0;
         const artKey = `${guild.id}:${attackerId}`;
         const art = this.attackerArtifacts.get(artKey);
@@ -639,8 +797,7 @@ class SecurityHandler {
             if (executor.id === this.client.user?.id)
                 return false;
             const key = `${guild.id}:rogue:${executor.id}`;
-            if (this.markHandled(key))
-                return true;
+            const first = !this.markHandled(key);
             const settings = await (0, models_1.getGuildSettings)(guild.id);
             const cfg = settings.protection?.antiNuke;
             // البوتات تُمنع دائماً عندما يكون مضاد النيوك مفعّلاً (وضع المنع أو التفاعل)
@@ -649,7 +806,7 @@ class SecurityHandler {
             if (await this.isTrustedExecutor(guild, executor.id))
                 return false;
             this.startIncident(guild.id, executor.id);
-            // احذف الهدف فوراً قبل أي شيء
+            // احذف الهدف فوراً قبل أي شيء — حتى في المحاولة المتكررة
             if (targetId) {
                 if (kind === 'channel') {
                     this.recordArtifact(guild.id, executor.id, 'channels', targetId);
@@ -664,6 +821,11 @@ class SecurityHandler {
                 else if (kind === 'webhook') {
                     this.recordArtifact(guild.id, executor.id, 'webhooks', targetId);
                 }
+            }
+            // ⚡ محاولة أولى: حظر + تطهير + تنبيه. المحاولات التالية: تطهير سريع فقط
+            if (!first) {
+                void this.purgeAttackerArtifacts(guild, executor.id, false).catch(() => { });
+                return true;
             }
             // حظر فوري بالمعرّف (لا ننتظر جلب العضو)
             const banned = await this.banUserById(guild, executor.id, 'Liberty City — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)');
@@ -706,8 +868,15 @@ class SecurityHandler {
                 return true;
             this.startIncident(guild.id, botId);
             const banned = await this.banUserById(guild, botId, 'Liberty City — بوت غير مصرح به (Anti-Bot)');
-            if (!banned && member) {
-                await member.kick('Liberty City — بوت غير مصرح به').catch(() => { });
+            if (!banned) {
+                const target = member ||
+                    guild.members.cache.get(botId) ||
+                    (await guild.members.fetch(botId).catch(() => null));
+                if (target) {
+                    await target.kick('Liberty City — بوت غير مصرح به').catch(() => { });
+                    // 🛡️ لو الطرد فشل بسبب التسلسل: اسحب كل رولاته حتى لا يملك أي صلاحية
+                    await target.roles?.set?.([], 'Liberty City — سحب صلاحيات بوت غير مصرح').catch(() => { });
+                }
             }
             void this.getAlertChannel(guild, settings, antiBot?.logChannel)
                 .then(ch => ch
@@ -736,6 +905,20 @@ class SecurityHandler {
             const executor = entry?.executor;
             if (!guild || !executor || executor.id === this.client.user?.id)
                 return;
+            // 🔎 سجل Gateway قد يحمل مستخدماً جزئياً (id فقط) — نحدد هل هو بوت حتى لا يفلت
+            if (typeof executor.bot !== 'boolean') {
+                const member = guild.members.cache.get(executor.id);
+                let isBot = member?.user.bot;
+                if (typeof isBot !== 'boolean')
+                    isBot = this.client.users.cache.get(executor.id)?.bot;
+                if (typeof isBot !== 'boolean') {
+                    const fetched = await this.client.users.fetch(executor.id).catch(() => null);
+                    if (fetched)
+                        isBot = fetched.bot;
+                }
+                if (typeof isBot === 'boolean')
+                    executor.bot = isBot;
+            }
             // 🤖 بوت جديد انضم → حظره قبل أن يفعل أي شيء
             if (entry.action === discord_js_1.AuditLogEvent.BotAdd) {
                 const targetId = entry.targetId;
@@ -747,33 +930,171 @@ class SecurityHandler {
                     await this.guardBotJoin(guild, targetId);
                 return;
             }
-            // 🤖 أي بوت غير مصرح ينشئ قناة/رول/ويب هوك → حظر فوري + حذف
-            if (!this.executorIsBot(guild, executor))
+            // 👑 المالك/المطوّر/الوايت ليست أحرار تماماً
+            if (await this.isTrustedExecutor(guild, executor.id))
                 return;
-            if (entry.action === discord_js_1.AuditLogEvent.ChannelCreate || entry.action === discord_js_1.AuditLogEvent.ThreadCreate) {
-                await this.handleRogueBot(guild, executor, 'channel', entry.targetId);
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const cfg = settings.protection?.antiNuke;
+            if (!cfg?.enabled)
+                return; // 🛑 احترام إطفاء مضاد النيوك
+            const isBot = this.executorIsBot(guild, executor);
+            const action = entry.action;
+            const bot = isBot;
+            const instantBotActions = new Set([
+                discord_js_1.AuditLogEvent.ChannelDelete,
+                discord_js_1.AuditLogEvent.RoleDelete,
+                discord_js_1.AuditLogEvent.MemberBanAdd,
+                discord_js_1.AuditLogEvent.MemberKick,
+                discord_js_1.AuditLogEvent.MemberPrune,
+                discord_js_1.AuditLogEvent.ThreadDelete,
+                discord_js_1.AuditLogEvent.EmojiDelete,
+                discord_js_1.AuditLogEvent.StickerDelete,
+                discord_js_1.AuditLogEvent.MessageBulkDelete,
+                discord_js_1.AuditLogEvent.GuildUpdate,
+                discord_js_1.AuditLogEvent.ChannelOverwriteCreate,
+                discord_js_1.AuditLogEvent.ChannelOverwriteUpdate,
+                discord_js_1.AuditLogEvent.ChannelOverwriteDelete,
+                discord_js_1.AuditLogEvent.MemberRoleUpdate,
+                discord_js_1.AuditLogEvent.RoleUpdate,
+            ]);
+            // 🤖 أي بوت غير مصرح: صفر تسامح — أول عملية تخريبية = حظر فوري
+            if (bot && instantBotActions.has(action)) {
+                const labels = {
+                    [discord_js_1.AuditLogEvent.ChannelDelete]: 'حذف قناة',
+                    [discord_js_1.AuditLogEvent.RoleDelete]: 'حذف رول',
+                    [discord_js_1.AuditLogEvent.MemberBanAdd]: 'حظر أعضاء',
+                    [discord_js_1.AuditLogEvent.MemberKick]: 'طرد أعضاء',
+                    [discord_js_1.AuditLogEvent.MemberPrune]: 'تنظيف أعضاء (Prune)',
+                    [discord_js_1.AuditLogEvent.ThreadDelete]: 'حذف ثريد',
+                    [discord_js_1.AuditLogEvent.EmojiDelete]: 'حذف إيموجي',
+                    [discord_js_1.AuditLogEvent.StickerDelete]: 'حذف ستيكر',
+                    [discord_js_1.AuditLogEvent.MessageBulkDelete]: 'حذف رسائل جماعي',
+                    [discord_js_1.AuditLogEvent.GuildUpdate]: 'تعديل إعدادات السيرفر',
+                    [discord_js_1.AuditLogEvent.ChannelOverwriteCreate]: 'تعديل صلاحيات قناة',
+                    [discord_js_1.AuditLogEvent.ChannelOverwriteUpdate]: 'تعديل صلاحيات قناة',
+                    [discord_js_1.AuditLogEvent.ChannelOverwriteDelete]: 'تعديل صلاحيات قناة',
+                    [discord_js_1.AuditLogEvent.MemberRoleUpdate]: 'تعديل رولات عضو',
+                    [discord_js_1.AuditLogEvent.RoleUpdate]: 'تعديل رول',
+                };
+                await this.handleInstantViolation(guild, executor, settings, cfg, labels[action] ?? 'عملية تخريبية', { forceBan: true });
+                return;
             }
-            else if (entry.action === discord_js_1.AuditLogEvent.RoleCreate) {
-                await this.handleRogueBot(guild, executor, 'role', entry.targetId);
+            // 🤖 بوت ينشئ قناة/رول/ويب هوك/ثريد → حظر فوري + حذف ما أنشأه
+            if (bot) {
+                if (action === discord_js_1.AuditLogEvent.ChannelCreate ||
+                    action === discord_js_1.AuditLogEvent.ThreadCreate) {
+                    await this.handleRogueBot(guild, executor, 'channel', entry.targetId);
+                    return;
+                }
+                if (action === discord_js_1.AuditLogEvent.RoleCreate) {
+                    await this.handleRogueBot(guild, executor, 'role', entry.targetId);
+                    return;
+                }
+                if (action === discord_js_1.AuditLogEvent.WebhookCreate) {
+                    await this.handleRogueBot(guild, executor, 'webhook', entry.targetId);
+                    return;
+                }
             }
-            else if (entry.action === discord_js_1.AuditLogEvent.WebhookCreate) {
-                await this.handleRogueBot(guild, executor, 'webhook', entry.targetId);
+            // 🔨 حذف قناة/رول من أي حساب غير موثوق → أول عملية = تحييد فوري
+            if (action === discord_js_1.AuditLogEvent.ChannelDelete || action === discord_js_1.AuditLogEvent.RoleDelete) {
+                await this.handleInstantViolation(guild, executor, settings, cfg, action === discord_js_1.AuditLogEvent.ChannelDelete ? 'حذف قناة' : 'حذف رول', { forceBan: cfg.mode !== 'react' });
+                return;
             }
-            else if (
-            // ⚡ أي عملية تخريبية من بوت: حظر فوري من بثّ التدقيق قبل حتى أن يصل حدث Discord
-            entry.action === discord_js_1.AuditLogEvent.ChannelDelete ||
-                entry.action === discord_js_1.AuditLogEvent.ChannelOverwriteCreate ||
-                entry.action === discord_js_1.AuditLogEvent.ChannelOverwriteUpdate ||
-                entry.action === discord_js_1.AuditLogEvent.ThreadDelete ||
-                entry.action === discord_js_1.AuditLogEvent.RoleDelete ||
-                entry.action === discord_js_1.AuditLogEvent.EmojiDelete ||
-                entry.action === discord_js_1.AuditLogEvent.StickerDelete ||
-                entry.action === discord_js_1.AuditLogEvent.MemberBanAdd ||
-                entry.action === discord_js_1.AuditLogEvent.MemberKick ||
-                entry.action === discord_js_1.AuditLogEvent.MemberPrune ||
-                entry.action === discord_js_1.AuditLogEvent.MemberRoleUpdate ||
-                entry.action === discord_js_1.AuditLogEvent.MemberUpdate) {
-                await this.handleRogueBot(guild, executor, 'channel');
+            // 🔨 حظر/طرد جماعي (الإنسان يُسمح له بعملية واحدة، والثانية خلال 10ث = هجوم)
+            if (action === discord_js_1.AuditLogEvent.MemberBanAdd || action === discord_js_1.AuditLogEvent.MemberKick) {
+                const kind = action === discord_js_1.AuditLogEvent.MemberBanAdd ? 'ban' : 'kick';
+                if (!isBot) {
+                    const count = this.trackActionOnce(guild.id, executor.id, kind, entry.targetId, 10000);
+                    if (count < 2)
+                        return;
+                }
+                await this.handleInstantViolation(guild, executor, settings, cfg, action === discord_js_1.AuditLogEvent.MemberBanAdd ? 'حظر جماعي' : 'طرد جماعي', { forceBan: true });
+                // إلغاء حظر الضحية إن أمكن
+                if (action === discord_js_1.AuditLogEvent.MemberBanAdd && entry.targetId) {
+                    void guild.members
+                        .unban(entry.targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً')
+                        .catch(() => { });
+                }
+                return;
+            }
+            // 🧹 Prune جماعي
+            if (action === discord_js_1.AuditLogEvent.MemberPrune) {
+                await this.handleInstantViolation(guild, executor, settings, cfg, 'تنظيف أعضاء (Prune)', {
+                    forceBan: true,
+                });
+                return;
+            }
+            // 🧵 حذف ثريدات / إيموجي / ستيكر — عتبة سريعة للإنسان، فوري للبوت (تم أعلاه)
+            if (action === discord_js_1.AuditLogEvent.ThreadDelete ||
+                action === discord_js_1.AuditLogEvent.EmojiDelete ||
+                action === discord_js_1.AuditLogEvent.StickerDelete) {
+                const key = action === discord_js_1.AuditLogEvent.ThreadDelete ? 'channel' : action === discord_js_1.AuditLogEvent.EmojiDelete ? 'emoji' : 'sticker';
+                const limit = action === discord_js_1.AuditLogEvent.ThreadDelete ? 3 : 5;
+                const count = this.track(guild.id, key, 10000);
+                if (count < limit)
+                    return;
+                this.deletionTracker.get(guild.id)[key] = [];
+                await this.handleInstantViolation(guild, executor, settings, cfg, 'حذف جماعي', {
+                    forceBan: cfg.mode !== 'react',
+                });
+                return;
+            }
+            // 🏗️ إنشاء قنوات/رولات/ثريدات بسرعة
+            //    قنوات/رولات: 2+ خلال 5ث — ثريدات: 3+ خلال 10ث
+            if (action === discord_js_1.AuditLogEvent.ChannelCreate ||
+                action === discord_js_1.AuditLogEvent.ThreadCreate ||
+                action === discord_js_1.AuditLogEvent.RoleCreate) {
+                const isThread = action === discord_js_1.AuditLogEvent.ThreadCreate;
+                const kind = isThread
+                    ? 'thread'
+                    : action === discord_js_1.AuditLogEvent.RoleCreate
+                        ? 'role'
+                        : 'channel';
+                const windowMs = isThread ? 10000 : 5000;
+                const limit = isThread ? 3 : 2;
+                const count = this.trackCreateOnce(guild.id, executor.id, kind, entry.targetId, windowMs);
+                if (count < limit)
+                    return;
+                await this.handleInstantViolation(guild, executor, settings, cfg, isThread
+                    ? 'إنشاء ثريدات جماعي'
+                    : action === discord_js_1.AuditLogEvent.RoleCreate
+                        ? 'إنشاء رولات جماعي'
+                        : 'إنشاء قنوات جماعي', {
+                    forceBan: cfg.mode !== 'react',
+                    targetId: entry.targetId,
+                    deleteTargetKind: (isThread ? 'channel' : kind),
+                });
+                return;
+            }
+            // 🔗 إنشاء ويب هوك — بوت تم أعلاه، الإنسان: أول ويب هوك غير مصرح = تحييد
+            if (action === discord_js_1.AuditLogEvent.WebhookCreate) {
+                const count = this.trackCreateOnce(guild.id, executor.id, 'webhook', entry.targetId, 10000);
+                if (count < 1)
+                    return;
+                await this.handleInstantViolation(guild, executor, settings, cfg, 'إنشاء ويب هوك غير مصرح', {
+                    forceBan: cfg.mode !== 'react',
+                });
+                return;
+            }
+            // ✏️ تغيير اسم قناة بسرعة (الإنسان: 2+ خلال 5ث) — البوت يُحظر من أول تغيير
+            if (action === discord_js_1.AuditLogEvent.ChannelUpdate) {
+                const nameChange = (entry.changes || []).find((c) => c.key === 'name');
+                if (!nameChange)
+                    return;
+                if (!isBot) {
+                    const count = this.trackRename(guild.id, executor.id, 5000);
+                    if (count < 2 && !this.isActiveAttacker(guild.id, executor.id))
+                        return;
+                }
+                // استرجاع الاسم القديم فوراً
+                const channel = guild.channels.cache.get(entry.targetId);
+                if (channel && nameChange.old) {
+                    channel.setName(String(nameChange.old), 'Liberty City — استرجاع اسم القناة').catch(() => { });
+                }
+                await this.handleInstantViolation(guild, executor, settings, cfg, 'تغيير اسم قناة سريع', {
+                    forceBan: isBot || cfg.mode !== 'react',
+                });
+                return;
             }
         }
         catch (error) {
@@ -787,8 +1108,9 @@ class SecurityHandler {
         if (this.botGuardTimers.has(guild.id))
             return;
         const run = () => this.auditDangerousBots(guild).catch(() => { });
-        setTimeout(run, 4000).unref?.();
-        const timer = setInterval(run, 30000);
+        // ⚡ فحص أول فوري — لا نترك نافذة 4 ثوانٍ يستغلها المهاجم
+        void run();
+        const timer = setInterval(run, 10000);
         timer.unref?.();
         this.botGuardTimers.set(guild.id, timer);
     }
@@ -808,13 +1130,15 @@ class SecurityHandler {
                 if (!member.user.bot || wl.has(member.id))
                     continue;
                 const p = member.permissions;
-                // بوت "قادر على النيوك": مدير عام، أو يدير القنوات + (رولات/حظر/طرد/إدارة سيرفر)
+                // بوت "قادر على النيوك": أي صلاحية تخريبية منفردة تكفي — لا ننتظر اجتماعها
                 const nukeCapable = p.has(discord_js_1.PermissionFlagsBits.Administrator) ||
-                    (p.has(discord_js_1.PermissionFlagsBits.ManageChannels) &&
-                        (p.has(discord_js_1.PermissionFlagsBits.ManageRoles) ||
-                            p.has(discord_js_1.PermissionFlagsBits.BanMembers) ||
-                            p.has(discord_js_1.PermissionFlagsBits.KickMembers) ||
-                            p.has(discord_js_1.PermissionFlagsBits.ManageGuild)));
+                    p.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageRoles) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageWebhooks) ||
+                    p.has(discord_js_1.PermissionFlagsBits.BanMembers) ||
+                    p.has(discord_js_1.PermissionFlagsBits.KickMembers) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageThreads);
                 if (nukeCapable)
                     dangerous.push(member);
             }
@@ -891,44 +1215,63 @@ class SecurityHandler {
             const threshold = Math.max(4, Number(spam?.maxMessages) || 5);
             if (!massMention && !invite && !scam && arr.length < threshold)
                 return false;
-            // 1) احذف الرسالة والويب هوك فوراً (قبل أي انتظار)
+            // 1) احذف الرسالة فوراً (قبل أي انتظار)
             await message.delete().catch(() => { });
             const keyHandled = `${guild.id}:wh-handle:${message.webhookId}`;
             if (this.markHandled(keyHandled))
                 return true;
+            // 2) احذف الويب هوك فوراً + استخرج مالكه بالجلب
             let whOwnerId;
+            let whName = 'unknown';
             try {
-                const whs = await guild.fetchWebhooks();
-                const target = whs.get(message.webhookId);
+                const target = (await guild.fetchWebhooks()).get(message.webhookId);
                 whOwnerId = target?.owner?.id;
-                await target?.delete('Liberty City — Anti-Webhook-Spam');
+                whName = target?.name ?? whName;
+                await target?.delete('Liberty City — Anti-Webhook-Spam').catch(() => { });
             }
-            catch { }
-            this.recordArtifact(guild.id, 'unknown', 'webhooks', message.webhookId);
-            // 2) حدّد صانع الويب هوك: بثّ التدقيق → سجلات التدقيق → مالك الويب هوك نفسه
-            let creator = await this.findAuditCreator(guild, discord_js_1.AuditLogEvent.WebhookCreate, message.webhookId);
-            if (!creator && whOwnerId) {
-                creator = await this.client.users.fetch(whOwnerId).catch(() => null);
-            }
+            catch { /* تجاهل */ }
             // 3) احذف رسائل الويب هوك السابقة
             void this.cleanupChannelMessages(message, (m) => m.webhookId === message.webhookId);
+            // 4) حدّد صانع الويب هوك: بثّ التدقيق → REST → مالك الويب هوك
+            let creator = await this.findAuditCreator(guild, discord_js_1.AuditLogEvent.WebhookCreate, message.webhookId);
+            if (!creator && whOwnerId) {
+                creator =
+                    guild.client.users.cache.get(whOwnerId) ||
+                        (await this.client.users.fetch(whOwnerId).catch(() => null));
+            }
+            this.recordArtifact(guild.id, creator?.id ?? 'unknown', 'webhooks', message.webhookId);
             let actionText = '🗑️ حذف الرسائل والويب هوك';
             if (creator && creator.id !== this.client.user?.id) {
                 const trusted = await this.isTrustedExecutor(guild, creator.id);
-                if (!trusted) {
-                    this.startIncident(guild.id, creator.id);
-                    const prevent = nuke?.mode !== 'react';
-                    const action = prevent
-                        ? 'ban'
-                        : (nuke?.action ?? 'kick');
-                    actionText += `\n${await this.punishById(guild, creator, action, 'Liberty City — سبام ويب هوك (Anti-Nuke)')}`;
+                if (!trusted && nuke?.enabled) {
+                    // 🚨 صفر تسامح: صانع الويب هوك يُحظر فوراً — ولو تعذّر الحظر تُسحب كل رولاته
+                    const text = await this.neutralizeById(guild, creator, nuke, 'Liberty City — سبام ويب هوك (Anti-Nuke)', nuke.mode !== 'react');
+                    actionText += `\n${text}`;
+                    // 🧹 احذف كل ويب هوكاته الأخرى حتى لا يكمل من واحدة ثانية
+                    try {
+                        const all = await guild.fetchWebhooks();
+                        await Promise.allSettled([...all.values()]
+                            .filter((w) => w?.owner?.id === creator.id)
+                            .map((w) => w.delete('Liberty City — حذف ويب هوكات المهاجم')));
+                    }
+                    catch { /* تجاهل */ }
                     await this.purgeAttackerArtifacts(guild, creator.id).catch(() => 0);
                 }
+                else if (!trusted) {
+                    actionText += '\n⚠️ مضاد النيوك مطفأ — لم تُنفّذ عقوبة (حذف الرسائل فقط)';
+                }
+                else {
+                    actionText += '\n👑 المنشئ موثوق — احتُوي الويب هوك فقط';
+                }
+            }
+            else if (!creator) {
+                actionText += '\n⚠️ تعذّر تحديد صانع الويب هوك — احتُوي الهجوم';
             }
             const ch = await this.getAlertChannel(guild, settings, nuke?.logChannel);
             ch?.send({
                 content: `🚨 **سبام ويب هوك — تم إيقافه فوراً**\n` +
-                    `🔗 الويب هوك: \`${message.webhookId}\`\n` +
+                    `🔗 الويب هوك: \`${whName}\` (\`${message.webhookId}\`)\n` +
+                    `👤 الصانع: ${creator ? `${creator} (\`${creator.id}\`)` : 'غير معروف'}\n` +
                     `📢 القناة: <#${message.channelId}>\n` +
                     `${actionText}\n` +
                     `السبب: ${massMention ? '@everyone / منشن جماعي' : invite ? 'رابط دعوة' : scam ? 'رابط احتيالي' : `${arr.length} رسائل في 3 ثوانٍ`}`,
@@ -1047,21 +1390,15 @@ class SecurityHandler {
                 const target = [...member.roles.cache.values()].filter(r => r.id !== guild.id && !r.managed);
                 if (target.length === 0)
                     return '⚠️ المخالف بلا رولات لسحبها';
-                let removed = 0;
-                for (const role of target) {
-                    // كل رولة على حدة — لو فشلت واحدة بسبب التسلّم نكمل الباقي
-                    const ok = await role
-                        .delete(`Liberty City Anti-Nuke: ${reason}`)
-                        .then(() => true)
-                        .catch(() => false);
-                    if (ok)
-                        removed++;
+                try {
+                    // 🗡️ سحب الرولات من العضو نفسه — وليس حذف الرولات من السيرفر!
+                    await member.roles.remove(target, reason);
+                    return `🗡️ تم سلب **${target.length}** رولة — باقٍ في السيرفر بلا صلاحيات`;
                 }
-                if (removed === 0) {
-                    logger.warn(`Strip failed in ${guild.name} — no roles removed`);
+                catch (error) {
+                    logger.warn(`Strip failed in ${guild.name}: ${error.message}`);
                     return '⚠️ تعذّر سلب الرولات';
                 }
-                return `🗡️ تم سلب **${removed}/${target.length}** رولة — باقٍ في السيرفر بلا صلاحيات`;
             }
         }
         catch (error) {
@@ -1171,7 +1508,9 @@ class SecurityHandler {
             return true;
         if (executor.bot === false)
             return false;
-        return guild.members.cache.get(executor.id)?.user.bot === true;
+        if (guild.members.cache.get(executor.id)?.user.bot === true)
+            return true;
+        return this.client.users.cache.get(executor.id)?.bot === true;
     }
     /** اسم مقروء للمنفّذ حتى لو كان جزئياً */
     userLabel(user) {
@@ -1192,7 +1531,7 @@ class SecurityHandler {
             // 🛑 احترام الإطفاء — لا حماية عندما يكون مضاد النيوك مطفأ
             if (!cfg?.enabled)
                 return;
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.ChannelCreate, channel.id);
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.ChannelCreate, channel.id, 1500, 15000);
             if (!executor)
                 return; // بثّ التدقيق سيصل غالباً — لا نحذف عمياء (قد نحذف قناة استعادة)
             if (executor.id === this.client.user?.id)
@@ -1208,19 +1547,16 @@ class SecurityHandler {
             }
             // 🧑 إنسان: قناة واحدة قد تكون طبيعية — نتدخل عند الانفجار (2+ خلال 5 ثوانٍ)
             //    أو إذا كان الحادث نشطاً على نفس المنفّذ.
-            const burst = this.trackCreate(guild.id, executor.id, 'channel', 5000);
+            const burst = this.trackCreateOnce(guild.id, executor.id, 'channel', channel.id, 5000);
             const suspiciousName = /nuked|hacked|kly|cracked|death.?note|pwned|on.?top|raid|destroy/i.test(channel.name || '');
             if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id))
                 return;
             this.startIncident(guild.id, executor.id);
             channel.delete('Liberty City — إنشاء قنوات جماعي (Anti-Nuke)').catch(() => { });
-            if (burst === 2 || suspiciousName) {
+            if (burst >= 2 || suspiciousName) {
                 const reason = 'Liberty City — إنشاء قنوات جماعي مشبوه (Anti-Nuke)';
                 const prevent = cfg.mode !== 'react';
-                const action = prevent
-                    ? 'ban'
-                    : (cfg.action ?? 'kick');
-                const text = await this.punishById(guild, executor, action, reason);
+                const text = await this.neutralizeById(guild, executor, cfg, reason, prevent);
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
                 void this.getAlertChannel(guild, settings, cfg.logChannel)
                     .then(ch => ch
@@ -1247,6 +1583,48 @@ class SecurityHandler {
         this.createTracker.set(key, arr);
         return arr.length;
     }
+    /**
+     * عدّاد إنشاء لا يعدّ نفس الهدف مرتين.
+     * ضروري لأن الحدث وسجل التدقيق يصلان معاً لنفس القناة/الرول — بدون هذا
+     * كان إنشاء واحد يُحسب مرتين ويُعاقب عضو عادي ظلماً.
+     */
+    trackCreateOnce(guildId, userId, kind, targetId, windowMs) {
+        if (!targetId)
+            return this.trackCreate(guildId, userId, kind, windowMs);
+        const dedupeKey = `${guildId}:create-once:${kind}:${targetId}`;
+        const seen = this.handledTargets.get(dedupeKey);
+        if (seen && Date.now() - seen < 30000) {
+            // سبق عدّه — نرجع العدد الحالي بدون زيادة
+            const key = `${guildId}:${kind}:${userId}`;
+            const arr = (this.createTracker.get(key) || []).filter(t => Date.now() - t <= windowMs);
+            this.createTracker.set(key, arr);
+            return arr.length;
+        }
+        this.handledTargets.set(dedupeKey, Date.now());
+        return this.trackCreate(guildId, userId, kind, windowMs);
+    }
+    /**
+     * عدّاد حظر/طرد لكل منفّذ مع منع احتساب نفس الهدف مرتين
+     * (حدث الحظر + سجل التدقيق يصلان لنفس العملية).
+     */
+    trackActionOnce(guildId, executorId, type, targetId, windowMs) {
+        const now = Date.now();
+        const key = `${guildId}:${type}:${executorId}`;
+        if (targetId) {
+            const dedupeKey = `${guildId}:action-once:${type}:${targetId}`;
+            const seen = this.handledTargets.get(dedupeKey);
+            if (seen && now - seen < 30000) {
+                const arr = (this.actionTracker.get(key) || []).filter(t => now - t <= windowMs);
+                this.actionTracker.set(key, arr);
+                return arr.length;
+            }
+            this.handledTargets.set(dedupeKey, now);
+        }
+        const arr = (this.actionTracker.get(key) || []).filter(t => now - t <= windowMs);
+        arr.push(now);
+        this.actionTracker.set(key, arr);
+        return arr.length;
+    }
     async onRoleCreate(role) {
         try {
             if (!role?.guild || role.managed)
@@ -1256,7 +1634,7 @@ class SecurityHandler {
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return;
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleCreate, role.id);
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleCreate, role.id, 1500, 15000);
             if (!executor)
                 return;
             if (executor.id === this.client.user?.id)
@@ -1270,18 +1648,15 @@ class SecurityHandler {
                 return;
             }
             // 🧑 إنسان: انفجار 2+ خلال 5 ثوانٍ أو اسم مشبوه أو حادث نشط
-            const burst = this.trackCreate(guild.id, executor.id, 'role', 5000);
+            const burst = this.trackCreateOnce(guild.id, executor.id, 'role', role.id, 5000);
             const suspiciousName = /nuked|hacked|kly|cracked|death.?note|pwned|on.?top|raid|destroy/i.test(role.name || '');
             if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id))
                 return;
             this.startIncident(guild.id, executor.id);
             role.delete('Liberty City — إنشاء رولات جماعي (Anti-Nuke)').catch(() => { });
-            if (burst === 2 || suspiciousName) {
+            if (burst >= 2 || suspiciousName) {
                 const prevent = cfg.mode !== 'react';
-                const action = prevent
-                    ? 'ban'
-                    : (cfg.action ?? 'kick');
-                const text = await this.punishById(guild, executor, action, 'Liberty City — إنشاء رولات جماعي مشبوه (Anti-Nuke)');
+                const text = await this.neutralizeById(guild, executor, cfg, 'Liberty City — إنشاء رولات جماعي مشبوه (Anti-Nuke)', prevent);
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
                 void this.getAlertChannel(guild, settings, cfg.logChannel)
                     .then(ch => ch
@@ -1306,96 +1681,56 @@ class SecurityHandler {
         try {
             if (!newChannel?.guild || oldChannel.name === newChannel.name)
                 return;
-            const logs = await newChannel.guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 1 });
-            const entry = logs.entries.first();
+            const guild = newChannel.guild;
+            // ⚡ بثّ التدقيق الفوري أولاً — ثم REST احتياطي (بدون اشتراط وجود العضو في الكاش)
+            const entry = await this.findAuditEntry(guild, discord_js_1.AuditLogEvent.ChannelUpdate, newChannel.id, 1500, 6000);
             if (!entry?.executor)
-                return;
-            if (Date.now() - entry.createdTimestamp > 1500)
                 return;
             if (entry.executor.id === this.client.user?.id)
                 return;
-            if (await this.isTrustedExecutor(newChannel.guild, entry.executor.id))
+            if (await this.isTrustedExecutor(guild, entry.executor.id))
                 return; // 👑 موثوق يغيّر بحرية
-            const guild = newChannel.guild;
-            const member = guild.members.cache.get(entry.executor.id);
-            if (!member)
-                return;
             // 📋 جلب الإعدادات
             const settings = await (0, models_1.getGuildSettings)(guild.id);
             const antiNuke = settings.protection?.antiNuke;
             if (!antiNuke?.enabled)
                 return;
-            // 🛡️ فحص التسلسل الهرمي — صامت تماماً (بدون رسائل عن الرولات الأعلى)
-            const hierarchy = this.checkHierarchy(guild);
-            if (!hierarchy.ok) {
-                logger.warn(`Rename guard skipped in ${guild.name} — bot not top role`);
-                return;
-            }
-            // 🔐 فحص الصلاحيات
+            const isBot = this.executorIsBot(guild, entry.executor);
+            const count = this.trackRename(guild.id, entry.executor.id, 5000);
+            const nameChange = (entry.changes || []).find((c) => c.key === 'name');
+            const oldName = nameChange?.old ? String(nameChange.old) : oldChannel.name;
+            // 1️⃣ إرجاع الاسم فوراً — حتى لو لم نعاقب (تغيير واحد من إنسان قد يكون طبيعياً)
             const me = guild.members.me;
             const canManageChannels = me?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ?? false;
-            const canKick = me?.permissions.has(discord_js_1.PermissionFlagsBits.KickMembers) ?? false;
-            const canBan = me?.permissions.has(discord_js_1.PermissionFlagsBits.BanMembers) ?? false;
             let nameRestored = false;
-            let punished = false;
-            let punishType = 'none';
-            // 1️⃣ إرجاع الاسم
             if (canManageChannels) {
                 try {
-                    await newChannel.setName(oldChannel.name, 'Security: rename reverted');
+                    await newChannel.setName(oldName, 'Liberty City — استرجاع اسم القناة');
                     nameRestored = true;
                 }
                 catch (e) {
                     logger.warn(`Failed to restore channel name in ${guild.name}: ${e.message}`);
                 }
             }
-            // 2️⃣ العقوبة حسب إعدادات antiNuke
-            const action = antiNuke.action || 'kick';
-            if (action !== 'alert' && member) {
-                if (action === 'strip' && canKick) {
-                    try {
-                        await member.roles.set([], 'Security: rapid rename (strip roles)');
-                        punished = true;
-                        punishType = 'strip';
-                    }
-                    catch (e) {
-                        logger.warn(`Failed to strip roles in ${guild.name}: ${e.message}`);
-                    }
-                }
-                else if (action === 'kick' && canKick) {
-                    try {
-                        await member.kick('Security: rapid channel rename');
-                        punished = true;
-                        punishType = 'kick';
-                    }
-                    catch (e) {
-                        logger.warn(`Failed to kick in ${guild.name}: ${e.message}`);
-                    }
-                }
-                else if (action === 'ban' && canBan) {
-                    try {
-                        await member.ban({ reason: 'Security: rapid channel rename (anti-nuke)' });
-                        punished = true;
-                        punishType = 'ban';
-                    }
-                    catch (e) {
-                        logger.warn(`Failed to ban in ${guild.name}: ${e.message}`);
-                    }
-                }
+            // 🧑 إنسان: تغيير واحد = استرجاع فقط. 2+ خلال 5 ثوانٍ = هجوم.
+            // 🤖 بوت: أول تغيير = حظر فوري.
+            if (!isBot && count < 2 && !this.isActiveAttacker(guild.id, entry.executor.id)) {
+                logger.info(`✏️ Channel rename reverted in ${guild.name} (single change by ${this.userLabel(entry.executor)})`);
+                return;
             }
+            // 2️⃣ العقوبة — وضع المنع = حظر فوري، ولو فشل نسحب كل الرولات
+            const prevent = antiNuke.mode !== 'react';
+            const text = await this.neutralizeById(guild, entry.executor, antiNuke, 'Liberty City — تغيير أسماء القنوات بسرعة (Anti-Nuke)', isBot || prevent);
+            await this.purgeAttackerArtifacts(guild, entry.executor.id).catch(() => 0);
             // 3️⃣ إرسال التقرير
             const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
-            const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
-            let msg = `✏️ **${executorType} غيّر اسم قناة:** ${entry.executor.tag}\n`;
-            msg += `📝 القناة: <#${newChannel.id}>\n`;
-            msg += `🔄 استرجاع الاسم: ${nameRestored ? '✅ تم' : canManageChannels ? '❌ فشل' : '⚠️ لا توجد صلاحية ManageChannels'}\n`;
-            if (action === 'alert') {
-                msg += `🔔 الإجراء: تنبيه فقط (حسب الإعدادات)`;
-            }
-            else {
-                msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل — تحقق من الصلاحيات/الهرمية'}`;
-            }
-            alert?.send({ content: msg }).catch(() => { });
+            const executorType = isBot ? '🤖 بوت' : '👤 عضو';
+            alert?.send({
+                content: `✏️ **${executorType} غيّر اسم قناة${count > 1 ? ` ${count} مرات/5 ثوانٍ` : ''}:** ${entry.executor.tag}\n` +
+                    `📝 القناة: <#${newChannel.id}>\n` +
+                    `🔄 استرجاع الاسم: ${nameRestored ? '✅ تم' : canManageChannels ? '❌ فشل' : '⚠️ لا توجد صلاحية ManageChannels'}\n` +
+                    `🛡️ ${text}`,
+            }).catch(() => { });
         }
         catch (error) {
             logger.error(`onChannelUpdate error: ${error.message}`);
@@ -1446,32 +1781,33 @@ class SecurityHandler {
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return; // احترام الإطفاء
-            const entryGuild = webhook.guild;
-            const executor = await this.findExecutor(entryGuild, discord_js_1.AuditLogEvent.WebhookCreate, webhook.id);
-            if (!executor)
-                return;
-            if (executor.id === this.client.user?.id)
-                return;
-            if (await this.isTrustedExecutor(entryGuild, executor.id))
-                return;
-            this.recordArtifact(guild.id, executor.id, 'webhooks', webhook.id);
-            // 🤖 بوت غير مصرح → صفر تسامح
-            if (this.executorIsBot(guild, executor)) {
-                await this.handleRogueBot(guild, executor, 'webhook', webhook.id);
+            // ⚡ ابحث عن المنفّذ من بثّ التدقيق أولاً (ينتظر حتى 1.5ث) ثم REST
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.WebhookCreate, webhook.id, 1500, 15000);
+            if (executor) {
+                if (executor.id === this.client.user?.id)
+                    return;
+                // 👑 الموثوق لا يُحذف ويب هوكه ولا يُعاقب
+                if (await this.isTrustedExecutor(guild, executor.id))
+                    return;
+            }
+            // 🗑️ حذف فوري — قبل أي انتظار إضافي
+            this.recordArtifact(guild.id, executor?.id ?? 'unknown', 'webhooks', webhook.id);
+            await webhook.delete('Liberty City — ويب هوك غير مصرح').catch(() => { });
+            if (!executor) {
+                logger.warn(`🚨 Webhook deleted in ${guild.name} — creator unknown (${webhook.id})`);
                 return;
             }
-            // 🧑 إنسان: ويب هوك جديد من غير الموثوقين = أداة سبام محتملة → احتواء فوري
-            webhook.delete('Liberty City — ويب هوك غير مصرح').catch(() => { });
-            this.startIncident(guild.id, executor.id);
+            // 🤖 بوت غير مصرح أو 🧑 إنسان: صفر تسامح — حظر/سحب رولات بالمعرّف
+            const isBot = this.executorIsBot(guild, executor);
             const prevent = cfg.mode !== 'react';
-            const action = prevent ? 'ban' : (cfg.action ?? 'kick');
-            const text = await this.punishById(guild, executor, action, 'Liberty City — إنشاء ويب هوك (Anti-Nuke)');
+            const text = await this.neutralizeById(guild, executor, cfg, 'Liberty City — إنشاء ويب هوك غير مصرح (Anti-Nuke)', isBot || prevent);
             await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
             void this.getAlertChannel(guild, settings, cfg.logChannel)
                 .then(ch => ch
                 ?.send({
                 content: `🚨 **ويب هوك غير مصرح — تم احتواؤه**\n` +
-                    `👤 ${this.userLabel(executor)}\n🔗 \`${webhook.id}\`\n${text}`,
+                    `${isBot ? '🤖' : '👤'} ${this.userLabel(executor)} (\`${executor.id}\`)\n` +
+                    `🔗 \`${webhook.id}\`\n${text}`,
             })
                 .catch(() => { }))
                 .catch(() => { });
@@ -1487,46 +1823,66 @@ class SecurityHandler {
         try {
             if (!newMember?.guild)
                 return;
+            const guild = newMember.guild;
             const addedRoles = newMember.roles.cache.filter((r) => !oldMember.roles.cache.has(r.id));
             if (addedRoles.size === 0)
                 return;
-            const guild = newMember.guild;
             const settings = await (0, models_1.getGuildSettings)(guild.id);
             const antiNuke = settings.protection?.antiNuke;
             if (!antiNuke?.enabled)
                 return;
+            // 🤖 بوت غير مصرح حصل على رولات → تحييد فوري (يمنع بناء ذراع تخريبي)
+            if (newMember.user?.bot) {
+                const wl = this.botWhitelist(settings);
+                if (!wl.has(newMember.id) && this.hasDangerousPermissions(newMember)) {
+                    this.startIncident(guild.id, newMember.id);
+                    void this.auditDangerousBots(guild).catch(() => { });
+                }
+                return;
+            }
             // ⚡ تحديد المنفّذ من بثّ التدقيق الفوري أولاً (بدون REST بطيء)
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.MemberRoleUpdate, newMember.id);
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.MemberRoleUpdate, newMember.id, 1500, 10000);
             if (!executor)
                 return;
             if (executor.id === this.client.user?.id)
                 return;
             if (await this.isTrustedExecutor(guild, executor.id))
                 return;
+            // 🧑 إنسان: إعطاء رول عادي واحد قد يكون طبيعياً. لا نعاقب إلا إذا كان الرول خطيراً أو 3+ رولات.
+            const dangerousRole = addedRoles.some((r) => {
+                const p = r.permissions;
+                return (p.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageRoles) ||
+                    p.has(discord_js_1.PermissionFlagsBits.ManageWebhooks) ||
+                    p.has(discord_js_1.PermissionFlagsBits.BanMembers) ||
+                    p.has(discord_js_1.PermissionFlagsBits.KickMembers));
+            });
+            if (!dangerousRole && addedRoles.size < 3)
+                return;
             const me = guild.members.me;
             const canManageRoles = me?.permissions.has(discord_js_1.PermissionFlagsBits.ManageRoles) ?? false;
             let rolesRestored = false;
             if (canManageRoles) {
                 try {
-                    await newMember.roles.remove(addedRoles, 'Security: unauthorized role assignment');
+                    await newMember.roles.remove(addedRoles, 'Liberty City — استرجاع رولات غير مصرح بها');
                     rolesRestored = true;
                 }
                 catch { }
             }
-            // 🛡️ وضع المنع: إعطاء رول من منفّذ غير موثوق = اعتداء → عقوبة فورية بالمعرّف
+            // 🛡️ وضع المنع: إعطاء رول خطير من منفّذ غير موثوق = اعتداء → عقوبة فورية بالمعرّف
             const preventMode = antiNuke.mode !== 'react';
-            const action = preventMode
-                ? 'ban'
-                : (antiNuke.action ?? 'kick');
-            const punishText = await this.punishById(guild, executor, action, 'Liberty City Anti-Nuke: إعطاء رولات بدون تصريح');
+            const punishText = await this.neutralizeById(guild, executor, antiNuke, 'Liberty City Anti-Nuke: إعطاء رولات خطيرة بدون تصريح', preventMode);
             await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
             const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
             const executorType = this.executorIsBot(guild, executor) ? '🤖 بوت' : '👤 عضو';
-            let msg = `🎭 **${executorType} أعطى رول:** ${this.userLabel(executor)}\n`;
-            msg += `👤 الهدف: ${newMember.user.tag}\n`;
-            msg += `🔄 استرجاع الرولات: ${rolesRestored ? '✅' : canManageRoles ? '❌' : '⚠️ لا توجد صلاحية ManageRoles'}\n`;
-            msg += `🛡️ العقوبة: ${punishText}`;
-            alert?.send({ content: msg }).catch(() => { });
+            alert?.send({
+                content: `🎭 **${executorType} أعطى رول خطير:** ${this.userLabel(executor)}\n` +
+                    `👤 الهدف: ${newMember.user.tag}\n` +
+                    `🔄 استرجاع الرولات: ${rolesRestored ? '✅' : canManageRoles ? '❌' : '⚠️ لا توجد صلاحية ManageRoles'}\n` +
+                    `🛡️ ${punishText}`,
+            }).catch(() => { });
         }
         catch (error) {
             logger.error(`onGuildMemberUpdate error: ${error.message}`);
@@ -1556,7 +1912,6 @@ class SecurityHandler {
                 discord_js_1.PermissionFlagsBits.ManageWebhooks,
                 discord_js_1.PermissionFlagsBits.ManageGuild,
             ];
-            // فحص: هل الـ allow الجديد فيه صلاحيات خطيرة؟
             const newAllow = newEveryone.allow?.bitfield ?? 0n;
             const oldAllow = oldEveryone?.allow?.bitfield ?? 0n;
             let dangerousAdded = false;
@@ -1574,82 +1929,41 @@ class SecurityHandler {
             const antiNuke = settings.protection?.antiNuke;
             if (!antiNuke?.enabled)
                 return; // احترام الإطفاء قبل أي طلب
-            // جلب المنفّذ
-            const logs = await guild.fetchAuditLogs({ type: discord_js_1.AuditLogEvent.ChannelUpdate, limit: 1 });
-            const entry = logs.entries.first();
+            // ⚡ بثّ التدقيق أولاً — بدون اشتراط وجود العضو في الكاش أو فحص الهرمية
+            const entry = await this.findAuditEntry(guild, discord_js_1.AuditLogEvent.ChannelUpdate, newChannel.id, 1500, 6000);
             if (!entry?.executor)
                 return;
-            if (Date.now() - entry.createdTimestamp > 1000)
-                return; // نافذة أضيق = 1 ثانية
             if (entry.executor.id === this.client.user?.id)
                 return;
             if (await this.isTrustedExecutor(guild, entry.executor.id))
                 return;
-            const member = guild.members.cache.get(entry.executor.id);
-            if (!member)
-                return;
-            const hierarchy = this.checkHierarchy(guild);
-            if (!hierarchy.ok) {
-                logger.warn(`Permission guard skipped in ${guild.name} — bot not top role`);
-                return;
-            }
             const me = guild.members.me;
             const canManageChannels = me?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ?? false;
-            const canKick = me?.permissions.has(discord_js_1.PermissionFlagsBits.KickMembers) ?? false;
-            const canBan = me?.permissions.has(discord_js_1.PermissionFlagsBits.BanMembers) ?? false;
-            let permsRestored = false;
-            let punished = false;
-            let punishType = 'none';
             // 1️⃣ إرجاع الأوفررايت فوراً
+            let permsRestored = false;
             if (canManageChannels && oldEveryone) {
                 try {
-                    await newChannel.permissionOverwrites.edit(everyoneRoleId, oldEveryone, 'Security: @everyone dangerous perm reverted');
+                    await newChannel.permissionOverwrites.edit(everyoneRoleId, oldEveryone, 'Liberty City — استرجاع صلاحيات @everyone');
                     permsRestored = true;
                 }
                 catch (e) {
                     logger.warn(`Failed to restore @everyone perms in ${guild.name}: ${e.message}`);
                 }
             }
-            // 3️⃣ العقوبة
-            const action = antiNuke.action || 'kick';
-            if (action !== 'alert' && member) {
-                if (action === 'strip' && canKick) {
-                    try {
-                        await member.roles.set([], 'Security: @everyone dangerous perm');
-                        punished = true;
-                        punishType = 'strip';
-                    }
-                    catch { }
-                }
-                else if (action === 'kick' && canKick) {
-                    try {
-                        await member.kick('Security: @everyone dangerous perm');
-                        punished = true;
-                        punishType = 'kick';
-                    }
-                    catch { }
-                }
-                else if (action === 'ban' && canBan) {
-                    try {
-                        await member.ban({ reason: 'Security: @everyone dangerous perm (anti-nuke)' });
-                        punished = true;
-                        punishType = 'ban';
-                    }
-                    catch { }
-                }
-            }
-            // 4️⃣ تنبيه أحمر
+            // 2️⃣ العقوبة — حظر فوري بالمعرّف (ولو فشل: سحب كل الرولات)
+            const isBot = this.executorIsBot(guild, entry.executor);
+            const prevent = antiNuke.mode !== 'react';
+            const text = await this.neutralizeById(guild, entry.executor, antiNuke, 'Liberty City — منح @everyone صلاحيات خطيرة (Anti-Nuke)', isBot || prevent);
+            // 3️⃣ تنبيه أحمر
             const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
-            const executorType = entry.executor.bot ? '🤖 بوت' : '👤 عضو';
-            let msg = `🚨 **${executorType} حاول إعطاء @everyone صلاحيات خطيرة!**\n`;
-            msg += `👤 المنفّذ: ${entry.executor.tag}\n`;
-            msg += `📍 القناة: <#${newChannel.id}>\n`;
-            msg += `🔄 استرجاع الصلاحيات: ${permsRestored ? '✅ تم' : '❌ فشل'}\n`;
-            if (action === 'alert')
-                msg += `🔔 الإجراء: تنبيه فقط`;
-            else
-                msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل'}`;
-            alert?.send({ content: msg }).catch(() => { });
+            const executorType = isBot ? '🤖 بوت' : '👤 عضو';
+            alert?.send({
+                content: `🚨 **${executorType} حاول إعطاء @everyone صلاحيات خطيرة!**\n` +
+                    `👤 المنفّذ: ${entry.executor.tag}\n` +
+                    `📍 القناة: <#${newChannel.id}>\n` +
+                    `🔄 استرجاع الصلاحيات: ${permsRestored ? '✅ تم' : '❌ فشل'}\n` +
+                    `🛡️ ${text}`,
+            }).catch(() => { });
             logger.error(`🚨 ANTI-@EVERYONE triggered in ${guild.name} by ${entry.executor.tag} on #${newChannel.name}`);
         }
         catch (error) {
@@ -1704,6 +2018,9 @@ class SecurityHandler {
             return;
         const check = async () => {
             try {
+                const settings = await (0, models_1.getGuildSettings)(guild.id);
+                if (!settings.protection?.antiNuke?.enabled)
+                    return;
                 const me = guild.members.me;
                 if (!me)
                     return;
@@ -1911,7 +2228,7 @@ class SecurityHandler {
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return; // احترام الإطفاء
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.ThreadCreate, thread.id);
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.ThreadCreate, thread.id, 1500, 15000);
             if (!executor)
                 return;
             if (executor.id === this.client.user?.id)
@@ -1936,7 +2253,7 @@ class SecurityHandler {
                 return;
             }
             // 🧑 إنسان: انفجار ثريدات (3+ خلال 10 ثوانٍ) = هجوم
-            const burst = this.trackCreate(guild.id, executor.id, 'channel', 10000);
+            const burst = this.trackCreateOnce(guild.id, executor.id, 'thread', thread.id, 10000);
             if (burst < 3)
                 return;
             this.startIncident(guild.id, executor.id);
@@ -2216,7 +2533,7 @@ class SecurityHandler {
             ban: { emoji: '🔨', label: 'حظر جماعي' },
             kick: { emoji: '👢', label: 'طرد جماعي' },
         };
-        const executor = await this.findExecutor(guild, auditType, targetId);
+        const executor = await this.findExecutor(guild, auditType, targetId, 1500, 15000);
         const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
         // ⏱ استجابة فورية — لكن صامتة لو المنفّذ هو البوت نفسه
         if (executor && executor.id === this.client.user?.id) {
@@ -2228,6 +2545,12 @@ class SecurityHandler {
         // تصرفات المالك/المطوّر/الوايت ليست شرعية — لا عقوبة ولا استعادة ولا تنبيه
         if (executor && trusted)
             return;
+        // 🔨 الحظر/الطرد: عملية واحدة قد تكون مشروعة — 2+ خلال 10 ثوانٍ = هجوم
+        if ((type === 'ban' || type === 'kick') && executor) {
+            const count = this.trackActionOnce(guild.id, executor.id, type, targetId, 10000);
+            if (count < 2)
+                return;
+        }
         // 🔨 الحظر يُلغى فوراً عن الضحية — بالتوازي مع كل شيء
         void (type === 'ban' && targetId && executor && !trusted
             ? guild.members.unban(targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً').catch(() => { })

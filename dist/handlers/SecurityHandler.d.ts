@@ -44,6 +44,7 @@ export declare class SecurityHandler {
     private activeIncidents;
     private messageRate;
     private createTracker;
+    private actionTracker;
     private handledTargets;
     private botGuardTimers;
     private botGuardBackoff;
@@ -58,6 +59,13 @@ export declare class SecurityHandler {
     /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
     ingestAuditEntry(entry: any, guildId?: string): void;
     private getCachedAuditLogs;
+    private findStreamedEntry;
+    /**
+     * ⚡ انتظار سجل التدقيق من Gateway (حتى 1.5 ثانية) ثم REST كاحتياطي.
+     * Discord يرسل سجل التدقيق بعد الحدث أحياناً بمئات الأجزاء من الثانية،
+     * وكان الكود القديم يستسلم فوراً → تفوت العقوبة. هذا الانتظار القصير يحل المشكلة.
+     */
+    private findAuditEntry;
     private findExecutor;
     private findKickExecutor;
     private findAuditCreator;
@@ -68,11 +76,27 @@ export declare class SecurityHandler {
     private botWhitelist;
     private banUserById;
     private punishById;
+    /** سحب كل رولات حساب بالمعرّف — يعمل حتى لو لم يكن العضو في الكاش */
+    private stripRolesById;
+    /**
+     * 🛡️ تحييد فوري: حظر بالمعرّف، ولو فشل (هرمية/صلاحيات) يسحب كل رولاته،
+     *    ولو فشل الاثنان يرجع نتيجة صريحة بدل السكوت.
+     */
+    private neutralizeById;
+    /** ردّ فوري على أي اعتداء من إنسان أو بوت (يُستدعى من بثّ سجلات التدقيق) */
+    private handleInstantViolation;
+    /** عدّاد تغيير أسماء القنوات السريع */
+    private trackRename;
+    /** هل يملك هذا العضو صلاحيات تخريبية فعلية؟ */
+    private hasDangerousPermissions;
     /**
      * 🧹 حذف كل ما أنشأه المهاجم (قنوات/رولات/ويب هوكس).
      * يعمل من الذاكرة أولاً ثم من سجلات التدقيق بفلتر user_id — حتى لو فاتتنا الأحداث.
+     * ⚡ مُجمَّع: لا نطلق عملية تطهير جديدة لنفس المهاجم أثناء عمل واحدة (يمنع عاصفة REST).
      */
+    private purgeInFlight;
     private purgeAttackerArtifacts;
+    private doPurgeAttackerArtifacts;
     /** بوت غير مصرح قام بفعل خطير → حظر فوري + حذف ما أنشأه + حادث نشط */
     private handleRogueBot;
     /** يمنع أي بوت غير مصرح من الدخول — حظر فوري بالمعرّف */
@@ -100,6 +124,17 @@ export declare class SecurityHandler {
     private userLabel;
     onChannelCreate(channel: any): Promise<void>;
     private trackCreate;
+    /**
+     * عدّاد إنشاء لا يعدّ نفس الهدف مرتين.
+     * ضروري لأن الحدث وسجل التدقيق يصلان معاً لنفس القناة/الرول — بدون هذا
+     * كان إنشاء واحد يُحسب مرتين ويُعاقب عضو عادي ظلماً.
+     */
+    private trackCreateOnce;
+    /**
+     * عدّاد حظر/طرد لكل منفّذ مع منع احتساب نفس الهدف مرتين
+     * (حدث الحظر + سجل التدقيق يصلان لنفس العملية).
+     */
+    private trackActionOnce;
     onRoleCreate(role: any): Promise<void>;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
     cleanupSuspicious(guild: Guild): Promise<number>;

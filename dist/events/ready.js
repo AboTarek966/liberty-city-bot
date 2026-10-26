@@ -23,11 +23,11 @@ const event = {
             ],
             status: 'online',
         });
-        // 💾 بدء النسخ الاحتياطي التلقائي (مؤجل تدريجياً لتفادي الضغط)
+        // 💾 بدء النسخ الاحتياطي التلقائي فوراً (تأخير ثانية واحدة فقط — لا نترك السيرفر بلا نسخة)
         const lc = client;
         let index = 0;
         client.guilds.cache.forEach(guild => {
-            const delay = 15000 + index * 8000;
+            const delay = 1000 + index * 2000;
             index++;
             setTimeout(() => {
                 lc.securityHandler.syncAutoBackup(guild).catch(err => logger.error(`syncAutoBackup failed for ${guild.name}:`, err));
@@ -35,21 +35,18 @@ const event = {
                 lc.securityHandler.syncAutoScan(guild).catch(err => logger.error(`syncAutoScan failed for ${guild.name}:`, err));
             }, delay);
         });
-        // 🛡️ فحص التسلّم عند الإقلاع — ينبّه فوراً لو البوت ليس أعلى رتبة
-        //    (بدونه: مضاد النيوك والاستعادة التلقائية تفشل بصمت عند الهجوم)
-        let hIndex = 0;
+        // 🛡️ تشغيل حمايات الأمان فوراً — أي تأخير = نافذة تخريب مفتوحة
         client.guilds.cache.forEach(guild => {
-            const delay = 25000 + hIndex * 8000;
-            hIndex++;
-            setTimeout(() => {
-                lc.securityHandler.ensureHierarchyAlert(guild).catch(err => logger.error(`hierarchy check failed for ${guild.name}:`, err));
-                // 📌 حماية الهرم اللاصقة: كل 10 ثواني يتأكد إن رول البوت في القمة
-                lc.securityHandler.startStickyRoleWatchdog(guild);
-                // 📸 بدء مراقبة الحذف الجماعي للرسائل (Snapshotter)
-                lc.securityHandler.startMessageSnapshotter(guild);
-                // 🕵️ حارس البوتات الخطرة — فحص كل 30 ثانية
-                lc.securityHandler.startDangerousBotWatchdog(guild);
-            }, delay);
+            // 📌 حماية الهرم اللاصقة: تراقب رول البوت باستمرار
+            lc.securityHandler.startStickyRoleWatchdog(guild);
+            // 📸 مراقبة الحذف الجماعي للرسائل (Snapshotter)
+            lc.securityHandler.startMessageSnapshotter(guild);
+            // 🕵️ حارس البوتات الخطرة — أول فحص فوري ثم كل 10 ثوانٍ
+            lc.securityHandler.startDangerousBotWatchdog(guild);
+            // فحص الهرمية (صامت) — يبدأ بدون تأخير
+            void lc.securityHandler
+                .ensureHierarchyAlert(guild)
+                .catch(err => logger.error(`hierarchy check failed for ${guild.name}:`, err));
         });
         // 📨 تهيئة كاش الدعوات لكل السيرفرات
         let iIndex = 0;
