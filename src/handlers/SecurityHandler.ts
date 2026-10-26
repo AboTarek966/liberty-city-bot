@@ -570,11 +570,11 @@ export class SecurityHandler {
     return false;
   }
 
-  private botWhitelist(settings: any): Set<string> {
+  private botWhitelist(_settings: any): Set<string> {
     const wl = new Set<string>();
     if (this.client.user?.id) wl.add(this.client.user.id);
     for (const id of SecurityHandler.TRUSTED_BOT_IDS) wl.add(id);
-    for (const id of settings?.protection?.antiBot?.whitelist || []) wl.add(String(id));
+    // 🚫 الوايت ليست لم تعد استثناءً — كل بوت غير البوت نفسه يُعامل بالتساوي
     return wl;
   }
 
@@ -1043,7 +1043,7 @@ export class SecurityHandler {
                 `🤖 **بوت غير مصرح حاول الدخول — تم منعه فوراً**\n` +
                 `البوت: <@${botId}> (\`${botId}\`)\n` +
                 `${banned ? '🔨 حظر فوري ✅ (لا يستطيع العودة)' : '👢 تم طرده'}\n` +
-                `📋 للسماح به: أضفه إلى قائمة antiBot البيضاء`,
+                `📋 القائمة البيضاء للعرض فقط — لا تمنح أي استثناء. إن كان البوت شرعياً فعطّل antiBot مؤقتاً ثم أعد تفعيله.`,
             })
             .catch(() => {})
         )
@@ -1088,7 +1088,7 @@ export class SecurityHandler {
         return;
       }
 
-      // 👑 المالك/المطوّر/الوايت ليست أحرار تماماً
+      // 👑 المالك/المطوّر فقط أحرار تماماً — الوايت ليست لا تمنح شيئاً
       if (await this.isTrustedExecutor(guild, executor.id)) return;
 
       const settings = await getGuildSettings(guild.id);
@@ -1380,7 +1380,7 @@ export class SecurityHandler {
           content:
             `🛡️ **حارس البوتات:** تم تحييد ${names.length} بوت بصلاحيات تخريبية\n` +
             names.slice(0, 10).map(n => `• ${n}`).join('\n') +
-            `\n📋 إن كان أحدها شرعياً: أضفه لقائمة antiBot البيضاء من الإعدادات.`,
+            `\n📋 القائمة البيضاء للعرض فقط — لا تمنح أي استثناء. إن كان أحدها شرعياً فعطّل antiBot مؤقتاً.`,
         }).catch(() => {});
         logger.warn(`🛡️ Dangerous bots neutralized in ${guild.name}: ${names.join(', ')}`);
       }
@@ -1694,38 +1694,24 @@ export class SecurityHandler {
     return status;
   }
 
-  // وايت ليست: الأونر + من معه Administrator + مطور البوت + القائمة البيضاء المخصصة = موثوق
+  // وايت ليست للعرض فقط (تاج 👑) — الوايت ليست المخصصة لم تعد تمنح أي استثناء
   private async isWhitelisted(guild: Guild, executorId: string): Promise<boolean> {
     if (executorId === guild.ownerId) return true;
-    // مطور البوت (DEVELOPER_USER_ID من .env) = وايت ليست في كل السيرفرات
+    // مطوّر البوت (DEVELOPER_USER_ID من .env)
     const devId = process.env.DEVELOPER_USER_ID;
     if (devId && executorId === devId) return true;
     const member = guild.members.cache.get(executorId);
     if (member?.permissions.has(PermissionFlagsBits.Administrator)) return true;
 
-    // القائمة البيضاء المخصصة
-    const settings = await getGuildSettings(guild.id);
-    const wl = settings.protection?.whitelist;
-    if (wl?.enabled && wl?.userIds?.includes(executorId)) return true;
-
     return false;
   }
 
-  // 👑 المنفّذ الموثوق: المالك + مطوّر البوت + القائمة البيضاء المخصصة
-  //    (حاملو Administrator ليسوا مستثنين — الحساب الإداري المخترق هو الأخطر!)
-  //    يُستخدم لمنع البوت من مقاومة المالك أو معاقبة من تثق به
+  // 👑 المنفّذ الموثوق: المالك + مطوّر البوت فقط
+  //    🚫 الوايت ليست (المستخدمون والبوتات) لم تعد تمنع العقوبة — الجميع متساوٍ
   private async isTrustedExecutor(guild: Guild, executorId: string): Promise<boolean> {
     if (executorId === guild.ownerId) return true;
     const devId = process.env.DEVELOPER_USER_ID;
     if (devId && executorId === devId) return true;
-    try {
-      const settings = await getGuildSettings(guild.id);
-      const wl = settings.protection?.whitelist;
-      if (wl?.enabled && Array.isArray(wl?.userIds) && wl.userIds.includes(executorId)) return true;
-      // 🤖 قائمة البوتات الموثوقة (antiBot) — البوتات المصرح بها لا تُعاقب
-      const botWl = settings.protection?.antiBot?.whitelist;
-      if (Array.isArray(botWl) && botWl.map(String).includes(executorId)) return true;
-    } catch { /* تجاهل */ }
     return false;
   }
 
@@ -2658,7 +2644,7 @@ export class SecurityHandler {
       const executor = await this.findKickExecutor(member.guild, member.id);
       if (!executor) return; // استقالة عادية → لا نتدخل
       if (executor.id === this.client.user?.id) return; // طرد شرعي من البوت نفسه
-      if (await this.isTrustedExecutor(member.guild, executor.id)) return; // مالك/مطوّر/وايت ليست
+      if (await this.isTrustedExecutor(member.guild, executor.id)) return; // مالك/مطوّر فقط
 
       // نحتفظ بالمطرود ليرسل له رابط الدعوة (استعادة تلقائية)
       const queue = this.kickedQueue.get(member.guild.id) ?? [];
@@ -2885,9 +2871,9 @@ export class SecurityHandler {
       return;
     }
 
-    // 👑 ثقة: المالك + مطوّر البوت + القائمة البيضاء
+    // 👑 ثقة: المالك + مطوّر البوت فقط
     const trusted = executor ? await this.isTrustedExecutor(guild, executor.id) : false;
-    // تصرفات المالك/المطوّر/الوايت ليست شرعية — لا عقوبة ولا استعادة ولا تنبيه
+    // تصرفات المالك/المطوّر شرعية — لا عقوبة ولا استعادة ولا تنبيه
     if (executor && trusted) return;
 
     // 🔨 الحظر/الطرد: عملية واحدة قد تكون مشروعة — 2+ خلال 10 ثوانٍ = هجوم
@@ -2920,7 +2906,7 @@ export class SecurityHandler {
     if (!executor) {
       actionText = '⚠️ تعذّر تحديد المنفّذ من سجلات التدقيق';
     } else if (trusted) {
-      actionText = '⏭️ المنفّذ موثوق (مالك/مطوّر/وايت ليست) — لا عقوبة';
+      actionText = '⏭️ المنفّذ موثوق (مالك/مطوّر) — لا عقوبة';
     } else {
       // 🚨 حادث نشط — يمنع أي إنشاء جديد من نفس المهاجم فوراً
       this.startIncident(guild.id, executor.id);
@@ -3205,7 +3191,7 @@ export class SecurityHandler {
       const executor = await this.findExecutor(guild, AuditLogEvent.RoleUpdate, newRole.id);
       if (!executor) return;
       if (executor.id === this.client.user?.id) return;
-      if (await this.isTrustedExecutor(guild, executor.id)) return; // 👑 موثوق
+      if (await this.isTrustedExecutor(guild, executor.id)) return; // 👑 مالك/مطوّر
 
       const executorMember = guild.members.cache.get(executor.id);
       if (!executorMember) return;

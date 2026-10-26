@@ -9,10 +9,10 @@ const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('whitelist')
-        .setDescription('إدارة القائمة البيضاء (المستخدمين الموثوقين)')
+        .setDescription('إدارة القائمة البيضاء (للعرض فقط — لا تمنح أي استثناء أمني)')
         .addSubcommand(subcommand => subcommand
         .setName('add')
-        .setDescription('إضافة مستخدم للقائمة البيضاء')
+        .setDescription('إضافة مستخدم للقائمة البيضاء (للعرض فقط)')
         .addUserOption(option => option.setName('user').setDescription('المستخدم المراد إضافته').setRequired(true))
         .addStringOption(option => option.setName('reason').setDescription('السبب').setRequired(false)))
         .addSubcommand(subcommand => subcommand
@@ -24,7 +24,7 @@ const command = {
         .setDescription('عرض أعضاء القائمة البيضاء'))
         .addSubcommand(subcommand => subcommand
         .setName('toggle')
-        .setDescription('تفعيل/تعطيل القائمة البيضاء')
+        .setDescription('تفعيل/تعطيل القائمة البيضاء (لا تؤثر على الحماية)')
         .addBooleanOption(option => option.setName('enabled').setDescription('حالة التفعيل').setRequired(true)))
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator)
         .setDMPermission(false),
@@ -42,7 +42,8 @@ const command = {
             wl.enabled = enabled;
             await settings.save();
             await interaction.editReply({
-                content: `${enabled ? '✅ تم تفعيل' : '❌ تم تعطيل'} القائمة البيضاء`,
+                content: `${enabled ? '✅ تم تفعيل' : '❌ تم تعطيل'} القائمة البيضاء\n` +
+                    '⚠️ للعرض فقط — لا تمنح أي استثناء أمني، والجميع يُعامل بالتساوي.',
             });
             return;
         }
@@ -58,7 +59,11 @@ const command = {
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle('✅ تم إضافة عضو للقائمة البيضاء')
                 .setColor(embeds_1.Colors.success)
-                .addFields({ name: '👤 المستخدم', value: `${user} (\`${user.id}\`)`, inline: true }, { name: '📝 السبب', value: reason, inline: true }, { name: '🛡️ بواسطة', value: `${interaction.user}`, inline: true })
+                .addFields({ name: '👤 المستخدم', value: `${user} (\`${user.id}\`)`, inline: true }, { name: '📝 السبب', value: reason, inline: true }, { name: '🛡️ بواسطة', value: `${interaction.user}`, inline: true }, {
+                name: '⚠️ تنبيه',
+                value: 'هذه القائمة للعرض فقط — لا تمنح أي استثناء. العضو أو البوت هنا يُعاقب مثل أي شخص آخر.',
+                inline: false,
+            })
                 .setTimestamp();
             await interaction.editReply({ embeds: [embed] });
             return;
@@ -86,8 +91,9 @@ const command = {
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle('👑 أعضاء القائمة البيضاء')
                 .setColor(embeds_1.Colors.info)
-                .setDescription(members.map((m, i) => `${i + 1}. ${m}`).join('\n'))
-                .setFooter({ text: `إجمالي: ${wl.userIds.length} عضو` })
+                .setDescription('⚠️ للعرض فقط — لا تمنح أي استثناء أمني.\n\n' +
+                members.map((m, i) => `${i + 1}. ${m}`).join('\n'))
+                .setFooter({ text: `إجمالي: ${wl.userIds.length} عضو (بدون صلاحيات)` })
                 .setTimestamp();
             await interaction.editReply({ embeds: [embed] });
             return;

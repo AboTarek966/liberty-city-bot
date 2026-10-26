@@ -8,7 +8,8 @@
 //    • المالك يطفى بنفسه مباشرة (هو صاحب التاج أصلاً).
 //    • 🛠️ مطوّر البوت (DEVELOPER_USER_ID) يطفى بنفسه أيضاً ويملك أزرار
 //      الموافقة ✅/❌ — المالك والمطوّر هما الأساسيان وحدهما.
-//    • من يقدّرون "طلب" الإطفاء: المالك + المطوّر + القائمة البيضاء.
+//    • من يقدّرون "طلب" الإطفاء: المالك + المطوّر فقط.
+//      🚫 الوايت ليست لم تعد تمنح أي حق — لا طلب ولا موافقة.
 //      (إن لم يكن DEVELOPER_USER_ID مضبوطاً يُسمح لمن عنده صلاحية
 //      الإعدادات أن يطلب — لكن الموافقة تبقى للمالك/المطوّر.)
 // ============================================
@@ -53,9 +54,7 @@ function canRequestProtectionOff(settings, guild, userId) {
     const devId = process.env.DEVELOPER_USER_ID;
     if (devId && userId === devId)
         return true; // 🛠️ مطوّر البوت
-    const wl = settings?.protection?.whitelist;
-    if (wl?.enabled && Array.isArray(wl?.userIds) && wl.userIds.includes(userId))
-        return true; // 📋 وايت ليست
+    // 🚫 الوايت ليست لا تمنح أي حق طلب — الجميع متساوٍ
     // البيئة غير مضبوطة (لم يُحدَّد DEVELOPER_USER_ID) → نسمح لمن عنده صلاحية الإعدادات أن يطلب
     // (الحدّ الفعلي دائمًا هو نقرة المالك — لا شيء يُطفى بدون التاج 👑)
     if (!devId)
@@ -75,7 +74,7 @@ async function gateProtectionOff(opts) {
     if (devEnv && opts.user.id === devEnv)
         return null; // 🛠️ المطوّر يطفى بنفسه (المالك والمطوّر الأساسيان)
     if (!canRequestProtectionOff(opts.settings, opts.guild, opts.user.id)) {
-        return '⛔ إطفاء الحماية محصور بمالك السيرفر 👑 (والمطوّر والقائمة البيضاء)';
+        return '⛔ إطفاء الحماية محصور بمالك السيرفر 👑 والمطوّر فقط';
     }
     const label = exports.PROTECTION_LABELS[opts.field] || opts.field;
     const sent = await requestOwnerApproval({

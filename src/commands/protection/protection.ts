@@ -173,15 +173,15 @@ const command: Command = {
     .addSubcommand(sub =>
       sub
         .setName('antibot')
-        .setDescription('مضاد البوتات — طرد البوتات غير المصرح بها')
+        .setDescription('مضاد البوتات — حظر البوتات غير المصرح بها (بدون استثناءات)')
         .addBooleanOption(opt =>
           opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
         )
         .addUserOption(opt =>
-          opt.setName('add').setDescription('إضافة بوت إلى القائمة البيضاء (استثناء)')
+          opt.setName('add').setDescription('إضافة بوت لقائمة العرض فقط (لا يمنع الحظر)')
         )
         .addUserOption(opt =>
-          opt.setName('remove').setDescription('إزالة بوت من القائمة البيضاء')
+          opt.setName('remove').setDescription('إزالة بوت من قائمة العرض')
         )
     )
     .addSubcommand(sub =>
@@ -334,7 +334,7 @@ async function showStatus(interaction: ChatInputCommandInteraction, settings: an
       {
         name: '🤖 مضاد البوتات',
         value: p.antiBot?.enabled
-          ? `✅ مفعل (${p.antiBot?.whitelist?.length || 0} استثناء)`
+          ? `✅ مفعل (${p.antiBot?.whitelist?.length || 0} في قائمة العرض)`
           : '❌ معطل',
         inline: true,
       },
@@ -621,7 +621,7 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
 
   if (add) {
     if (!add.bot) {
-      note = `⚠️ \`${add.tag}\` ليس بوتاً — تمت إضافته على أي حال كاستثناء`;
+      note = `ℹ️ \`${add.tag}\` ليس بوتاً — أُضيف لقائمة العرض فقط`;
     }
     if (!wl.includes(add.id)) wl.push(add.id);
   }
@@ -636,15 +636,16 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
   const whitelistText =
     wl.length > 0
       ? wl.map(id => `• <@${id}> (\`${id}\`)`).join('\n')
-      : 'لا يوجد — أي بوت جديد سيتم طرده عند التفعيل';
+      : 'لا يوجد — كل بوت غير البوت الرسمي سيُحظر عند التفعيل';
 
   const embed = new EmbedBuilder()
     .setTitle('🤖 مضاد البوتات')
     .setColor(enabled ? Colors.success : Colors.error)
     .addFields(
       { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
-      { name: 'ملاحظة', value: note || 'يطرد أي بوت ينضم دون إذن', inline: false },
-      { name: 'القائمة البيضاء (استثناءات)', value: whitelistText, inline: false }
+      { name: 'ملاحظة', value: note || 'يحظر أي بوت غير مصرح به فوراً — القائمة أدناه للعرض فقط', inline: false },
+      { name: 'قائمة العرض (لا تمنع الحظر)', value: whitelistText, inline: false },
+      { name: '⚠️ تنبيه', value: 'لا توجد استثناءات. لإضافة بوت شرعي: عطّل antiBot مؤقتاً ثم أعد تفعيله.', inline: false }
     )
     .setFooter({ text: 'Liberty City Protection' })
     .setTimestamp();
