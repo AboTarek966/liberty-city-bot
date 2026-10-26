@@ -461,7 +461,7 @@ class SecurityHandler {
             return '🔔 تنبيه فقط';
         if (action === 'ban') {
             const ok = await this.banUserById(guild, executor.id, reason);
-            return ok ? '🔨 تم حظر المخالف فوراً' : '⚠️ فشل الحظر — تأكد أن رول البوت أعلى من رول المخالف';
+            return ok ? '🔨 تم حظر المخالف فوراً' : '⚠️ تعذّر تنفيذ الحظر';
         }
         if (action === 'kick') {
             const kickKey = `${guild.id}:${executor.id}`;
@@ -474,7 +474,7 @@ class SecurityHandler {
                 return '👢 تم طرد المخالف فوراً';
             }
             catch (error) {
-                return `⚠️ فشل الطرد (${error.message}) — راجع تسلّم البوت`;
+                return '⚠️ تعذّر تنفيذ الطرد';
             }
         }
         // strip
@@ -956,7 +956,7 @@ class SecurityHandler {
                 content: `🚨 **بوت يسبام — تم إيقافه فوراً**\n` +
                     `🤖 ${message.author.tag} (\`${message.author.id}\`)\n` +
                     `📢 القناة: <#${message.channelId}> — ${arr.length} رسائل/3 ثوانٍ\n` +
-                    `${banned ? '🔨 حظر فوري ✅' : '⚠️ تعذّر الحظر — راجع تسلّم البوت'}`,
+                    `${banned ? '🔨 حظر فوري ✅' : '⚠️ تعذّر الحظر'}`,
             }).catch(() => { });
             logger.warn(`🚨 Spamming bot neutralized: ${message.author.tag} in ${guild.name}`);
             return true;
@@ -1008,10 +1008,9 @@ class SecurityHandler {
             const botTop = me.roles.highest;
             const targetTop = member.roles.highest;
             if (targetTop.comparePositionTo(botTop) >= 0) {
-                // نبلّغ عن مشكلة التسلّم (تنبيه واحد فقط عند التغيّر)
-                void this.ensureHierarchyAlert(guild);
-                return (`⛔ **رتبته فوق البوت** (‎${targetTop.name}‎ ≥ ‎${botTop.name}‎) — ` +
-                    `العقوبة مستحيلة. اسحب رول البوت لأعلى القائمة`);
+                // صامت تماماً — لا نرسل أي رسالة عن رولات أعلى من البوت
+                logger.warn(`Punish blocked (hierarchy) in ${guild.name} — target above bot`);
+                return '⚠️ تعذّر تنفيذ العقوبة';
             }
         }
         try {
@@ -1038,17 +1037,15 @@ class SecurityHandler {
                         removed++;
                 }
                 if (removed === 0) {
-                    void this.ensureHierarchyAlert(guild);
-                    return (`⛔ تعذّر سلب أي رولة من ${target.length} — ` +
-                        `تحقّق من تسلّم البوت (ارفع رول البوت للأعلى)`);
+                    logger.warn(`Strip failed in ${guild.name} — no roles removed`);
+                    return '⚠️ تعذّر سلب الرولات';
                 }
                 return `🗡️ تم سلب **${removed}/${target.length}** رولة — باقٍ في السيرفر بلا صلاحيات`;
             }
         }
         catch (error) {
             logger.warn(`punish failed (${action}) in ${guild.name}: ${error.message}`);
-            void this.ensureHierarchyAlert(guild);
-            return `⚠️ فشل التنفيذ (${error.message}) — راجع تسلّم البوت`;
+            return '⚠️ تعذّر تنفيذ العقوبة';
         }
         return '📢 تم الإشعار فقط';
     }
@@ -1307,16 +1304,10 @@ class SecurityHandler {
             const antiNuke = settings.protection?.antiNuke;
             if (!antiNuke?.enabled)
                 return;
-            // 🛡️ فحص التسلسل الهرمي — لو البوت مش أعلى رتبة، العقوبات تفشل
+            // 🛡️ فحص التسلسل الهرمي — صامت تماماً (بدون رسائل عن الرولات الأعلى)
             const hierarchy = this.checkHierarchy(guild);
             if (!hierarchy.ok) {
-                const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
-                alert?.send({
-                    content: `⚠️ **فشل حماية إعادة التسمية** — البوت ليس أعلى رتبة!\n` +
-                        `المنفّذ: ${entry.executor.tag} | رول البوت: ${hierarchy.botRoleName} (#${hierarchy.botPosition})\n` +
-                        `رولات فوق البوت: ${hierarchy.offenderCount} — اسحب رول البوت للأعلى.`
-                }).catch(() => { });
-                logger.warn(`Hierarchy block: rename revert failed in ${guild.name} — bot not top role`);
+                logger.warn(`Rename guard skipped in ${guild.name} — bot not top role`);
                 return;
             }
             // 🔐 فحص الصلاحيات
@@ -1578,8 +1569,7 @@ class SecurityHandler {
                 return;
             const hierarchy = this.checkHierarchy(guild);
             if (!hierarchy.ok) {
-                const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
-                alert?.send({ content: `⚠️ **فشل منع @everyone危险权限** — البوت ليس أعلى رتبة! اسحب رول البوت للأعلى.` }).catch(() => { });
+                logger.warn(`Permission guard skipped in ${guild.name} — bot not top role`);
                 return;
             }
             const me = guild.members.me;
@@ -1794,7 +1784,7 @@ class SecurityHandler {
                 .setTitle('🚨 تحذير أمني — حذف جماعي للرسائل!')
                 .setDescription(`تم حذف **${messages.size} رسالة** في ${channel} خلال ثوانٍ — تم قفل القناة واستعادة ما أمكن.`)
                 .setColor(embeds_1.Colors.error)
-                .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${this.userLabel(executor)}\`)${isWhitelisted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء', value: actionText, inline: true }, { name: '📬 استعادة', value: `أعيد إرسال **${restored}** رسالة`, inline: true }, { name: '🛡️ مستوى تسلّم البوت', value: await this.hierarchyField(guild), inline: false })
+                .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${this.userLabel(executor)}\`)${isWhitelisted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء', value: actionText, inline: true }, { name: '📬 استعادة', value: `أعيد إرسال **${restored}** رسالة`, inline: true })
                 .setFooter({ text: 'Liberty City Anti-Nuke' })
                 .setTimestamp();
             const alert = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
@@ -2264,10 +2254,6 @@ class SecurityHandler {
             .setDescription(`${labels[type].emoji} تنفيذ عملية **${labels[type].label}** — ردّ أمني **فوري من أول عملية** (نافذة الرصد ${windowSec}ث) — نمط هجوم "نيوك"!`)
             .setColor(embeds_1.Colors.error)
             .addFields({ name: 'المخالف', value: executor ? `${executor} (\`${this.userLabel(executor)}\`)${trusted ? ' 👑' : ''}` : 'غير معروف', inline: true }, { name: 'الإجراء المتخذ', value: actionText, inline: true }, {
-            name: '🛡️ مستوى تسلّم البوت',
-            value: await this.hierarchyField(guild),
-            inline: false,
-        }, {
             name: '♻️ التعافي',
             value: type === 'ban'
                 ? '🔨 تم **إلغاء حظر الضحية** تلقائياً (إن أمكن)'
@@ -2292,18 +2278,7 @@ class SecurityHandler {
         logger.warn(`🚨 Anti-Nuke (فوري): ${type} في ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
         void restoreP;
     }
-    // سطر يوضّح إذا كان البوت قادرًا فعلاً على العقوبة
-    async hierarchyField(guild) {
-        try {
-            const s = this.checkHierarchy(guild);
-            return s.ok
-                ? `✅ البوت أعلى رتبة (${s.botRoleName}) — يقدر يعاقب أي أحد`
-                : `⛔ **البوت ليس أعلى رتبة** — ${s.offenderCount} رول فوقه، العقوبات تفشل. اسحب رول البوت للأعلى!`;
-        }
-        catch {
-            return '—';
-        }
-    }
+    // (تمت إزالة سطر مستوى التسلّم — البوت صامت تماماً ولا يرسل رسائل عن الرولات الأعلى)
     // ♻️ الاستعادة التلقائية — تعيد القنوات والرولات المفقودة من آخر نسخة احتياطية
     async runAutoRestore(guild, settings, type) {
         const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
@@ -2360,46 +2335,11 @@ class SecurityHandler {
     // --------------------------------------------
     // 3) ANTI-ADMIN: منح صلاحية Administrator
     // --------------------------------------------
-    // 🚨 تنبيه حرج: خُفّضت رتبة البوت ففقد أعلى رتبة
+    // 🚨 خُفّضت رتبة البوت — تسجيل داخلي صامت فقط (بدون أي رسالة Discord)
     async announceBotDemotion(guild, oldRole, newRole) {
-        // نُلغي كتم التنبيه ليعاد إطلاقه مع هذه الحالة
         this.hierarchyState.set(guild.id, false);
         try {
-            const settings = await (0, models_1.getGuildSettings)(guild.id);
-            const channel = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
             const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id);
-            const s = this.checkHierarchy(guild);
-            const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🚨🚨 خُفّضت رتبة البوت — الحماية معطّلة الآن!')
-                .setDescription('**هذا أكثر هجوم صامت ضد السيرفر.**\n' +
-                `رتبة **${oldRole.name}** نزلت من \`#${oldRole.position}\` إلى \`#${newRole.position}\`، ` +
-                'وبذلك **فقد البوت أعلى رتبة**: مضاد النيوك لن يطرد ولا يحظر، والاستعادة التلقائية قد تفشل — ' +
-                'والهجوم التالي على السيرفر **سينجح بلا مقاومة**.')
-                .setColor(embeds_1.Colors.error)
-                .addFields({
-                name: '🎯 المنفّذ',
-                value: executor ? `${executor} (\`${this.userLabel(executor)}\`)` : '⚠️ غير معروف — راجع سجل التدقيق',
-                inline: true,
-            }, {
-                name: '📌 حالة البوت الآن',
-                value: `أعلى رتبة: **${s.botRoleName}** — الموقع \`#${s.botPosition}\``,
-                inline: true,
-            }, {
-                name: `⛔ الرولات فوق البوت (${s.offenderCount})`,
-                value: s.offenders.join('\n') || '—',
-                inline: false,
-            }, {
-                name: '✅ أعدّها الآن (خطوتين)',
-                value: '**1.** Server Settings ← Roles\n' +
-                    `**2.** اسحب رول البوت (‎${s.botRoleName}‎) **لأعلى القائمة** تحت @everyone مباشرة\n\n` +
-                    '_بعد التصحيح يرسل البوت رسالة تأكيد بأن الحماية رجعت تعمل._',
-                inline: false,
-            })
-                .setFooter({ text: 'Liberty City — Hierarchy Guard' })
-                .setTimestamp();
-            if (channel) {
-                await channel.send({ embeds: [embed], content: `<@${guild.ownerId}>` }).catch(() => { });
-            }
             logger.error(`🚨🚨 Bot demoted in ${guild.name}: #${oldRole.position} → #${newRole.position} | executor=${executor?.tag ?? 'unknown'}`);
         }
         catch (error) {
@@ -2487,9 +2427,9 @@ class SecurityHandler {
                             new discord_js_1.EmbedBuilder()
                                 .setTitle('🛡️ حاجز الصلاحيات — الهجوم أُبطل من الأساس')
                                 .setDescription(`${preventMode ? '🛡️ **وضع المنع**:' : '⚠️'} رول **${newRole.name}**${newRole.id === guild.id ? ' (@everyone)' : ''} حاول الحصول على: **${names}**\n` +
-                                `تم إرجاع الصلاحيات ${reverted ? 'فوراً ✅' : 'فشل الاسترجاع ❌ (افحص الهرمية)'} — فلا يستطيع أحد النيوك أصلاً.`)
+                                `تم إرجاع الصلاحيات ${reverted ? 'فوراً ✅' : 'فشل الاسترجاع ❌'} — فلا يستطيع أحد النيوك أصلاً.`)
                                 .setColor(embeds_1.Colors.error)
-                                .addFields({ name: 'المنفّذ', value: `${executor.bot ? '🤖' : '👤'} ${executor.tag}`, inline: true }, { name: 'العقوبة', value: punishText, inline: true }, { name: '🛡️ مستوى تسلّم البوت', value: await this.hierarchyField(guild), inline: false })
+                                .addFields({ name: 'المنفّذ', value: `${executor.bot ? '🤖' : '👤'} ${executor.tag}`, inline: true }, { name: 'العقوبة', value: punishText, inline: true })
                                 .setFooter({ text: 'Liberty City — Permission Guard' })
                                 .setTimestamp(),
                         ],
@@ -2518,8 +2458,7 @@ class SecurityHandler {
             // 🛡️ فحص التسلسل الهرمي
             const hierarchy = this.checkHierarchy(guild);
             if (!hierarchy.ok) {
-                const alert = await this.getAlertChannel(guild, settings, cfg.logChannel);
-                alert?.send({ content: `⚠️ **فشل Anti-Admin** — البوت ليس أعلى رتبة! لا يمكن استرجاع Administrator من ${isEveryone ? '@everyone' : newRole.name}. اسحب رول البوت للأعلى.` }).catch(() => { });
+                logger.warn(`Anti-Admin skipped in ${guild.name} — bot not top role`);
                 return;
             }
             const botMember = guild.members.me;

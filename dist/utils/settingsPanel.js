@@ -66,7 +66,6 @@ exports.buildLevelIgnorePanel = buildLevelIgnorePanel;
 exports.buildLevelRewardsPanel = buildLevelRewardsPanel;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
-const SecurityHandler_1 = require("../handlers/SecurityHandler");
 const pendingWarnRoles_1 = require("./pendingWarnRoles");
 const embeds_1 = require("./embeds");
 const welcomeCard_1 = require("./welcomeCard");
@@ -333,14 +332,8 @@ function buildProtection(guild, s) {
         p.antiAlt?.enabled, p.inviteTracker?.enabled, p.messageScanner?.enabled,
         p.aiAutoMod?.enabled,
     ].filter(Boolean).length;
-    // 🛡️ حالة تسلّم البوت — أهم مؤشر: بدونه كل العقوبات فشل
-    const hs = (0, SecurityHandler_1.computeHierarchy)(guild);
-    const hierarchyLine = hs.ok
-        ? `> ✅ **تسلّم البوت** — أعلى رتبة (‎${hs.botRoleName}‎ \`#${hs.botPosition}\`)، الحماية تعمل بالكامل`
-        : `> 🚨 **${hs.offenderCount} رول فوق البوت** — مضاد النيوك والاستعادة **ستفشل**! ارفع رول البوت ← \`/protection hierarchy\``;
     const embed = categoryEmbed('protection', guild, `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
         `**المحميات المفعّلة: ${active}/17**\n\n` +
-        `${hierarchyLine}\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
         `> ${on(p.antiSpam.enabled)} **مكافحة السبام** — يوقف تكرار الرسائل\n` +

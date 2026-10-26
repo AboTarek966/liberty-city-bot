@@ -140,7 +140,6 @@ export declare class SecurityHandler {
     /** رابط دعوة دائم — يستخدم الموجود أو ينشئ واحداً جديداً */
     getInviteLink(guild: Guild): Promise<string | null>;
     private respondMassDeletion;
-    private hierarchyField;
     private runAutoRestore;
     onMemberJoin(member: GuildMember): Promise<boolean>;
     private announceBotDemotion;
