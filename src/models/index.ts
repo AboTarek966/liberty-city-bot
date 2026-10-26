@@ -1398,16 +1398,55 @@ export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig,
 const settingsCache = new Map<string, { doc: IGuildSettings; ts: number }>();
 const SETTINGS_CACHE_TTL_MS = 30_000;
 
+// 🛡️ منع سباق إنشاء الإعدادات: عدة استدعاءات متزامنة لنفس السيرفر
+// كانت تنشئ وثيقتين في نفس اللحظة → E11000 duplicate key
+const settingsLoading = new Map<string, Promise<IGuildSettings>>();
+
+async function loadGuildSettings(guildId: string): Promise<IGuildSettings> {
+  // upsert ذرّي: لا يرمي خطأ لو وُجدت الوثيقة بالفعل
+  try {
+    const settings = await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { $setOnInsert: { guildId } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    if (settings) return settings;
+  } catch (error: any) {
+    // سباق نادر بين عمليتي upsert — نقرأ الوثيقة الموجودة
+    if (error?.code !== 11000) throw error;
+  }
+
+  const existing = await GuildSettings.findOne({ guildId });
+  if (existing) return existing;
+
+  // احتياط أخير (لو فشل الـupsert لأي سبب)
+  try {
+    return await GuildSettings.create({ guildId });
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      const again = await GuildSettings.findOne({ guildId });
+      if (again) return again;
+    }
+    throw error;
+  }
+}
+
 export async function getGuildSettings(guildId: string): Promise<IGuildSettings> {
   const hit = settingsCache.get(guildId);
   if (hit && Date.now() - hit.ts < SETTINGS_CACHE_TTL_MS) return hit.doc;
 
-  let settings = await GuildSettings.findOne({ guildId });
-  if (!settings) {
-    settings = await GuildSettings.create({ guildId });
+  const pending = settingsLoading.get(guildId);
+  if (pending) return pending;
+
+  const load = loadGuildSettings(guildId);
+  settingsLoading.set(guildId, load);
+  try {
+    const settings = await load;
+    settingsCache.set(guildId, { doc: settings, ts: Date.now() });
+    return settings;
+  } finally {
+    settingsLoading.delete(guildId);
   }
-  settingsCache.set(guildId, { doc: settings, ts: Date.now() });
-  return settings;
 }
 
 /** إجبار إعادة الجلب من قاعدة البيانات (بعد تعديل خارجي مباشر) */
@@ -1416,11 +1455,29 @@ export function invalidateGuildSettings(guildId: string): void {
 }
 
 export async function getOrCreateUserProfile(userId: string, guildId: string): Promise<IUserProfile> {
-  let profile = await UserProfile.findOne({ userId, guildId });
-  if (!profile) {
-    profile = await UserProfile.create({ userId, guildId });
+  try {
+    const profile = await UserProfile.findOneAndUpdate(
+      { userId, guildId },
+      { $setOnInsert: { userId, guildId } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    if (profile) return profile;
+  } catch (error: any) {
+    if (error?.code !== 11000) throw error;
   }
-  return profile;
+
+  const existing = await UserProfile.findOne({ userId, guildId });
+  if (existing) return existing;
+
+  try {
+    return await UserProfile.create({ userId, guildId });
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      const again = await UserProfile.findOne({ userId, guildId });
+      if (again) return again;
+    }
+    throw error;
+  }
 }
 
 export async function getNextCaseId(guildId: string): Promise<number> {

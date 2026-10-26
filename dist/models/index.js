@@ -693,27 +693,83 @@ Object.defineProperty(exports, "BackupConfig", { enumerable: true, get: function
 // (تُستخدم نفس الوثيقة للمدة الصالحة — التعديلات والحفظ تعمل كالمعتاد)
 const settingsCache = new Map();
 const SETTINGS_CACHE_TTL_MS = 30_000;
+// 🛡️ منع سباق إنشاء الإعدادات: عدة استدعاءات متزامنة لنفس السيرفر
+// كانت تنشئ وثيقتين في نفس اللحظة → E11000 duplicate key
+const settingsLoading = new Map();
+async function loadGuildSettings(guildId) {
+    // upsert ذرّي: لا يرمي خطأ لو وُجدت الوثيقة بالفعل
+    try {
+        const settings = await exports.GuildSettings.findOneAndUpdate({ guildId }, { $setOnInsert: { guildId } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+        if (settings)
+            return settings;
+    }
+    catch (error) {
+        // سباق نادر بين عمليتي upsert — نقرأ الوثيقة الموجودة
+        if (error?.code !== 11000)
+            throw error;
+    }
+    const existing = await exports.GuildSettings.findOne({ guildId });
+    if (existing)
+        return existing;
+    // احتياط أخير (لو فشل الـupsert لأي سبب)
+    try {
+        return await exports.GuildSettings.create({ guildId });
+    }
+    catch (error) {
+        if (error?.code === 11000) {
+            const again = await exports.GuildSettings.findOne({ guildId });
+            if (again)
+                return again;
+        }
+        throw error;
+    }
+}
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);
     if (hit && Date.now() - hit.ts < SETTINGS_CACHE_TTL_MS)
         return hit.doc;
-    let settings = await exports.GuildSettings.findOne({ guildId });
-    if (!settings) {
-        settings = await exports.GuildSettings.create({ guildId });
+    const pending = settingsLoading.get(guildId);
+    if (pending)
+        return pending;
+    const load = loadGuildSettings(guildId);
+    settingsLoading.set(guildId, load);
+    try {
+        const settings = await load;
+        settingsCache.set(guildId, { doc: settings, ts: Date.now() });
+        return settings;
     }
-    settingsCache.set(guildId, { doc: settings, ts: Date.now() });
-    return settings;
+    finally {
+        settingsLoading.delete(guildId);
+    }
 }
 /** إجبار إعادة الجلب من قاعدة البيانات (بعد تعديل خارجي مباشر) */
 function invalidateGuildSettings(guildId) {
     settingsCache.delete(guildId);
 }
 async function getOrCreateUserProfile(userId, guildId) {
-    let profile = await exports.UserProfile.findOne({ userId, guildId });
-    if (!profile) {
-        profile = await exports.UserProfile.create({ userId, guildId });
+    try {
+        const profile = await exports.UserProfile.findOneAndUpdate({ userId, guildId }, { $setOnInsert: { userId, guildId } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+        if (profile)
+            return profile;
     }
-    return profile;
+    catch (error) {
+        if (error?.code !== 11000)
+            throw error;
+    }
+    const existing = await exports.UserProfile.findOne({ userId, guildId });
+    if (existing)
+        return existing;
+    try {
+        return await exports.UserProfile.create({ userId, guildId });
+    }
+    catch (error) {
+        if (error?.code === 11000) {
+            const again = await exports.UserProfile.findOne({ userId, guildId });
+            if (again)
+                return again;
+        }
+        throw error;
+    }
 }
 async function getNextCaseId(guildId) {
     const lastCase = await exports.ModerationCase.findOne({ guildId }).sort({ caseId: -1 });
