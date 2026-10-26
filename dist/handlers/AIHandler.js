@@ -640,7 +640,7 @@ class AIHandler {
         // Fallback
         const finalResponse = response || this.getFallbackResponse(aiConfig.language || 'ar');
         // 🔒 تنظيف أخير — لا تصل أي علامة أداة إلى المستخدم أبداً
-        const leaked = /\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i.exec(finalResponse.content || '');
+        const leaked = (finalResponse.content || '').match(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i);
         if (leaked) {
             finalResponse.content = finalResponse.content.replace(leaked[0], '').trim() || finalResponse.content;
         }
@@ -648,7 +648,7 @@ class AIHandler {
     }
     /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */
     extractToolCall(text) {
-        const m = /\[\[\s*(SEARCH|FETCH)\s*:\s*([\s\S]{1,400}?)\s*\]\]/i.exec(text || '');
+        const m = (text || '').match(/\[\[\s*(SEARCH|FETCH)\s*:\s*([\s\S]{1,400}?)\s*\]\]/i);
         if (!m)
             return null;
         const type = m[1].toUpperCase();
@@ -664,7 +664,7 @@ class AIHandler {
     }
     /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
     extractActionCall(text) {
-        const m = /```json\s*(\{[\s\S]*?\})\s*```/i.exec(text || '');
+        const m = (text || '').match(/```json\s*(\{[\s\S]*?\})\s*```/i);
         if (!m)
             return null;
         try {

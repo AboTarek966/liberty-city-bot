@@ -263,8 +263,8 @@ function parseDDG(html: string, max: number): SearchResult[] {
   
   // نمط نتائج DDG الحديث
   const regex = /<a[^>]*class="result__snippet"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let match;
-  while ((match = regex.exec(html)) !== null && results.length < max) {
+  for (const match of html.matchAll(regex)) {
+    if (results.length >= max) break;
     const url = match[1];
     const snippet = match[2].replace(/<[^>]*>/g, '').trim();
     if (url && !seen.has(url) && url.startsWith('http') && !url.includes('duckduckgo')) {
@@ -276,7 +276,8 @@ function parseDDG(html: string, max: number): SearchResult[] {
   // احتياطي: روابط عامة
   if (results.length === 0) {
     const linkRegex = /<a[^>]*href="(https?:\/\/[^"]*)"[^>]*>([^<]{10,})<\/a>/gi;
-    while ((match = linkRegex.exec(html)) !== null && results.length < max) {
+    for (const match of html.matchAll(linkRegex)) {
+      if (results.length >= max) break;
       const url = match[1];
       const title = match[2].trim();
       if (!seen.has(url) && !url.includes('duckduckgo') && title.length > 5) {
@@ -483,7 +484,7 @@ export async function fetchWebPage(url: string, maxChars = 6000): Promise<PageCo
     }
 
     const html = await res.text();
-    const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
     const title = titleMatch ? stripHtml(titleMatch[1]).slice(0, 200) : parsed.hostname;
 
     const text = stripHtml(html).slice(0, maxChars);

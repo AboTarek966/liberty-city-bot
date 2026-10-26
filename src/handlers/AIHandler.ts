@@ -719,7 +719,7 @@ export class AIHandler {
     // Fallback
     const finalResponse = response || this.getFallbackResponse(aiConfig.language || 'ar');
     // 🔒 تنظيف أخير — لا تصل أي علامة أداة إلى المستخدم أبداً
-    const leaked = /\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i.exec(finalResponse.content || '');
+    const leaked = (finalResponse.content || '').match(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i);
     if (leaked) {
       finalResponse.content = finalResponse.content.replace(leaked[0], '').trim() || finalResponse.content;
     }
@@ -728,7 +728,7 @@ export class AIHandler {
 
   /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */
   private extractToolCall(text: string): { raw: string; type: 'SEARCH' | 'FETCH'; args: string; label: string } | null {
-    const m = /\[\[\s*(SEARCH|FETCH)\s*:\s*([\s\S]{1,400}?)\s*\]\]/i.exec(text || '');
+    const m = (text || '').match(/\[\[\s*(SEARCH|FETCH)\s*:\s*([\s\S]{1,400}?)\s*\]\]/i);
     if (!m) return null;
     const type = m[1].toUpperCase() as 'SEARCH' | 'FETCH';
     const args = m[2].trim();
@@ -743,7 +743,7 @@ export class AIHandler {
 
   /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
   private extractActionCall(text: string): { tool: string; args: any } | null {
-    const m = /```json\s*(\{[\s\S]*?\})\s*```/i.exec(text || '');
+    const m = (text || '').match(/```json\s*(\{[\s\S]*?\})\s*```/i);
     if (!m) return null;
     try {
       const parsed = JSON.parse(m[1]);
