@@ -967,6 +967,14 @@ export class SecurityHandler {
         executor.id,
         'Liberty City — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)'
       );
+      // 🛡️ لو فشل الحظر (هرمية/صلاحيات): اسحب كل رولاته فوراً حتى لا يكمل
+      const stripped = !banned
+        ? await this.stripRolesById(
+            guild,
+            executor.id,
+            'Liberty City — سحب صلاحيات بوت تخريبي (Anti-Nuke)'
+          )
+        : false;
 
       // حذف كل آثاره
       const purged = await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
@@ -980,14 +988,14 @@ export class SecurityHandler {
               content:
                 `🚨 **بوت تخريب — تم احتواءه فوراً**\n` +
                 `🤖 البوت: ${this.userLabel(executor)} (\`${executor.id}\`)\n` +
-                `${banned ? '🔨 حظر فوري ✅' : '⚠️ تعذّر الحظر'}\n` +
+                `${banned ? '🔨 حظر فوري ✅' : stripped ? '🗡️ سُحبت كل رولاته (تعذّر الحظر — هرمية)' : '⚠️ تعذّر الحظر وسحب الرولات'}\n` +
                 `🧹 حُذف ${purged} من آثاره (قنوات/رولات/ويب هوكس)`,
             })
             .catch(() => {})
         )
         .catch(() => {});
 
-      logger.error(`🚨 ROGUE BOT neutralized: ${this.userLabel(executor)} in ${guild.name} | banned=${banned} purged=${purged}`);
+      logger.error(`🚨 ROGUE BOT neutralized: ${this.userLabel(executor)} in ${guild.name} | banned=${banned} stripped=${stripped} purged=${purged}`);
       return true;
     } catch (error: any) {
       logger.error(`handleRogueBot error: ${error.message}`);
