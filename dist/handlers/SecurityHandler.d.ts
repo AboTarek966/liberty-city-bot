@@ -47,6 +47,7 @@ export declare class SecurityHandler {
     private actionTracker;
     private handledTargets;
     private botGuardTimers;
+    private botGuardInFlight;
     private botGuardBackoff;
     private recentBans;
     private recentKicks;
@@ -56,6 +57,7 @@ export declare class SecurityHandler {
     private getAlertChannel;
     private auditLogCache;
     private static readonly TRUSTED_BOT_IDS;
+    private static readonly DANGEROUS_BOT_PERMS;
     /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
     ingestAuditEntry(entry: any, guildId?: string): void;
     private getCachedAuditLogs;
@@ -79,6 +81,16 @@ export declare class SecurityHandler {
     /** سحب كل رولات حساب بالمعرّف — يعمل حتى لو لم يكن العضو في الكاش */
     private stripRolesById;
     /**
+     * 🛡️ تجريد بوت من كل قدراته التخريبية:
+     *   1) إزالة كل الرولات القابلة للإزالة.
+     *   2) تنظيف رول البوت المُدار (managed role) من صلاحيات النيوك —
+     *      لأن roles.set([]) لا يزيل رول البوت المُدار، وكان يترك Administrator/ManageChannels!
+     *   3) التحقق فعلياً أن الصلاحيات الخطرة اختفت.
+     */
+    private stripBotPowers;
+    /** تجريد بوت بالمعرّف — يستخدمه مسار الحظر عند فشل الحظر بسبب الهرمية */
+    private stripBotPowersById;
+    /**
      * 🛡️ تحييد فوري: حظر بالمعرّف، ولو فشل (هرمية/صلاحيات) يسحب كل رولاته،
      *    ولو فشل الاثنان يرجع نتيجة صريحة بدل السكوت.
      */
@@ -89,6 +101,11 @@ export declare class SecurityHandler {
     private trackRename;
     /** هل يملك هذا العضو صلاحيات تخريبية فعلية؟ */
     private hasDangerousPermissions;
+    /**
+     * فحص بوت: نتحقق من صلاحيات العضو الفعلية + رول البوت المُدار نفسه.
+     * ضروري لأن member.permissions قد تكون قديمة، ولأن roles.set([]) لا يزيل الرول المُدار.
+     */
+    private botHasDangerousPowers;
     /**
      * 🧹 حذف كل ما أنشأه المهاجم (قنوات/رولات/ويب هوكس).
      * يعمل من الذاكرة أولاً ثم من سجلات التدقيق بفلتر user_id — حتى لو فاتتنا الأحداث.

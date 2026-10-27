@@ -52,7 +52,7 @@ const event: Event = {
       lc.securityHandler.startStickyRoleWatchdog(guild);
       // 📸 مراقبة الحذف الجماعي للرسائل (Snapshotter)
       lc.securityHandler.startMessageSnapshotter(guild);
-      // 🕵️ حارس البوتات الخطرة — أول فحص فوري ثم كل 10 ثوانٍ
+      // 🕵️ حارس البوتات الخطرة — أول فحص فوري ثم كل 5 ثوانٍ
       lc.securityHandler.startDangerousBotWatchdog(guild);
       // فحص الهرمية (صامت) — يبدأ بدون تأخير
       void lc.securityHandler

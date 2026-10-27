@@ -212,10 +212,13 @@ export class SecurityHandler {
   // 🧹 منع تكرار معالجة نفس الهدف/المنفّذ خلال ثوانٍ
   private handledTargets: Map<string, number> = new Map();
 
-  // 🤖 حارس البوتات الخطرة (يفحص البوتات الموجودة كل 30 ثانية)
+  // 🤖 حارس البوتات الخطرة (يفحص البوتات الموجودة كل 5 ثوانٍ)
   private botGuardTimers: Map<string, NodeJS.Timeout> = new Map();
 
-  // ⏳ تهدئة حارس البوتات: البوت الذي فشل تحييده لا يُعاد فحصه إلا بعد 10 دقائق
+  // ⛔ منع تداخل فحوصات حارس البوتات (فحص واحد لكل سيرفر في نفس الوقت)
+  private botGuardInFlight: Set<string> = new Set();
+
+  // ⏳ تهدئة حارس البوتات: البوت الذي فشل تحييده لا يُعاد فحصه إلا بعد 30 ثانية
   private botGuardBackoff: Map<string, number> = new Map();
 
   // ⚡ منع تكرار عقوبة نفس الحساب خلال دقيقة (تفادي أخطاء "محظور مسبقاً" وتوفير REST)
@@ -397,6 +400,18 @@ export class SecurityHandler {
   private static readonly TRUSTED_BOT_IDS = [
     '854233015475109888', // Clyde (Discord)
     '293036868578279425', // Discord Bots
+  ];
+
+  // ⚠️ أي صلاحية من هذه = البوت قادر على التخريب (حذف قنوات/رولات/باند/ويب هوك)
+  private static readonly DANGEROUS_BOT_PERMS = [
+    PermissionFlagsBits.Administrator,
+    PermissionFlagsBits.ManageGuild,
+    PermissionFlagsBits.ManageChannels,
+    PermissionFlagsBits.ManageRoles,
+    PermissionFlagsBits.ManageWebhooks,
+    PermissionFlagsBits.BanMembers,
+    PermissionFlagsBits.KickMembers,
+    PermissionFlagsBits.ManageThreads,
   ];
 
   /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
@@ -662,6 +677,64 @@ export class SecurityHandler {
   }
 
   /**
+   * 🛡️ تجريد بوت من كل قدراته التخريبية:
+   *   1) إزالة كل الرولات القابلة للإزالة.
+   *   2) تنظيف رول البوت المُدار (managed role) من صلاحيات النيوك —
+   *      لأن roles.set([]) لا يزيل رول البوت المُدار، وكان يترك Administrator/ManageChannels!
+   *   3) التحقق فعلياً أن الصلاحيات الخطرة اختفت.
+   */
+  private async stripBotPowers(guild: Guild, member: GuildMember, reason: string): Promise<boolean> {
+    // 1) إزالة الرولات العادية واحداً واحداً (أكثر مرونة من roles.set عند وجود رول أعلى)
+    for (const role of member.roles.cache.values()) {
+      if (role.managed) continue;
+      await member.roles.remove(role, reason).catch(() => {});
+    }
+
+    // 2) تنظيف رول البوت المُدار نفسه
+    try {
+      let managed = guild.roles.cache.find(
+        (r: Role) => r.managed && r.tags?.botId === member.id
+      );
+      if (!managed) {
+        const roles = await guild.roles.fetch().catch(() => null);
+        managed = roles?.find((r: Role) => r.managed && r.tags?.botId === member.id) ?? undefined;
+      }
+      if (managed) {
+        const dangerousMask =
+          PermissionFlagsBits.Administrator |
+          PermissionFlagsBits.ManageGuild |
+          PermissionFlagsBits.ManageChannels |
+          PermissionFlagsBits.ManageRoles |
+          PermissionFlagsBits.ManageWebhooks |
+          PermissionFlagsBits.BanMembers |
+          PermissionFlagsBits.KickMembers |
+          PermissionFlagsBits.ManageThreads;
+        const before = managed.permissions.bitfield;
+        const cleaned = before & ~dangerousMask;
+        if (cleaned !== before) {
+          await managed.setPermissions(cleaned, reason);
+        }
+      }
+    } catch {
+      /* الهرمية تمنع التعديل — سيُعيد الحارس المحاولة */
+    }
+
+    // 3) التحقق النهائي من الصلاحيات الفعلية (ويشمل رول البوت المُدار)
+    const fresh = await guild.members.fetch(member.id).catch(() => null);
+    return !this.botHasDangerousPowers(guild, (fresh ?? member) as GuildMember);
+  }
+
+  /** تجريد بوت بالمعرّف — يستخدمه مسار الحظر عند فشل الحظر بسبب الهرمية */
+  private async stripBotPowersById(guild: Guild, userId: string, reason: string): Promise<boolean> {
+    if (!userId || userId === guild.ownerId || userId === this.client.user?.id) return false;
+    const member =
+      guild.members.cache.get(userId) ||
+      (await guild.members.fetch(userId).catch(() => null));
+    if (!member) return false;
+    return this.stripBotPowers(guild, member, reason);
+  }
+
+  /**
    * 🛡️ تحييد فوري: حظر بالمعرّف، ولو فشل (هرمية/صلاحيات) يسحب كل رولاته،
    *    ولو فشل الاثنان يرجع نتيجة صريحة بدل السكوت.
    */
@@ -678,9 +751,12 @@ export class SecurityHandler {
 
     if (action === 'alert') return '🔔 تنبيه فقط';
     if (action === 'strip') {
-      return (await this.stripRolesById(guild, executor.id, reason))
-        ? '🗡️ سُحبت كل رولاته — لا يستطيع فعل أي شيء'
-        : '⚠️ تعذّر سحب الرولات';
+      const stripped = this.executorIsBot(guild, executor)
+        ? await this.stripBotPowersById(guild, executor.id, reason)
+        : await this.stripRolesById(guild, executor.id, reason);
+      return stripped
+        ? '🗡️ سُحبت صلاحياته التخريبية — لا يستطيع فعل أي شيء'
+        : '⚠️ تعذّر سحب الصلاحيات';
     }
     if (action === 'kick') {
       return this.punishById(guild, executor, 'kick', reason);
@@ -690,11 +766,14 @@ export class SecurityHandler {
     if (await this.banUserById(guild, executor.id, reason)) {
       return '🔨 حظر فوري ✅';
     }
-    // احتياطي: سحب الرولات حتى لو تعذّر الحظر بسبب الهرمية
-    if (await this.stripRolesById(guild, executor.id, reason)) {
-      return '🗡️ سُحبت كل رولاته (تعذّر الحظر — غالباً بسبب الهرمية)';
+    // احتياطي: تجريد الصلاحيات حتى لو تعذّر الحظر بسبب الهرمية
+    const stripped = this.executorIsBot(guild, executor)
+      ? await this.stripBotPowersById(guild, executor.id, reason)
+      : await this.stripRolesById(guild, executor.id, reason);
+    if (stripped) {
+      return '🗡️ سُحبت صلاحياته التخريبية (تعذّر الحظر — غالباً بسبب الهرمية)';
     }
-    return '⚠️ تعذّر الحظر وسحب الرولات — راجع رتبة البوت';
+    return '⚠️ تعذّر الحظر وسحب الصلاحيات — راجع رتبة البوت';
   }
 
   /** ردّ فوري على أي اعتداء من إنسان أو بوت (يُستدعى من بثّ سجلات التدقيق) */
@@ -758,15 +837,19 @@ export class SecurityHandler {
   /** هل يملك هذا العضو صلاحيات تخريبية فعلية؟ */
   private hasDangerousPermissions(member: GuildMember): boolean {
     const p = member.permissions;
-    return (
-      p.has(PermissionFlagsBits.Administrator) ||
-      p.has(PermissionFlagsBits.ManageGuild) ||
-      p.has(PermissionFlagsBits.ManageChannels) ||
-      p.has(PermissionFlagsBits.ManageRoles) ||
-      p.has(PermissionFlagsBits.ManageWebhooks) ||
-      p.has(PermissionFlagsBits.BanMembers) ||
-      p.has(PermissionFlagsBits.KickMembers)
+    return SecurityHandler.DANGEROUS_BOT_PERMS.some(bit => p.has(bit));
+  }
+
+  /**
+   * فحص بوت: نتحقق من صلاحيات العضو الفعلية + رول البوت المُدار نفسه.
+   * ضروري لأن member.permissions قد تكون قديمة، ولأن roles.set([]) لا يزيل الرول المُدار.
+   */
+  private botHasDangerousPowers(guild: Guild, member: GuildMember): boolean {
+    if (this.hasDangerousPermissions(member)) return true;
+    const managed = guild.roles.cache.find(
+      (r: Role) => r.managed && r.tags?.botId === member.id
     );
+    return !!managed && SecurityHandler.DANGEROUS_BOT_PERMS.some(bit => managed!.permissions.has(bit));
   }
 
   /**
@@ -967,9 +1050,9 @@ export class SecurityHandler {
         executor.id,
         'Liberty City — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)'
       );
-      // 🛡️ لو فشل الحظر (هرمية/صلاحيات): اسحب كل رولاته فوراً حتى لا يكمل
+      // 🛡️ لو فشل الحظر (هرمية/صلاحيات): اسحب كل صلاحياته فوراً حتى لا يكمل
       const stripped = !banned
-        ? await this.stripRolesById(
+        ? await this.stripBotPowersById(
             guild,
             executor.id,
             'Liberty City — سحب صلاحيات بوت تخريبي (Anti-Nuke)'
@@ -1010,46 +1093,58 @@ export class SecurityHandler {
 
       const settings = await getGuildSettings(guild.id);
       const antiBot = settings.protection?.antiBot;
-      // 🛑 احترام إطفاء antiBot: لو مطفأ فعلاً لا نتدخل
-      if (!antiBot?.enabled) return false;
+      const antiNuke = settings.protection?.antiNuke;
+      const preventMode = antiNuke?.enabled && antiNuke?.mode !== 'react';
+
+      // 🛑 antiBot مطفأ = لا حظر لمجرد الانضمام،
+      //    لكن antiNuke في وضع المنع يحيّد أي بوت خطِر فوراً حتى لو antiBot مطفأ.
+      if (!antiBot?.enabled && !preventMode) return false;
       if (this.botWhitelist(settings).has(botId)) return false;
+
+      let target =
+        member ||
+        guild.members.cache.get(botId) ||
+        null;
+
+      // antiBot مطفأ: نسمح بالبوتات غير الخطرة، ونمنع فقط البوت القادر على التخريب
+      if (!antiBot?.enabled) {
+        if (!target) target = await guild.members.fetch(botId).catch(() => null);
+        if (!target || !this.botHasDangerousPowers(guild, target)) return false;
+      }
 
       // منع التكرار (قد يصل الحدث من Gateway ومن رد الفعل معاً)
       if (this.markHandled(`${guild.id}:botjoin:${botId}`)) return true;
 
       this.startIncident(guild.id, botId);
-      const banned = await this.banUserById(
-        guild,
-        botId,
-        'Liberty City — بوت غير مصرح به (Anti-Bot)'
-      );
+      const reason = antiBot?.enabled
+        ? 'Liberty City — بوت غير مصرح به (Anti-Bot)'
+        : 'Liberty City — بوت خطِر غير مصرح (Anti-Nuke)';
+      const banned = await this.banUserById(guild, botId, reason);
+      let stripped = false;
       if (!banned) {
-        const target =
-          member ||
-          guild.members.cache.get(botId) ||
-          (await guild.members.fetch(botId).catch(() => null));
+        if (!target) target = await guild.members.fetch(botId).catch(() => null);
         if (target) {
-          await target.kick('Liberty City — بوت غير مصرح به').catch(() => {});
-          // 🛡️ لو الطرد فشل بسبب التسلسل: اسحب كل رولاته حتى لا يملك أي صلاحية
-          await target.roles?.set?.([], 'Liberty City — سحب صلاحيات بوت غير مصرح').catch(() => {});
+          await target.kick(reason).catch(() => {});
+          // 🛡️ لو الطرد فشل بسبب التسلسل: اسحب رولاته وصلاحياته المُدارة أيضاً
+          stripped = await this.stripBotPowers(guild, target, reason).catch(() => false);
         }
       }
 
-      void this.getAlertChannel(guild, settings, antiBot?.logChannel)
+      void this.getAlertChannel(guild, settings, antiBot?.logChannel || antiNuke?.logChannel)
         .then(ch =>
           ch
             ?.send({
               content:
-                `🤖 **بوت غير مصرح حاول الدخول — تم منعه فوراً**\n` +
+                `🤖 **${antiBot?.enabled ? 'بوت غير مصرح حاول الدخول' : 'بوت خطِر حاول الدخول'} — تم منعه فوراً**\n` +
                 `البوت: <@${botId}> (\`${botId}\`)\n` +
-                `${banned ? '🔨 حظر فوري ✅ (لا يستطيع العودة)' : '👢 تم طرده'}\n` +
+                `${banned ? '🔨 حظر فوري ✅ (لا يستطيع العودة)' : stripped ? '🗡️ سُحبت صلاحياته التخريبية' : '👢 تم طرده'}\n` +
                 `📋 القائمة البيضاء للعرض فقط — لا تمنح أي استثناء. إن كان البوت شرعياً فعطّل antiBot مؤقتاً ثم أعد تفعيله.`,
             })
             .catch(() => {})
         )
         .catch(() => {});
 
-      logger.warn(`🤖 Bot join blocked: ${botId} in ${guild.name}`);
+      logger.warn(`🤖 Bot join blocked: ${botId} in ${guild.name} | banned=${banned} stripped=${stripped}`);
       return true;
     } catch (error: any) {
       logger.error(`guardBotJoin error: ${error.message}`);
@@ -1306,38 +1401,36 @@ export class SecurityHandler {
   public startDangerousBotWatchdog(guild: Guild): void {
     if (this.botGuardTimers.has(guild.id)) return;
     const run = () => this.auditDangerousBots(guild).catch(() => {});
-    // ⚡ فحص أول فوري — لا نترك نافذة 4 ثوانٍ يستغلها المهاجم
+    // ⚡ فحص أول فوري — لا نترك أي نافذة يستغلها المهاجم
     void run();
-    const timer = setInterval(run, 10000);
+    const timer = setInterval(run, 5000);
     timer.unref?.();
     this.botGuardTimers.set(guild.id, timer);
   }
 
   async auditDangerousBots(guild: Guild): Promise<void> {
+    if (this.botGuardInFlight.has(guild.id)) return;
+    this.botGuardInFlight.add(guild.id);
     try {
       const settings = await getGuildSettings(guild.id);
-      const cfg = settings.protection?.antiNuke;
-      if (!cfg?.enabled) return;
+      const antiNuke = settings.protection?.antiNuke;
       const antiBot = settings.protection?.antiBot;
-      // 🛑 احترام إطفاء antiBot: لا تحييد لبوتات موجودة إذا كانت الحماية مطفأة
-      if (!antiBot?.enabled) return;
+
+      // 🛡️ الحارس يعمل إذا:
+      //    • antiBot مفعّل (حماية انضمام البوتات), أو
+      //    • antiNuke مفعّل بوضع المنع (لا بوت يملك صلاحية تخريبية أصلاً)
+      const antiNukePrevent = antiNuke?.enabled && antiNuke?.mode !== 'react';
+      if (!antiBot?.enabled && !antiNukePrevent) return;
+
       const wl = this.botWhitelist(settings);
       const dangerous: GuildMember[] = [];
 
       for (const [, member] of guild.members.cache) {
         if (!member.user.bot || wl.has(member.id)) continue;
-        const p = member.permissions;
         // بوت "قادر على النيوك": أي صلاحية تخريبية منفردة تكفي — لا ننتظر اجتماعها
-        const nukeCapable =
-          p.has(PermissionFlagsBits.Administrator) ||
-          p.has(PermissionFlagsBits.ManageGuild) ||
-          p.has(PermissionFlagsBits.ManageChannels) ||
-          p.has(PermissionFlagsBits.ManageRoles) ||
-          p.has(PermissionFlagsBits.ManageWebhooks) ||
-          p.has(PermissionFlagsBits.BanMembers) ||
-          p.has(PermissionFlagsBits.KickMembers) ||
-          p.has(PermissionFlagsBits.ManageThreads);
-        if (nukeCapable) dangerous.push(member as GuildMember);
+        if (this.botHasDangerousPowers(guild, member as GuildMember)) {
+          dangerous.push(member as GuildMember);
+        }
       }
 
       if (dangerous.length === 0) return;
@@ -1358,24 +1451,26 @@ export class SecurityHandler {
           this.botGuardBackoff.delete(backoffKey);
           names.push(`${member.user.tag} (حظر)`);
         } else {
-          const stripped = await member.roles
-            .set([], 'Liberty City — سحب صلاحيات بوت خطِر')
-            .then(() => true)
+          const stripped = await this
+            .stripBotPowers(guild, member, 'Liberty City — سحب صلاحيات بوت خطِر')
             .catch(() => false);
           if (stripped) {
             this.botGuardBackoff.delete(backoffKey);
             names.push(`${member.user.tag} (سحب رولات)`);
           } else {
-            // 🔕 فشل بسبب التسلّم → صامت تماماً + تهدئة 10 دقائق (بدون أي رسالة)
-            this.botGuardBackoff.set(backoffKey, Date.now() + 10 * 60 * 1000);
-            logger.warn(`Bot guard could not neutralize ${member.user.tag} in ${guild.name} (hierarchy)`);
+            // 🔕 فشل بسبب التسلّم → صامت + إعادة محاولة بعد 30 ثانية (بدون أي رسالة)
+            this.botGuardBackoff.set(backoffKey, Date.now() + 30 * 1000);
+            logger.warn(
+              `Bot guard could not neutralize ${member.user.tag} in ${guild.name} (hierarchy) ` +
+              `| botRole=#${member.roles.highest.position} myRole=#${guild.members.me?.roles.highest.position ?? '?'}`
+            );
           }
         }
         await this.purgeAttackerArtifacts(guild, member.id, false).catch(() => 0);
       }
 
       if (names.length) {
-        const ch = await this.getAlertChannel(guild, settings, cfg.logChannel);
+        const ch = await this.getAlertChannel(guild, settings, antiNuke?.logChannel || antiBot?.logChannel);
         ch?.send({
           content:
             `🛡️ **حارس البوتات:** تم تحييد ${names.length} بوت بصلاحيات تخريبية\n` +
@@ -1386,6 +1481,8 @@ export class SecurityHandler {
       }
     } catch (error: any) {
       logger.error(`auditDangerousBots error: ${error.message}`);
+    } finally {
+      this.botGuardInFlight.delete(guild.id);
     }
   }
 
@@ -2086,17 +2183,37 @@ export class SecurityHandler {
 
       const settings = await getGuildSettings(guild.id);
       const antiNuke = settings.protection?.antiNuke;
-      if (!antiNuke?.enabled) return;
+      const antiBot = settings.protection?.antiBot;
 
       // 🤖 بوت غير مصرح حصل على رولات → تحييد فوري (يمنع بناء ذراع تخريبي)
       if (newMember.user?.bot) {
+        if (!antiNuke?.enabled && !antiBot?.enabled) return;
         const wl = this.botWhitelist(settings);
-        if (!wl.has(newMember.id) && this.hasDangerousPermissions(newMember)) {
+        if (!wl.has(newMember.id) && this.botHasDangerousPowers(guild, newMember)) {
           this.startIncident(guild.id, newMember.id);
-          void this.auditDangerousBots(guild).catch(() => {});
+          const reason = 'Liberty City — بوت خطِر حصل على صلاحيات تخريبية';
+          const banned = await this.banUserById(guild, newMember.id, reason);
+          if (!banned) {
+            await this.stripBotPowers(guild, newMember, reason).catch(() => false);
+          }
+          void this.purgeAttackerArtifacts(guild, newMember.id, false).catch(() => 0);
+          const alertCh = await this.getAlertChannel(
+            guild,
+            settings,
+            antiNuke?.logChannel || antiBot?.logChannel
+          );
+          alertCh
+            ?.send({
+              content:
+                `🚨 **بوت خطِر — تم تحييده فوراً:** ${newMember.user.tag} (\`${newMember.id}\`)\n` +
+                `${banned ? '🔨 حظر فوري ✅' : '🗡️ سُحبت رولاته (تعذّر الحظر)'}`,
+            })
+            .catch(() => {});
         }
         return;
       }
+
+      if (!antiNuke?.enabled) return;
 
       // ⚡ تحديد المنفّذ من بثّ التدقيق الفوري أولاً (بدون REST بطيء)
       const executor = await this.findExecutor(guild, AuditLogEvent.MemberRoleUpdate, newMember.id, 1500, 10000);
@@ -2888,8 +3005,11 @@ export class SecurityHandler {
       : Promise.resolve());
 
     // 🛡️ وضع المنع الوقائي: أول عملية اعتداء = حظر فوري
+    // 🤖 أي بوت غير مصرح = حظر دائم دائماً (حتى في وضع التفاعل) — لا يكفي الطرد
+    const executorIsBot = executor ? this.executorIsBot(guild, executor) : false;
     const preventMode = cfg.mode !== 'react';
-    const effectiveAction: 'alert' | 'kick' | 'ban' | 'strip' = preventMode ? 'ban' : (cfg.action ?? 'kick');
+    const effectiveAction: 'alert' | 'kick' | 'ban' | 'strip' =
+      preventMode || executorIsBot ? 'ban' : (cfg.action ?? 'kick');
 
     // ♻️ الاستعادة تبدأ الآن فوراً — بالتوازي مع العقوبة والتنبيه (لا ننتظر شيئاً)
     const restoreP: Promise<unknown> =
@@ -2922,6 +3042,14 @@ export class SecurityHandler {
     if (executor && !trusted) {
       const punishResult = await punishP.catch((err: any) => `⚠️ ${err?.message ?? 'فشل'}`);
       if (punishResult) actionText = preventMode ? `🛡️ **وضع المنع** — ${punishResult}` : punishResult;
+      // 🤖 بوت: تأكد من سحب صلاحياته حتى لو نجح الطرد فقط أو فشل الحظر بسبب الهرمية
+      if (executorIsBot) {
+        void this.stripBotPowersById(
+          guild,
+          executor.id,
+          'Liberty City — تأكيد سحب صلاحيات بوت تخريبي'
+        ).catch(() => false);
+      }
       void purgeP.then(n => {
         if (n > 0) logger.info(`🧹 Anti-Nuke purge: حُذف ${n} من آثار ${this.userLabel(executor)} في ${guild.name}`);
       });
