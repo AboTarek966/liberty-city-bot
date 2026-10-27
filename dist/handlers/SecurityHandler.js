@@ -475,14 +475,44 @@ class SecurityHandler {
         this.handledTargets.set(key, now);
         return false;
     }
-    botWhitelist(_settings) {
+    /** بوتات مستثناة تماماً: البوت نفسه + بوتات ديسكورد الرسمية فقط */
+    trustedBotIds() {
         const wl = new Set();
         if (this.client.user?.id)
             wl.add(this.client.user.id);
         for (const id of SecurityHandler.TRUSTED_BOT_IDS)
             wl.add(id);
-        // 🚫 الوايت ليست لم تعد استثناءً — كل بوت غير البوت نفسه يُعامل بالتساوي
         return wl;
+    }
+    /**
+     * 👑 القائمة البيضاء = استثناء من الحظر الوقائي فقط.
+     *    - البوت/العضو الموجود هنا لا يُحظر عند الدخول أو الفحص التلقائي.
+     *    - لكن أي هجوم سريع (حذف/إنشاء/تعديل جماعي) يُعاقب فوراً عند تجاوز العتبة.
+     */
+    botWhitelist(settings) {
+        const wl = this.trustedBotIds();
+        const main = settings?.protection?.whitelist;
+        if (main?.enabled && Array.isArray(main.userIds)) {
+            for (const id of main.userIds)
+                wl.add(String(id));
+        }
+        const antiBot = settings?.protection?.antiBot;
+        if (Array.isArray(antiBot?.whitelist)) {
+            for (const id of antiBot.whitelist)
+                wl.add(String(id));
+        }
+        return wl;
+    }
+    /** هل المنفّذ مستثنى من الحماية الوقائية (وليس من عقوبة الهجوم السريع)؟ */
+    isPreemptivelyWhitelisted(settings, userId) {
+        if (!userId)
+            return false;
+        return this.botWhitelist(settings).has(String(userId));
+    }
+    /** نسخة تعتمد على إعدادات السيرفر — للاستخدام من الأحداث */
+    async isPreemptivelyWhitelistedInGuild(guildId, userId) {
+        const settings = await (0, models_1.getGuildSettings)(guildId);
+        return this.isPreemptivelyWhitelisted(settings, userId);
     }
     // ⚡ حظر/طرد بالمعرّف مباشرة — لا ننتظر جلب العضو (جلب الأعضاء هو أبطأ خطوة)
     async banUserById(guild, userId, reason) {
@@ -651,9 +681,9 @@ class SecurityHandler {
             ? await this.stripBotPowersById(guild, executor.id, reason)
             : await this.stripRolesById(guild, executor.id, reason);
         if (stripped) {
-            return '🗡️ سُحبت صلاحياته التخريبية (تعذّر الحظر — غالباً بسبب الهرمية)';
+            return '🗡️ سُحبت صلاحياته التخريبية (تعذّر الحظر — الصلاحيات غير كافية)';
         }
-        return '⚠️ تعذّر الحظر وسحب الصلاحيات — راجع رتبة البوت';
+        return '⚠️ تعذّر الحظر وسحب الصلاحيات — تحقق من صلاحيات البوت';
     }
     /** ردّ فوري على أي اعتداء من إنسان أو بوت (يُستدعى من بثّ سجلات التدقيق) */
     async handleInstantViolation(guild, executor, settings, cfg, label, opts = {}) {
@@ -881,6 +911,9 @@ class SecurityHandler {
                 return false;
             if (await this.isTrustedExecutor(guild, executor.id))
                 return false;
+            // 👑 القائمة البيضاء لا تُحظر وقائياً — تُترك للعتبات في مسارات الهجوم السريع
+            if (this.isPreemptivelyWhitelisted(settings, executor.id))
+                return false;
             this.startIncident(guild.id, executor.id);
             // احذف الهدف فوراً قبل أي شيء — حتى في المحاولة المتكررة
             if (targetId) {
@@ -918,7 +951,7 @@ class SecurityHandler {
                 ?.send({
                 content: `🚨 **بوت تخريب — تم احتواءه فوراً**\n` +
                     `🤖 البوت: ${this.userLabel(executor)} (\`${executor.id}\`)\n` +
-                    `${banned ? '🔨 حظر فوري ✅' : stripped ? '🗡️ سُحبت كل رولاته (تعذّر الحظر — هرمية)' : '⚠️ تعذّر الحظر وسحب الرولات'}\n` +
+                    `${banned ? '🔨 حظر فوري ✅' : stripped ? '🗡️ سُحبت كل رولاته (تعذّر الحظر — صلاحيات غير كافية)' : '⚠️ تعذّر الحظر وسحب الرولات'}\n` +
                     `🧹 حُذف ${purged} من آثاره (قنوات/رولات/ويب هوكس)`,
             })
                 .catch(() => { }))
@@ -980,7 +1013,7 @@ class SecurityHandler {
                 content: `🤖 **${antiBot?.enabled ? 'بوت غير مصرح حاول الدخول' : 'بوت خطِر حاول الدخول'} — تم منعه فوراً**\n` +
                     `البوت: <@${botId}> (\`${botId}\`)\n` +
                     `${banned ? '🔨 حظر فوري ✅ (لا يستطيع العودة)' : stripped ? '🗡️ سُحبت صلاحياته التخريبية' : '👢 تم طرده'}\n` +
-                    `📋 القائمة البيضاء للعرض فقط — لا تمنح أي استثناء. إن كان البوت شرعياً فعطّل antiBot مؤقتاً ثم أعد تفعيله.`,
+                    `📋 القائمة البيضاء تستثني من الحظر الوقائي فقط — أي هجوم سريع يُعاقب فوراً.`,
             })
                 .catch(() => { }))
                 .catch(() => { });
@@ -1026,7 +1059,7 @@ class SecurityHandler {
                     await this.guardBotJoin(guild, targetId);
                 return;
             }
-            // 👑 المالك/المطوّر فقط أحرار تماماً — الوايت ليست لا تمنح شيئاً
+            // 👑 المالك/المطوّر فقط أحرار تماماً — القائمة البيضاء استثناء وقائي وليست حصانة
             if (await this.isTrustedExecutor(guild, executor.id))
                 return;
             const settings = await (0, models_1.getGuildSettings)(guild.id);
@@ -1036,6 +1069,8 @@ class SecurityHandler {
             const isBot = this.executorIsBot(guild, executor);
             const action = entry.action;
             const bot = isBot;
+            // 👑 القائمة البيضاء = استثناء وقائي فقط (وليس من عقوبة الهجوم السريع)
+            const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
             const instantBotActions = new Set([
                 discord_js_1.AuditLogEvent.ChannelDelete,
                 discord_js_1.AuditLogEvent.RoleDelete,
@@ -1054,7 +1089,7 @@ class SecurityHandler {
                 discord_js_1.AuditLogEvent.RoleUpdate,
             ]);
             // 🤖 أي بوت غير مصرح: صفر تسامح — أول عملية تخريبية = حظر فوري
-            if (bot && instantBotActions.has(action)) {
+            if (bot && !preWhitelisted && instantBotActions.has(action)) {
                 const labels = {
                     [discord_js_1.AuditLogEvent.ChannelDelete]: 'حذف قناة',
                     [discord_js_1.AuditLogEvent.RoleDelete]: 'حذف رول',
@@ -1075,8 +1110,32 @@ class SecurityHandler {
                 await this.handleInstantViolation(guild, executor, settings, cfg, labels[action] ?? 'عملية تخريبية', { forceBan: true });
                 return;
             }
+            // 👑 منفّذ في القائمة البيضاء: عملية واحدة مسموحة، والانفجار السريع = هجوم.
+            //    الأحداث التي لها مسار عتبة مخصص بالأسفل تُترك له.
+            const whitelistBurstKinds = {
+                [discord_js_1.AuditLogEvent.MessageBulkDelete]: 'message',
+                [discord_js_1.AuditLogEvent.GuildUpdate]: 'guild',
+                [discord_js_1.AuditLogEvent.ChannelOverwriteCreate]: 'overwrite',
+                [discord_js_1.AuditLogEvent.ChannelOverwriteUpdate]: 'overwrite',
+                [discord_js_1.AuditLogEvent.ChannelOverwriteDelete]: 'overwrite',
+                [discord_js_1.AuditLogEvent.RoleUpdate]: 'role-update',
+            };
+            if (preWhitelisted && instantBotActions.has(action)) {
+                const kind = whitelistBurstKinds[action];
+                // RoleUpdate: نراقب تغييرات الاسم فقط — تعديل الصلاحيات يتكفّل به onRoleUpdate
+                const relevant = action !== discord_js_1.AuditLogEvent.RoleUpdate ||
+                    (entry.changes || []).some((c) => c.key === 'name');
+                if (kind && relevant) {
+                    const count = this.trackActionOnce(guild.id, executor.id, kind, entry.targetId, cfg.timeWindow ?? 10000);
+                    if (count < Math.max(2, cfg.threshold ?? 2))
+                        return;
+                    await this.handleInstantViolation(guild, executor, settings, cfg, 'عمليات تخريبية متكررة بسرعة', { forceBan: isBot || cfg.mode !== 'react' });
+                    return;
+                }
+            }
             // 🤖 بوت ينشئ قناة/رول/ويب هوك/ثريد → حظر فوري + حذف ما أنشأه
-            if (bot) {
+            //    (بوت القائمة البيضاء يُترك لعدّاد العتبة بالأسفل)
+            if (bot && !preWhitelisted) {
                 if (action === discord_js_1.AuditLogEvent.ChannelCreate ||
                     action === discord_js_1.AuditLogEvent.ThreadCreate) {
                     await this.handleRogueBot(guild, executor, 'channel', entry.targetId);
@@ -1092,15 +1151,23 @@ class SecurityHandler {
                 }
             }
             // 🔨 حذف قناة/رول من أي حساب غير موثوق → أول عملية = تحييد فوري
+            //    👑 القائمة البيضاء: حذف واحد مسموح، والانفجار (2+ داخل النافذة) = هجوم
             if (action === discord_js_1.AuditLogEvent.ChannelDelete || action === discord_js_1.AuditLogEvent.RoleDelete) {
-                await this.handleInstantViolation(guild, executor, settings, cfg, action === discord_js_1.AuditLogEvent.ChannelDelete ? 'حذف قناة' : 'حذف رول', { forceBan: cfg.mode !== 'react' });
+                if (preWhitelisted) {
+                    const kind = action === discord_js_1.AuditLogEvent.ChannelDelete ? 'channel' : 'role';
+                    const count = this.trackActionOnce(guild.id, executor.id, kind, entry.targetId, cfg.timeWindow ?? 10000);
+                    if (count < Math.max(2, cfg.threshold ?? 2))
+                        return;
+                }
+                await this.handleInstantViolation(guild, executor, settings, cfg, action === discord_js_1.AuditLogEvent.ChannelDelete ? 'حذف قناة' : 'حذف رول', { forceBan: isBot || cfg.mode !== 'react' });
                 return;
             }
-            // 🔨 حظر/طرد جماعي (الإنسان يُسمح له بعملية واحدة، والثانية خلال 10ث = هجوم)
+            // 🔨 حظر/طرد جماعي (عملية واحدة مسموحة، والثانية خلال النافذة = هجوم)
+            //    👑 القائمة البيضاء تُعامل مثل الإنسان هنا؛ البوت غير المصرح صفر تسامح بالأعلى
             if (action === discord_js_1.AuditLogEvent.MemberBanAdd || action === discord_js_1.AuditLogEvent.MemberKick) {
                 const kind = action === discord_js_1.AuditLogEvent.MemberBanAdd ? 'ban' : 'kick';
-                if (!isBot) {
-                    const count = this.trackActionOnce(guild.id, executor.id, kind, entry.targetId, 10000);
+                if (!isBot || preWhitelisted) {
+                    const count = this.trackActionOnce(guild.id, executor.id, kind, entry.targetId, cfg.timeWindow ?? 10000);
                     if (count < 2)
                         return;
                 }
@@ -1120,18 +1187,22 @@ class SecurityHandler {
                 });
                 return;
             }
-            // 🧵 حذف ثريدات / إيموجي / ستيكر — عتبة سريعة للإنسان، فوري للبوت (تم أعلاه)
+            // 🧵 حذف ثريدات / إيموجي / ستيكر — عتبة سريعة لكل منفّذ
+            //    (البوت غير المصرح عولج فوراً بالأعلى)
             if (action === discord_js_1.AuditLogEvent.ThreadDelete ||
                 action === discord_js_1.AuditLogEvent.EmojiDelete ||
                 action === discord_js_1.AuditLogEvent.StickerDelete) {
-                const key = action === discord_js_1.AuditLogEvent.ThreadDelete ? 'channel' : action === discord_js_1.AuditLogEvent.EmojiDelete ? 'emoji' : 'sticker';
+                const kind = action === discord_js_1.AuditLogEvent.ThreadDelete
+                    ? 'thread'
+                    : action === discord_js_1.AuditLogEvent.EmojiDelete
+                        ? 'emoji'
+                        : 'sticker';
                 const limit = action === discord_js_1.AuditLogEvent.ThreadDelete ? 3 : 5;
-                const count = this.track(guild.id, key, 10000);
+                const count = this.trackActionOnce(guild.id, executor.id, kind, entry.targetId, 10000);
                 if (count < limit)
                     return;
-                this.deletionTracker.get(guild.id)[key] = [];
                 await this.handleInstantViolation(guild, executor, settings, cfg, 'حذف جماعي', {
-                    forceBan: cfg.mode !== 'react',
+                    forceBan: isBot || cfg.mode !== 'react',
                 });
                 return;
             }
@@ -1156,28 +1227,31 @@ class SecurityHandler {
                     : action === discord_js_1.AuditLogEvent.RoleCreate
                         ? 'إنشاء رولات جماعي'
                         : 'إنشاء قنوات جماعي', {
-                    forceBan: cfg.mode !== 'react',
+                    forceBan: isBot || cfg.mode !== 'react',
                     targetId: entry.targetId,
                     deleteTargetKind: (isThread ? 'channel' : kind),
                 });
                 return;
             }
-            // 🔗 إنشاء ويب هوك — بوت تم أعلاه، الإنسان: أول ويب هوك غير مصرح = تحييد
+            // 🔗 إنشاء ويب هوك — بوت غير مصرح تم أعلاه.
+            //    👑 القائمة البيضاء: ويب هوك واحد مسموح، و2+ خلال 5ث = هجوم
             if (action === discord_js_1.AuditLogEvent.WebhookCreate) {
-                const count = this.trackCreateOnce(guild.id, executor.id, 'webhook', entry.targetId, 10000);
-                if (count < 1)
+                const limit = preWhitelisted ? 2 : 1;
+                const windowMs = preWhitelisted ? 5000 : 10000;
+                const count = this.trackCreateOnce(guild.id, executor.id, 'webhook', entry.targetId, windowMs);
+                if (count < limit)
                     return;
                 await this.handleInstantViolation(guild, executor, settings, cfg, 'إنشاء ويب هوك غير مصرح', {
-                    forceBan: cfg.mode !== 'react',
+                    forceBan: isBot || cfg.mode !== 'react',
                 });
                 return;
             }
-            // ✏️ تغيير اسم قناة بسرعة (الإنسان: 2+ خلال 5ث) — البوت يُحظر من أول تغيير
+            // ✏️ تغيير اسم قناة بسرعة (القائمة البيضاء: 2+ خلال 5ث) — البوت غير المصرح يُحظر من أول تغيير
             if (action === discord_js_1.AuditLogEvent.ChannelUpdate) {
                 const nameChange = (entry.changes || []).find((c) => c.key === 'name');
                 if (!nameChange)
                     return;
-                if (!isBot) {
+                if (!isBot || preWhitelisted) {
                     const count = this.trackRename(guild.id, executor.id, 5000);
                     if (count < 2 && !this.isActiveAttacker(guild.id, executor.id))
                         return;
@@ -1270,7 +1344,7 @@ class SecurityHandler {
                 ch?.send({
                     content: `🛡️ **حارس البوتات:** تم تحييد ${names.length} بوت بصلاحيات تخريبية\n` +
                         names.slice(0, 10).map(n => `• ${n}`).join('\n') +
-                        `\n📋 القائمة البيضاء للعرض فقط — لا تمنح أي استثناء. إن كان أحدها شرعياً فعطّل antiBot مؤقتاً.`,
+                        `\n📋 القائمة البيضاء تستثني من الحظر الوقائي فقط — أي هجوم سريع يُعاقب فوراً.`,
                 }).catch(() => { });
                 logger.warn(`🛡️ Dangerous bots neutralized in ${guild.name}: ${names.join(', ')}`);
             }
@@ -1388,7 +1462,7 @@ class SecurityHandler {
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return false;
-            if (this.botWhitelist(settings).has(message.author.id))
+            if (this.trustedBotIds().has(message.author.id))
                 return false;
             const key = `${guild.id}:bot:${message.author.id}`;
             const now = Date.now();
@@ -1555,7 +1629,7 @@ class SecurityHandler {
         }
         return status;
     }
-    // وايت ليست للعرض فقط (تاج 👑) — الوايت ليست المخصصة لم تعد تمنح أي استثناء
+    // تاج 👑 للعرض في تقارير الحذف الجماعي — ليس استثناءً أمنياً بحد ذاته
     async isWhitelisted(guild, executorId) {
         if (executorId === guild.ownerId)
             return true;
@@ -1619,12 +1693,15 @@ class SecurityHandler {
             this.recordArtifact(guild.id, executor.id, 'channels', channel.id);
             this.handledTargets.set(`${guild.id}:ch-target:${channel.id}`, Date.now());
             // 🤖 بوت غير مصرح: صفر تسامح — حظر فوري + حذف القناة + كل آثاره
-            if (this.executorIsBot(guild, executor)) {
+            //    👑 بوت القائمة البيضاء: إنشاء واحد مسموح، والانفجار 2+/5ث = هجوم
+            const isBot = this.executorIsBot(guild, executor);
+            const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
+            if (isBot && !preWhitelisted) {
                 await this.handleRogueBot(guild, executor, 'channel', channel.id);
                 return;
             }
-            // 🧑 إنسان: قناة واحدة قد تكون طبيعية — نتدخل عند الانفجار (2+ خلال 5 ثوانٍ)
-            //    أو إذا كان الحادث نشطاً على نفس المنفّذ.
+            // 🧑 إنسان أو 👑 بوت/عضو في القائمة البيضاء: قناة واحدة طبيعية —
+            //    نتدخل عند الانفجار (2+ خلال 5 ثوانٍ) أو الاسم المشبوه أو الحادث النشط.
             const burst = this.trackCreateOnce(guild.id, executor.id, 'channel', channel.id, 5000);
             const suspiciousName = /nuked|hacked|kly|cracked|death.?note|pwned|on.?top|raid|destroy/i.test(channel.name || '');
             if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id))
@@ -1634,7 +1711,7 @@ class SecurityHandler {
             if (burst >= 2 || suspiciousName) {
                 const reason = 'Liberty City — إنشاء قنوات جماعي مشبوه (Anti-Nuke)';
                 const prevent = cfg.mode !== 'react';
-                const text = await this.neutralizeById(guild, executor, cfg, reason, prevent);
+                const text = await this.neutralizeById(guild, executor, cfg, reason, isBot || prevent);
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
                 void this.getAlertChannel(guild, settings, cfg.logChannel)
                     .then(ch => ch
@@ -1721,11 +1798,14 @@ class SecurityHandler {
                 return;
             this.recordArtifact(guild.id, executor.id, 'roles', role.id);
             // 🤖 بوت غير مصرح: صفر تسامح
-            if (this.executorIsBot(guild, executor)) {
+            //    👑 بوت القائمة البيضاء: رول واحد مسموح، والانفجار 2+/5ث = هجوم
+            const isBot = this.executorIsBot(guild, executor);
+            const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
+            if (isBot && !preWhitelisted) {
                 await this.handleRogueBot(guild, executor, 'role', role.id);
                 return;
             }
-            // 🧑 إنسان: انفجار 2+ خلال 5 ثوانٍ أو اسم مشبوه أو حادث نشط
+            // 🧑 إنسان أو 👑 قائمة بيضاء: انفجار 2+ خلال 5 ثوانٍ أو اسم مشبوه أو حادث نشط
             const burst = this.trackCreateOnce(guild.id, executor.id, 'role', role.id, 5000);
             const suspiciousName = /nuked|hacked|kly|cracked|death.?note|pwned|on.?top|raid|destroy/i.test(role.name || '');
             if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id))
@@ -1734,7 +1814,7 @@ class SecurityHandler {
             role.delete('Liberty City — إنشاء رولات جماعي (Anti-Nuke)').catch(() => { });
             if (burst >= 2 || suspiciousName) {
                 const prevent = cfg.mode !== 'react';
-                const text = await this.neutralizeById(guild, executor, cfg, 'Liberty City — إنشاء رولات جماعي مشبوه (Anti-Nuke)', prevent);
+                const text = await this.neutralizeById(guild, executor, cfg, 'Liberty City — إنشاء رولات جماعي مشبوه (Anti-Nuke)', isBot || prevent);
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
                 void this.getAlertChannel(guild, settings, cfg.logChannel)
                     .then(ch => ch
@@ -1774,10 +1854,11 @@ class SecurityHandler {
             if (!antiNuke?.enabled)
                 return;
             const isBot = this.executorIsBot(guild, entry.executor);
+            const preWhitelisted = this.isPreemptivelyWhitelisted(settings, entry.executor.id);
             const count = this.trackRename(guild.id, entry.executor.id, 5000);
             const nameChange = (entry.changes || []).find((c) => c.key === 'name');
             const oldName = nameChange?.old ? String(nameChange.old) : oldChannel.name;
-            // 1️⃣ إرجاع الاسم فوراً — حتى لو لم نعاقب (تغيير واحد من إنسان قد يكون طبيعياً)
+            // 1️⃣ إرجاع الاسم فوراً — حتى لو لم نعاقب (تغيير واحد قد يكون طبيعياً)
             const me = guild.members.me;
             const canManageChannels = me?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ?? false;
             let nameRestored = false;
@@ -1790,9 +1871,9 @@ class SecurityHandler {
                     logger.warn(`Failed to restore channel name in ${guild.name}: ${e.message}`);
                 }
             }
-            // 🧑 إنسان: تغيير واحد = استرجاع فقط. 2+ خلال 5 ثوانٍ = هجوم.
-            // 🤖 بوت: أول تغيير = حظر فوري.
-            if (!isBot && count < 2 && !this.isActiveAttacker(guild.id, entry.executor.id)) {
+            // 👑 القائمة البيضاء/الإنسان: تغيير واحد = استرجاع فقط. 2+ خلال 5 ثوانٍ = هجوم.
+            // 🤖 البوت غير المصرح: أول تغيير = حظر فوري.
+            if ((!isBot || preWhitelisted) && count < 2 && !this.isActiveAttacker(guild.id, entry.executor.id)) {
                 logger.info(`✏️ Channel rename reverted in ${guild.name} (single change by ${this.userLabel(entry.executor)})`);
                 return;
             }
@@ -1867,6 +1948,12 @@ class SecurityHandler {
                 // 👑 الموثوق لا يُحذف ويب هوكه ولا يُعاقب
                 if (await this.isTrustedExecutor(guild, executor.id))
                     return;
+                // 👑 القائمة البيضاء: ويب هوك واحد مسموح — 2+ خلال 5ث = هجوم
+                if (this.isPreemptivelyWhitelisted(settings, executor.id)) {
+                    const count = this.trackCreateOnce(guild.id, executor.id, 'webhook', webhook.id, 5000);
+                    if (count < 2 && !this.isActiveAttacker(guild.id, executor.id))
+                        return;
+                }
             }
             // 🗑️ حذف فوري — قبل أي انتظار إضافي
             this.recordArtifact(guild.id, executor?.id ?? 'unknown', 'webhooks', webhook.id);
@@ -1965,11 +2052,18 @@ class SecurityHandler {
                 catch { }
             }
             // 🛡️ وضع المنع: إعطاء رول خطير من منفّذ غير موثوق = اعتداء → عقوبة فورية بالمعرّف
+            //    👑 بوت القائمة البيضاء: منح رول واحد مسموح، و2+ خلال النافذة = هجوم
+            const executorIsBot = this.executorIsBot(guild, executor);
+            if (executorIsBot && this.isPreemptivelyWhitelisted(settings, executor.id)) {
+                const count = this.trackActionOnce(guild.id, executor.id, 'member-role', newMember.id, antiNuke.timeWindow ?? 10000);
+                if (count < Math.max(2, antiNuke.threshold ?? 2))
+                    return;
+            }
             const preventMode = antiNuke.mode !== 'react';
-            const punishText = await this.neutralizeById(guild, executor, antiNuke, 'Liberty City Anti-Nuke: إعطاء رولات خطيرة بدون تصريح', preventMode);
+            const punishText = await this.neutralizeById(guild, executor, antiNuke, 'Liberty City Anti-Nuke: إعطاء رولات خطيرة بدون تصريح', executorIsBot || preventMode);
             await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
             const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
-            const executorType = this.executorIsBot(guild, executor) ? '🤖 بوت' : '👤 عضو';
+            const executorType = executorIsBot ? '🤖 بوت' : '👤 عضو';
             alert?.send({
                 content: `🎭 **${executorType} أعطى رول خطير:** ${this.userLabel(executor)}\n` +
                     `👤 الهدف: ${newMember.user.tag}\n` +
@@ -2329,7 +2423,10 @@ class SecurityHandler {
             if (await this.isTrustedExecutor(guild, executor.id))
                 return;
             // أي بوت غير مصرح ينشئ ثريد → حظر فوري + حذف
-            if (this.executorIsBot(guild, executor)) {
+            //    👑 بوت القائمة البيضاء: 3+ خلال 10ث = هجوم فقط
+            const isBot = this.executorIsBot(guild, executor);
+            const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
+            if (isBot && !preWhitelisted) {
                 try {
                     await thread.delete('Liberty City — بوت غير مصرح أنشأ ثريد');
                 }
@@ -2345,7 +2442,7 @@ class SecurityHandler {
                     .catch(() => { });
                 return;
             }
-            // 🧑 إنسان: انفجار ثريدات (3+ خلال 10 ثوانٍ) = هجوم
+            // 🧑 إنسان أو 👑 قائمة بيضاء: انفجار ثريدات (3+ خلال 10 ثوانٍ) = هجوم
             const burst = this.trackCreateOnce(guild.id, executor.id, 'thread', thread.id, 10000);
             if (burst < 3)
                 return;
@@ -2355,7 +2452,7 @@ class SecurityHandler {
             }
             catch { }
             const prevent = cfg.mode !== 'react';
-            const action = prevent ? 'ban' : (cfg.action ?? 'kick');
+            const action = isBot || prevent ? 'ban' : (cfg.action ?? 'kick');
             const text = await this.punishById(guild, executor, action, 'Liberty City — إنشاء ثريدات جماعي');
             await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
             void this.getAlertChannel(guild, settings, cfg.logChannel)
@@ -2452,6 +2549,12 @@ class SecurityHandler {
                 return; // طرد شرعي من البوت نفسه
             if (await this.isTrustedExecutor(member.guild, executor.id))
                 return; // مالك/مطوّر فقط
+            // 👑 القائمة البيضاء: طرد واحد مسموح — لا استعادة ولا عقوبة إلا عند الانفجار
+            if (this.isPreemptivelyWhitelisted(settings, executor.id)) {
+                const count = this.trackActionOnce(member.guild.id, executor.id, 'kick', member.id, cfg.timeWindow ?? 10000);
+                if (count < Math.max(2, cfg.threshold ?? 2))
+                    return;
+            }
             // نحتفظ بالمطرود ليرسل له رابط الدعوة (استعادة تلقائية)
             const queue = this.kickedQueue.get(member.guild.id) ?? [];
             if (!queue.some(e => e.userId === member.id)) {
@@ -2638,9 +2741,18 @@ class SecurityHandler {
         // تصرفات المالك/المطوّر شرعية — لا عقوبة ولا استعادة ولا تنبيه
         if (executor && trusted)
             return;
+        // 👑 القائمة البيضاء: استثناء وقائي فقط — عملية واحدة مسموحة، والانفجار السريع = هجوم
+        const preWhitelisted = executor ? this.isPreemptivelyWhitelisted(settings, executor.id) : false;
+        const burstWindow = cfg.timeWindow ?? 10000;
+        if (executor && preWhitelisted && (type === 'channel' || type === 'role')) {
+            const count = this.trackActionOnce(guild.id, executor.id, type, targetId, burstWindow);
+            if (count < Math.max(2, cfg.threshold ?? 2))
+                return;
+        }
         // 🔨 الحظر/الطرد: عملية واحدة قد تكون مشروعة — 2+ خلال 10 ثوانٍ = هجوم
         if ((type === 'ban' || type === 'kick') && executor) {
-            const count = this.trackActionOnce(guild.id, executor.id, type, targetId, 10000);
+            const windowMs = preWhitelisted ? burstWindow : 10000;
+            const count = this.trackActionOnce(guild.id, executor.id, type, targetId, windowMs);
             if (count < 2)
                 return;
         }

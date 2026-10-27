@@ -75,7 +75,18 @@ export declare class SecurityHandler {
     private startIncident;
     private isActiveAttacker;
     private markHandled;
+    /** بوتات مستثناة تماماً: البوت نفسه + بوتات ديسكورد الرسمية فقط */
+    private trustedBotIds;
+    /**
+     * 👑 القائمة البيضاء = استثناء من الحظر الوقائي فقط.
+     *    - البوت/العضو الموجود هنا لا يُحظر عند الدخول أو الفحص التلقائي.
+     *    - لكن أي هجوم سريع (حذف/إنشاء/تعديل جماعي) يُعاقب فوراً عند تجاوز العتبة.
+     */
     private botWhitelist;
+    /** هل المنفّذ مستثنى من الحماية الوقائية (وليس من عقوبة الهجوم السريع)؟ */
+    isPreemptivelyWhitelisted(settings: any, userId: string): boolean;
+    /** نسخة تعتمد على إعدادات السيرفر — للاستخدام من الأحداث */
+    isPreemptivelyWhitelistedInGuild(guildId: string, userId: string): Promise<boolean>;
     private banUserById;
     private punishById;
     /** سحب كل رولات حساب بالمعرّف — يعمل حتى لو لم يكن العضو في الكاش */

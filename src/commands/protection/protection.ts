@@ -173,15 +173,15 @@ const command: Command = {
     .addSubcommand(sub =>
       sub
         .setName('antibot')
-        .setDescription('مضاد البوتات — حظر البوتات غير المصرح بها (بدون استثناءات)')
+        .setDescription('مضاد البوتات — حظر البوتات غير المصرح بها، والقائمة البيضاء استثناء وقائي فقط')
         .addBooleanOption(opt =>
           opt.setName('enabled').setDescription('تفعيل أو تعطيل').setRequired(true)
         )
         .addUserOption(opt =>
-          opt.setName('add').setDescription('إضافة بوت لقائمة العرض فقط (لا يمنع الحظر)')
+          opt.setName('add').setDescription('إضافة بوت للقائمة البيضاء (استثناء وقائي — الهجوم السريع يُعاقب)')
         )
         .addUserOption(opt =>
-          opt.setName('remove').setDescription('إزالة بوت من قائمة العرض')
+          opt.setName('remove').setDescription('إزالة بوت من القائمة البيضاء')
         )
     )
     .addSubcommand(sub =>
@@ -334,7 +334,7 @@ async function showStatus(interaction: ChatInputCommandInteraction, settings: an
       {
         name: '🤖 مضاد البوتات',
         value: p.antiBot?.enabled
-          ? `✅ مفعل (${p.antiBot?.whitelist?.length || 0} في قائمة العرض)`
+          ? `✅ مفعل (${p.antiBot?.whitelist?.length || 0} في القائمة البيضاء الوقائية)`
           : '❌ معطل',
         inline: true,
       },
@@ -621,7 +621,7 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
 
   if (add) {
     if (!add.bot) {
-      note = `ℹ️ \`${add.tag}\` ليس بوتاً — أُضيف لقائمة العرض فقط`;
+      note = `ℹ️ \`${add.tag}\` ليس بوتاً — للبوتات استخدم /whitelist، وهذا الاستثناء الوقائي يشمل الأعضاء أيضاً`;
     }
     if (!wl.includes(add.id)) wl.push(add.id);
   }
@@ -643,9 +643,21 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
     .setColor(enabled ? Colors.success : Colors.error)
     .addFields(
       { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
-      { name: 'ملاحظة', value: note || 'يحظر أي بوت غير مصرح به فوراً — القائمة أدناه للعرض فقط', inline: false },
-      { name: 'قائمة العرض (لا تمنع الحظر)', value: whitelistText, inline: false },
-      { name: '⚠️ تنبيه', value: 'لا توجد استثناءات. لإضافة بوت شرعي: عطّل antiBot مؤقتاً ثم أعد تفعيله.', inline: false }
+      {
+        name: 'ملاحظة',
+        value:
+          note ||
+          'يحظر أي بوت غير مصرح به فوراً — والقائمة البيضاء تستثنيه من الحظر الوقائي فقط',
+        inline: false,
+      },
+      { name: 'القائمة البيضاء الوقائية', value: whitelistText, inline: false },
+      {
+        name: '⚠️ تنبيه',
+        value:
+          'الاستثناء يشمل الدخول والفحص التلقائي فقط.\n' +
+          '🚨 أي هجوم سريع (حذف/إنشاء/تعديل جماعي أو سبام) يُعاقب فوراً حتى لو كان البوت في القائمة.',
+        inline: false,
+      }
     )
     .setFooter({ text: 'Liberty City Protection' })
     .setTimestamp();

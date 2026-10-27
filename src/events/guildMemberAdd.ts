@@ -21,20 +21,28 @@ const event: Event = {
       // Anti-Raid check
       const raidResult = await client.protectionHandler.checkRaid(member);
       if (raidResult.isRaid && raidResult.action) {
-        logger.warn(`Raid detected in ${member.guild.name}!`);
+        // 👑 القائمة البيضاء: استثناء من الحظر الوقائي حتى أثناء الرايد
+        const whitelisted = await client.securityHandler
+          .isPreemptivelyWhitelistedInGuild(member.guild.id, member.id)
+          .catch(() => false);
+        if (whitelisted) {
+          logger.info(`Raid action skipped for whitelisted member ${member.user.tag}`);
+        } else {
+          logger.warn(`Raid detected in ${member.guild.name}!`);
 
-        // Execute raid action
-        if (raidResult.action.type === 'kick' || raidResult.action.type === 'ban') {
-          if (raidResult.action.type === 'ban') {
-            await member.ban({ reason: raidResult.action.reason }).catch(() => {});
-          } else {
-            await member.kick(raidResult.action.reason).catch(() => {});
+          // Execute raid action
+          if (raidResult.action.type === 'kick' || raidResult.action.type === 'ban') {
+            if (raidResult.action.type === 'ban') {
+              await member.ban({ reason: raidResult.action.reason }).catch(() => {});
+            } else {
+              await member.kick(raidResult.action.reason).catch(() => {});
+            }
           }
-        }
 
-        // Log the raid
-        await logRaid(member, raidResult.action.reason);
-        return;
+          // Log the raid
+          await logRaid(member, raidResult.action.reason);
+          return;
+        }
       }
 
       // 🛡️ Anti-Bot: طرد بوت غير مصرح به (يُتخطى الترحيب تلقائياً)

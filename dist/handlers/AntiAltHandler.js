@@ -18,6 +18,12 @@ class AntiAltHandler {
     // --------------------------------------------
     async onMemberJoin(member) {
         try {
+            // 👑 القائمة البيضاء: لا تُطبّق العقوبات الوقائية على العضو/البوت
+            if (await this.client.securityHandler
+                .isPreemptivelyWhitelistedInGuild(member.guild.id, member.id)
+                .catch(() => false)) {
+                return;
+            }
             const settings = await (0, models_1.getGuildSettings)(member.guild.id);
             const cfg = settings.protection?.antiAlt;
             if (!cfg?.enabled)

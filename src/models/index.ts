@@ -91,7 +91,7 @@ export interface IGuildSettings extends Document {
     };
     antiBot: {
       enabled: boolean;
-      /** 📋 للعرض فقط — لا تمنع الحظر */
+      /** 📋 القائمة البيضاء — استثناء من الحظر الوقائي فقط (الهجوم السريع يُعاقب) */
       whitelist: string[];
       logChannel?: string;
     };
@@ -202,7 +202,7 @@ export interface IGuildSettings extends Document {
       maxLength: number;
       logChannel?: string;
     };
-    /** 📋 Whitelist — للعرض فقط، لا تمنح أي استثناء أمني */
+    /** 📋 Whitelist — استثناء من الحظر الوقائي فقط، والهجوم السريع يُعاقب */
     whitelist?: {
       enabled: boolean;
       userIds: string[];

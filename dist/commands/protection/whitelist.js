@@ -9,10 +9,10 @@ const embeds_1 = require("../../utils/embeds");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('whitelist')
-        .setDescription('إدارة القائمة البيضاء (للعرض فقط — لا تمنح أي استثناء أمني)')
+        .setDescription('القائمة البيضاء — استثناء من الحظر الوقائي فقط، والهجوم السريع يُعاقب')
         .addSubcommand(subcommand => subcommand
         .setName('add')
-        .setDescription('إضافة مستخدم للقائمة البيضاء (للعرض فقط)')
+        .setDescription('إضافة مستخدم/بوت للقائمة البيضاء (استثناء وقائي فقط)')
         .addUserOption(option => option.setName('user').setDescription('المستخدم المراد إضافته').setRequired(true))
         .addStringOption(option => option.setName('reason').setDescription('السبب').setRequired(false)))
         .addSubcommand(subcommand => subcommand
@@ -24,7 +24,7 @@ const command = {
         .setDescription('عرض أعضاء القائمة البيضاء'))
         .addSubcommand(subcommand => subcommand
         .setName('toggle')
-        .setDescription('تفعيل/تعطيل القائمة البيضاء (لا تؤثر على الحماية)')
+        .setDescription('تفعيل/تعطيل استثناء الحظر الوقائي')
         .addBooleanOption(option => option.setName('enabled').setDescription('حالة التفعيل').setRequired(true)))
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator)
         .setDMPermission(false),
@@ -41,9 +41,10 @@ const command = {
             const enabled = interaction.options.getBoolean('enabled', true);
             wl.enabled = enabled;
             await settings.save();
+            (0, models_1.invalidateGuildSettings)(guild.id);
             await interaction.editReply({
-                content: `${enabled ? '✅ تم تفعيل' : '❌ تم تعطيل'} القائمة البيضاء\n` +
-                    '⚠️ للعرض فقط — لا تمنح أي استثناء أمني، والجميع يُعامل بالتساوي.',
+                content: `${enabled ? '✅ تم تفعيل' : '❌ تم تعطيل'} استثناء القائمة البيضاء\n` +
+                    '🛡️ المفعّل: لا يُحظر البوت/العضو وقائياً عند الدخول أو الفحص التلقائي — لكن أي هجوم سريع (حذف/إنشاء/تعديل جماعي) يُعاقب فوراً.',
             });
             return;
         }
@@ -51,17 +52,34 @@ const command = {
             const user = interaction.options.getUser('user', true);
             const reason = interaction.options.getString('reason') || 'لا يوجد سبب';
             if (wl.userIds.includes(user.id)) {
+                if (!wl.enabled) {
+                    wl.enabled = true;
+                    await settings.save();
+                    (0, models_1.invalidateGuildSettings)(guild.id);
+                    await interaction.editReply({
+                        content: `⚠️ ${user} موجود بالفعل — وتم **تفعيل** القائمة البيضاء تلقائياً.\n` +
+                            '🛡️ استثناء وقائي فقط، وأي هجوم سريع يُعاقب.',
+                    });
+                    return;
+                }
                 await interaction.editReply({ content: `⚠️ ${user} موجود بالفعل في القائمة البيضاء` });
                 return;
             }
             wl.userIds.push(user.id);
+            wl.enabled = true; // الإضافة تعني الاستثناء الوقائي فوراً
             await settings.save();
+            (0, models_1.invalidateGuildSettings)(guild.id);
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle('✅ تم إضافة عضو للقائمة البيضاء')
                 .setColor(embeds_1.Colors.success)
                 .addFields({ name: '👤 المستخدم', value: `${user} (\`${user.id}\`)`, inline: true }, { name: '📝 السبب', value: reason, inline: true }, { name: '🛡️ بواسطة', value: `${interaction.user}`, inline: true }, {
+                name: '✅ الحالة',
+                value: 'تم تفعيل الاستثناء الوقائي تلقائياً.',
+                inline: false,
+            }, {
                 name: '⚠️ تنبيه',
-                value: 'هذه القائمة للعرض فقط — لا تمنح أي استثناء. العضو أو البوت هنا يُعاقب مثل أي شخص آخر.',
+                value: 'هذا استثناء من الحظر الوقائي فقط (الدخول/الفحص التلقائي).\n' +
+                    '🚨 أي هجوم سريع — حذف/إنشاء/تعديل جماعي أو سبام — يُعاقب فوراً كأي مخالف.',
                 inline: false,
             })
                 .setTimestamp();
@@ -76,6 +94,7 @@ const command = {
             }
             wl.userIds = wl.userIds.filter(id => id !== user.id);
             await settings.save();
+            (0, models_1.invalidateGuildSettings)(guild.id);
             await interaction.editReply({ content: `✅ تم إزالة ${user} من القائمة البيضاء` });
             return;
         }
@@ -91,9 +110,10 @@ const command = {
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle('👑 أعضاء القائمة البيضاء')
                 .setColor(embeds_1.Colors.info)
-                .setDescription('⚠️ للعرض فقط — لا تمنح أي استثناء أمني.\n\n' +
+                .setDescription(`${wl.enabled ? '✅ الاستثناء الوقائي مفعّل' : '⚠️ الاستثناء الوقائي معطّل (toggle)'}\n` +
+                '🛡️ لا يُحظرون وقائياً — لكن الهجوم السريع يُعاقب.\n\n' +
                 members.map((m, i) => `${i + 1}. ${m}`).join('\n'))
-                .setFooter({ text: `إجمالي: ${wl.userIds.length} عضو (بدون صلاحيات)` })
+                .setFooter({ text: `إجمالي: ${wl.userIds.length} عضو/بوت (استثناء وقائي فقط)` })
                 .setTimestamp();
             await interaction.editReply({ embeds: [embed] });
             return;

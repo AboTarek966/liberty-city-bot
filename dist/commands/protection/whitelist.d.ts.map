@@ -1,1 +1,1 @@
-{"version":3,"file":"whitelist.d.ts","sourceRoot":"","sources":["../../../src/commands/protection/whitelist.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OAwId,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"whitelist.d.ts","sourceRoot":"","sources":["../../../src/commands/protection/whitelist.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAIxD,QAAA,MAAM,OAAO,EAAE,OA+Jd,CAAC;AAEF,eAAe,OAAO,CAAC"}
