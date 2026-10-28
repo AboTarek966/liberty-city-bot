@@ -16,6 +16,7 @@ import {
   EventHandler,
   InteractionHandler,
   AIHandler,
+  AIInvestigator,
   ProtectionHandler,
   TicketHandler,
   ModerationHandler,
@@ -49,6 +50,7 @@ export class LibertyClient extends Client {
   public eventHandler: EventHandler;
   public interactionHandler: InteractionHandler;
   public aiHandler: AIHandler;
+  public aiInvestigator: AIInvestigator;
   public protectionHandler: ProtectionHandler;
   public ticketHandler: TicketHandler;
   public moderationHandler: ModerationHandler;
@@ -112,6 +114,7 @@ export class LibertyClient extends Client {
     this.eventHandler = new EventHandler(this);
     this.interactionHandler = new InteractionHandler(this);
     this.aiHandler = new AIHandler(this);
+    this.aiInvestigator = new AIInvestigator(this);
     this.protectionHandler = new ProtectionHandler(this);
     this.ticketHandler = new TicketHandler(this);
     this.moderationHandler = new ModerationHandler(this);
@@ -709,6 +712,7 @@ export class LibertyClient extends Client {
     this.activityTracker.cleanup();
     this.securityHandler.cleanup();
     this.levelingHandler.cleanup();
+    this.aiInvestigator.cleanup();
 
     await mongoose.disconnect();
     logger.info('📦 Disconnected from MongoDB');

@@ -57,6 +57,7 @@ class LibertyClient extends discord_js_1.Client {
     eventHandler;
     interactionHandler;
     aiHandler;
+    aiInvestigator;
     protectionHandler;
     ticketHandler;
     moderationHandler;
@@ -114,6 +115,7 @@ class LibertyClient extends discord_js_1.Client {
         this.eventHandler = new handlers_1.EventHandler(this);
         this.interactionHandler = new handlers_1.InteractionHandler(this);
         this.aiHandler = new handlers_1.AIHandler(this);
+        this.aiInvestigator = new handlers_1.AIInvestigator(this);
         this.protectionHandler = new handlers_1.ProtectionHandler(this);
         this.ticketHandler = new handlers_1.TicketHandler(this);
         this.moderationHandler = new handlers_1.ModerationHandler(this);
@@ -684,6 +686,7 @@ class LibertyClient extends discord_js_1.Client {
         this.activityTracker.cleanup();
         this.securityHandler.cleanup();
         this.levelingHandler.cleanup();
+        this.aiInvestigator.cleanup();
         await mongoose_1.default.disconnect();
         logger.info('📦 Disconnected from MongoDB');
         this.destroy();

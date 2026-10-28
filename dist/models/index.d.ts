@@ -367,6 +367,23 @@ export interface IGuildSettings extends Document {
         ignoredRoles: string[];
         responseLanguage: string;
     };
+    aiInvestigator: {
+        enabled: boolean;
+        /** الفحص التلقائي (بدء التشغيل + الجدولة + الأحداث). إيقافه لا يمنع الفحص اليدوي */
+        automatic: boolean;
+        scanOnStartup: boolean;
+        intervalHours: number;
+        alertChannelId?: string;
+        minSeverityToAlert: 'info' | 'low' | 'medium' | 'high' | 'critical';
+        includeMessages: boolean;
+        messageLookbackHours: number;
+        maxMessagesPerChannel: number;
+        maxTextChannels: number;
+        maxMembers: number;
+        maxFindings: number;
+        autoResolveDays: number;
+        ignoredChannelIds: string[];
+    };
     customCommands: ICustomCommand[];
     tags: ITag[];
     reactionRoles: IReactionRole[];
@@ -684,6 +701,7 @@ export declare const DashboardCommand: mongoose.Model<IDashboardCommand, {}, {},
 }, any>;
 export { CommandAlias } from './CommandAlias';
 export { AIConfig, AIResponseRule } from './AIConfig';
+export { InvestigationRun, InvestigationFinding } from './AIInvestigation';
 export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';

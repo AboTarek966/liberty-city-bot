@@ -1,11 +1,12 @@
 import { Client, Collection } from 'discord.js';
-import { CommandHandler, EventHandler, InteractionHandler, AIHandler, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, DashboardCommandWorker } from './handlers';
+import { CommandHandler, EventHandler, InteractionHandler, AIHandler, AIInvestigator, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, DashboardCommandWorker } from './handlers';
 import { Express } from 'express';
 export declare class LibertyClient extends Client {
     commandHandler: CommandHandler;
     eventHandler: EventHandler;
     interactionHandler: InteractionHandler;
     aiHandler: AIHandler;
+    aiInvestigator: AIInvestigator;
     protectionHandler: ProtectionHandler;
     ticketHandler: TicketHandler;
     moderationHandler: ModerationHandler;

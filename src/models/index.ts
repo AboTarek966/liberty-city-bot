@@ -404,6 +404,25 @@ export interface IGuildSettings extends Document {
     ignoredRoles: string[];
     responseLanguage: string;
   };
+
+  // 🕵️ AI Investigator — محقق أمني داخلي مستقل عن مساعد المحادثة
+  aiInvestigator: {
+    enabled: boolean;
+    /** الفحص التلقائي (بدء التشغيل + الجدولة + الأحداث). إيقافه لا يمنع الفحص اليدوي */
+    automatic: boolean;
+    scanOnStartup: boolean;
+    intervalHours: number;
+    alertChannelId?: string;
+    minSeverityToAlert: 'info' | 'low' | 'medium' | 'high' | 'critical';
+    includeMessages: boolean;
+    messageLookbackHours: number;
+    maxMessagesPerChannel: number;
+    maxTextChannels: number;
+    maxMembers: number;
+    maxFindings: number;
+    autoResolveDays: number;
+    ignoredChannelIds: string[];
+  };
   
   // Custom
   customCommands: ICustomCommand[];
@@ -1137,6 +1156,28 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     ignoredRoles: [{ type: String }],
     responseLanguage: { type: String, default: 'ar' },
   },
+
+  // 🕵️ AI Investigator — افتراضياً مفعّل، تحليل فقط بدون أي عقوبات تلقائية
+  aiInvestigator: {
+    enabled: { type: Boolean, default: true },
+    automatic: { type: Boolean, default: true },
+    scanOnStartup: { type: Boolean, default: true },
+    intervalHours: { type: Number, default: 6, min: 1, max: 168 },
+    alertChannelId: { type: String },
+    minSeverityToAlert: {
+      type: String,
+      enum: ['info', 'low', 'medium', 'high', 'critical'],
+      default: 'high',
+    },
+    includeMessages: { type: Boolean, default: true },
+    messageLookbackHours: { type: Number, default: 48, min: 1, max: 720 },
+    maxMessagesPerChannel: { type: Number, default: 25, min: 5, max: 100 },
+    maxTextChannels: { type: Number, default: 30, min: 5, max: 100 },
+    maxMembers: { type: Number, default: 1200, min: 100, max: 5000 },
+    maxFindings: { type: Number, default: 40, min: 5, max: 100 },
+    autoResolveDays: { type: Number, default: 30, min: 1, max: 365 },
+    ignoredChannelIds: [{ type: String }],
+  },
   
   customCommands: [CustomCommandSchema],
   tags: [TagSchema],
@@ -1386,6 +1427,7 @@ export const DashboardCommand = mongoose.model<IDashboardCommand>('DashboardComm
 // Re-export new models
 export { CommandAlias } from './CommandAlias';
 export { AIConfig, AIResponseRule } from './AIConfig';
+export { InvestigationRun, InvestigationFinding } from './AIInvestigation';
 export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';

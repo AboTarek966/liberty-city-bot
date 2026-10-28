@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -473,6 +473,27 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         ignoredRoles: [{ type: String }],
         responseLanguage: { type: String, default: 'ar' },
     },
+    // 🕵️ AI Investigator — افتراضياً مفعّل، تحليل فقط بدون أي عقوبات تلقائية
+    aiInvestigator: {
+        enabled: { type: Boolean, default: true },
+        automatic: { type: Boolean, default: true },
+        scanOnStartup: { type: Boolean, default: true },
+        intervalHours: { type: Number, default: 6, min: 1, max: 168 },
+        alertChannelId: { type: String },
+        minSeverityToAlert: {
+            type: String,
+            enum: ['info', 'low', 'medium', 'high', 'critical'],
+            default: 'high',
+        },
+        includeMessages: { type: Boolean, default: true },
+        messageLookbackHours: { type: Number, default: 48, min: 1, max: 720 },
+        maxMessagesPerChannel: { type: Number, default: 25, min: 5, max: 100 },
+        maxTextChannels: { type: Number, default: 30, min: 5, max: 100 },
+        maxMembers: { type: Number, default: 1200, min: 100, max: 5000 },
+        maxFindings: { type: Number, default: 40, min: 5, max: 100 },
+        autoResolveDays: { type: Number, default: 30, min: 1, max: 365 },
+        ignoredChannelIds: [{ type: String }],
+    },
     customCommands: [CustomCommandSchema],
     tags: [TagSchema],
     reactionRoles: [ReactionRoleSchema],
@@ -674,6 +695,9 @@ Object.defineProperty(exports, "CommandAlias", { enumerable: true, get: function
 var AIConfig_2 = require("./AIConfig");
 Object.defineProperty(exports, "AIConfig", { enumerable: true, get: function () { return AIConfig_2.AIConfig; } });
 Object.defineProperty(exports, "AIResponseRule", { enumerable: true, get: function () { return AIConfig_2.AIResponseRule; } });
+var AIInvestigation_1 = require("./AIInvestigation");
+Object.defineProperty(exports, "InvestigationRun", { enumerable: true, get: function () { return AIInvestigation_1.InvestigationRun; } });
+Object.defineProperty(exports, "InvestigationFinding", { enumerable: true, get: function () { return AIInvestigation_1.InvestigationFinding; } });
 var GameStats_2 = require("./GameStats");
 Object.defineProperty(exports, "GameStats", { enumerable: true, get: function () { return GameStats_2.GameStats; } });
 var Poll_2 = require("./Poll");

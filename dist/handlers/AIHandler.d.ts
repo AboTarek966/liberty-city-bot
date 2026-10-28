@@ -124,6 +124,18 @@ export declare class AIHandler {
     removeResponseRule(guildId: string, ruleId: string): Promise<void>;
     setRolePersonality(guildId: string, roleId: string, personality: string): Promise<void>;
     removeRolePersonality(guildId: string, roleId: string): Promise<void>;
+    /**
+     * توليد تحليل أمني عبر مزوّدي الذكاء الاصطناعي مع تبديل تلقائي عند الفشل.
+     * مستقل عن مساعد المحادثة: لا يستخدم الذاكرة ولا أدوات البحث ولا يرسل ردوداً.
+     */
+    generateInvestigation(prompt: string, systemPrompt: string, options?: {
+        maxTokens?: number;
+        temperature?: number;
+    }): Promise<{
+        content: string;
+        tokensUsed: number;
+        model: string;
+    }>;
     isAvailable(): boolean;
     getProviders(): string[];
     clearCooldown(userId: string, guildId?: string): void;

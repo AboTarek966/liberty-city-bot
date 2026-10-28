@@ -1595,14 +1595,76 @@ export class AIHandler {
   }
 
   // --------------------------------------------
+  // AI Investigator — تحليل أمني منظم (JSON)
+  // --------------------------------------------
+  /**
+   * توليد تحليل أمني عبر مزوّدي الذكاء الاصطناعي مع تبديل تلقائي عند الفشل.
+   * مستقل عن مساعد المحادثة: لا يستخدم الذاكرة ولا أدوات البحث ولا يرسل ردوداً.
+   */
+  async generateInvestigation(
+    prompt: string,
+    systemPrompt: string,
+    options: { maxTokens?: number; temperature?: number } = {}
+  ): Promise<{ content: string; tokensUsed: number; model: string }> {
+    const providers = this.resolveProviderOrder('auto');
+    if (!providers.length) throw new Error('No AI provider available');
+
+    const aiConfig = {
+      temperature: options.temperature ?? 0.15,
+      maxTokens: Math.max(1200, options.maxTokens ?? 4096),
+    };
+
+    let lastError: any = null;
+    for (const provider of providers) {
+      try {
+        let response: AIResponse;
+        switch (provider) {
+          case 'gemini':
+            response = await this.generateGemini(prompt, systemPrompt, aiConfig);
+            break;
+          case 'openrouter':
+            response = await this.generateOpenRouter(prompt, systemPrompt, aiConfig);
+            break;
+          case 'anthropic':
+            response = await this.generateAnthropic(prompt, systemPrompt, aiConfig);
+            break;
+          case 'openai':
+            response = await this.generateOpenAI(prompt, systemPrompt, aiConfig);
+            break;
+          case 'groq':
+            response = await this.generateGroq(prompt, systemPrompt, aiConfig);
+            break;
+          default:
+            continue;
+        }
+
+        const content = String(response?.content || '').trim();
+        if (!content) throw new Error('Empty investigation response');
+        return {
+          content,
+          tokensUsed: response.tokensUsed || 0,
+          model: response.model || provider,
+        };
+      } catch (error: any) {
+        lastError = error;
+        logger.warn(`Investigator provider ${provider} failed: ${String(error?.message || error).slice(0, 220)}`);
+      }
+    }
+
+    throw lastError || new Error('All AI providers failed');
+  }
+
+  // --------------------------------------------
   // Utility
   // --------------------------------------------
   isAvailable(): boolean {
-    return !!this.openai || !!this.anthropic || !!this.groq;
+    return !!this.openai || !!this.anthropic || !!this.groq || this.geminiReady || !!this.openrouter;
   }
 
   getProviders(): string[] {
     const providers: string[] = [];
+    if (this.geminiReady) providers.push('Gemini');
+    if (this.openrouter) providers.push('OpenRouter');
     if (this.groq) providers.push('Groq');
     if (this.openai) providers.push('OpenAI');
     if (this.anthropic) providers.push('Anthropic');

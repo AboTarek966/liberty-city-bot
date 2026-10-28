@@ -79,6 +79,8 @@ const event = {
                 lc.economyHandler.applyBankInterest(guild).catch(err => logger.error(`Bank interest error for ${guild.name}:`, err));
             });
         }, 24 * 60 * 60 * 1000);
+        // 🕵️ تشغيل المحقق الأمني الداخلي — تقارير فقط، بعد استقرار الكاش
+        lc.aiInvestigator.start();
     },
 };
 exports.default = event;
