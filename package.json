@@ -2,15 +2,15 @@
   "name": "liberty-city-bot",
   "version": "2.0.0",
   "description": "Liberty City - بوت ديسكورد شامل ومتكامل مع حماية، تكتات، AI وإعدادات متقدمة",
-  "main": "dist/index.js",
+  "main": "out/index.js",
   "scripts": {
-    "build": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc",
-    "build:discloud": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc --outDir out",
-    "start": "node --max-old-space-size=192 dist/index.js",
+    "build": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc --outDir out",
+    "build:dist": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc",
+    "start": "node --max-old-space-size=192 out/index.js",
     "dev": "ts-node src/index.ts",
     "watch": "nodemon --exec ts-node src/index.ts",
     "lint": "eslint src/**/*.ts",
-    "register:commands": "node dist/utils/registerCommands.js",
+    "register:commands": "node out/utils/registerCommands.js",
     "deploy": "npm run build && npm run start"
   },
   "keywords": [
