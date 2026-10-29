@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc",
+    "build:discloud": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc --outDir out",
     "start": "node --max-old-space-size=192 dist/index.js",
     "dev": "ts-node src/index.ts",
     "watch": "nodemon --exec ts-node src/index.ts",

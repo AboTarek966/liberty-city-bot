@@ -22,19 +22,19 @@
 - الموقع: https://discloud.com
 - الخطوات:
   1. أنشئ حساباً.
-  2. ارفع ZIP للمشروع (بدون `node_modules`) مع ملف `deploy/discloud/discloud.config` في الجذر:
+  2. ارفع ZIP للمشروع (بدون `node_modules`) مع ملف `discloud.config` في الجذر:
      ```ini
      NAME=liberty-city
      TYPE=bot
-     MAIN=dist/index.js
+     MAIN=out/index.js
+     START=node out/index.js
      RAM=512
      VERSION=latest
      ```
-     انسخه إلى جذر المشروع قبل الـ ZIP:
+  3. **مهم:** Discloud يحجز مجلد `dist` — لذلك نستخدم `out`:
      ```powershell
-     Copy-Item deploy\discloud\discloud.config .\discloud.config
+     npm run build:discloud
      ```
-  3. تأكد أن `dist/` موجود (مبني مسبقاً في المستودع).
   4. ارفع من لوحة Discloud → سيثبّت الحزم ويشغّل البوت.
   5. أضف متغيرات البيئة (DISCORD_TOKEN, MONGODB_URI, ...) من لوحة الإدارة.
 
