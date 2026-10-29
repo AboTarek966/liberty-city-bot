@@ -1,0 +1,199 @@
+"use strict";
+// ============================================
+// Liberty City Bot - Main Entry Point
+// ============================================
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const LibertyClient_1 = require("./LibertyClient");
+const helpers_1 = require("./utils/helpers");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const os_1 = __importDefault(require("os"));
+const logger = (0, helpers_1.createLogger)('Main');
+// --------------------------------------------
+// سجل دائم يصمد بعد موت السيرفر (الكونسول يُمسح معه — الملف لا)
+// نسجّل فيه الذاكرة والأخطاء حتى بعد إعادة التشغيل لمعرفة سبب القتل
+// --------------------------------------------
+const PERSIST_FILE = path_1.default.join(process.cwd(), 'bot-persist.log');
+function persist(line) {
+    try {
+        const ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const entry = `[${ts}] ${line}\n`;
+        // ⚠️ existsSync قبل statSync — وإلا ENOENT في أول استدعاء يُلغي الكتابة كلها
+        if (fs_1.default.existsSync(PERSIST_FILE) && fs_1.default.statSync(PERSIST_FILE).size > 400_000) {
+            fs_1.default.writeFileSync(PERSIST_FILE + '.old', fs_1.default.readFileSync(PERSIST_FILE));
+            fs_1.default.writeFileSync(PERSIST_FILE, '');
+        }
+        fs_1.default.appendFileSync(PERSIST_FILE, entry);
+    }
+    catch { /* لا نعطل البوت بسبب السجل */ }
+}
+// --------------------------------------------
+// ASCII Art Banner
+// --------------------------------------------
+const banner = `
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   ██████╗ ██╗     ██╗   ██╗███████╗████████╗ ██████╗        ║
+║   ██╔══██╗██║     ██║   ██║██╔════╝╚══██╔══╝██╔═══██╗       ║
+║   ██████╔╝██║     ██║   ██║███████╗   ██║   ██║   ██║       ║
+║   ██╔══██╗██║     ██║   ██║╚════██║   ██║   ██║   ██║       ║
+║   ██████╔╝███████╗╚██████╔╝███████║   ██║   ╚██████╔╝       ║
+║   ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝   ╚═╝    ╚═════╝        ║
+║                                                              ║
+║                  ██████╗ ██████╗ ██████╗ ███████╗██████╗     ║
+║                  ██╔══██╗██╔══██╗██╔══██╗██╔════╝██╔══██╗    ║
+║                  ██████╔╝██████╔╝██║  ██║█████╗  ██████╔╝    ║
+║                  ██╔═══╝ ██╔══██╗██║  ██║██╔══╝  ██╔══██╗    ║
+║                  ██║     ██║  ██║██████╔╝███████╗██║  ██║    ║
+║                  ╚═╝     ╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝    ║
+║                                                              ║
+║          🛡️  Comprehensive Discord Bot  🎫  Tickets           ║
+║          🤖  AI Integration  ⚙️  Advanced Settings           ║
+║                                                              ║
+║                     Version 2.0.0                            ║
+╚══════════════════════════════════════════════════════════════╝
+`;
+// --------------------------------------------
+// Main Function
+// --------------------------------------------
+async function main() {
+    console.log(banner);
+    logger.info('🎆 Welcome to Liberty City Bot!');
+    const startTime = Date.now();
+    // Create client
+    const client = new LibertyClient_1.LibertyClient();
+    // Graceful shutdown handling
+    const gracefulShutdown = async (signal) => {
+        logger.info(`\n⚠️ Received ${signal}. Starting graceful shutdown...`);
+        persist(`SIGNAL ${signal} — graceful shutdown`);
+        try {
+            await client.cleanup();
+            logger.info('✅ Graceful shutdown complete');
+            persist('EXIT 0 (graceful)');
+            process.exit(0);
+        }
+        catch (error) {
+            logger.error('❌ Error during shutdown:', error);
+            persist(`EXIT 1 (shutdown error): ${String(error).slice(0, 200)}`);
+            process.exit(1);
+        }
+    };
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('unhandledRejection', (reason, promise) => {
+        logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+        const mu = process.memoryUsage();
+        persist(`UNHANDLED_REJECTION rss=${Math.round(mu.rss / 1048576)}MB reason=${String(reason).slice(0, 300)}`);
+    });
+    // ⚠️ لا نُنهي العملية عند خطأ غير متوقع — الخطأ الصغير لا يجب أن يقتل البوت كله
+    // (سابقاً أي uncaughtException كان يوقف البوت بالكامل في منتصف تشغيل موسيقى!)
+    process.on('uncaughtException', (error) => {
+        logger.error('Uncaught Exception (bot keeps running):', error);
+        const mu = process.memoryUsage();
+        persist(`UNCAUGHT_EXCEPTION rss=${Math.round(mu.rss / 1048576)}MB ${String(error?.stack || error).slice(0, 500)}`);
+    });
+    // تسجيل دوري للاستهلاك — يكشف ارتفاع الذاكرة قبل أن تقتلها الاستضافة (OOM kill)
+    setInterval(() => {
+        const mu = process.memoryUsage();
+        const mb = (n) => Math.round(n / 1024 / 1024);
+        logger.debug(`MEM rss=${mb(mu.rss)}MB heap=${mb(mu.heapUsed)}/${mb(mu.heapTotal)}MB external=${mb(mu.external)}`);
+        persist(`MEM rss=${mb(mu.rss)}MB heap=${mb(mu.heapUsed)}MB external=${mb(mu.external)}`);
+    }, 60_000);
+    // علامات حياة/موت في الملف الدائم
+    persist(`BOOT pid=${process.pid} argv=${process.execArgv.join(' ') || '-'}`);
+    // 📜 نعرض ذيل السجل الدائم من الجلسة السابقة في الكونسول — الكونسول يُمسح مع كل قتل،
+    // وهذا يبقي آخر لحظات الموت (MEM/SIGNAL/UNCAUGHT) ظاهرة في أول إقلاع بعده
+    try {
+        if (fs_1.default.existsSync(PERSIST_FILE)) {
+            const tailLines = fs_1.default.readFileSync(PERSIST_FILE, 'utf8').split('\n').filter(Boolean).slice(-14);
+            if (tailLines.length) {
+                logger.info('📜 persist tail (previous session):');
+                for (const l of tailLines)
+                    console.log('   ' + l);
+            }
+        }
+    }
+    catch { /* تجاهل */ }
+    // 🧪 حصة المعالج الفعلية للحاوية — نسبة اللوحة تُحسب على هذه الحصة لا على كامل النواة
+    try {
+        let q = '', p = '';
+        try {
+            const t = fs_1.default.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/);
+            q = t[0];
+            p = t[1];
+        }
+        catch { /* cgroup v1 */ }
+        if (!q) {
+            try {
+                q = fs_1.default.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim();
+                p = fs_1.default.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim();
+            }
+            catch { /* لا وصول */ }
+        }
+        const la = os_1.default.loadavg().map(n => n.toFixed(2)).join(' ');
+        if (q) {
+            const cores = q === 'max' ? '∞' : (Number(q) / Number(p || 100000)).toFixed(2);
+            logger.info(`🧪 CPU quota: ${q}/${p || '-'} = ${cores} core | loadavg ${la}`);
+        }
+        else {
+            logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
+        }
+    }
+    catch { /* تجاهل */ }
+    // 🔬 تتبّع spawn/spawnSync: يسجّل أول استدعاء لكل مسار استدعاء مع الـstack —
+    // ⚠️ لازم require() الحقيقي: import * as cp يبني نسخة جديدة (__importStar) فتعديلها لا يصل للحزم
+    try {
+        const cpMod = require('child_process');
+        const seen = new Set();
+        const wrap = (name, orig) => function (...args) {
+            try {
+                const st = (new Error().stack || '').split('\n').slice(2, 7).map(s => s.trim()).join(' <- ');
+                if (!seen.has(st)) {
+                    seen.add(st);
+                    logger.info(`🔬 ${name}: ${String(args[0]).slice(0, 90)}\n     ${st}`);
+                }
+            }
+            catch { /* تجاهل */ }
+            return orig.apply(this, args);
+        };
+        cpMod.spawn = wrap('spawn', cpMod.spawn);
+        cpMod.spawnSync = wrap('spawnSync', cpMod.spawnSync);
+    }
+    catch { /* تجاهل */ }
+    // Initialize the bot
+    try {
+        await client.initialize();
+        // Register slash commands
+        await client.registerCommands();
+        // Set initial status
+        client.setStatus();
+        // Set interval to change status every 5 minutes
+        setInterval(() => client.setStatus(), 5 * 60 * 1000);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        logger.info(`🎉 Bot is ready! Took ${elapsed}s`);
+        persist(`READY in ${elapsed}s guilds=${client.guilds.cache.size}`);
+        logger.info(`📊 Logged in as: ${client.user?.tag}`);
+        logger.info(`🏠 Serving ${client.guilds.cache.size} guilds`);
+        logger.info(`👥 Serving ${client.users.cache.size} users`);
+        // Start Express server for Dashboard API (replaces simple HTTP server)
+        const PORT = parseInt(process.env.PORT || '3000', 10);
+        client.expressApp.listen(PORT, () => {
+            logger.info(`🌐 Express server (Dashboard API) running on port ${PORT}`);
+        });
+    }
+    catch (error) {
+        logger.error('❌ Failed to start bot:', error);
+        process.exit(1);
+    }
+}
+// --------------------------------------------
+// Start Bot
+// --------------------------------------------
+main().catch((error) => {
+    logger.error('❌ Fatal error:', error);
+    process.exit(1);
+});
+//# sourceMappingURL=index.js.map
