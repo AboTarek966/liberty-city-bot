@@ -35,6 +35,14 @@ export interface IGuildSettings extends Document {
       timeWindow: number;
       action: 'kick' | 'ban' | 'lockdown';
       logChannel?: string;
+      beastMode?: {
+        enabled?: boolean;
+        minAccountAgeDays?: number;
+        requireAvatar?: boolean;
+        suspiciousJoinAction?: 'kick' | 'ban' | 'none';
+        escalateVerification?: boolean;
+        autoRecoverMinutes?: number;
+      };
     };
     antiSpam: {
       enabled: boolean;
@@ -88,6 +96,11 @@ export interface IGuildSettings extends Document {
       autoRestore?: boolean;
       /** 👢 ربط المطرودين تلقائياً برابط الدعوة (الطرد لا يُلغى في ديسكورد) */
       autoDmRecovery?: boolean;
+      slowNukeGuard?: boolean;
+      slowNukeMax?: number;
+      slowNukeWindowMinutes?: number;
+      whitelistedRoles?: string[];
+      whitelistedChannels?: string[];
     };
     antiBot: {
       enabled: boolean;
@@ -811,6 +824,14 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       timeWindow: { type: Number, default: 60000 },
       action: { type: String, enum: ['kick', 'ban', 'lockdown'], default: 'kick' },
       logChannel: { type: String },
+      beastMode: {
+        enabled: { type: Boolean, default: true },
+        minAccountAgeDays: { type: Number, default: 7 },
+        requireAvatar: { type: Boolean, default: true },
+        suspiciousJoinAction: { type: String, enum: ['kick', 'ban', 'none'], default: 'kick' },
+        escalateVerification: { type: Boolean, default: true },
+        autoRecoverMinutes: { type: Number, default: 15 },
+      },
     },
     antiSpam: {
       enabled: { type: Boolean, default: true },
@@ -864,6 +885,13 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       autoRestore: { type: Boolean, default: true },
       /** 👢 إرسال رابط الدعوة للمطرودين تلقائياً (الطرد لا يُلغى في ديسكورد) */
       autoDmRecovery: { type: Boolean, default: true },
+      /** 🐢 حارس النيوك البطيء (تراكمي) */
+      slowNukeGuard: { type: Boolean, default: true },
+      slowNukeMax: { type: Number, default: 6 },
+      slowNukeWindowMinutes: { type: Number, default: 10 },
+      /** 📋 رولات/قنوات مستثناة من مضاد النيوك (whitelist) */
+      whitelistedRoles: [{ type: String }],
+      whitelistedChannels: [{ type: String }],
     },
     antiBot: {
       enabled: { type: Boolean, default: true },
@@ -1428,6 +1456,7 @@ export const DashboardCommand = mongoose.model<IDashboardCommand>('DashboardComm
 export { CommandAlias } from './CommandAlias';
 export { AIConfig, AIResponseRule } from './AIConfig';
 export { InvestigationRun, InvestigationFinding } from './AIInvestigation';
+export { RogueBot } from './RogueBot';
 export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';

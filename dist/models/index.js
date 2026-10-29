@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -139,6 +139,14 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             timeWindow: { type: Number, default: 60000 },
             action: { type: String, enum: ['kick', 'ban', 'lockdown'], default: 'kick' },
             logChannel: { type: String },
+            beastMode: {
+                enabled: { type: Boolean, default: true },
+                minAccountAgeDays: { type: Number, default: 7 },
+                requireAvatar: { type: Boolean, default: true },
+                suspiciousJoinAction: { type: String, enum: ['kick', 'ban', 'none'], default: 'kick' },
+                escalateVerification: { type: Boolean, default: true },
+                autoRecoverMinutes: { type: Number, default: 15 },
+            },
         },
         antiSpam: {
             enabled: { type: Boolean, default: true },
@@ -192,6 +200,13 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             autoRestore: { type: Boolean, default: true },
             /** 👢 إرسال رابط الدعوة للمطرودين تلقائياً (الطرد لا يُلغى في ديسكورد) */
             autoDmRecovery: { type: Boolean, default: true },
+            /** 🐢 حارس النيوك البطيء (تراكمي) */
+            slowNukeGuard: { type: Boolean, default: true },
+            slowNukeMax: { type: Number, default: 6 },
+            slowNukeWindowMinutes: { type: Number, default: 10 },
+            /** 📋 رولات/قنوات مستثناة من مضاد النيوك (whitelist) */
+            whitelistedRoles: [{ type: String }],
+            whitelistedChannels: [{ type: String }],
         },
         antiBot: {
             enabled: { type: Boolean, default: true },
@@ -698,6 +713,8 @@ Object.defineProperty(exports, "AIResponseRule", { enumerable: true, get: functi
 var AIInvestigation_1 = require("./AIInvestigation");
 Object.defineProperty(exports, "InvestigationRun", { enumerable: true, get: function () { return AIInvestigation_1.InvestigationRun; } });
 Object.defineProperty(exports, "InvestigationFinding", { enumerable: true, get: function () { return AIInvestigation_1.InvestigationFinding; } });
+var RogueBot_1 = require("./RogueBot");
+Object.defineProperty(exports, "RogueBot", { enumerable: true, get: function () { return RogueBot_1.RogueBot; } });
 var GameStats_2 = require("./GameStats");
 Object.defineProperty(exports, "GameStats", { enumerable: true, get: function () { return GameStats_2.GameStats; } });
 var Poll_2 = require("./Poll");

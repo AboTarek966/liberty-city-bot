@@ -40,6 +40,9 @@ exports.ProtectionHandler = void 0;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
+const lockdown_1 = require("../utils/lockdown");
+const threatScore_1 = require("../utils/threatScore");
+const raidScoring_1 = require("../utils/raidScoring");
 const helpers_2 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('ProtectionHandler');
 // --------------------------------------------
@@ -51,6 +54,11 @@ class ProtectionHandler {
     spamTracker = new discord_js_1.Collection(); // key: userId_channelId
     raidTracker = new discord_js_1.Collection(); // key: guildId
     userCooldowns = new discord_js_1.Collection(); // key: userId_action
+    // Beast Mode state
+    verificationState = new Map();
+    threatAlertCooldown = new Map();
+    recoveryTimers = new Map();
+    lockdownRecoveryTimers = new Map();
     constructor(client) {
         this.client = client;
         // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
@@ -459,32 +467,186 @@ class ProtectionHandler {
             return { isRaid: false };
         const guildId = member.guild.id;
         const now = Date.now();
-        const timeWindow = antiRaid.timeWindow;
-        const threshold = antiRaid.threshold;
+        const timeWindow = antiRaid.timeWindow || 60000;
+        const threshold = antiRaid.threshold || 5;
+        const beast = antiRaid.beastMode || {};
+        const beastEnabled = beast.enabled !== false;
+        // Whitelist check (preemptive) — استثناء من الحظر الوقائي
+        let whitelisted = false;
+        try {
+            whitelisted = await this.client.securityHandler?.isPreemptivelyWhitelistedInGuild?.(guildId, member.id) ?? false;
+        }
+        catch {
+            whitelisted = false;
+        }
+        // حساب نقاط اشتباه المنضم
+        const createdMs = member.user.createdTimestamp || Date.now();
+        const joinScore = (0, raidScoring_1.scoreJoin)({
+            accountAgeMs: now - createdMs,
+            hasAvatar: !!member.user.avatar,
+            username: member.user.username,
+            isBot: member.user.bot,
+            minAccountAgeDays: beast.minAccountAgeDays ?? 7,
+            requireAvatar: beast.requireAvatar !== false,
+        });
         let tracker = this.raidTracker.get(guildId);
         if (!tracker || now - tracker.firstJoin > timeWindow) {
-            tracker = {
-                joins: 1,
-                firstJoin: now,
-            };
+            tracker = { timestamps: [], points: [], firstJoin: now };
             this.raidTracker.set(guildId, tracker);
+        }
+        tracker.timestamps = tracker.timestamps.filter(t => now - t <= timeWindow);
+        tracker.points = tracker.points.slice(tracker.points.length - tracker.timestamps.length);
+        tracker.timestamps.push(now);
+        tracker.points.push(joinScore.points);
+        const recentJoins = tracker.timestamps.length;
+        const suspicionPoints = tracker.points.reduce((a, b) => a + b, 0);
+        const weighted = recentJoins + suspicionPoints;
+        // Beast Mode: إذا كان الوضع مرتفعاً/حرجاً، طرد المنضمين المشبوهين فوراً (حتى تحت العتبة)
+        if (beastEnabled && !whitelisted) {
+            const snap = threatScore_1.globalThreat.get(guildId, now);
+            if ((snap.level === 'high' || snap.level === 'critical') && joinScore.suspicious) {
+                const action = {
+                    type: (beast.suspiciousJoinAction === 'ban' ? 'ban' : 'kick'),
+                    reason: 'Beast Mode — منضم مشبوه أثناء تهديد مرتفع',
+                };
+                threatScore_1.globalThreat.add(guildId, 2, 'suspicious join during threat');
+                void this.applyBeastMode(member.guild, settings);
+                return { isRaid: true, action };
+            }
+            if (snap.level === 'critical' && !whitelisted && member.user.bot === false) {
+                // في الوضع الحرج: طرد أي حساب جديد (< 30 يوم) حتى لو wasn't flagged
+                const ageDays = (now - createdMs) / (24 * 60 * 60 * 1000);
+                if (ageDays < 30) {
+                    const action = { type: 'kick', reason: 'Beast Mode — وضع حرج: منع انضمام حسابات جديدة' };
+                    return { isRaid: true, action };
+                }
+            }
+        }
+        // Determine raid trigger
+        const suspiciousTrigger = beastEnabled && recentJoins >= Math.max(3, Math.ceil(threshold / 2)) && suspicionPoints >= threshold;
+        const isRaid = recentJoins > threshold || suspiciousTrigger;
+        if (!isRaid) {
+            // record mild threat for suspicious joins
+            if (joinScore.suspicious)
+                threatScore_1.globalThreat.add(guildId, 2, 'suspicious join');
             return { isRaid: false };
         }
-        tracker.joins++;
-        if (tracker.joins > threshold) {
-            // Raid detected!
-            this.raidTracker.delete(guildId);
-            const action = {
-                type: antiRaid.action === 'lockdown' ? 'kick' : antiRaid.action,
-                reason: 'هجوم DDoS/Raid على السيرفر',
-            };
-            // If lockdown, lock all channels
-            if (antiRaid.action === 'lockdown') {
-                await this.lockdown(member.guild);
-            }
-            return { isRaid: true, action };
+        // Raid detected!
+        this.raidTracker.delete(guildId);
+        threatScore_1.globalThreat.add(guildId, 12, 'raid detected');
+        const action = {
+            type: antiRaid.action === 'lockdown' ? 'kick' : antiRaid.action,
+            reason: 'هجوم DDoS/Raid على السيرفر',
+        };
+        if (antiRaid.action === 'lockdown') {
+            await this.lockdown(member.guild);
+            this.scheduleLockdownRecovery(member.guild, settings);
         }
-        return { isRaid: false };
+        void this.applyBeastMode(member.guild, settings);
+        return { isRaid: true, action };
+    }
+    // --------------------------------------------
+    // Beast Mode: تصعيد/استعادة مستوى التحقق + تنبيه
+    // --------------------------------------------
+    async applyBeastMode(guild, settings) {
+        try {
+            const antiRaid = settings?.protection?.antiRaid;
+            if (!antiRaid?.enabled)
+                return;
+            const beast = antiRaid.beastMode || {};
+            if (beast.enabled === false)
+                return;
+            const guildId = guild.id;
+            const snap = threatScore_1.globalThreat.get(guildId);
+            const currentLevel = guild.verificationLevel ?? 0;
+            const escalate = beast.escalateVerification !== false;
+            const autoRecoverMinutes = beast.autoRecoverMinutes ?? 15;
+            if (snap.level === 'high' || snap.level === 'critical') {
+                const targetLevel = snap.level === 'critical'
+                    ? discord_js_1.GuildVerificationLevel.VeryHigh
+                    : discord_js_1.GuildVerificationLevel.High;
+                if (escalate && currentLevel < targetLevel) {
+                    try {
+                        await guild.setVerificationLevel(targetLevel, 'Liberty City Beast Mode');
+                        this.verificationState.set(guildId, { applied: targetLevel, previous: currentLevel, at: Date.now() });
+                    }
+                    catch (e) {
+                        // ignore permission errors
+                    }
+                }
+                // تنبيه (مرة كل 10 دقائق)
+                const lastAlert = this.threatAlertCooldown.get(guildId) || 0;
+                if (Date.now() - lastAlert > 10 * 60 * 1000) {
+                    this.threatAlertCooldown.set(guildId, Date.now());
+                    const logChannelId = antiRaid.logChannel || settings?.protection?.logChannel;
+                    const ch = logChannelId ? guild.channels.cache.get(logChannelId) : null;
+                    if (ch && 'send' in ch) {
+                        await ch.send({
+                            content: `🧟 **Beast Mode — ${snap.level === 'critical' ? 'حرج' : 'مرتفع'}**\n` +
+                                `📊 الدرجة: ${snap.score}\n` +
+                                `📌 الأسباب: ${snap.reasons.join('، ') || '—'}\n` +
+                                `🔐 مستوى التحقق: ${snap.level === 'critical' ? 'الأعلى' : 'عالٍ'}\n` +
+                                `⏱️ استعادة تلقائية بعد ${autoRecoverMinutes} دقيقة من الهدوء.`,
+                        }).catch(() => { });
+                    }
+                }
+                this.scheduleRecovery(guild, settings, autoRecoverMinutes);
+            }
+        }
+        catch (e) {
+            // silent
+        }
+    }
+    scheduleRecovery(guild, settings, minutes) {
+        const guildId = guild.id;
+        if (this.recoveryTimers.has(guildId))
+            return;
+        const timer = setTimeout(async () => {
+            this.recoveryTimers.delete(guildId);
+            try {
+                const snap = threatScore_1.globalThreat.get(guildId);
+                if (snap.level === 'high' || snap.level === 'critical') {
+                    // لا يزال مرتفعاً → أعد الجدولة
+                    this.scheduleRecovery(guild, settings, minutes);
+                    return;
+                }
+                const state = this.verificationState.get(guildId);
+                if (state && guild.verificationLevel === state.applied) {
+                    try {
+                        await guild.setVerificationLevel(state.previous, 'Liberty City Beast Mode recovery');
+                    }
+                    catch { }
+                }
+                this.verificationState.delete(guildId);
+            }
+            catch { }
+        }, minutes * 60 * 1000);
+        timer.unref?.();
+        this.recoveryTimers.set(guildId, timer);
+    }
+    scheduleLockdownRecovery(guild, settings) {
+        const guildId = guild.id;
+        if (this.lockdownRecoveryTimers.has(guildId))
+            return;
+        const minutes = (settings?.protection?.antiRaid?.beastMode?.autoRecoverMinutes ?? 15);
+        const timer = setTimeout(async () => {
+            this.lockdownRecoveryTimers.delete(guildId);
+            try {
+                // لا تفتح إذا كان وضع الطوارئ اليدوي مفعّلاً
+                const fresh = await (0, models_1.getGuildSettings)(guildId);
+                if (fresh?.protection?.lockdown)
+                    return;
+                const snap = threatScore_1.globalThreat.get(guildId);
+                if (snap.level === 'high' || snap.level === 'critical') {
+                    this.scheduleLockdownRecovery(guild, settings);
+                    return;
+                }
+                await (0, lockdown_1.setLockdown)(guild, false);
+            }
+            catch { }
+        }, minutes * 60 * 1000);
+        timer.unref?.();
+        this.lockdownRecoveryTimers.set(guildId, timer);
     }
     // --------------------------------------------
     // Lockdown
@@ -550,7 +712,7 @@ class ProtectionHandler {
         });
         // Clean raid trackers
         this.raidTracker.forEach((tracker, guildId) => {
-            if (now - tracker.firstJoin > 300000) { // 5 minutes
+            if (!tracker.timestamps.length || now - tracker.firstJoin > 300000) { // 5 minutes
                 this.raidTracker.delete(guildId);
             }
         });

@@ -67,6 +67,14 @@ export interface AntiRaidConfig {
   threshold: number;
   timeWindow: number;
   action: 'kick' | 'ban' | 'lockdown';
+  beastMode?: {
+    enabled?: boolean;
+    minAccountAgeDays?: number;
+    requireAvatar?: boolean;
+    suspiciousJoinAction?: 'kick' | 'ban' | 'none';
+    escalateVerification?: boolean;
+    autoRecoverMinutes?: number;
+  };
 }
 
 export interface AntiSpamConfig {

@@ -9,6 +9,10 @@ export declare class ProtectionHandler {
     private spamTracker;
     private raidTracker;
     private userCooldowns;
+    private verificationState;
+    private threatAlertCooldown;
+    private recoveryTimers;
+    private lockdownRecoveryTimers;
     constructor(client: Client);
     private webhookSpamCooldown;
     handleWebhookMessage(message: Message): Promise<boolean>;
@@ -28,6 +32,9 @@ export declare class ProtectionHandler {
         isRaid: boolean;
         action?: ProtectionAction;
     }>;
+    applyBeastMode(guild: any, settings: any): Promise<void>;
+    private scheduleRecovery;
+    private scheduleLockdownRecovery;
     private lockdown;
     private hasIgnoredRole;
     private isIgnoredChannel;

@@ -14,6 +14,7 @@ const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
+const threatScore_1 = require("../utils/threatScore");
 const logger = (0, helpers_1.createLogger)('SecurityHandler');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // أنواع القنوات القابلة لإعادة الإنشاء
@@ -110,6 +111,8 @@ class SecurityHandler {
     createTracker = new Map();
     // 📈 معدل الحظر/الطرد لكل منفّذ — لا نخلط بين مشرفين مختلفين
     actionTracker = new Map();
+    // 🐢 حارس النيوك البطيء (تراكمي 10 دقائق) — يمنع التدمير التدريجي
+    slowActionTracker = new Map();
     // 🧹 منع تكرار معالجة نفس الهدف/المنفّذ خلال ثوانٍ
     handledTargets = new Map();
     // 🤖 حارس البوتات الخطرة (يفحص البوتات الموجودة كل 5 ثوانٍ)
@@ -118,6 +121,9 @@ class SecurityHandler {
     botGuardInFlight = new Set();
     // ⏳ تهدئة حارس البوتات: البوت الذي فشل تحييده لا يُعاد فحصه إلا بعد 30 ثانية
     botGuardBackoff = new Map();
+    // 🌐 القائمة السوداء العالمية للبوتات المارقة (in-memory cache)
+    rogueBotIds = new Set();
+    rogueBotsLoaded = false;
     // ⚡ منع تكرار عقوبة نفس الحساب خلال دقيقة (تفادي أخطاء "محظور مسبقاً" وتوفير REST)
     recentBans = new Map();
     recentKicks = new Map();
@@ -183,6 +189,9 @@ class SecurityHandler {
         for (const key of this.botGuardBackoff.keys())
             if (key.startsWith(`${guildId}:`))
                 this.botGuardBackoff.delete(key);
+        for (const key of this.slowActionTracker.keys())
+            if (key.startsWith(`${guildId}:`))
+                this.slowActionTracker.delete(key);
         logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
     }
     cleanup() {
@@ -475,6 +484,42 @@ class SecurityHandler {
         this.handledTargets.set(key, now);
         return false;
     }
+    /** 🌐 تحميل القائمة السوداء العالمية للبوتات المارقة (مرة واحدة) */
+    async loadRogueBots() {
+        if (this.rogueBotsLoaded)
+            return;
+        try {
+            const docs = await models_1.RogueBot.find({}).select('botId').lean();
+            for (const d of docs || [])
+                if (d?.botId)
+                    this.rogueBotIds.add(String(d.botId));
+            this.rogueBotsLoaded = true;
+            logger.info(`🌐 Loaded ${this.rogueBotIds.size} rogue bots into memory`);
+        }
+        catch (e) {
+            logger.warn(`loadRogueBots failed: ${e.message}`);
+        }
+    }
+    /** 🌐 إضافة بوت للقائمة السوداء (تخزين + ذاكرة) */
+    async blacklistBot(botId, reason, guildId, evidence = []) {
+        if (!botId || botId === this.client.user?.id)
+            return;
+        this.rogueBotIds.add(botId);
+        try {
+            await models_1.RogueBot.findOneAndUpdate({ botId }, {
+                $set: { reason, detectedInGuildId: guildId, detectedAt: new Date(), evidence },
+                $inc: { banCount: 1 },
+                $setOnInsert: { botId },
+            }, { upsert: true });
+        }
+        catch (e) {
+            logger.warn(`blacklistBot persist failed: ${e.message}`);
+        }
+        threatScore_1.globalThreat.add(guildId || 'global', 8, 'rogue bot blacklisted');
+    }
+    isRogueBot(botId) {
+        return this.rogueBotIds.has(String(botId));
+    }
     /** بوتات مستثناة تماماً: البوت نفسه + بوتات ديسكورد الرسمية فقط */
     trustedBotIds() {
         const wl = new Set();
@@ -513,6 +558,17 @@ class SecurityHandler {
     async isPreemptivelyWhitelistedInGuild(guildId, userId) {
         const settings = await (0, models_1.getGuildSettings)(guildId);
         return this.isPreemptivelyWhitelisted(settings, userId);
+    }
+    /** 🔥 تحميل الإعدادات في الذاكرة + القائمة السوداء — لتسريع الحارس */
+    async prewarmGuild(guild) {
+        try {
+            await (0, models_1.getGuildSettings)(guild.id);
+        }
+        catch { }
+        try {
+            await this.loadRogueBots();
+        }
+        catch { }
     }
     // ⚡ حظر/طرد بالمعرّف مباشرة — لا ننتظر جلب العضو (جلب الأعضاء هو أبطأ خطوة)
     async banUserById(guild, userId, reason) {
@@ -688,6 +744,11 @@ class SecurityHandler {
     /** ردّ فوري على أي اعتداء من إنسان أو بوت (يُستدعى من بثّ سجلات التدقيق) */
     async handleInstantViolation(guild, executor, settings, cfg, label, opts = {}) {
         const reason = `Liberty City — ${label} (Anti-Nuke — ردّ فوري)`;
+        if (this.executorIsBot(guild, executor) && (opts.forceBan || cfg?.mode !== 'react')) {
+            void this.blacklistBot(executor.id, `instant violation: ${label}`, guild.id);
+        }
+        threatScore_1.globalThreat.add(guild.id, this.executorIsBot(guild, executor) ? 8 : 4, `anti-nuke: ${label}`);
+        void this.client.protectionHandler?.applyBeastMode?.(guild, settings);
         const text = await this.neutralizeById(guild, executor, cfg, reason, opts.forceBan ?? false);
         // احذف الهدف الذي أنشأه للتو (قناة/رول)
         if (opts.targetId && opts.deleteTargetKind) {
@@ -957,6 +1018,7 @@ class SecurityHandler {
                 .catch(() => { }))
                 .catch(() => { });
             logger.error(`🚨 ROGUE BOT neutralized: ${this.userLabel(executor)} in ${guild.name} | banned=${banned} stripped=${stripped} purged=${purged}`);
+            void this.blacklistBot(executor.id, 'rogue bot (created channel/role/webhook)', guild.id);
             return true;
         }
         catch (error) {
@@ -969,10 +1031,24 @@ class SecurityHandler {
         try {
             if (!botId || botId === this.client.user?.id)
                 return false;
+            // 🌐 القائمة السوداء العالمية: بوت مارق معروف → حظر فوري (حتى لو antiBot مطفأ، ما دام antiNuke prevent)
+            const rogue = this.rogueBotIds.has(botId);
             const settings = await (0, models_1.getGuildSettings)(guild.id);
             const antiBot = settings.protection?.antiBot;
             const antiNuke = settings.protection?.antiNuke;
             const preventMode = antiNuke?.enabled && antiNuke?.mode !== 'react';
+            if (rogue) {
+                if (!antiBot?.enabled && !preventMode)
+                    return false;
+                if (this.botWhitelist(settings).has(botId))
+                    return false; // fully exempt
+                this.startIncident(guild.id, botId);
+                const banned = await this.banUserById(guild, botId, 'Liberty City — بوت مارق (قائمة سوداء عالمية)');
+                threatScore_1.globalThreat.add(guild.id, 12, 'rogue bot join (blacklisted)');
+                void this.client.protectionHandler?.applyBeastMode?.(guild, settings);
+                logger.warn(`🌐 Rogue bot (blacklisted) join blocked: ${botId} in ${guild.name} banned=${banned}`);
+                return true;
+            }
             // 🛑 antiBot مطفأ = لا حظر لمجرد الانضمام،
             //    لكن antiNuke في وضع المنع يحيّد أي بوت خطِر فوراً حتى لو antiBot مطفأ.
             if (!antiBot?.enabled && !preventMode)
@@ -1066,11 +1142,43 @@ class SecurityHandler {
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return; // 🛑 احترام إطفاء مضاد النيوك
+            // 📋 Role/Channel whitelist for anti-nuke
+            if (entry.targetId && Array.isArray(cfg.whitelistedChannels) && cfg.whitelistedChannels.includes(entry.targetId))
+                return;
+            if (entry.targetId && Array.isArray(cfg.whitelistedRoles) && cfg.whitelistedRoles.includes(entry.targetId))
+                return;
             const isBot = this.executorIsBot(guild, executor);
             const action = entry.action;
             const bot = isBot;
             // 👑 القائمة البيضاء = استثناء وقائي فقط (وليس من عقوبة الهجوم السريع)
             const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
+            // 🐢 حارس النيوك البطيء: تراكم 6+ عمليات تخريبية خلال 10 دقائق
+            const SLOW_ACTIONS = new Set([
+                discord_js_1.AuditLogEvent.ChannelDelete,
+                discord_js_1.AuditLogEvent.RoleDelete,
+                discord_js_1.AuditLogEvent.MemberBanAdd,
+                discord_js_1.AuditLogEvent.MemberKick,
+                discord_js_1.AuditLogEvent.ChannelCreate,
+                discord_js_1.AuditLogEvent.RoleCreate,
+                discord_js_1.AuditLogEvent.WebhookCreate,
+                discord_js_1.AuditLogEvent.GuildUpdate,
+                discord_js_1.AuditLogEvent.ChannelOverwriteDelete,
+            ]);
+            if (cfg?.slowNukeGuard !== false && SLOW_ACTIONS.has(action) && (isBot || preWhitelisted)) {
+                const slowWindowMs = (cfg?.slowNukeWindowMinutes ?? 10) * 60 * 1000;
+                const slowLimit = cfg?.slowNukeMax ?? 6;
+                const slowKey = `${guild.id}:${executor.id}:${action}:slow`;
+                const now2 = Date.now();
+                const arr = (this.slowActionTracker.get(slowKey) || []).filter(t => now2 - t < slowWindowMs);
+                arr.push(now2);
+                this.slowActionTracker.set(slowKey, arr);
+                if (arr.length > slowLimit) {
+                    await this.handleInstantViolation(guild, executor, settings, cfg, 'nyuk بطيء (تراكمي)', {
+                        forceBan: isBot || cfg.mode !== 'react',
+                    });
+                    return;
+                }
+            }
             const instantBotActions = new Set([
                 discord_js_1.AuditLogEvent.ChannelDelete,
                 discord_js_1.AuditLogEvent.RoleDelete,
@@ -1321,6 +1429,7 @@ class SecurityHandler {
                 if (ok) {
                     this.botGuardBackoff.delete(backoffKey);
                     names.push(`${member.user.tag} (حظر)`);
+                    void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
                 }
                 else {
                     const stripped = await this
@@ -1329,6 +1438,7 @@ class SecurityHandler {
                     if (stripped) {
                         this.botGuardBackoff.delete(backoffKey);
                         names.push(`${member.user.tag} (سحب رولات)`);
+                        void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
                     }
                     else {
                         // 🔕 فشل بسبب التسلّم → صامت + إعادة محاولة بعد 30 ثانية (بدون أي رسالة)
@@ -2002,6 +2112,8 @@ class SecurityHandler {
                 const wl = this.botWhitelist(settings);
                 if (!wl.has(newMember.id) && this.botHasDangerousPowers(guild, newMember)) {
                     this.startIncident(guild.id, newMember.id);
+                    void this.blacklistBot(newMember.id, 'bot gained dangerous powers', guild.id);
+                    threatScore_1.globalThreat.add(guild.id, 10, 'bot gained dangerous powers');
                     const reason = 'Liberty City — بوت خطِر حصل على صلاحيات تخريبية';
                     const banned = await this.banUserById(guild, newMember.id, reason);
                     if (!banned) {

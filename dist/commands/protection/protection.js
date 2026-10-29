@@ -29,7 +29,8 @@ const command = {
         .addStringOption(opt => opt
         .setName('action')
         .setDescription('الإجراء عند رصد هجوم')
-        .addChoices({ name: 'طرد', value: 'kick' }, { name: 'حظر', value: 'ban' }, { name: 'إغلاق القنوات', value: 'lockdown' })))
+        .addChoices({ name: 'طرد', value: 'kick' }, { name: 'حظر', value: 'ban' }, { name: 'إغلاق القنوات', value: 'lockdown' }))
+        .addBooleanOption(opt => opt.setName('beast_mode').setDescription('تفعيل Beast Mode (تصعيد التحقق + كشف المشبوهين)')))
         .addSubcommand(sub => sub
         .setName('antispam')
         .setDescription('إعدادات مضاد السبام')
@@ -91,7 +92,8 @@ const command = {
         .addChoices({ name: 'تنبيه فقط', value: 'alert' }, { name: 'طرد', value: 'kick' }, { name: 'حظر', value: 'ban' }, { name: '🗡️ سلب كل الرولات (يبقى في السيرفر معطّلاً)', value: 'strip' }))
         .addBooleanOption(opt => opt
         .setName('autorestore')
-        .setDescription('♻️ إعادة بنية السيرفر تلقائياً بعد هجوم الحذف (الافتراضي: مفعّل)')))
+        .setDescription('♻️ إعادة بنية السيرفر تلقائياً بعد هجوم الحذف (الافتراضي: مفعّل)'))
+        .addBooleanOption(opt => opt.setName('slow_nuke_guard').setDescription('🐢 حارس النيوك البطيء (تراكمي — الافتراضي: مفعّل)')))
         .addSubcommand(sub => sub
         .setName('hierarchy')
         .setDescription('🛡️ فحص التسلّم — هل البوت أعلى رتبة؟ أهم فحص أمني'))
@@ -247,11 +249,17 @@ async function configureAntiRaid(interaction, settings) {
     const enabled = interaction.options.getBoolean('enabled', true);
     const threshold = interaction.options.getInteger('threshold');
     const action = interaction.options.getString('action');
+    const beastMode = interaction.options.getBoolean('beast_mode');
     settings.protection.antiRaid.enabled = enabled;
     if (threshold)
         settings.protection.antiRaid.threshold = threshold;
     if (action)
         settings.protection.antiRaid.action = action;
+    if (beastMode !== null) {
+        if (!settings.protection.antiRaid.beastMode)
+            settings.protection.antiRaid.beastMode = {};
+        settings.protection.antiRaid.beastMode.enabled = beastMode;
+    }
     await settings.save();
     (0, models_1.invalidateGuildSettings)(interaction.guildId);
     const embed = new discord_js_1.EmbedBuilder()
@@ -340,6 +348,7 @@ async function configureAntiNuke(interaction, settings) {
     const windowSec = interaction.options.getInteger('window');
     const action = interaction.options.getString('action');
     const autoRestore = interaction.options.getBoolean('autorestore');
+    const slowNukeGuard = interaction.options.getBoolean('slow_nuke_guard');
     if (!settings.protection.antiNuke)
         settings.protection.antiNuke = {};
     settings.protection.antiNuke.enabled = enabled;
@@ -354,6 +363,9 @@ async function configureAntiNuke(interaction, settings) {
     }
     else if (settings.protection.antiNuke.autoRestore === undefined) {
         settings.protection.antiNuke.autoRestore = true; // الافتراضي: مفعّل
+    }
+    if (slowNukeGuard !== null && slowNukeGuard !== undefined) {
+        settings.protection.antiNuke.slowNukeGuard = slowNukeGuard;
     }
     await settings.save();
     (0, models_1.invalidateGuildSettings)(interaction.guildId);

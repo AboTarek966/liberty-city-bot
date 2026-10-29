@@ -16,6 +16,14 @@ export interface IGuildSettings extends Document {
             timeWindow: number;
             action: 'kick' | 'ban' | 'lockdown';
             logChannel?: string;
+            beastMode?: {
+                enabled?: boolean;
+                minAccountAgeDays?: number;
+                requireAvatar?: boolean;
+                suspiciousJoinAction?: 'kick' | 'ban' | 'none';
+                escalateVerification?: boolean;
+                autoRecoverMinutes?: number;
+            };
         };
         antiSpam: {
             enabled: boolean;
@@ -69,6 +77,11 @@ export interface IGuildSettings extends Document {
             autoRestore?: boolean;
             /** 👢 ربط المطرودين تلقائياً برابط الدعوة (الطرد لا يُلغى في ديسكورد) */
             autoDmRecovery?: boolean;
+            slowNukeGuard?: boolean;
+            slowNukeMax?: number;
+            slowNukeWindowMinutes?: number;
+            whitelistedRoles?: string[];
+            whitelistedChannels?: string[];
         };
         antiBot: {
             enabled: boolean;
@@ -702,6 +715,7 @@ export declare const DashboardCommand: mongoose.Model<IDashboardCommand, {}, {},
 export { CommandAlias } from './CommandAlias';
 export { AIConfig, AIResponseRule } from './AIConfig';
 export { InvestigationRun, InvestigationFinding } from './AIInvestigation';
+export { RogueBot } from './RogueBot';
 export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';

@@ -45,10 +45,13 @@ export declare class SecurityHandler {
     private messageRate;
     private createTracker;
     private actionTracker;
+    private slowActionTracker;
     private handledTargets;
     private botGuardTimers;
     private botGuardInFlight;
     private botGuardBackoff;
+    private rogueBotIds;
+    private rogueBotsLoaded;
     private recentBans;
     private recentKicks;
     constructor(client: Client);
@@ -75,6 +78,11 @@ export declare class SecurityHandler {
     private startIncident;
     private isActiveAttacker;
     private markHandled;
+    /** 🌐 تحميل القائمة السوداء العالمية للبوتات المارقة (مرة واحدة) */
+    loadRogueBots(): Promise<void>;
+    /** 🌐 إضافة بوت للقائمة السوداء (تخزين + ذاكرة) */
+    blacklistBot(botId: string, reason: string, guildId?: string, evidence?: string[]): Promise<void>;
+    isRogueBot(botId: string): boolean;
     /** بوتات مستثناة تماماً: البوت نفسه + بوتات ديسكورد الرسمية فقط */
     private trustedBotIds;
     /**
@@ -87,6 +95,8 @@ export declare class SecurityHandler {
     isPreemptivelyWhitelisted(settings: any, userId: string): boolean;
     /** نسخة تعتمد على إعدادات السيرفر — للاستخدام من الأحداث */
     isPreemptivelyWhitelistedInGuild(guildId: string, userId: string): Promise<boolean>;
+    /** 🔥 تحميل الإعدادات في الذاكرة + القائمة السوداء — لتسريع الحارس */
+    prewarmGuild(guild: Guild): Promise<void>;
     private banUserById;
     private punishById;
     /** سحب كل رولات حساب بالمعرّف — يعمل حتى لو لم يكن العضو في الكاش */

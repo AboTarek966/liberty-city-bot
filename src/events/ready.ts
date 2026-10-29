@@ -46,6 +46,14 @@ const event: Event = {
       }, delay);
     });
 
+    // 🌐 تحميل القائمة السوداء العالمية للبوتات المارقة
+    void lc.securityHandler.loadRogueBots().catch(err => logger.error('loadRogueBots failed:', err));
+
+    // 🔥 تحميل الإعدادات في الذاكرة (تسريع الحارس)
+    client.guilds.cache.forEach(guild => {
+      void lc.securityHandler.prewarmGuild(guild).catch(() => {});
+    });
+
     // 🛡️ تشغيل حمايات الأمان فوراً — أي تأخير = نافذة تخريب مفتوحة
     client.guilds.cache.forEach(guild => {
       // 📌 حماية الهرم اللاصقة: تراقب رول البوت باستمرار

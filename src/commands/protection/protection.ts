@@ -50,6 +50,9 @@ const command: Command = {
               { name: 'إغلاق القنوات', value: 'lockdown' }
             )
         )
+        .addBooleanOption(opt =>
+          opt.setName('beast_mode').setDescription('تفعيل Beast Mode (تصعيد التحقق + كشف المشبوهين)')
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -163,6 +166,9 @@ const command: Command = {
           opt
             .setName('autorestore')
             .setDescription('♻️ إعادة بنية السيرفر تلقائياً بعد هجوم الحذف (الافتراضي: مفعّل)')
+        )
+        .addBooleanOption(opt =>
+          opt.setName('slow_nuke_guard').setDescription('🐢 حارس النيوك البطيء (تراكمي — الافتراضي: مفعّل)')
         )
     )
     .addSubcommand(sub =>
@@ -364,10 +370,15 @@ async function configureAntiRaid(interaction: ChatInputCommandInteraction, setti
   const enabled = interaction.options.getBoolean('enabled', true);
   const threshold = interaction.options.getInteger('threshold');
   const action = interaction.options.getString('action');
+  const beastMode = interaction.options.getBoolean('beast_mode');
 
   settings.protection.antiRaid.enabled = enabled;
   if (threshold) settings.protection.antiRaid.threshold = threshold;
   if (action) settings.protection.antiRaid.action = action;
+  if (beastMode !== null) {
+    if (!settings.protection.antiRaid.beastMode) settings.protection.antiRaid.beastMode = {};
+    settings.protection.antiRaid.beastMode.enabled = beastMode;
+  }
 
   await settings.save();
   invalidateGuildSettings(interaction.guildId!);
@@ -485,6 +496,7 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
   const windowSec = interaction.options.getInteger('window');
   const action = interaction.options.getString('action');
   const autoRestore = interaction.options.getBoolean('autorestore');
+  const slowNukeGuard = interaction.options.getBoolean('slow_nuke_guard');
 
   if (!settings.protection.antiNuke) settings.protection.antiNuke = {};
   settings.protection.antiNuke.enabled = enabled;
@@ -495,6 +507,9 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
     settings.protection.antiNuke.autoRestore = autoRestore;
   } else if (settings.protection.antiNuke.autoRestore === undefined) {
     settings.protection.antiNuke.autoRestore = true; // الافتراضي: مفعّل
+  }
+  if (slowNukeGuard !== null && slowNukeGuard !== undefined) {
+    settings.protection.antiNuke.slowNukeGuard = slowNukeGuard;
   }
 
   await settings.save();
