@@ -1,0 +1,21 @@
+# /etc/systemd/system/liberty-city.service
+# بديل لـ Docker: تشغيل مباشر (Node + PM2 غير مطلوب)
+[Unit]
+Description=Liberty City Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/liberty-city-bot
+EnvironmentFile=/opt/liberty-city-bot/.env
+ExecStart=/usr/bin/node /opt/liberty-city-bot/dist/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=liberty-city
+
+[Install]
+WantedBy=multi-user.target
