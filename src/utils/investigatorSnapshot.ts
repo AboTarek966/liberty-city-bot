@@ -272,6 +272,9 @@ export async function collectGuildSnapshot(
     protectedIds?: Set<string>;
   } = {}
 ): Promise<GuildSnapshot> {
+  // أعِد تثبيت توكن REST قبل أي طلب شبكي — المكتبة تمسحه عند 401 عابر.
+  if (guild.client.token) guild.client.rest.setToken(guild.client.token);
+
   const startedAt = Date.now();
   const now = Date.now();
   const settings = extra.settings || (await getGuildSettings(guild.id));

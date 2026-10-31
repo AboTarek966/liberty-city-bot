@@ -232,6 +232,9 @@ function bufferedToSnapshot(message, protectedIds) {
 // Main collector
 // --------------------------------------------
 async function collectGuildSnapshot(guild, options, extra = {}) {
+    // أعِد تثبيت توكن REST قبل أي طلب شبكي — المكتبة تمسحه عند 401 عابر.
+    if (guild.client.token)
+        guild.client.rest.setToken(guild.client.token);
     const startedAt = Date.now();
     const now = Date.now();
     const settings = extra.settings || (await (0, models_1.getGuildSettings)(guild.id));

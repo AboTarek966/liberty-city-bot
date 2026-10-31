@@ -77,6 +77,8 @@ class LibertyClient extends discord_js_1.Client {
     dashboardCommandWorker;
     // Express server for Dashboard API
     expressApp;
+    // مؤقّت إعادة تثبيت توكن REST (يُمسح تلقائياً عند أي 401 في @discordjs/rest)
+    restTokenTimer;
     // Cooldowns
     cooldowns = new discord_js_1.Collection();
     // Cache
@@ -595,6 +597,9 @@ class LibertyClient extends discord_js_1.Client {
             await this.loadHandlers();
             // Login to Discord
             await this.login(config_1.config.discord.token);
+            // أعِد تثبيت توكن REST دورياً — أي 401 عابر في @discordjs/rest يمسح
+            // التوكن ويترك البوت متصلاً بالبوابة لكن كل طلبات REST معطّلة.
+            this.startRestTokenGuard();
             // أوامر لوحة التحكم عن بعد (طابور عبر MongoDB)
             try {
                 this.dashboardCommandWorker.start();
@@ -609,6 +614,23 @@ class LibertyClient extends discord_js_1.Client {
             logger.error('❌ Failed to initialize bot:', error);
             process.exit(1);
         }
+    }
+    // --------------------------------------------
+    // حماية توكن REST
+    // --------------------------------------------
+    // @discordjs/rest يمسح التوكن داخلياً عند أول استجابة 401، بينما تبقى بوابة
+    // Discord متصلة — فتتعطّل كل طلبات REST حتى إعادة تشغيل البوت بالكامل.
+    // إعادة تثبيت التوكن الحالي دورياً تجعل البوت يتعافى من أي 401 عابر.
+    startRestTokenGuard() {
+        const apply = () => {
+            if (this.token)
+                this.rest.setToken(this.token);
+        };
+        apply();
+        if (this.restTokenTimer)
+            clearInterval(this.restTokenTimer);
+        this.restTokenTimer = setInterval(apply, 90_000);
+        this.restTokenTimer.unref?.();
     }
     // --------------------------------------------
     // Connect to Database
@@ -680,6 +702,10 @@ class LibertyClient extends discord_js_1.Client {
     // --------------------------------------------
     async cleanup() {
         logger.info('🧹 Cleaning up...');
+        if (this.restTokenTimer) {
+            clearInterval(this.restTokenTimer);
+            this.restTokenTimer = undefined;
+        }
         this.protectionHandler.cleanup();
         this.ticketHandler.cleanup();
         this.loggingHandler.cleanup();

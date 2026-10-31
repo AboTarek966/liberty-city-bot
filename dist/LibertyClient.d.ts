@@ -25,6 +25,7 @@ export declare class LibertyClient extends Client {
     musicHandler: MusicHandler;
     dashboardCommandWorker: DashboardCommandWorker;
     expressApp: Express;
+    private restTokenTimer?;
     cooldowns: Collection<string, Collection<string, number>>;
     guildSettingsCache: Collection<string, any>;
     constructor();
@@ -35,6 +36,7 @@ export declare class LibertyClient extends Client {
     private getGuildStats;
     private getDashboardStats;
     initialize(): Promise<void>;
+    private startRestTokenGuard;
     private connectDatabase;
     private loadHandlers;
     registerCommands(): Promise<void>;

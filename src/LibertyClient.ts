@@ -72,6 +72,9 @@ export class LibertyClient extends Client {
   // Express server for Dashboard API
   public expressApp: Express;
 
+  // مؤقّت إعادة تثبيت توكن REST (يُمسح تلقائياً عند أي 401 في @discordjs/rest)
+  private restTokenTimer?: NodeJS.Timeout;
+
   // Cooldowns
   public cooldowns: Collection<string, Collection<string, number>> = new Collection();
 
@@ -610,6 +613,10 @@ export class LibertyClient extends Client {
       // Login to Discord
       await this.login(config.discord.token);
 
+      // أعِد تثبيت توكن REST دورياً — أي 401 عابر في @discordjs/rest يمسح
+      // التوكن ويترك البوت متصلاً بالبوابة لكن كل طلبات REST معطّلة.
+      this.startRestTokenGuard();
+
       // أوامر لوحة التحكم عن بعد (طابور عبر MongoDB)
       try {
         this.dashboardCommandWorker.start();
@@ -623,6 +630,22 @@ export class LibertyClient extends Client {
       logger.error('❌ Failed to initialize bot:', error);
       process.exit(1);
     }
+  }
+
+  // --------------------------------------------
+  // حماية توكن REST
+  // --------------------------------------------
+  // @discordjs/rest يمسح التوكن داخلياً عند أول استجابة 401، بينما تبقى بوابة
+  // Discord متصلة — فتتعطّل كل طلبات REST حتى إعادة تشغيل البوت بالكامل.
+  // إعادة تثبيت التوكن الحالي دورياً تجعل البوت يتعافى من أي 401 عابر.
+  private startRestTokenGuard(): void {
+    const apply = (): void => {
+      if (this.token) this.rest.setToken(this.token);
+    };
+    apply();
+    if (this.restTokenTimer) clearInterval(this.restTokenTimer);
+    this.restTokenTimer = setInterval(apply, 90_000);
+    this.restTokenTimer.unref?.();
   }
 
   // --------------------------------------------
@@ -705,6 +728,11 @@ export class LibertyClient extends Client {
   // --------------------------------------------
   async cleanup(): Promise<void> {
     logger.info('🧹 Cleaning up...');
+
+    if (this.restTokenTimer) {
+      clearInterval(this.restTokenTimer);
+      this.restTokenTimer = undefined;
+    }
 
     this.protectionHandler.cleanup();
     this.ticketHandler.cleanup();
