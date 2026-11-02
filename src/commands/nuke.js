@@ -7,7 +7,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    const allowed = ['YOUR_USER_ID_HERE']; // حط آي ديك
+    const allowed = ['1342238662368296980']; // حط آي ديك
     if (!allowed.includes(interaction.user.id)) {
       return interaction.reply({ content: 'مش مسموح.', ephemeral: true });
     }
