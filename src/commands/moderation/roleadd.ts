@@ -17,13 +17,14 @@ import {
   createRolePickerState,
   buildRolePicker,
   getGrantableRoles,
+  canManageTarget,
 } from '../../utils/rolePicker';
 
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName('roleadd')
-    .setDescription('إضافة رول لعضو (للمالك فقط)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .setDescription('إضافة رول لعضو — الرولات الأقل من رتبتك فقط')
+    // 🔓 بدون صلاحية مطلوبة — أي إداري يستطيع إعطاء الرولات الأقل من رتبته (القيد حسب الهرمية)
     .addUserOption(o =>
       o.setName('user').setDescription('العضو المراد إضافة الرول له').setRequired(true)
     )
@@ -56,12 +57,8 @@ const command: Command = {
     const guild = interaction.guild!;
     const member = interaction.options.getMember('user') as GuildMember;
     const reason = interaction.options.getString('reason') || 'إضافة رول';
-
-    // 🔒 للمالك فقط (owner فقط)
-    if (interaction.user.id !== guild.ownerId) {
-      await interaction.reply({ content: '❌ هذا الأمر للمالك فقط', ephemeral: true });
-      return;
-    }
+    const executorMember = interaction.member as GuildMember;
+    const isOwner = interaction.user.id === guild.ownerId;
 
     // ✅ كل الرولات المحددة في نفس الأمر (role حتى role5)
     const requestedRoles = (['role', 'role2', 'role3', 'role4', 'role5'] as const)
@@ -74,19 +71,38 @@ const command: Command = {
       return;
     }
 
+    // رتبة البوت يجب أن تسمح بإدارة الرولات
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      await interaction.reply({ content: '❌ البوت لا يملك صلاحية إدارة الرتب', ephemeral: true });
+      return;
+    }
+
+    // لا يمكن إعطاء رول لنفسك
+    if (member.id === interaction.user.id) {
+      await interaction.reply({ content: '❌ لا يمكنك إعطاء رول لنفسك', ephemeral: true });
+      return;
+    }
+
     // لا يمكن تعديل رولات مالك السيرفر (إلا لو كان المنفذ هو المالك نفسه)
-    if (member.id === guild.ownerId && interaction.user.id !== guild.ownerId) {
+    if (member.id === guild.ownerId && !isOwner) {
       await interaction.reply({ content: '❌ لا يمكن تعديل رولات مالك السيرفر', ephemeral: true });
       return;
     }
 
-    const executorMember = interaction.member as GuildMember;
+    // 🔒 العضو يجب أن يكون أقل رتبة من المنفذ (المالك مستثنى)
+    if (!canManageTarget(guild, executorMember, member)) {
+      await interaction.reply({
+        content: '❌ لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك',
+        ephemeral: true,
+      });
+      return;
+    }
 
     // --------------------------------------------
     // لوحة اختيار الرولات (لم يتم تحديد أي رول)
     // --------------------------------------------
     if (uniqueRoles.length === 0) {
-      const grantable = getGrantableRoles(guild, executorMember);
+      const grantable = getGrantableRoles(guild, executorMember, member);
       if (grantable.length === 0) {
         await interaction.reply({
           content: '❌ لا توجد رولات يمكنك إعطاؤها — تأكد من رتبتك ورتبة البوت',
@@ -107,13 +123,17 @@ const command: Command = {
     // --------------------------------------------
     // فحص كل الرولات المحددة
     // --------------------------------------------
-    const isOwner = interaction.user.id === guild.ownerId;
     const grantable: Role[] = [];
     const execBlocked: Role[] = [];
     const botBlocked: Role[] = [];
     const alreadyOwned: Role[] = [];
+    const invalidRoles: Role[] = [];
 
     for (const role of uniqueRoles) {
+      if (role.id === guild.id || role.managed) {
+        invalidRoles.push(role);
+        continue;
+      }
       if (member.roles.cache.has(role.id)) {
         alreadyOwned.push(role);
         continue;
@@ -133,6 +153,7 @@ const command: Command = {
       let msg = `❌ العضو يملك هذه الرولات بالفعل (${alreadyOwned.length})`;
       if (execBlocked.length) msg = '❌ رتبتك يجب أن تكون أعلى من الرول المضاف';
       else if (botBlocked.length) msg = '❌ رتبة البوت يجب أن تكون أعلى من الرول المضاف';
+      else if (invalidRoles.length) msg = '❌ لا يمكن إعطاء @everyone أو رول مُدار (بوت)';
       await interaction.reply({ content: msg, ephemeral: true });
       return;
     }
@@ -144,7 +165,8 @@ const command: Command = {
       );
 
       const rolesText = grantable.map(r => `${r}`).join(', ');
-      const skippedCount = execBlocked.length + botBlocked.length + alreadyOwned.length;
+      const skippedCount =
+        execBlocked.length + botBlocked.length + alreadyOwned.length + invalidRoles.length;
 
       await interaction.reply({
         content: `➕ **${member}** ← ${rolesText}` +
@@ -162,6 +184,7 @@ const command: Command = {
               ...execBlocked.map(r => `${r} (أعلى من رتبتك)`),
               ...botBlocked.map(r => `${r} (أعلى من رتبة البوت)`),
               ...alreadyOwned.map(r => `${r} (مملوك بالفعل)`),
+              ...invalidRoles.map(r => `${r} (غير قابل للإعطاء)`),
             ].slice(0, 10).join('\n');
 
             const logEmbed = new EmbedBuilder()

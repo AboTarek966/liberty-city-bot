@@ -114,8 +114,8 @@ const command: Command = {
           r.id !== guild.id &&                             // ليس @everyone
           !r.managed                                       // ليس رول مدار (بوتات)
         )
-        // للمالك: لا قيود إضافية. لغير المالك: لا يتجاوز رتبته
-        .filter(r => isOwner || r.position <= executorTopRole.position)
+        // للمالك: لا قيود إضافية. لغير المالك: يجب أن يكون الرول أقل من رتبته
+        .filter(r => isOwner || r.position < executorTopRole.position)
         .sort((a, b) => a.position - b.position); // الأقرب لرتبة العضو الحالية أولاً (التدرج الطبيعي)
        
       if (higherRoles.size === 0) {

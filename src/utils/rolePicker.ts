@@ -81,20 +81,43 @@ export function getSelectedRoleIds(state: RolePickerState): string[] {
   return [...set];
 }
 
-// الرولات التي يستطيع المنفذ إعطاؤها (مفلترة حسب الصلاحيات)
-export function getGrantableRoles(guild: Guild, executor: GuildMember): Role[] {
-  const isOwner = executor.id === guild.ownerId;
-  const botTop = guild.members.me?.roles.highest.position ?? 0;
-  const execTop = executor.roles.highest.position;
+// هل يستطيع هذا المنفذ إعطاء هذا الرول؟
+// القاعدة: الرول أقل من رتبة البوت، وأقل من رتبة المنفذ (المالك مستثنى من قيد رتبته)
+export function isRoleGrantable(guild: Guild, executor: GuildMember, role: Role): boolean {
+  if (!role) return false;
+  if (role.id === guild.id) return false; // بدون @everyone
+  if (role.managed) return false; // بدون رولات مُدارة (بوتات/تكاملات)
 
+  const bot = guild.members.me;
+  if (!bot) return false;
+  if (role.position >= bot.roles.highest.position) return false; // أعلى من رتبة البوت
+
+  // المالك يستطيع إعطاء أي رول أقل من رتبة البوت، وغيره فقط ما هو أقل من رتبته
+  if (executor.id !== guild.ownerId && role.position >= executor.roles.highest.position) return false;
+
+  return true;
+}
+
+// هل يستطيع المنفذ تعديل رولات هذا العضو؟ (العضو يجب أن يكون أقل رتبة)
+export function canManageTarget(guild: Guild, executor: GuildMember, target: GuildMember): boolean {
+  if (executor.id === target.id) return false;
+  if (executor.id === guild.ownerId) return true; // المالك يستثنى
+  if (target.id === guild.ownerId) return false; // لا أحد يعدّل المالك
+  return executor.roles.highest.position > target.roles.highest.position;
+}
+
+// الرولات التي يستطيع المنفذ إعطاؤها (مفلترة حسب الهرمية)
+export function getGrantableRoles(
+  guild: Guild,
+  executor: GuildMember,
+  target?: GuildMember | null,
+): Role[] {
   return [
     ...guild.roles.cache
       .filter(
         r =>
-          r.id !== guild.id && // بدون @everyone
-          !r.managed && // بدون رولات مُدارة
-          r.position < botTop && // أقل من رتبة البوت
-          (isOwner || r.position < execTop), // أقل من رتبة المنفذ
+          isRoleGrantable(guild, executor, r) &&
+          (!target || !target.roles.cache.has(r.id)), // بدون الرولات التي يملكها العضو أصلاً
       )
       .sort((a, b) => b.position - a.position) // الأعلى أولاً
       .values(),
@@ -103,13 +126,23 @@ export function getGrantableRoles(guild: Guild, executor: GuildMember): Role[] {
 
 // الرولات المعروضة في اللوحة (قائمة محددة أو كل الرولات القابلة للإعطاء)
 export function getPickerRoles(state: RolePickerState, guild: Guild, executor: GuildMember): Role[] {
+  const target = guild.members.cache.get(state.targetId) ?? null;
+
   if (state.roleIds && state.roleIds.length) {
+    const botTop = guild.members.me?.roles.highest.position ?? 0;
     return state.roleIds
       .map(id => guild.roles.cache.get(id))
-      .filter((r): r is Role => !!r && r.id !== guild.id && !r.managed)
+      .filter(
+        (r): r is Role =>
+          !!r &&
+          r.id !== guild.id &&
+          !r.managed &&
+          r.position < botTop &&
+          (!target || !target.roles.cache.has(r.id)),
+      )
       .sort((a, b) => b.position - a.position);
   }
-  return getGrantableRoles(guild, executor);
+  return getGrantableRoles(guild, executor, target);
 }
 
 // بناء محتوى اللوحة (الرسالة + الأزرار)
@@ -129,7 +162,7 @@ export function buildRolePicker(
 
   const content = state.title
     ? `${state.title}\nالمحدد حاليا: ${total}`
-    : `✅ <@${state.targetId}> اختر رتبة أو أكثر لإضامتها\nالمحدد حاليا: ${total}`;
+    : `✅ <@${state.targetId}> اختر رتبة أو أكثر لإضافتها\n🛡️ تظهر هنا فقط الرولات الأقل من رتبتك\nالمحدد حاليا: ${total}`;
 
   const components: any[] = [];
 

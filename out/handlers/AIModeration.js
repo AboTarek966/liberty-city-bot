@@ -47,6 +47,7 @@ const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
+const rolePicker_1 = require("../utils/rolePicker");
 const logger = (0, helpers_1.createLogger)('AIModeration');
 // ⚠️ الترتيب مهم: "رفع الكتم" يجب أن يُفحص قبل "كتم"
 const ACTIONS = [
@@ -495,6 +496,8 @@ async function executeAIModeration(message, client, question) {
                     throw new Error('لا يمكن حذف رول مدار (بوتات/تكاملات)');
                 if (role.position >= guild.members.me.roles.highest.position)
                     throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد حذفه');
+                if (message.author.id !== guild.ownerId && role.position >= message.member.roles.highest.position)
+                    throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد حذفه');
                 await role.delete(`${reason} | بواسطة ${moderator.user.tag}`);
                 embed = new discord_js_1.EmbedBuilder()
                     .setTitle('🗑️ تم حذف الرول')
@@ -518,6 +521,8 @@ async function executeAIModeration(message, client, question) {
                     throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المضاف');
                 const isOwner = message.author.id === guild.ownerId;
                 const executorMember = message.member;
+                if (!(0, rolePicker_1.canManageTarget)(guild, executorMember, member))
+                    throw new Error('لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك');
                 if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0)
                     throw new Error('رتبتك يجب أن تكون أعلى من الرول المضاف');
                 await member.roles.add(role, `${reason} | بواسطة ${moderator.user.tag}`);
@@ -543,6 +548,8 @@ async function executeAIModeration(message, client, question) {
                     throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد إزالته');
                 const isOwner = message.author.id === guild.ownerId;
                 const executorMember = message.member;
+                if (!(0, rolePicker_1.canManageTarget)(guild, executorMember, member))
+                    throw new Error('لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك');
                 if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0)
                     throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد إزالته');
                 await member.roles.remove(role, `${reason} | بواسطة ${moderator.user.tag}`);
@@ -562,12 +569,14 @@ async function executeAIModeration(message, client, question) {
                 const executorTopRole = message.member.roles.highest;
                 const memberTopRole = member.roles.highest;
                 const isOwner = message.author.id === guild.ownerId;
+                if (!(0, rolePicker_1.canManageTarget)(guild, message.member, member))
+                    throw new Error('لا يمكنك ترقية عضو رتبته أعلى منك أو مساوية لرتبتك');
                 const higherRoles = guild.roles.cache
                     .filter(r => r.position > memberTopRole.position &&
                     r.position < botTopRole.position &&
                     r.id !== guild.id &&
                     !r.managed)
-                    .filter(r => isOwner || r.position <= executorTopRole.position)
+                    .filter(r => isOwner || r.position < executorTopRole.position)
                     .sort((a, b) => a.position - b.position);
                 if (higherRoles.size === 0)
                     throw new Error('لا يوجد رول أعلى متاح للترقية');

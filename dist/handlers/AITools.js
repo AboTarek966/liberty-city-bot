@@ -10,6 +10,7 @@ exports.getAllToolNames = getAllToolNames;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const helpers_1 = require("../utils/helpers");
+const rolePicker_1 = require("../utils/rolePicker");
 const logger = (0, helpers_1.createLogger)('AITools');
 // --------------------------------------------
 // سجل الأدوات المتاحة للـ AI
@@ -290,6 +291,12 @@ registerTool('give_role', {
             return { success: false, message: '❌ الرول غير موجود' };
         if (role.managed)
             return { success: false, message: '❌ لا يمكن إعطاء رول مُدار' };
+        if (!(0, rolePicker_1.canManageTarget)(guild, executor, member)) {
+            return { success: false, message: '❌ لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك' };
+        }
+        if (!(0, rolePicker_1.isRoleGrantable)(guild, executor, role)) {
+            return { success: false, message: '❌ هذا الرول أعلى من رتبتك أو من رتبة البوت' };
+        }
         if (member.roles.cache.has(roleId))
             return { success: false, message: 'ℹ️ العضو يملك الرول بالفعل' };
         try {
@@ -318,6 +325,12 @@ registerTool('remove_role', {
             return { success: false, message: '❌ الرول غير موجود' };
         if (!member.roles.cache.has(roleId))
             return { success: false, message: 'ℹ️ العضو لا يملك الرول' };
+        if (!(0, rolePicker_1.canManageTarget)(guild, executor, member)) {
+            return { success: false, message: '❌ لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك' };
+        }
+        if (!(0, rolePicker_1.isRoleGrantable)(guild, executor, role)) {
+            return { success: false, message: '❌ هذا الرول أعلى من رتبتك أو من رتبة البوت' };
+        }
         try {
             await member.roles.remove(role, `${executor.user.tag}: ${reason}`);
             return { success: true, message: `➖ **أُزيل** ${role.name} **من** <@${userId}>`, data: { userId, roleId } };

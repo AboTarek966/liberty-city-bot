@@ -20,6 +20,7 @@ import {
 import { LibertyClient } from './../LibertyClient';
 import { getGuildSettings, ModerationCase } from '../models';
 import { createLogger } from '../utils/helpers';
+import { canManageTarget, isRoleGrantable } from '../utils/rolePicker';
 
 const logger = createLogger('AITools');
 
@@ -313,6 +314,12 @@ registerTool('give_role', {
     if (!member) return { success: false, message: '❌ العضو غير موجود' };
     if (!role) return { success: false, message: '❌ الرول غير موجود' };
     if (role.managed) return { success: false, message: '❌ لا يمكن إعطاء رول مُدار' };
+    if (!canManageTarget(guild, executor, member)) {
+      return { success: false, message: '❌ لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك' };
+    }
+    if (!isRoleGrantable(guild, executor, role)) {
+      return { success: false, message: '❌ هذا الرول أعلى من رتبتك أو من رتبة البوت' };
+    }
     if (member.roles.cache.has(roleId)) return { success: false, message: 'ℹ️ العضو يملك الرول بالفعل' };
 
     try {
@@ -338,6 +345,12 @@ registerTool('remove_role', {
     if (!member) return { success: false, message: '❌ العضو غير موجود' };
     if (!role) return { success: false, message: '❌ الرول غير موجود' };
     if (!member.roles.cache.has(roleId)) return { success: false, message: 'ℹ️ العضو لا يملك الرول' };
+    if (!canManageTarget(guild, executor, member)) {
+      return { success: false, message: '❌ لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك' };
+    }
+    if (!isRoleGrantable(guild, executor, role)) {
+      return { success: false, message: '❌ هذا الرول أعلى من رتبتك أو من رتبة البوت' };
+    }
 
     try {
       await member.roles.remove(role, `${executor.user.tag}: ${reason}`);

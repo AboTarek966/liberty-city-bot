@@ -12,6 +12,7 @@ import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
 import { getGuildSettings } from '../models';
 import { Colors } from '../utils/embeds';
+import { canManageTarget } from '../utils/rolePicker';
 
 const logger = createLogger('AIModeration');
 
@@ -532,6 +533,8 @@ export async function executeAIModeration(
         if (role.managed) throw new Error('لا يمكن حذف رول مدار (بوتات/تكاملات)');
         if (role.position >= guild.members.me!.roles.highest.position) 
           throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد حذفه');
+        if (message.author.id !== guild.ownerId && role.position >= (message.member as GuildMember).roles.highest.position)
+          throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد حذفه');
         
         await role.delete(`${reason} | بواسطة ${moderator.user.tag}`);
         
@@ -560,6 +563,8 @@ export async function executeAIModeration(
         
         const isOwner = message.author.id === guild.ownerId;
         const executorMember = message.member as GuildMember;
+        if (!canManageTarget(guild, executorMember, member))
+          throw new Error('لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك');
         if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0)
           throw new Error('رتبتك يجب أن تكون أعلى من الرول المضاف');
         
@@ -591,6 +596,8 @@ export async function executeAIModeration(
         
         const isOwner = message.author.id === guild.ownerId;
         const executorMember = message.member as GuildMember;
+        if (!canManageTarget(guild, executorMember, member))
+          throw new Error('لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك');
         if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0)
           throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد إزالته');
         
@@ -616,6 +623,8 @@ export async function executeAIModeration(
         const executorTopRole = (message.member as GuildMember).roles.highest;
         const memberTopRole = member.roles.highest;
         const isOwner = message.author.id === guild.ownerId;
+        if (!canManageTarget(guild, message.member as GuildMember, member))
+          throw new Error('لا يمكنك ترقية عضو رتبته أعلى منك أو مساوية لرتبتك');
         
         const higherRoles = guild.roles.cache
           .filter(r => 
@@ -624,7 +633,7 @@ export async function executeAIModeration(
             r.id !== guild.id &&
             !r.managed
           )
-          .filter(r => isOwner || r.position <= executorTopRole.position)
+          .filter(r => isOwner || r.position < executorTopRole.position)
           .sort((a, b) => a.position - b.position);
         
         if (higherRoles.size === 0) throw new Error('لا يوجد رول أعلى متاح للترقية');

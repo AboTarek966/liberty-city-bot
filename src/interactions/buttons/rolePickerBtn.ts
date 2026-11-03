@@ -10,6 +10,7 @@ import {
   deleteRolePickerState,
   getSelectedRoleIds,
   buildRolePicker,
+  canManageTarget,
 } from '../../utils/rolePicker';
 import { Colors } from '../../utils/embeds';
 
@@ -95,9 +96,14 @@ const handler: ButtonHandler = {
         return;
       }
 
-      // 🔒 للمالك فقط
-      if (executor.id !== guild.ownerId) {
-        await interaction.followUp({ content: '❌ هذه اللوحة للمالك فقط', ephemeral: true }).catch(() => {});
+      // 🔒 العضو يجب أن يكون أقل رتبة من المنفذ (المالك مستثنى)
+      if (!canManageTarget(guild, executor, target)) {
+        await interaction
+          .followUp({
+            content: '❌ لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك',
+            ephemeral: true,
+          })
+          .catch(() => {});
         return;
       }
 

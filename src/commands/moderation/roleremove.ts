@@ -44,9 +44,21 @@ const command: Command = {
       return;
     }
 
+    const executorMember = interaction.member as GuildMember;
+    const isOwner = interaction.user.id === guild.ownerId;
+
     // لا يمكن تعديل رولات مالك السيرفر (إلا لو كان المنفذ هو المالك نفسه)
-    if (member.id === guild.ownerId && interaction.user.id !== guild.ownerId) {
+    if (member.id === guild.ownerId && !isOwner) {
       await interaction.reply({ content: '❌ لا يمكن تعديل رولات مالك السيرفر', ephemeral: true });
+      return;
+    }
+
+    // 🔒 العضو يجب أن يكون أقل رتبة من المنفذ (المالك مستثنى)
+    if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
+      await interaction.reply({
+        content: '❌ لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك',
+        ephemeral: true,
+      });
       return;
     }
 
@@ -55,8 +67,6 @@ const command: Command = {
       return;
     }
 
-    const executorMember = interaction.member as GuildMember;
-    const isOwner = interaction.user.id === guild.ownerId;
     if (!isOwner && executorMember.roles.highest.comparePositionTo(role) <= 0) {
       await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من الرول المراد إزالته', ephemeral: true });
       return;
