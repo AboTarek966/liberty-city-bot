@@ -305,9 +305,9 @@ class TicketHandler {
                 components: this.buildTicketControls(false),
             });
         }
-        // 🤖 AI Ticket Assistant — تحليل التذكرة ومحاولة الحل تلقائياً
+        // 🤖 AI Ticket Assistant — استلام/تحليل التذكرة تلقائياً
         const aiTicketConfig = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant;
-        if (aiTicketConfig?.enabled && aiTicketConfig.analyzeOnCreate) {
+        if (aiTicketConfig?.enabled) {
             setTimeout(() => {
                 this.client.aiTicketAssistant?.onTicketCreated(ticket, channel).catch((err) => logger.error(`AI Ticket Assistant error: ${err.message}`));
             }, 2000); // انتظار بسيط ليستقر الكاش
@@ -493,8 +493,13 @@ class TicketHandler {
         if (!ticket)
             throw new Error('لم يتم العثور على التذكرة');
         if (ticket.status === 'claimed') {
-            const claimer = claimedBy.guild.members.cache.get(ticket.claimedBy);
-            throw new Error(`التذكرة مستلمة بالفعل بواسطة ${claimer || 'مشرف آخر'}`);
+            // 🤖 لو الـ AI هو اللي مستلم التذكرة → نسمح لإداري بشري بأخذها بدل ما تتقفل
+            const isAIClaim = ticket.claimedBy === this.client.user?.id;
+            if (!isAIClaim) {
+                const claimer = claimedBy.guild.members.cache.get(ticket.claimedBy);
+                throw new Error(`التذكرة مستلمة بالفعل بواسطة ${claimer || 'مشرف آخر'}`);
+            }
+            logger.info(`Human takeover of AI-claimed ticket in ${claimedBy.guild.name}`);
         }
         ticket.status = 'claimed';
         ticket.claimedBy = claimedBy.id;
@@ -574,8 +579,10 @@ class TicketHandler {
         if (ticket.status !== 'claimed')
             throw new Error('التذكرة غير مستلمة');
         const isClaimer = ticket.claimedBy === unclaimedBy.id;
+        const isAIClaim = ticket.claimedBy === this.client.user?.id;
         // ⛔ إلغاء الاستلام للمستلم فقط — لا يمكن لإداري آخر تحرير تذكرة استلمها زميله
-        if (!isClaimer) {
+        //    ما عدا تذكرة استلمها الـ AI → يقدر أي إداري يحررها
+        if (!isClaimer && !isAIClaim) {
             throw new Error('فقط المستلم هو من يستطيع إلغاء استلام التذكرة');
         }
         const previousClaimer = guild.members.cache.get(ticket.claimedBy);

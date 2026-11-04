@@ -1065,6 +1065,7 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
     enabled: false,
     autoClaim: false,
     analyzeOnCreate: true,
+    replyToMessages: true,
     requireAdminApprovalForRoles: true,
     requireAdminApprovalForPermissions: true,
     requireAdminApprovalForBans: true,
@@ -1072,14 +1073,18 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
     confidenceThreshold: 70,
     notifyAdminsOnFailure: true
   };
+  const analyzeOnCreate = aiTicket.analyzeOnCreate !== false;
+  const replyToMessages = aiTicket.replyToMessages !== false;
 
   const embed = categoryEmbed(
     'tickets',
     guild,
     `🤖 مساعد التذاكر الذكي — تحليل تلقائي وردود داخل التذاكر\n\n` +
+    `> 🌐 **الذكاء العام:** ${on(s.ai?.enabled)} ${s.ai?.enabled ? 'مفعّل' : 'معطّل — لازم تفعّله من قسم الذكاء الاصطناعي'}\n` +
     `> ⚡ **مساعد AI:** ${on(aiTicket.enabled)} ${aiTicket.enabled ? 'مفعّل' : 'معطّل'}\n` +
     `> 🤝 **الاستلام التلقائي:** ${on(aiTicket.autoClaim)} ${aiTicket.autoClaim ? 'يستلم التذكرة تلقائياً' : 'بدون استلام تلقائي'}\n` +
-    `> 🔍 **تحليل عند الإنشاء:** ${on(aiTicket.analyzeOnCreate)} ${aiTicket.analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
+    `> 🔍 **تحليل عند الإنشاء:** ${on(analyzeOnCreate)} ${analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
+    `> 💬 **الرد على متابعة العضو:** ${on(replyToMessages)} ${replyToMessages ? 'يرد على رسائل التذكرة' : 'لا يرد بعد الفتح'}\n` +
     `> 🎭 **موافقة الإدارة على الرولات:** ${on(aiTicket.requireAdminApprovalForRoles)} ${aiTicket.requireAdminApprovalForRoles ? 'يطلب موافقة قبل منح الرولات' : 'بدون موافقة'}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `💡 *فعّل المساعد أولاً، ثم اضبط خياراته من الأزرار بالأسفل*`
@@ -1100,8 +1105,8 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
     ),
     btn(
       'settings_tog:tickets:aianalyze',
-      `تحليل: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`,
-      aiTicket.analyzeOnCreate ? ButtonStyle.Success : ButtonStyle.Secondary,
+      `تحليل: ${analyzeOnCreate ? '🟢' : '🔴'}`,
+      analyzeOnCreate ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🔍'
     ),
     btn(
@@ -1110,10 +1115,19 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
       aiTicket.requireAdminApprovalForRoles ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🎭'
     ),
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn(
+      'settings_tog:tickets:aireply',
+      `ردود المتابعة: ${replyToMessages ? '🟢' : '🔴'}`,
+      replyToMessages ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '💬'
+    ),
     btn('settings_cat:tickets', 'رجوع للتذاكر', ButtonStyle.Secondary, '↩️'),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [row, row2] };
 }
 
 // --------------------------------------------

@@ -3,6 +3,7 @@
 // Omni Bot - AI Ticket Assistant
 // ============================================
 // الـ AI يستلم التذكرة، يحلل المشكلة، يحاول يحلها
+// ويتابع محادثة صاحب التذكرة ويرد على رسائله الجديدة
 // لو محتاج يعطي رول → يطلب موافقة أدمن أولاً
 // لو فشل → يمنشن الإدارة العليا + يلخص المشكلة
 //
@@ -56,6 +57,10 @@ const logger = (0, helpers_1.createLogger)('AITicketAssistant');
 const APPROVAL_TTL_MS = 15 * 60 * 1000;
 class AITicketAssistant {
     client;
+    /** 🛡️ منع ردّين متزامنين على نفس التذكرة عند وصول رسائل سريعة */
+    ticketReplyInFlight = new Set();
+    /** ⏳ فترة سماح بعد الرد الأولي حتى لا يردّ AI مرتين على نفس التذكرة */
+    ticketAutoCooldown = new Map();
     constructor(client) {
         this.client = client;
     }
@@ -64,6 +69,9 @@ class AITicketAssistant {
     // --------------------------------------------
     async getConfig(guildId) {
         const settings = await (0, models_1.getGuildSettings)(guildId);
+        // 🌐 مساعد التذاكر يحتاج الذكاء العام مفعّلاً — نفس مصدر الحقيقة في لوحة الإعدادات
+        if (settings.ai?.enabled === false)
+            return null;
         const config = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant;
         return config || null;
     }
@@ -84,6 +92,10 @@ class AITicketAssistant {
                     logger.warn(`Auto-claim failed: ${error.message}`);
                 }
             }
+            // ⚙️ خيار "تحليل عند الإنشاء" مستقل عن الاستلام التلقائي
+            //    لو معطّل: يستلم التذكرة فقط ولا يحللها ولا يرد تلقائياً
+            if (aiConfig.analyzeOnCreate === false)
+                return;
             // قراءة الرسالة الأولى في التذكرة
             const messages = await channel.messages.fetch({ limit: 10 });
             let firstUserMessage = [...messages.values()]
@@ -112,9 +124,11 @@ class AITicketAssistant {
                 };
             }
             // 🤖 رد أولي فوري
-            if (aiConfig.analyzeOnCreate) {
-                await this.sendAutoResponse(channel, firstUserMessage, ticket);
-            }
+            await this.sendAutoResponse(channel, firstUserMessage, ticket);
+            // فترة سماح: لو العضو كتب رسالة تانية بسرعة، التحليل أو الرد الأولي يغطيها
+            this.ticketAutoCooldown.set(channel.id, Date.now() + 8000);
+            const cooldownTimer = setTimeout(() => this.ticketAutoCooldown.delete(channel.id), 9000);
+            cooldownTimer.unref?.();
             // تحليل المشكلة
             const analysis = await this.analyzeTicket(firstUserMessage, channel.guild, ticket);
             // تنفيذ الحل المقترح
@@ -122,6 +136,89 @@ class AITicketAssistant {
         }
         catch (error) {
             logger.error(`AITicketAssistant onTicketCreated error: ${error.message}`);
+        }
+    }
+    // --------------------------------------------
+    // 💬 متابعة محادثة التذكرة — يرد على رسائل صاحب التذكرة
+    // --------------------------------------------
+    async onTicketMessage(ticket, channel, message) {
+        try {
+            if (!message.content.trim() && message.attachments.size === 0)
+                return;
+            if (message.author.id !== String(ticket.userId))
+                return;
+            if (['closed', 'deleted'].includes(String(ticket.status)))
+                return;
+            const aiConfig = await this.getConfig(channel.guild.id);
+            if (!aiConfig?.enabled)
+                return;
+            if (aiConfig.replyToMessages === false)
+                return;
+            // لو إداري بشري استلم التذكرة → الـ AI يتركها له
+            if (ticket.claimedBy && ticket.claimedBy !== this.client.user?.id)
+                return;
+            // لو لسه في فترة الرد الأولي/التحليل → ما نكررش الرد
+            const autoUntil = this.ticketAutoCooldown.get(channel.id) || 0;
+            if (Date.now() < autoUntil)
+                return;
+            // منع ردّين متزامنين لنفس التذكرة
+            if (this.ticketReplyInFlight.has(channel.id))
+                return;
+            this.ticketReplyInFlight.add(channel.id);
+            try {
+                const recent = await channel.messages.fetch({ limit: 20 });
+                const transcript = [...recent.values()]
+                    .reverse()
+                    .filter(m => m.content.trim())
+                    .map(m => {
+                    const who = m.author.id === this.client.user?.id
+                        ? 'المساعد'
+                        : m.author.bot
+                            ? 'بوت'
+                            : 'العضو';
+                    return `${who}: ${m.content.replace(/\s+/g, ' ').slice(0, 700)}`;
+                })
+                    .slice(-14)
+                    .join('\n');
+                const attachments = [...message.attachments.values()]
+                    .map(a => a.name)
+                    .filter(Boolean)
+                    .join(', ');
+                const prompt = `أنت مساعد الدعم الذكي داخل تذكرة Discord في سيرفر "${channel.guild.name}".
+هذه محادثة التذكرة (الأحدث في الأسفل):
+${transcript || 'لا توجد رسائل سابقة'}
+
+رسالة صاحب التذكرة الجديدة:
+"${message.content || '(مرفق بدون نص)'}"
+${attachments ? `المرفقات: ${attachments}` : ''}
+
+اكتب رداً عربياً طبيعياً ومختصراً:
+- جاوب على سؤاله أو استفساره مباشرة.
+- لو المشكلة تحتاج صلاحية أو إجراء إداري، قل له إنه سيتم تحويلها للإدارة.
+- لا تخترع معلومات ولا تكرر الترحيب إذا كانت المحادثة مستمرة.
+- لا تذكر أنك نموذج ذكاء اصطناعي إلا لو سألك.
+
+ردك:`;
+                if ('sendTyping' in channel) {
+                    await channel.sendTyping().catch(() => { });
+                }
+                const response = await this.client.aiHandler.generateResponse(`ticket-ai:chat:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true });
+                const content = response?.content?.trim().slice(0, 1900);
+                if (!content)
+                    return;
+                await message
+                    .reply({ content, allowedMentions: { parse: [], repliedUser: false } })
+                    .catch(async () => {
+                    await channel.send({ content }).catch(() => { });
+                });
+                logger.info(`AI ticket follow-up reply in ${channel.guild.name}`);
+            }
+            finally {
+                this.ticketReplyInFlight.delete(channel.id);
+            }
+        }
+        catch (error) {
+            logger.warn(`AI ticket follow-up failed: ${error.message}`);
         }
     }
     // --------------------------------------------
@@ -139,6 +236,26 @@ class AITicketAssistant {
                 claimedAt: new Date(),
                 status: 'claimed',
             });
+            // 🔓 استلام AI مش زي استلام إداري: لازم نفتح الكتابة لصاحب التذكرة وفريق الدعم
+            //    وإلا التذكرة تتقفل على البوت ومحدش يقدر يرد غيره
+            try {
+                const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
+                const permissionJobs = [];
+                if (settings.tickets?.lockUntilClaim && ticket.userId) {
+                    permissionJobs.push(channel.permissionOverwrites
+                        .edit(String(ticket.userId), { SendMessages: true })
+                        .catch(() => { }));
+                }
+                for (const roleId of settings.tickets?.supportRoleIds || []) {
+                    permissionJobs.push(channel.permissionOverwrites
+                        .edit(roleId, { SendMessages: true })
+                        .catch(() => { }));
+                }
+                await Promise.allSettled(permissionJobs);
+            }
+            catch (error) {
+                logger.warn(`AI claim permission update failed: ${error.message}`);
+            }
             const embed = new discord_js_1.EmbedBuilder()
                 .setTitle('🤖 AI Assistant — استلام التذكرة')
                 .setDescription('تم استلام التذكرة تلقائياً بواسطة الذكاء الاصطناعي. جاري تحليل المشكلة...')
@@ -173,7 +290,7 @@ class AITicketAssistant {
 - كن مختصراً وودوداً
 
 ردك:`;
-            const response = await this.client.aiHandler.generateResponse(firstMessage.author.id || 'system-ticket-ai', channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true });
+            const response = await this.client.aiHandler.generateResponse(`ticket-ai:reply:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true });
             if (response?.content) {
                 const embed = new discord_js_1.EmbedBuilder()
                     .setTitle('🤖 AI Assistant — رد أولي')
@@ -258,7 +375,7 @@ ${context}
   "confidence": 0-100
 }`;
         try {
-            const response = await this.client.aiHandler.generateResponse(message.author.id || 'system-ticket-ai', guild.id, message.channel.id, prompt, [], false, false, { fromCommand: true });
+            const response = await this.client.aiHandler.generateResponse(`ticket-ai:analysis:${String(ticket._id)}`, guild.id, message.channel.id, prompt, [], false, false, { fromCommand: true });
             if (!response?.content) {
                 return this.getDefaultAnalysis();
             }

@@ -167,8 +167,15 @@ const handler: ButtonHandler = {
           break;
         }
         if (field === 'aianalyze') {
-          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, replyToMessages: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
           s.aiTicketAssistant.analyzeOnCreate = !s.aiTicketAssistant.analyzeOnCreate;
+          break;
+        }
+        if (field === 'aireply') {
+          if (!s.aiTicketAssistant) s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, replyToMessages: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+          // الافتراضي مفعّل — فلو القيمة غير موجودة نعتبرها true ثم نعكسها
+          const replyOn = s.aiTicketAssistant.replyToMessages !== false;
+          s.aiTicketAssistant.replyToMessages = !replyOn;
           break;
         }
         if (field === 'aiadminroles') {
@@ -269,7 +276,7 @@ const handler: ButtonHandler = {
     // 🤖 أزرار مساعد التذاكر في اللوحة الفرعية — أعد عرض نفس اللوحة بدل الرجوع للقائمة الرئيسية
     const isTicketAIField =
       section === 'tickets' &&
-      ['aienabled', 'aiclaim', 'aianalyze', 'aiadminroles', 'aiadminperms', 'aiadminbans'].includes(field);
+      ['aienabled', 'aiclaim', 'aianalyze', 'aireply', 'aiadminroles', 'aiadminperms', 'aiadminbans'].includes(field);
 
     const panel =
       isTicketAIField

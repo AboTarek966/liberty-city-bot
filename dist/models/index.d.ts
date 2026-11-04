@@ -177,6 +177,7 @@ export interface IGuildSettings extends Document {
             enabled: boolean;
             autoClaim: boolean;
             analyzeOnCreate: boolean;
+            replyToMessages?: boolean;
             requireAdminApprovalForRoles: boolean;
             requireAdminApprovalForPermissions: boolean;
             requireAdminApprovalForBans: boolean;

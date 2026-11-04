@@ -251,12 +251,22 @@ const event = {
             catch {
                 /* لا يعطّل باقي الأنظمة */
             }
-            // AI auto-reply (mention or reply to bot) — يعمل في السيرفرات
+            // 🎫 AI Ticket Assistant — رد على متابعة صاحب التذكرة (قبل الرد العام حتى لا يتكرر)
+            let ticketAiHandled = false;
             try {
-                await handleAIResponse(message, client);
+                ticketAiHandled = await handleTicketAIMessage(message, client);
             }
             catch (error) {
-                logger.error('Error in AI response:', error);
+                logger.error('Error in ticket AI response:', error);
+            }
+            // AI auto-reply (mention or reply to bot) — يعمل في السيرفرات
+            if (!ticketAiHandled) {
+                try {
+                    await handleAIResponse(message, client);
+                }
+                catch (error) {
+                    logger.error('Error in AI response:', error);
+                }
             }
             // Leveling system (add XP via centralized handler) — في الخلفية
             try {
@@ -1336,6 +1346,40 @@ async function handleMusicGeneration(message, prompt, question) {
         files: [{ attachment: music.data, name: `song.${music.ext}` }],
     })
         .catch(() => { });
+}
+async function handleTicketAIMessage(message, client) {
+    if (!client.aiTicketAssistant || !message.guild || message.author.bot)
+        return false;
+    // فحص سريع: التذاكر تُنشأ داخل فئة محددة في الإعدادات — لا نضرب قاعدة البيانات لكل رسالة
+    const settings = await (0, models_1.getGuildSettings)(message.guild.id);
+    const ticketCategoryId = settings.tickets?.categoryId;
+    const maybeTicketChannel = (ticketCategoryId &&
+        'parentId' in message.channel &&
+        message.channel.parentId === ticketCategoryId) ||
+        /^ticket-\d+$/i.test(message.channel.name || '');
+    if (!maybeTicketChannel)
+        return false;
+    const ticket = await models_1.Ticket.findOne({
+        guildId: message.guild.id,
+        channelId: message.channel.id,
+        status: { $in: ['open', 'claimed', 'waiting'] },
+    });
+    if (!ticket)
+        return false;
+    // الـ AI يرد على صاحب التذكرة فقط — مش على الإداريين أو فريق الدعم
+    if (String(ticket.userId) !== message.author.id)
+        return false;
+    const aiTicketConfig = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant;
+    if (!aiTicketConfig?.enabled)
+        return false;
+    if (aiTicketConfig.replyToMessages === false)
+        return false;
+    // لو إداري بشري استلم التذكرة → الـ AI يسكت
+    const botId = client.user?.id;
+    if (ticket.claimedBy && ticket.claimedBy !== botId)
+        return false;
+    await client.aiTicketAssistant.onTicketMessage(ticket, message.channel, message);
+    return true;
 }
 async function handleAIResponse(message, client) {
     if (!client.aiHandler)

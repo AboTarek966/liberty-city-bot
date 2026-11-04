@@ -1,4 +1,4 @@
-import { TextChannel } from 'discord.js';
+import { TextChannel, Message } from 'discord.js';
 import { OmniClient } from '../OmniClient';
 import { TicketAction } from '../utils/aiTicketActions';
 export interface TicketAnalysis {
@@ -27,9 +27,14 @@ export interface AdminResponseResult {
 }
 export declare class AITicketAssistant {
     private client;
+    /** 🛡️ منع ردّين متزامنين على نفس التذكرة عند وصول رسائل سريعة */
+    private ticketReplyInFlight;
+    /** ⏳ فترة سماح بعد الرد الأولي حتى لا يردّ AI مرتين على نفس التذكرة */
+    private ticketAutoCooldown;
     constructor(client: OmniClient);
     private getConfig;
     onTicketCreated(ticket: any, channel: TextChannel): Promise<void>;
+    onTicketMessage(ticket: any, channel: TextChannel, message: Message): Promise<void>;
     private claimTicket;
     private sendAutoResponse;
     private analyzeTicket;

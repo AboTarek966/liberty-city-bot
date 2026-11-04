@@ -196,6 +196,7 @@ export interface IGuildSettings extends Document {
       enabled: boolean;
       autoClaim: boolean;
       analyzeOnCreate: boolean;
+      replyToMessages?: boolean;
       requireAdminApprovalForRoles: boolean;
       requireAdminApprovalForPermissions: boolean;
       requireAdminApprovalForBans: boolean;
@@ -1006,6 +1007,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       enabled: { type: Boolean, default: false },
       autoClaim: { type: Boolean, default: false },
       analyzeOnCreate: { type: Boolean, default: true },
+      replyToMessages: { type: Boolean, default: true },
       requireAdminApprovalForRoles: { type: Boolean, default: true },
       requireAdminApprovalForPermissions: { type: Boolean, default: true },
       requireAdminApprovalForBans: { type: Boolean, default: true },
