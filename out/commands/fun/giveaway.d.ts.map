@@ -1,1 +1,1 @@
-{"version":3,"file":"giveaway.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/giveaway.ts"],"names":[],"mappings":"AAgBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAaxD,QAAA,MAAM,OAAO,EAAE,OA+Jd,CAAC;AAiJF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"giveaway.d.ts","sourceRoot":"","sources":["../../../src/commands/fun/giveaway.ts"],"names":[],"mappings":"AAgBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAaxD,QAAA,MAAM,OAAO,EAAE,OA+Jd,CAAC;AA6KF,eAAe,OAAO,CAAC"}

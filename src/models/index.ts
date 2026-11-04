@@ -469,6 +469,8 @@ export interface IGuildSettings extends Document {
     captchaEnabled?: boolean;
     /** 🚧 رول الحجر — يُزال عند التوثيق الناجح */
     quarantineRoleId?: string;
+    /** 🚧 إعطاء رول الحجر تلقائياً عند دخول العضو (افتراضي: نعم) */
+    autoQuarantine?: boolean;
     /** 📢 قناة سجل التوثيق (اختياري) */
     logChannelId?: string;
     /** 👢 طرد الحساب إذا فشل شرط العمر */
@@ -489,6 +491,28 @@ export interface IGuildSettings extends Document {
     deleteMessage: boolean;
     /** استثناء الإداريين (Administrator / ManageGuild) من العقوبة */
     ignoreAdmins: boolean;
+  };
+
+  // 🎁 Giveaways (السحوبات)
+  giveaways?: {
+    enabled: boolean;
+    /** قناة السحب الافتراضية عند عدم تحديد قناة */
+    defaultChannelId?: string;
+    /** المدة الافتراضية بالدقائق */
+    defaultDurationMinutes: number;
+    /** عدد الفائزين الافتراضي */
+    defaultWinners: number;
+    /** رولات مطلوبة افتراضياً */
+    defaultRoleIds: string[];
+    defaultMinLevel: number;
+    defaultMinAccountAgeDays: number;
+    defaultMinInvites: number;
+    /** إرسال رسالة خاصة للفائزين */
+    dmWinners: boolean;
+    /** منشن الفائزين في قناة السحب */
+    pingWinners: boolean;
+    /** قناة سجل نتائج السحوبات */
+    logChannelId?: string;
   };
 
   // Shop (متجر السيرفر — شراء رولات بالرصيد)
@@ -1263,6 +1287,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     minAccountAgeDays: { type: Number, default: 0, min: 0, max: 365 },
     captchaEnabled: { type: Boolean, default: false },
     quarantineRoleId: { type: String },
+    autoQuarantine: { type: Boolean, default: true },
     logChannelId: { type: String },
     kickOnFail: { type: Boolean, default: false },
     messageId: { type: String },
@@ -1278,6 +1303,21 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     deleteMessage: { type: Boolean, default: true },
     ignoreAdmins: { type: Boolean, default: true },
   },
+
+  giveaways: {
+    enabled: { type: Boolean, default: true },
+    defaultChannelId: { type: String },
+    defaultDurationMinutes: { type: Number, default: 60, min: 1, max: 43200 },
+    defaultWinners: { type: Number, default: 1, min: 1, max: 20 },
+    defaultRoleIds: [{ type: String }],
+    defaultMinLevel: { type: Number, default: 0, min: 0, max: 1000 },
+    defaultMinAccountAgeDays: { type: Number, default: 0, min: 0, max: 365 },
+    defaultMinInvites: { type: Number, default: 0, min: 0, max: 10000 },
+    dmWinners: { type: Boolean, default: true },
+    pingWinners: { type: Boolean, default: true },
+    logChannelId: { type: String },
+  },
+
   shop: {
     enabled: { type: Boolean, default: true },
     items: [ShopItemSchema],

@@ -422,6 +422,8 @@ export interface IGuildSettings extends Document {
         captchaEnabled?: boolean;
         /** 🚧 رول الحجر — يُزال عند التوثيق الناجح */
         quarantineRoleId?: string;
+        /** 🚧 إعطاء رول الحجر تلقائياً عند دخول العضو (افتراضي: نعم) */
+        autoQuarantine?: boolean;
         /** 📢 قناة سجل التوثيق (اختياري) */
         logChannelId?: string;
         /** 👢 طرد الحساب إذا فشل شرط العمر */
@@ -440,6 +442,26 @@ export interface IGuildSettings extends Document {
         deleteMessage: boolean;
         /** استثناء الإداريين (Administrator / ManageGuild) من العقوبة */
         ignoreAdmins: boolean;
+    };
+    giveaways?: {
+        enabled: boolean;
+        /** قناة السحب الافتراضية عند عدم تحديد قناة */
+        defaultChannelId?: string;
+        /** المدة الافتراضية بالدقائق */
+        defaultDurationMinutes: number;
+        /** عدد الفائزين الافتراضي */
+        defaultWinners: number;
+        /** رولات مطلوبة افتراضياً */
+        defaultRoleIds: string[];
+        defaultMinLevel: number;
+        defaultMinAccountAgeDays: number;
+        defaultMinInvites: number;
+        /** إرسال رسالة خاصة للفائزين */
+        dmWinners: boolean;
+        /** منشن الفائزين في قناة السحب */
+        pingWinners: boolean;
+        /** قناة سجل نتائج السحوبات */
+        logChannelId?: string;
     };
     shop: {
         enabled: boolean;

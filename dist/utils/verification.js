@@ -19,8 +19,11 @@ const logger = (0, helpers_1.createLogger)('Verification');
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 const BLOCK_MS = 10 * 60 * 1000;
+const ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const challenges = new Map();
 const blockedUntil = new Map();
+// 🧮 عدّاد المحاولات يبقى عبر إعادة فتح المودال — لا يمكن تجاوز الحد بفتح سؤال جديد
+const attemptRecords = new Map();
 function getAccountAgeDays(user) {
     return Math.floor((Date.now() - user.createdTimestamp) / 86_400_000);
 }
@@ -33,6 +36,10 @@ function cleanupVerificationState() {
     for (const [key, until] of blockedUntil) {
         if (until <= now)
             blockedUntil.delete(key);
+    }
+    for (const [key, record] of attemptRecords) {
+        if (record.expiresAt <= now)
+            attemptRecords.delete(key);
     }
 }
 function createVerificationChallenge(userId) {
@@ -50,9 +57,16 @@ function createVerificationChallenge(userId) {
     const useSubtraction = (0, crypto_1.randomInt)(0, 2) === 1 && a > b;
     const answer = useSubtraction ? a - b : a + b;
     const question = useSubtraction ? `${a} − ${b} = ؟` : `${a} + ${b} = ؟`;
+    // 🔁 اجلب المحاولات السابقة (إن وُجدت) حتى لا يلتف المستخدم حول حد الـ3
+    const previous = attemptRecords.get(userId);
+    const attempts = previous && previous.expiresAt > Date.now() ? Math.min(MAX_ATTEMPTS, previous.attempts) : 0;
+    attemptRecords.set(userId, {
+        attempts,
+        expiresAt: Date.now() + ATTEMPT_WINDOW_MS,
+    });
     challenges.set(userId, {
         answer,
-        attempts: 0,
+        attempts,
         expiresAt: Date.now() + CHALLENGE_TTL_MS,
     });
     return { ok: true, question, expiresInMinutes: CHALLENGE_TTL_MS / 60_000 };
@@ -77,14 +91,20 @@ function consumeVerificationChallenge(userId, rawAnswer) {
     const answer = Number(normalized);
     if (!Number.isFinite(answer) || answer !== challenge.answer) {
         challenge.attempts += 1;
+        attemptRecords.set(userId, {
+            attempts: challenge.attempts,
+            expiresAt: Date.now() + ATTEMPT_WINDOW_MS,
+        });
         if (challenge.attempts >= MAX_ATTEMPTS) {
             challenges.delete(userId);
+            attemptRecords.delete(userId);
             blockedUntil.set(userId, Date.now() + BLOCK_MS);
             return { status: 'blocked', blockedMinutes: BLOCK_MS / 60_000 };
         }
         return { status: 'wrong', attemptsLeft: MAX_ATTEMPTS - challenge.attempts };
     }
     challenges.delete(userId);
+    attemptRecords.delete(userId);
     return { status: 'ok' };
 }
 async function grantVerifiedRole(guild, member, verification, reason = 'توثيق ذاتي بالزر') {

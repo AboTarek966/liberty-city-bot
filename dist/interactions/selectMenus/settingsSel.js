@@ -238,6 +238,41 @@ const handler = {
                     await interaction.editReply({ embeds: vp.embeds, components: vp.components });
                 }
                 return;
+            case 'giveaways:channel':
+                if (!settings.giveaways)
+                    settings.giveaways = {};
+                settings.giveaways.defaultChannelId = values[0] || undefined;
+                break;
+            case 'giveaways:roles':
+                if (!settings.giveaways)
+                    settings.giveaways = {};
+                settings.giveaways.defaultRoleIds = [...values];
+                break;
+            case 'giveaways:log':
+                if (!settings.giveaways)
+                    settings.giveaways = {};
+                settings.giveaways.logChannelId = values[0] || undefined;
+                break;
+            case 'honeypot:channel':
+                if (!settings.honeypot)
+                    settings.honeypot = { enabled: false, action: 'ban' };
+                settings.honeypot.channelId = values[0] || undefined;
+                break;
+            case 'honeypot:action':
+                if (!settings.honeypot)
+                    settings.honeypot = { enabled: false, action: 'ban' };
+                settings.honeypot.action = values[0] || 'ban';
+                break;
+            case 'honeypot:alertroles':
+                if (!settings.honeypot)
+                    settings.honeypot = { enabled: false, action: 'ban' };
+                settings.honeypot.alertRoleIds = [...values];
+                break;
+            case 'honeypot:log':
+                if (!settings.honeypot)
+                    settings.honeypot = { enabled: false, action: 'ban' };
+                settings.honeypot.logChannelId = values[0] || undefined;
+                break;
             case 'leave:channel':
                 settings.leave.channelId = values[0] || null;
                 break;

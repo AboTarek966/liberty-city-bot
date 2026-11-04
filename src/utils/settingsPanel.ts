@@ -40,6 +40,8 @@ export type SettingsCategory =
   | 'levels'
   | 'automod'
   | 'verification'
+  | 'giveaways'
+  | 'honeypot'
   | 'commands'
   | 'announcements'
   | 'music';
@@ -180,6 +182,8 @@ export const ICONS: Record<SettingsCategory, string> = {
   levels: '📈',
   automod: '🔇',
   verification: '✅',
+  giveaways: '🎁',
+  honeypot: '🍯',
   commands: '📝',
   announcements: '📢',
   music: '🎵',
@@ -198,6 +202,8 @@ export const TITLES: Record<SettingsCategory, string> = {
   levels: 'نظام المستويات',
   automod: 'الأوتو مود',
   verification: 'توثيق الأعضاء',
+  giveaways: 'نظام السحوبات',
+  honeypot: 'قناة الطعم',
   commands: 'الأوامر المخصصة',
   announcements: 'الإعلانات الجماعية',
   music: 'نظام الموسيقى',
@@ -216,6 +222,8 @@ export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
   levels: 0xe67e22,
   automod: 0xe74c3c,
   verification: 0x57f287,
+  giveaways: 0xf1c40f,
+  honeypot: 0xe67e22,
   commands: 0x3498db,
   announcements: 0xf39c12,
   music: 0x1db954,
@@ -275,6 +283,12 @@ export async function buildPanel(
       return buildLevels(guild, settings);
     case 'automod':
       return buildAutoMod(guild, settings);
+    case 'verification':
+      return buildVerificationPanel(guild, settings);
+    case 'giveaways':
+      return buildGiveawaysPanel(guild, settings);
+    case 'honeypot':
+      return buildHoneypotPanel(guild, settings);
     case 'commands':
       return buildCommands(guild, settings);
     case 'announcements':
@@ -332,6 +346,8 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
       { name: '📋 السجلات', value: `${on(s.logging.enabled)} ${s.logging.channelId ? `<#${s.logging.channelId}>` : 'بدون قناة'}`, inline: true },
       { name: '📈 المستويات', value: `${on(s.leveling.enabled)} ${s.leveling.enabled ? 'مفعّل' : 'معطّل'}`, inline: true },
       { name: '🔇 الأوتو مود', value: `${on(s.automod.enabled)} ${s.automod.enabled ? 'مفعّل' : 'معطّل'}`, inline: true },
+      { name: '🎁 السحوبات', value: `${on(s.giveaways?.enabled !== false)} ${s.giveaways?.enabled !== false ? 'مفعّل' : 'معطّل'}`, inline: true },
+      { name: '🍯 قناة الطعم', value: `${on(!!s.honeypot?.enabled)} ${s.honeypot?.enabled ? 'مفعّل' : 'معطّل'}`, inline: true },
       { name: '📝 أوامر مخصصة', value: `${(s.customCommands || []).length} أمر`, inline: true },
     )
     .setFooter({ text: `الأعضاء: ${guild.memberCount} • اضغط زر للانتقال إلى القسم` })
@@ -361,7 +377,13 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
     btn('settings_btn:general:warnroles', '🎭 رولات التحذير', ButtonStyle.Secondary, '🎭'),
   );
 
-  return { embeds: [embed], components: [row1, row2, row3] };
+  const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Success, '🎁'),
+    btn('settings_cat:honeypot', 'قناة الطعم', ButtonStyle.Secondary, '🍯'),
+    btn('settings_back', '🔄 تحديث', ButtonStyle.Secondary, '🔄'),
+  );
+
+  return { embeds: [embed], components: [row1, row2, row3, row4] };
 }
 
 // --------------------------------------------
@@ -463,6 +485,8 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     ),
     toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false),
     btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
+    btn('settings_cat:honeypot', 'قناة الطعم', ButtonStyle.Secondary, '🍯'),
+    btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Primary, '🎁'),
   );
 
   // Row 5: Protection log channel selection
@@ -506,6 +530,7 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
         `> 🕰️ **أقل عمر للحساب:** ${v.minAccountAgeDays ? `\`${v.minAccountAgeDays}\` يوم` : 'بدون حد'}\n` +
         `> 🧮 **كابتشا رياضية:** ${v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة'}\n` +
         `> 🚧 **رول الحجر:** ${quarantine ? `${quarantine}` : '—'}\n` +
+        `> 🚧 **حجر تلقائي عند الدخول:** ${v.autoQuarantine !== false ? '🟢 نعم' : '🔴 لا'}\n` +
         `> 👢 **طرد عند فشل العمر:** ${v.kickOnFail ? '🟢 نعم' : '🔴 لا'}\n` +
         `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -564,9 +589,218 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
     btn('settings_btn:verification:log', 'قناة السجل', ButtonStyle.Secondary, '📋'),
   );
 
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn(
+      'verification',
+      'autoquarantine',
+      'حجر تلقائي',
+      '🚧',
+      v.autoQuarantine !== false
+    ),
+    btn('settings_btn:verification:emoji', 'إيموجي الزر', ButtonStyle.Secondary, '😀'),
+  );
+
   return {
     embeds: [embed],
-    components: [roleSelect, channelSelect, quarantineSelect, row1, row2],
+    components: [roleSelect, channelSelect, quarantineSelect, row1, row2, row3],
+  };
+}
+
+// --------------------------------------------
+// Giveaways — لوحة السحوبات
+// --------------------------------------------
+export function buildGiveawaysPanel(guild: Guild, s: any): BuiltPanel {
+  const g = s.giveaways || {};
+  const enabled = g.enabled !== false;
+  const channel = g.defaultChannelId ? guild.channels.cache.get(g.defaultChannelId) : null;
+  const logChannel = g.logChannelId ? guild.channels.cache.get(g.logChannelId) : null;
+  const roles = (g.defaultRoleIds || [])
+    .map((id: string) => guild.roles.cache.get(id))
+    .filter(Boolean);
+
+  const embed = new EmbedBuilder()
+    .setTitle('🎁 نظام السحوبات — Giveaways')
+    .setDescription(
+      `سحوبات كاملة تُحفظ في قاعدة البيانات وتُستأنف بعد إعادة التشغيل\n\n` +
+        `> ⚡ **الحالة:** ${on(enabled)} ${enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 📍 **القناة الافتراضية:** ${channel ? `${channel}` : 'القناة الحالية'}\n` +
+        `> ⏱️ **المدة الافتراضية:** \`${g.defaultDurationMinutes || 60}\` دقيقة\n` +
+        `> 🏆 **عدد الفائزين:** \`${g.defaultWinners || 1}\`\n` +
+        `> 🎭 **رولات مطلوبة:** ${roles.length ? roles.map((r: any) => `${r}`).join('، ') : 'بدون'}\n` +
+        `> 📈 **أقل مستوى:** ${g.defaultMinLevel ? `\`${g.defaultMinLevel}\`` : 'بدون حد'}\n` +
+        `> 🕰️ **عمر الحساب:** ${g.defaultMinAccountAgeDays ? `\`${g.defaultMinAccountAgeDays}\` يوم` : 'بدون حد'}\n` +
+        `> 📨 **دعوات مطلوبة:** ${g.defaultMinInvites ? `\`${g.defaultMinInvites}\`` : 'بدون حد'}\n` +
+        `> 📩 **رسالة خاصة للفائزين:** ${g.dmWinners !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 🔔 **منشن الفائزين:** ${g.pingWinners !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 استخدم \`/giveaway start\` — كل الخيارات اختيارية وتأخذ القيم من هنا\n` +
+        `⚠️ *عند التعطيل يتوقف إنشاء السحوبات والمشاركة فيها*`
+    )
+    .setColor(enabled ? 0xf1c40f : 0xe74c3c)
+    .setFooter({ text: `${guild.name} • Giveaways` })
+    .setTimestamp();
+
+  const channelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:giveaways:channel')
+      .setPlaceholder('📍 اختر قناة السحب الافتراضية')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+      .setDefaultChannels(
+        g.defaultChannelId &&
+          guild.channels.cache.get(g.defaultChannelId)?.type === ChannelType.GuildText
+          ? [g.defaultChannelId]
+          : []
+      )
+  );
+
+  const roleSelect = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('settings_sel:giveaways:roles')
+      .setPlaceholder('🎭 اختر رولات مطلوبة افتراضياً — اختياري')
+      .setMinValues(0)
+      .setMaxValues(5)
+      .setDefaultRoles(...(g.defaultRoleIds || []).filter((id: string) => guild.roles.cache.has(id)))
+  );
+
+  const logSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:giveaways:log')
+      .setPlaceholder('📋 اختر قناة سجل نتائج السحوبات — اختياري')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+      .setDefaultChannels(
+        g.logChannelId &&
+          guild.channels.cache.get(g.logChannelId)?.type === ChannelType.GuildText
+          ? [g.logChannelId]
+          : []
+      )
+  );
+
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('giveaways', 'enabled', 'السحوبات', '🎁', enabled),
+    btn('settings_btn:giveaways:duration', 'المدة الافتراضية', ButtonStyle.Primary, '⏱️'),
+    btn('settings_btn:giveaways:winners', 'عدد الفائزين', ButtonStyle.Primary, '🏆'),
+    btn('settings_btn:giveaways:requirements', 'الشروط', ButtonStyle.Secondary, '📋'),
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('giveaways', 'dmwinners', 'رسالة خاصة', '📩', g.dmWinners !== false),
+    toggleBtn('giveaways', 'pingwinners', 'منشن الفائز', '🔔', g.pingWinners !== false),
+    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [channelSelect, roleSelect, logSelect, row1, row2],
+  };
+}
+
+// --------------------------------------------
+// Honeypot — لوحة قناة الطعم
+// --------------------------------------------
+export function buildHoneypotPanel(guild: Guild, s: any): BuiltPanel {
+  const h = s.honeypot || {};
+  const enabled = !!h.enabled;
+  const channel = h.channelId ? guild.channels.cache.get(h.channelId) : null;
+  const logChannel = h.logChannelId ? guild.channels.cache.get(h.logChannelId) : null;
+  const alertRoles = (h.alertRoleIds || [])
+    .map((id: string) => guild.roles.cache.get(id))
+    .filter(Boolean);
+  const action = h.action || 'ban';
+
+  const actionLabels: Record<string, string> = {
+    delete: '🗑️ حذف الرسالة فقط',
+    timeout: '⏳ كتم مؤقت',
+    kick: '👢 طرد',
+    ban: '🔨 حظر',
+  };
+
+  const embed = new EmbedBuilder()
+    .setTitle('🍯 قناة الطعم — Honeypot')
+    .setDescription(
+      `قناة مخفية لا يكتب فيها إلا المخترقون والسبام — أي رسالة فيها = عقوبة فورية\n\n` +
+        `> ⚡ **الحالة:** ${on(enabled)} ${enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 📍 **القناة:** ${channel ? `${channel}` : '❌ غير محددة'}\n` +
+        `> ⚙️ **العقوبة:** ${actionLabels[action] || action}\n` +
+        `> ⏱️ **مدة الكتم:** \`${h.timeoutMinutes || 10}\` دقيقة\n` +
+        `> 🗑️ **حذف الرسالة:** ${h.deleteMessage !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 🛡️ **استثناء الإداريين:** ${h.ignoreAdmins !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n` +
+        `> 🔔 **رولات التنبيه:** ${alertRoles.length ? alertRoles.map((r: any) => `${r}`).join('، ') : '—'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 **الخطوات:** أنشئ قناة خاصة ← حددها هنا ← فعّل النظام\n` +
+        `⚠️ *لا تكتب أي رسالة تعريفية داخل القناة حتى لا ينتبه المخترق*`
+    )
+    .setColor(enabled ? 0xe67e22 : 0xe74c3c)
+    .setFooter({ text: `${guild.name} • Honeypot` })
+    .setTimestamp();
+
+  const channelSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:honeypot:channel')
+      .setPlaceholder('📍 اختر قناة الطعم')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+      .setDefaultChannels(
+        h.channelId && guild.channels.cache.get(h.channelId)?.type === ChannelType.GuildText
+          ? [h.channelId]
+          : []
+      )
+  );
+
+  const actionSelect = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('settings_sel:honeypot:action')
+      .setPlaceholder('⚙️ اختر العقوبة عند الكتابة في القناة')
+      .addOptions([
+        { label: 'حذف الرسالة فقط', value: 'delete', emoji: '🗑️', default: action === 'delete' },
+        { label: 'كتم مؤقت', value: 'timeout', emoji: '⏳', default: action === 'timeout' },
+        { label: 'طرد', value: 'kick', emoji: '👢', default: action === 'kick' },
+        { label: 'حظر', value: 'ban', emoji: '🔨', default: action === 'ban' },
+      ])
+  );
+
+  const alertRoleSelect = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('settings_sel:honeypot:alertroles')
+      .setPlaceholder('🔔 اختر رولات يتم منشنها عند الاصطياد — اختياري')
+      .setMinValues(0)
+      .setMaxValues(5)
+      .setDefaultRoles(
+        ...(h.alertRoleIds || []).filter((id: string) => guild.roles.cache.has(id))
+      )
+  );
+
+  const logSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:honeypot:log')
+      .setPlaceholder('📋 اختر قناة سجل قناة الطعم — اختياري')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+      .setDefaultChannels(
+        h.logChannelId && guild.channels.cache.get(h.logChannelId)?.type === ChannelType.GuildText
+          ? [h.logChannelId]
+          : []
+      )
+  );
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('honeypot', 'enabled', 'النظام', '🍯', enabled),
+    btn('settings_btn:honeypot:timeout', 'مدة الكتم', ButtonStyle.Primary, '⏱️'),
+    toggleBtn('honeypot', 'delete', 'حذف الرسالة', '🗑️', h.deleteMessage !== false),
+    toggleBtn('honeypot', 'ignoreadmins', 'استثناء الإداريين', '🛡️', h.ignoreAdmins !== false),
+    btn('settings_cat:protection', 'رجوع', ButtonStyle.Secondary, '↩️'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [channelSelect, actionSelect, alertRoleSelect, logSelect, row],
   };
 }
 

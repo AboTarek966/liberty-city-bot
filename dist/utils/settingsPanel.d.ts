@@ -1,5 +1,5 @@
 import { ActionRowBuilder, EmbedBuilder, Guild, ChatInputCommandInteraction, ModalBuilder } from 'discord.js';
-export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'commands' | 'announcements' | 'music';
+export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'giveaways' | 'honeypot' | 'commands' | 'announcements' | 'music';
 type PanelComponent = ActionRowBuilder<any>;
 export interface BuiltPanel {
     embeds: EmbedBuilder[];
@@ -34,6 +34,8 @@ export declare const TITLES: Record<SettingsCategory, string>;
 export declare const CATEGORY_COLORS: Record<SettingsCategory, number>;
 export declare function buildPanel(category: SettingsCategory, guild: Guild, userId: string): Promise<BuiltPanel>;
 export declare function buildVerificationPanel(guild: Guild, s: any): BuiltPanel;
+export declare function buildGiveawaysPanel(guild: Guild, s: any): BuiltPanel;
+export declare function buildHoneypotPanel(guild: Guild, s: any): BuiltPanel;
 export declare function buildWarnRolesPanel(guild: Guild, s: any): BuiltPanel;
 export declare function getActivePanel(settings: any): any;
 export declare function buildCommands(guild: Guild, s: any): BuiltPanel;

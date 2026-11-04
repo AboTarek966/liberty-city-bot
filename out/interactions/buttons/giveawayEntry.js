@@ -3,6 +3,7 @@
 // Omni Bot - Giveaway Entry Button
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
+const models_1 = require("../../models");
 const giveaway_1 = require("../../utils/giveaway");
 const handler = {
     id: 'giveaway:entry',
@@ -17,6 +18,11 @@ const handler = {
             return;
         }
         await interaction.deferReply({ ephemeral: true });
+        const settings = await (0, models_1.getGuildSettings)(interaction.guild.id).catch(() => null);
+        if (settings?.giveaways && settings.giveaways.enabled === false) {
+            await interaction.editReply({ content: '⚠️ نظام السحوبات معطّل حالياً في هذا السيرفر' });
+            return;
+        }
         const member = interaction.guild.members.cache.get(interaction.user.id) ||
             (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
         if (!member) {

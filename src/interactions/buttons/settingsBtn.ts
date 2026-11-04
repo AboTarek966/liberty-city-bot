@@ -63,7 +63,8 @@ const handler: ButtonHandler = {
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
+      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'levels:msg',
+      'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
       'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
       'translator:settings',
       'music:volume', 'music:queue_limit',
@@ -256,6 +257,85 @@ const handler: ButtonHandler = {
 
       await interaction.showModal(modal);
       return;
+    }
+
+    // 🎁 مودالات السحوبات
+    if (`${section}:${action}` === 'verification:emoji') {
+      const v = settings.verification || {};
+      return openModal(
+        '😀 إيموجي زر التوثيق',
+        'إيموجي واحد فقط — مثال: ✅ أو 🎉 (اتركه فارغاً للإزالة)',
+        TextInputStyle.Short,
+        64,
+        (v.buttonEmoji || '✅').substring(0, 64),
+        false
+      );
+    }
+
+    if (`${section}:${action}` === 'giveaways:duration') {
+      return openModal(
+        '⏱️ المدة الافتراضية للسحب',
+        'بالدقائق — مثال: 60 (ساعة) أو 1440 (يوم)',
+        TextInputStyle.Short,
+        6,
+        String(settings.giveaways?.defaultDurationMinutes || 60)
+      );
+    }
+
+    if (`${section}:${action}` === 'giveaways:winners') {
+      return openModal(
+        '🏆 عدد الفائزين الافتراضي',
+        'من 1 إلى 20',
+        TextInputStyle.Short,
+        2,
+        String(settings.giveaways?.defaultWinners || 1)
+      );
+    }
+
+    if (`${section}:${action}` === 'giveaways:requirements') {
+      const g = settings.giveaways || {};
+      const levelInput = new TextInputBuilder()
+        .setCustomId('minLevel')
+        .setLabel('أقل مستوى مطلوب (0 = بدون)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(4)
+        .setRequired(false)
+        .setValue(String(g.defaultMinLevel || 0));
+      const ageInput = new TextInputBuilder()
+        .setCustomId('minAge')
+        .setLabel('أقل عمر للحساب بالأيام (0 = بدون)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(3)
+        .setRequired(false)
+        .setValue(String(g.defaultMinAccountAgeDays || 0));
+      const invitesInput = new TextInputBuilder()
+        .setCustomId('minInvites')
+        .setLabel('أقل عدد دعوات مطلوب (0 = بدون)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(5)
+        .setRequired(false)
+        .setValue(String(g.defaultMinInvites || 0));
+
+      const modal = new ModalBuilder()
+        .setCustomId('settings_modal:giveaways:requirements')
+        .setTitle('📋 شروط المشاركة الافتراضية')
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(levelInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(ageInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(invitesInput)
+        );
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (`${section}:${action}` === 'honeypot:timeout') {
+      return openModal(
+        '⏱️ مدة كتم قناة الطعم',
+        'بالدقائق — من 1 إلى 40320',
+        TextInputStyle.Short,
+        5,
+        String(settings.honeypot?.timeoutMinutes || 10)
+      );
     }
 
     // الإجراءات التي تفتح مودال → ترجع فوراً (showModal هو الرد)

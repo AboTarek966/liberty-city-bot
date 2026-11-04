@@ -86,7 +86,28 @@ const handler: ButtonHandler = {
         if (!v) break;
         if (field === 'captcha') v.captchaEnabled = !v.captchaEnabled;
         else if (field === 'kickOnFail') v.kickOnFail = !v.kickOnFail;
+        else if (field === 'autoquarantine') v.autoQuarantine = !(v.autoQuarantine !== false);
         else v.enabled = !v.enabled;
+        break;
+      }
+      case 'giveaways': {
+        if (!settings.giveaways) {
+          (settings as any).giveaways = {};
+        }
+        const g: any = settings.giveaways;
+        if (field === 'dmwinners') g.dmWinners = !(g.dmWinners !== false);
+        else if (field === 'pingwinners') g.pingWinners = !(g.pingWinners !== false);
+        else g.enabled = !(g.enabled !== false);
+        break;
+      }
+      case 'honeypot': {
+        if (!settings.honeypot) {
+          (settings as any).honeypot = { enabled: false, action: 'ban' };
+        }
+        const h: any = settings.honeypot;
+        if (field === 'delete') h.deleteMessage = !(h.deleteMessage !== false);
+        else if (field === 'ignoreadmins') h.ignoreAdmins = !(h.ignoreAdmins !== false);
+        else h.enabled = !h.enabled;
         break;
       }
       case 'welcome':

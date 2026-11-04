@@ -184,6 +184,28 @@ async function refreshGiveawayMessage(client, giveaway) {
         logger.debug(`Could not refresh giveaway ${giveaway.shortId}: ${error.message}`);
     }
 }
+async function getGiveawayOptions(guildId) {
+    const settings = await (0, models_1.getGuildSettings)(guildId).catch(() => null);
+    const cfg = settings?.giveaways;
+    return {
+        dmWinners: cfg?.dmWinners !== false,
+        pingWinners: cfg?.pingWinners !== false,
+        logChannelId: cfg?.logChannelId,
+    };
+}
+async function sendGiveawayLog(client, giveaway, logChannelId, embed) {
+    if (!logChannelId)
+        return;
+    try {
+        const channel = await client.channels.fetch(logChannelId).catch(() => null);
+        if (!channel || !channel.isTextBased())
+            return;
+        await channel.send({ embeds: [embed] }).catch(() => { });
+    }
+    catch (error) {
+        logger.debug(`Could not send giveaway log: ${error.message}`);
+    }
+}
 // --------------------------------------------
 // Create
 // --------------------------------------------
@@ -323,6 +345,7 @@ async function finishGiveaway(client, giveaway) {
     await giveaway.save();
     clearGiveawayTimer(giveaway._id.toString());
     await refreshGiveawayMessage(client, giveaway);
+    const options = await getGiveawayOptions(giveaway.guildId);
     const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
     if (channel && channel.isTextBased()) {
         const announcement = new discord_js_1.EmbedBuilder()
@@ -337,17 +360,31 @@ async function finishGiveaway(client, giveaway) {
             .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guild.name}` })
             .setTimestamp();
         await channel.send({
-            content: winners.length ? winners.map(id => `<@${id}>`).join(' ') : undefined,
+            content: options.pingWinners && winners.length
+                ? winners.map(id => `<@${id}>`).join(' ')
+                : undefined,
             embeds: [announcement],
         }).catch(() => { });
     }
-    for (const winnerId of winners) {
-        const member = guild.members.cache.get(winnerId);
-        if (member) {
-            await member.send(`🎉 مبروك! لقد فزت في سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
-                `تواصل مع الإدارة لاستلام جائزتك.`).catch(() => { });
+    if (options.dmWinners) {
+        for (const winnerId of winners) {
+            const member = guild.members.cache.get(winnerId);
+            if (member) {
+                await member.send(`🎉 مبروك! لقد فزت في سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
+                    `تواصل مع الإدارة لاستلام جائزتك.`).catch(() => { });
+            }
         }
     }
+    await sendGiveawayLog(client, giveaway, options.logChannelId, new discord_js_1.EmbedBuilder()
+        .setTitle('🏁 سجل سحب — انتهى')
+        .setColor(winners.length ? embeds_1.Colors.success : embeds_1.Colors.warning)
+        .setDescription(`> 🎁 **الجائزة:** ${giveaway.prize}\n` +
+        `> 🆔 **المعرّف:** \`${giveaway.shortId}\`\n` +
+        `> 👥 **المشاركون:** \`${giveaway.entries.length}\`\n` +
+        `> 🎩 **صاحب السحب:** <@${giveaway.hostId}>\n` +
+        `> 🏆 **الفائزون:** ${winners.length ? winners.map(id => `<@${id}>`).join('، ') : 'لا يوجد'}`)
+        .setFooter({ text: guild.name })
+        .setTimestamp());
     logger.info(`Giveaway ${giveaway.shortId} ended — winners: ${winners.join(', ') || 'none'}`);
     return { ok: true, winners, giveaway };
 }
@@ -377,6 +414,7 @@ async function rerollGiveaway(client, guildId, ref, winnersCount) {
     giveaway.endedAt = new Date();
     await giveaway.save();
     await refreshGiveawayMessage(client, giveaway);
+    const options = await getGiveawayOptions(giveaway.guildId);
     const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
     if (channel && channel.isTextBased()) {
         const embed = new discord_js_1.EmbedBuilder()
@@ -387,10 +425,27 @@ async function rerollGiveaway(client, guildId, ref, winnersCount) {
             .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guild.name}` })
             .setTimestamp();
         await channel.send({
-            content: winners.map(id => `<@${id}>`).join(' '),
+            content: options.pingWinners ? winners.map(id => `<@${id}>`).join(' ') : undefined,
             embeds: [embed],
         }).catch(() => { });
     }
+    if (options.dmWinners) {
+        for (const winnerId of winners) {
+            const member = guild.members.cache.get(winnerId);
+            if (member) {
+                await member.send(`🎉 مبروك! لقد فزت في إعادة سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
+                    `تواصل مع الإدارة لاستلام جائزتك.`).catch(() => { });
+            }
+        }
+    }
+    await sendGiveawayLog(client, giveaway, options.logChannelId, new discord_js_1.EmbedBuilder()
+        .setTitle('🔄 سجل سحب — إعادة سحب')
+        .setColor(embeds_1.Colors.success)
+        .setDescription(`> 🎁 **الجائزة:** ${giveaway.prize}\n` +
+        `> 🆔 **المعرّف:** \`${giveaway.shortId}\`\n` +
+        `> 🏆 **الفائزون الجدد:** ${winners.map(id => `<@${id}>`).join('، ')}`)
+        .setFooter({ text: guild.name })
+        .setTimestamp());
     logger.info(`Giveaway ${giveaway.shortId} rerolled — winners: ${winners.join(', ')}`);
     return { ok: true, winners, giveaway };
 }

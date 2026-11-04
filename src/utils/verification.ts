@@ -14,6 +14,7 @@ const logger = createLogger('Verification');
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 const BLOCK_MS = 10 * 60 * 1000;
+const ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 
 interface Challenge {
   answer: number;
@@ -21,8 +22,15 @@ interface Challenge {
   expiresAt: number;
 }
 
+interface AttemptRecord {
+  attempts: number;
+  expiresAt: number;
+}
+
 const challenges = new Map<string, Challenge>();
 const blockedUntil = new Map<string, number>();
+// 🧮 عدّاد المحاولات يبقى عبر إعادة فتح المودال — لا يمكن تجاوز الحد بفتح سؤال جديد
+const attemptRecords = new Map<string, AttemptRecord>();
 
 export function getAccountAgeDays(user: { createdTimestamp: number }): number {
   return Math.floor((Date.now() - user.createdTimestamp) / 86_400_000);
@@ -35,6 +43,9 @@ export function cleanupVerificationState(): void {
   }
   for (const [key, until] of blockedUntil) {
     if (until <= now) blockedUntil.delete(key);
+  }
+  for (const [key, record] of attemptRecords) {
+    if (record.expiresAt <= now) attemptRecords.delete(key);
   }
 }
 
@@ -64,9 +75,18 @@ export function createVerificationChallenge(userId: string): ChallengeResult {
   const answer = useSubtraction ? a - b : a + b;
   const question = useSubtraction ? `${a} − ${b} = ؟` : `${a} + ${b} = ؟`;
 
+  // 🔁 اجلب المحاولات السابقة (إن وُجدت) حتى لا يلتف المستخدم حول حد الـ3
+  const previous = attemptRecords.get(userId);
+  const attempts =
+    previous && previous.expiresAt > Date.now() ? Math.min(MAX_ATTEMPTS, previous.attempts) : 0;
+  attemptRecords.set(userId, {
+    attempts,
+    expiresAt: Date.now() + ATTEMPT_WINDOW_MS,
+  });
+
   challenges.set(userId, {
     answer,
-    attempts: 0,
+    attempts,
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
   });
 
@@ -102,8 +122,13 @@ export function consumeVerificationChallenge(userId: string, rawAnswer: string):
 
   if (!Number.isFinite(answer) || answer !== challenge.answer) {
     challenge.attempts += 1;
+    attemptRecords.set(userId, {
+      attempts: challenge.attempts,
+      expiresAt: Date.now() + ATTEMPT_WINDOW_MS,
+    });
     if (challenge.attempts >= MAX_ATTEMPTS) {
       challenges.delete(userId);
+      attemptRecords.delete(userId);
       blockedUntil.set(userId, Date.now() + BLOCK_MS);
       return { status: 'blocked', blockedMinutes: BLOCK_MS / 60_000 };
     }
@@ -111,6 +136,7 @@ export function consumeVerificationChallenge(userId: string, rawAnswer: string):
   }
 
   challenges.delete(userId);
+  attemptRecords.delete(userId);
   return { status: 'ok' };
 }
 

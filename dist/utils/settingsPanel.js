@@ -47,6 +47,8 @@ exports.checkSettingsAccess = checkSettingsAccess;
 exports.buildSettingsPasswordModal = buildSettingsPasswordModal;
 exports.buildPanel = buildPanel;
 exports.buildVerificationPanel = buildVerificationPanel;
+exports.buildGiveawaysPanel = buildGiveawaysPanel;
+exports.buildHoneypotPanel = buildHoneypotPanel;
 exports.buildWarnRolesPanel = buildWarnRolesPanel;
 exports.getActivePanel = getActivePanel;
 exports.buildCommands = buildCommands;
@@ -180,6 +182,8 @@ exports.ICONS = {
     levels: '📈',
     automod: '🔇',
     verification: '✅',
+    giveaways: '🎁',
+    honeypot: '🍯',
     commands: '📝',
     announcements: '📢',
     music: '🎵',
@@ -197,6 +201,8 @@ exports.TITLES = {
     levels: 'نظام المستويات',
     automod: 'الأوتو مود',
     verification: 'توثيق الأعضاء',
+    giveaways: 'نظام السحوبات',
+    honeypot: 'قناة الطعم',
     commands: 'الأوامر المخصصة',
     announcements: 'الإعلانات الجماعية',
     music: 'نظام الموسيقى',
@@ -214,6 +220,8 @@ exports.CATEGORY_COLORS = {
     levels: 0xe67e22,
     automod: 0xe74c3c,
     verification: 0x57f287,
+    giveaways: 0xf1c40f,
+    honeypot: 0xe67e22,
     commands: 0x3498db,
     announcements: 0xf39c12,
     music: 0x1db954,
@@ -260,6 +268,12 @@ async function buildPanel(category, guild, userId) {
             return buildLevels(guild, settings);
         case 'automod':
             return buildAutoMod(guild, settings);
+        case 'verification':
+            return buildVerificationPanel(guild, settings);
+        case 'giveaways':
+            return buildGiveawaysPanel(guild, settings);
+        case 'honeypot':
+            return buildHoneypotPanel(guild, settings);
         case 'commands':
             return buildCommands(guild, settings);
         case 'announcements':
@@ -300,13 +314,14 @@ function buildHome(guild, userId, s) {
         `اختر القسم الذي تريده، وكل شيء يتم بضغطة واحدة ⚡\n\n` +
         `━━━━━━━━━━━ **حالة السيرفر** ━━━━━━━━━━━`)
         .setColor(embeds_1.Colors.primary)
-        .addFields({ name: '🌐 عام', value: `${s.language === 'ar' ? '🇸🇦 عربي' : '🇺🇸 English'}\nبادئة: \`${s.prefix}\``, inline: true }, { name: '🛡️ الحماية', value: `${protCount}/7 محميات\nمفعّلة`, inline: true }, { name: '🎫 التذاكر', value: s.tickets.categoryId ? '🟢 مُعدّة' : '🔴 غير مُعدّة', inline: true }, { name: '🤖 الذكاء', value: `${on(s.ai.enabled)} ${s.ai.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '👋 الترحيب', value: `${on(s.welcome.enabled)} ${s.welcome.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '📤 المغادرة', value: `${on(s.leave.enabled)} ${s.leave.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '📋 السجلات', value: `${on(s.logging.enabled)} ${s.logging.channelId ? `<#${s.logging.channelId}>` : 'بدون قناة'}`, inline: true }, { name: '📈 المستويات', value: `${on(s.leveling.enabled)} ${s.leveling.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '🔇 الأوتو مود', value: `${on(s.automod.enabled)} ${s.automod.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '📝 أوامر مخصصة', value: `${(s.customCommands || []).length} أمر`, inline: true })
+        .addFields({ name: '🌐 عام', value: `${s.language === 'ar' ? '🇸🇦 عربي' : '🇺🇸 English'}\nبادئة: \`${s.prefix}\``, inline: true }, { name: '🛡️ الحماية', value: `${protCount}/7 محميات\nمفعّلة`, inline: true }, { name: '🎫 التذاكر', value: s.tickets.categoryId ? '🟢 مُعدّة' : '🔴 غير مُعدّة', inline: true }, { name: '🤖 الذكاء', value: `${on(s.ai.enabled)} ${s.ai.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '👋 الترحيب', value: `${on(s.welcome.enabled)} ${s.welcome.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '📤 المغادرة', value: `${on(s.leave.enabled)} ${s.leave.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '📋 السجلات', value: `${on(s.logging.enabled)} ${s.logging.channelId ? `<#${s.logging.channelId}>` : 'بدون قناة'}`, inline: true }, { name: '📈 المستويات', value: `${on(s.leveling.enabled)} ${s.leveling.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '🔇 الأوتو مود', value: `${on(s.automod.enabled)} ${s.automod.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '🎁 السحوبات', value: `${on(s.giveaways?.enabled !== false)} ${s.giveaways?.enabled !== false ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '🍯 قناة الطعم', value: `${on(!!s.honeypot?.enabled)} ${s.honeypot?.enabled ? 'مفعّل' : 'معطّل'}`, inline: true }, { name: '📝 أوامر مخصصة', value: `${(s.customCommands || []).length} أمر`, inline: true })
         .setFooter({ text: `الأعضاء: ${guild.memberCount} • اضغط زر للانتقال إلى القسم` })
         .setTimestamp();
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:general', 'عام', discord_js_1.ButtonStyle.Primary, '🌐'), btn('settings_cat:protection', 'الحماية', discord_js_1.ButtonStyle.Success, '🛡️'), btn('settings_cat:tickets', 'التذاكر', discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_cat:ai', 'الذكاء', discord_js_1.ButtonStyle.Danger, '🤖'), btn('settings_cat:welcome', 'الترحيب', discord_js_1.ButtonStyle.Success, '👋'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:leave', 'المغادرة', discord_js_1.ButtonStyle.Danger, '📤'), btn('settings_cat:logging', 'السجلات', discord_js_1.ButtonStyle.Primary, '📋'), btn('settings_cat:levels', 'المستويات', discord_js_1.ButtonStyle.Secondary, '📈'), btn('settings_cat:automod', 'الأوتو مود', discord_js_1.ButtonStyle.Danger, '🔇'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Secondary, '🔄'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_cat:announcements', '📢 إعلانات', discord_js_1.ButtonStyle.Success, '📢'), btn('settings_cat:music', '🎵 الموسيقى', discord_js_1.ButtonStyle.Success, '🎵'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
-    return { embeds: [embed], components: [row1, row2, row3] };
+    const row4 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:giveaways', 'السحوبات', discord_js_1.ButtonStyle.Success, '🎁'), btn('settings_cat:honeypot', 'قناة الطعم', discord_js_1.ButtonStyle.Secondary, '🍯'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Secondary, '🔄'));
+    return { embeds: [embed], components: [row1, row2, row3, row4] };
 }
 // --------------------------------------------
 // General
@@ -361,7 +376,7 @@ function buildProtection(guild, s) {
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiMention', 'منشنز', '📣', p.antiMention.enabled), toggleBtn('protection', 'antiCaps', 'كابس', '🔠', p.antiCaps.enabled), toggleBtn('protection', 'antiEmoji', 'إيموجي', '😀', p.antiEmoji.enabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled));
-    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'));
+    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'), btn('settings_cat:honeypot', 'قناة الطعم', discord_js_1.ButtonStyle.Secondary, '🍯'), btn('settings_cat:giveaways', 'السحوبات', discord_js_1.ButtonStyle.Primary, '🎁'));
     // Row 5: Protection log channel selection
     const protectionLogChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:protection:logChannel')
@@ -395,6 +410,7 @@ function buildVerificationPanel(guild, s) {
         `> 🕰️ **أقل عمر للحساب:** ${v.minAccountAgeDays ? `\`${v.minAccountAgeDays}\` يوم` : 'بدون حد'}\n` +
         `> 🧮 **كابتشا رياضية:** ${v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة'}\n` +
         `> 🚧 **رول الحجر:** ${quarantine ? `${quarantine}` : '—'}\n` +
+        `> 🚧 **حجر تلقائي عند الدخول:** ${v.autoQuarantine !== false ? '🟢 نعم' : '🔴 لا'}\n` +
         `> 👢 **طرد عند فشل العمر:** ${v.kickOnFail ? '🟢 نعم' : '🔴 لا'}\n` +
         `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -427,9 +443,148 @@ function buildVerificationPanel(guild, s) {
         .setMaxValues(1));
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('verification', 'enabled', 'التوثيق', '⚡', !!v.enabled), btn('settings_btn:verification:msg', 'تعديل الرسالة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:verification:send', 'إرسال الرسالة', discord_js_1.ButtonStyle.Success, '📤'), btn('settings_cat:protection', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('verification', 'captcha', 'كابتشا', '🧮', !!v.captchaEnabled), toggleBtn('verification', 'kickOnFail', 'طرد عند الفشل', '👢', !!v.kickOnFail), btn('settings_btn:verification:age', 'عمر الحساب', discord_js_1.ButtonStyle.Secondary, '🕰️'), btn('settings_btn:verification:log', 'قناة السجل', discord_js_1.ButtonStyle.Secondary, '📋'));
+    const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('verification', 'autoquarantine', 'حجر تلقائي', '🚧', v.autoQuarantine !== false), btn('settings_btn:verification:emoji', 'إيموجي الزر', discord_js_1.ButtonStyle.Secondary, '😀'));
     return {
         embeds: [embed],
-        components: [roleSelect, channelSelect, quarantineSelect, row1, row2],
+        components: [roleSelect, channelSelect, quarantineSelect, row1, row2, row3],
+    };
+}
+// --------------------------------------------
+// Giveaways — لوحة السحوبات
+// --------------------------------------------
+function buildGiveawaysPanel(guild, s) {
+    const g = s.giveaways || {};
+    const enabled = g.enabled !== false;
+    const channel = g.defaultChannelId ? guild.channels.cache.get(g.defaultChannelId) : null;
+    const logChannel = g.logChannelId ? guild.channels.cache.get(g.logChannelId) : null;
+    const roles = (g.defaultRoleIds || [])
+        .map((id) => guild.roles.cache.get(id))
+        .filter(Boolean);
+    const embed = new discord_js_1.EmbedBuilder()
+        .setTitle('🎁 نظام السحوبات — Giveaways')
+        .setDescription(`سحوبات كاملة تُحفظ في قاعدة البيانات وتُستأنف بعد إعادة التشغيل\n\n` +
+        `> ⚡ **الحالة:** ${on(enabled)} ${enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 📍 **القناة الافتراضية:** ${channel ? `${channel}` : 'القناة الحالية'}\n` +
+        `> ⏱️ **المدة الافتراضية:** \`${g.defaultDurationMinutes || 60}\` دقيقة\n` +
+        `> 🏆 **عدد الفائزين:** \`${g.defaultWinners || 1}\`\n` +
+        `> 🎭 **رولات مطلوبة:** ${roles.length ? roles.map((r) => `${r}`).join('، ') : 'بدون'}\n` +
+        `> 📈 **أقل مستوى:** ${g.defaultMinLevel ? `\`${g.defaultMinLevel}\`` : 'بدون حد'}\n` +
+        `> 🕰️ **عمر الحساب:** ${g.defaultMinAccountAgeDays ? `\`${g.defaultMinAccountAgeDays}\` يوم` : 'بدون حد'}\n` +
+        `> 📨 **دعوات مطلوبة:** ${g.defaultMinInvites ? `\`${g.defaultMinInvites}\`` : 'بدون حد'}\n` +
+        `> 📩 **رسالة خاصة للفائزين:** ${g.dmWinners !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 🔔 **منشن الفائزين:** ${g.pingWinners !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 استخدم \`/giveaway start\` — كل الخيارات اختيارية وتأخذ القيم من هنا\n` +
+        `⚠️ *عند التعطيل يتوقف إنشاء السحوبات والمشاركة فيها*`)
+        .setColor(enabled ? 0xf1c40f : 0xe74c3c)
+        .setFooter({ text: `${guild.name} • Giveaways` })
+        .setTimestamp();
+    const channelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:giveaways:channel')
+        .setPlaceholder('📍 اختر قناة السحب الافتراضية')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText)
+        .setMinValues(0)
+        .setMaxValues(1)
+        .setDefaultChannels(g.defaultChannelId &&
+        guild.channels.cache.get(g.defaultChannelId)?.type === discord_js_1.ChannelType.GuildText
+        ? [g.defaultChannelId]
+        : []));
+    const roleSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:giveaways:roles')
+        .setPlaceholder('🎭 اختر رولات مطلوبة افتراضياً — اختياري')
+        .setMinValues(0)
+        .setMaxValues(5)
+        .setDefaultRoles(...(g.defaultRoleIds || []).filter((id) => guild.roles.cache.has(id))));
+    const logSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:giveaways:log')
+        .setPlaceholder('📋 اختر قناة سجل نتائج السحوبات — اختياري')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText)
+        .setMinValues(0)
+        .setMaxValues(1)
+        .setDefaultChannels(g.logChannelId &&
+        guild.channels.cache.get(g.logChannelId)?.type === discord_js_1.ChannelType.GuildText
+        ? [g.logChannelId]
+        : []));
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('giveaways', 'enabled', 'السحوبات', '🎁', enabled), btn('settings_btn:giveaways:duration', 'المدة الافتراضية', discord_js_1.ButtonStyle.Primary, '⏱️'), btn('settings_btn:giveaways:winners', 'عدد الفائزين', discord_js_1.ButtonStyle.Primary, '🏆'), btn('settings_btn:giveaways:requirements', 'الشروط', discord_js_1.ButtonStyle.Secondary, '📋'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('giveaways', 'dmwinners', 'رسالة خاصة', '📩', g.dmWinners !== false), toggleBtn('giveaways', 'pingwinners', 'منشن الفائز', '🔔', g.pingWinners !== false), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    return {
+        embeds: [embed],
+        components: [channelSelect, roleSelect, logSelect, row1, row2],
+    };
+}
+// --------------------------------------------
+// Honeypot — لوحة قناة الطعم
+// --------------------------------------------
+function buildHoneypotPanel(guild, s) {
+    const h = s.honeypot || {};
+    const enabled = !!h.enabled;
+    const channel = h.channelId ? guild.channels.cache.get(h.channelId) : null;
+    const logChannel = h.logChannelId ? guild.channels.cache.get(h.logChannelId) : null;
+    const alertRoles = (h.alertRoleIds || [])
+        .map((id) => guild.roles.cache.get(id))
+        .filter(Boolean);
+    const action = h.action || 'ban';
+    const actionLabels = {
+        delete: '🗑️ حذف الرسالة فقط',
+        timeout: '⏳ كتم مؤقت',
+        kick: '👢 طرد',
+        ban: '🔨 حظر',
+    };
+    const embed = new discord_js_1.EmbedBuilder()
+        .setTitle('🍯 قناة الطعم — Honeypot')
+        .setDescription(`قناة مخفية لا يكتب فيها إلا المخترقون والسبام — أي رسالة فيها = عقوبة فورية\n\n` +
+        `> ⚡ **الحالة:** ${on(enabled)} ${enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 📍 **القناة:** ${channel ? `${channel}` : '❌ غير محددة'}\n` +
+        `> ⚙️ **العقوبة:** ${actionLabels[action] || action}\n` +
+        `> ⏱️ **مدة الكتم:** \`${h.timeoutMinutes || 10}\` دقيقة\n` +
+        `> 🗑️ **حذف الرسالة:** ${h.deleteMessage !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 🛡️ **استثناء الإداريين:** ${h.ignoreAdmins !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n` +
+        `> 🔔 **رولات التنبيه:** ${alertRoles.length ? alertRoles.map((r) => `${r}`).join('، ') : '—'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 **الخطوات:** أنشئ قناة خاصة ← حددها هنا ← فعّل النظام\n` +
+        `⚠️ *لا تكتب أي رسالة تعريفية داخل القناة حتى لا ينتبه المخترق*`)
+        .setColor(enabled ? 0xe67e22 : 0xe74c3c)
+        .setFooter({ text: `${guild.name} • Honeypot` })
+        .setTimestamp();
+    const channelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:honeypot:channel')
+        .setPlaceholder('📍 اختر قناة الطعم')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText)
+        .setMinValues(0)
+        .setMaxValues(1)
+        .setDefaultChannels(h.channelId && guild.channels.cache.get(h.channelId)?.type === discord_js_1.ChannelType.GuildText
+        ? [h.channelId]
+        : []));
+    const actionSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()
+        .setCustomId('settings_sel:honeypot:action')
+        .setPlaceholder('⚙️ اختر العقوبة عند الكتابة في القناة')
+        .addOptions([
+        { label: 'حذف الرسالة فقط', value: 'delete', emoji: '🗑️', default: action === 'delete' },
+        { label: 'كتم مؤقت', value: 'timeout', emoji: '⏳', default: action === 'timeout' },
+        { label: 'طرد', value: 'kick', emoji: '👢', default: action === 'kick' },
+        { label: 'حظر', value: 'ban', emoji: '🔨', default: action === 'ban' },
+    ]));
+    const alertRoleSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
+        .setCustomId('settings_sel:honeypot:alertroles')
+        .setPlaceholder('🔔 اختر رولات يتم منشنها عند الاصطياد — اختياري')
+        .setMinValues(0)
+        .setMaxValues(5)
+        .setDefaultRoles(...(h.alertRoleIds || []).filter((id) => guild.roles.cache.has(id))));
+    const logSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:honeypot:log')
+        .setPlaceholder('📋 اختر قناة سجل قناة الطعم — اختياري')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText)
+        .setMinValues(0)
+        .setMaxValues(1)
+        .setDefaultChannels(h.logChannelId && guild.channels.cache.get(h.logChannelId)?.type === discord_js_1.ChannelType.GuildText
+        ? [h.logChannelId]
+        : []));
+    const row = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('honeypot', 'enabled', 'النظام', '🍯', enabled), btn('settings_btn:honeypot:timeout', 'مدة الكتم', discord_js_1.ButtonStyle.Primary, '⏱️'), toggleBtn('honeypot', 'delete', 'حذف الرسالة', '🗑️', h.deleteMessage !== false), toggleBtn('honeypot', 'ignoreadmins', 'استثناء الإداريين', '🛡️', h.ignoreAdmins !== false), btn('settings_cat:protection', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
+    return {
+        embeds: [embed],
+        components: [channelSelect, actionSelect, alertRoleSelect, logSelect, row],
     };
 }
 // --------------------------------------------

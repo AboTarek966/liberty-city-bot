@@ -339,6 +339,95 @@ const handler = {
                 await interaction.followUp({ content: '✅ تم حفظ رسالة التوثيق', ephemeral: true });
                 return;
             }
+            case 'verification:emoji': {
+                const emoji = value.substring(0, 64).trim();
+                settings.verification.buttonEmoji = emoji || '✅';
+                await settings.save();
+                const vpEmoji = (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: vpEmoji.embeds, components: vpEmoji.components });
+                await interaction.followUp({
+                    content: `✅ تم حفظ إيموجي زر التوثيق: ${settings.verification.buttonEmoji}`,
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'giveaways:duration': {
+                const minutes = parseInt(value, 10);
+                if (isNaN(minutes) || minutes < 1 || minutes > 43200) {
+                    await interaction.followUp({ content: '❌ أدخل مدة بالدقائق بين 1 و 43200', ephemeral: true });
+                    return;
+                }
+                if (!settings.giveaways)
+                    settings.giveaways = {};
+                settings.giveaways.defaultDurationMinutes = minutes;
+                await settings.save();
+                const gpDur = (0, settingsPanel_1.buildGiveawaysPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: gpDur.embeds, components: gpDur.components });
+                await interaction.followUp({ content: `✅ المدة الافتراضية: **${minutes}** دقيقة`, ephemeral: true });
+                return;
+            }
+            case 'giveaways:winners': {
+                const winners = parseInt(value, 10);
+                if (isNaN(winners) || winners < 1 || winners > 20) {
+                    await interaction.followUp({ content: '❌ أدخل رقماً بين 1 و 20', ephemeral: true });
+                    return;
+                }
+                if (!settings.giveaways)
+                    settings.giveaways = {};
+                settings.giveaways.defaultWinners = winners;
+                await settings.save();
+                const gpWin = (0, settingsPanel_1.buildGiveawaysPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: gpWin.embeds, components: gpWin.components });
+                await interaction.followUp({ content: `✅ عدد الفائزين الافتراضي: **${winners}**`, ephemeral: true });
+                return;
+            }
+            case 'giveaways:requirements': {
+                const readNum = (id, max) => {
+                    let raw = '';
+                    try {
+                        raw = interaction.fields.getTextInputValue(id).trim();
+                    }
+                    catch {
+                        raw = '';
+                    }
+                    const n = parseInt(raw || '0', 10);
+                    return isNaN(n) ? 0 : Math.min(max, Math.max(0, n));
+                };
+                const minLevel = readNum('minLevel', 1000);
+                const minAge = readNum('minAge', 365);
+                const minInvites = readNum('minInvites', 10000);
+                if (!settings.giveaways)
+                    settings.giveaways = {};
+                settings.giveaways.defaultMinLevel = minLevel;
+                settings.giveaways.defaultMinAccountAgeDays = minAge;
+                settings.giveaways.defaultMinInvites = minInvites;
+                await settings.save();
+                const gpReq = (0, settingsPanel_1.buildGiveawaysPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: gpReq.embeds, components: gpReq.components });
+                await interaction.followUp({
+                    content: `✅ تم حفظ الشروط الافتراضية\n` +
+                        `> 📈 المستوى: \`${minLevel}\`\n` +
+                        `> 🕰️ عمر الحساب: \`${minAge}\` يوم\n` +
+                        `> 📨 الدعوات: \`${minInvites}\``,
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'honeypot:timeout': {
+                const minutes = parseInt(value, 10);
+                if (isNaN(minutes) || minutes < 1 || minutes > 40320) {
+                    await interaction.followUp({ content: '❌ أدخل مدة بالدقائق بين 1 و 40320', ephemeral: true });
+                    return;
+                }
+                if (!settings.honeypot)
+                    settings.honeypot = { enabled: false, action: 'ban' };
+                settings.honeypot.timeoutMinutes = minutes;
+                await settings.save();
+                const hpTimeout = (0, settingsPanel_1.buildHoneypotPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: hpTimeout.embeds, components: hpTimeout.components });
+                await interaction.followUp({ content: `✅ مدة الكتم: **${minutes}** دقيقة`, ephemeral: true });
+                return;
+            }
             case 'music:volume': {
                 const n = parseInt(value, 10);
                 if (isNaN(n) || n < 0 || n > 200) {

@@ -58,6 +58,9 @@ const event: Event = {
       // Auto-Role
       await handleAutoRole(member);
 
+      // 🚧 الحجر التلقائي لحين التوثيق
+      await handleVerificationQuarantine(member);
+
       // Welcome message
       const welcomeResult = await handleWelcome(member);
       if (welcomeResult !== 'sent' && welcomeResult !== 'disabled') {
@@ -88,6 +91,40 @@ async function handleAutoRole(member: GuildMember): Promise<void> {
     logger.info(`Auto-role ${role.name} given to ${member.user.tag}`);
   } catch (error) {
     logger.warn(`Failed to give auto-role to ${member.user.tag}:`, error);
+  }
+}
+
+// --------------------------------------------
+// 🚧 رول الحجر التلقائي عند الدخول
+// --------------------------------------------
+async function handleVerificationQuarantine(member: GuildMember): Promise<void> {
+  try {
+    if (member.user.bot) return;
+
+    const settings = await getGuildSettings(member.guild.id);
+    const v = settings.verification;
+    if (!v?.enabled || !v.roleId || !v.quarantineRoleId) return;
+    if (v.autoQuarantine === false) return;
+    if (member.roles.cache.has(v.roleId)) return;
+
+    const role = member.guild.roles.cache.get(v.quarantineRoleId);
+    if (!role) {
+      logger.warn(`Quarantine role ${v.quarantineRoleId} not found in ${member.guild.name}`);
+      return;
+    }
+
+    const me = member.guild.members.me;
+    if (!me || me.roles.highest.position <= role.position) {
+      logger.warn(
+        `Cannot apply quarantine role "${role.name}" to ${member.user.tag} — bot role is too low`
+      );
+      return;
+    }
+
+    await member.roles.add(role, 'Omni - Verification quarantine');
+    logger.info(`Quarantined ${member.user.tag} until verification in ${member.guild.name}`);
+  } catch (error: any) {
+    logger.warn(`Failed to apply verification quarantine to ${member.user.tag}: ${error.message}`);
   }
 }
 

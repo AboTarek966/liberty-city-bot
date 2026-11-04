@@ -4,6 +4,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
+import { getGuildSettings } from '../../models';
 import { toggleGiveawayEntry } from '../../utils/giveaway';
 
 const handler: ButtonHandler = {
@@ -21,6 +22,12 @@ const handler: ButtonHandler = {
     }
 
     await interaction.deferReply({ ephemeral: true });
+
+    const settings = await getGuildSettings(interaction.guild.id).catch(() => null);
+    if (settings?.giveaways && settings.giveaways.enabled === false) {
+      await interaction.editReply({ content: '⚠️ نظام السحوبات معطّل حالياً في هذا السيرفر' });
+      return;
+    }
 
     const member =
       interaction.guild.members.cache.get(interaction.user.id) ||

@@ -16,7 +16,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
-import { Giveaway } from '../../models';
+import { Giveaway, getGuildSettings } from '../../models';
 import { Colors } from '../../utils/embeds';
 import { parseDuration } from '../../utils/helpers';
 import {
@@ -42,8 +42,8 @@ const command: Command = {
         .addStringOption(o =>
           o
             .setName('duration')
-            .setDescription('المدة (مثال: 1h، 30m، 2d، 1w)')
-            .setRequired(true)
+            .setDescription('المدة (مثال: 1h، 30m، 2d، 1w) — افتراضي: من الإعدادات')
+            .setRequired(false)
             .setMaxLength(20)
         )
         .addIntegerOption(o =>
@@ -196,20 +196,41 @@ async function handleStart(
   client: OmniClient
 ): Promise<void> {
   const guild = interaction.guild!;
-  const prize = interaction.options.getString('prize', true);
-  const durationRaw = interaction.options.getString('duration', true);
-  const durationMs = parseDuration(durationRaw);
+  const settings = await getGuildSettings(guild.id).catch(() => null);
+  const cfg = settings?.giveaways;
 
-  if (!durationMs || durationMs < 10_000) {
+  if (cfg && cfg.enabled === false) {
     await interaction.reply({
-      content: '❌ مدة غير صالحة — استخدم مثلاً `30m` أو `1h` أو `2d` (الحد الأدنى 10 ثوانٍ)',
+      content: '⚠️ نظام السحوبات معطّل حالياً — فعّله من **الإعدادات ← السحوبات**',
       ephemeral: true,
     });
     return;
   }
 
+  const prize = interaction.options.getString('prize', true);
+  const durationRaw = interaction.options.getString('duration');
+
+  let durationMs: number | null = null;
+  if (durationRaw) {
+    durationMs = parseDuration(durationRaw);
+    if (!durationMs || durationMs < 10_000) {
+      await interaction.reply({
+        content: '❌ مدة غير صالحة — استخدم مثلاً `30m` أو `1h` أو `2d` (الحد الأدنى 10 ثوانٍ)',
+        ephemeral: true,
+      });
+      return;
+    }
+  } else {
+    const minutes = Math.min(43_200, Math.max(1, cfg?.defaultDurationMinutes || 60));
+    durationMs = minutes * 60_000;
+  }
+
+  const configuredChannel = cfg?.defaultChannelId
+    ? guild.channels.cache.get(cfg.defaultChannelId)
+    : null;
   const channel =
     (interaction.options.getChannel('channel') as TextChannel | null) ||
+    (configuredChannel as TextChannel | null) ||
     (interaction.channel as TextChannel | null);
 
   if (!channel || channel.type !== ChannelType.GuildText) {
@@ -235,6 +256,7 @@ async function handleStart(
   await interaction.deferReply({ ephemeral: true });
 
   const requiredRole = interaction.options.getRole('required_role');
+  const defaultRoles = (cfg?.defaultRoleIds || []).filter(id => guild.roles.cache.has(id));
 
   const giveaway = await createGiveaway({
     guildId: guild.id,
@@ -242,13 +264,19 @@ async function handleStart(
     hostId: interaction.user.id,
     prize,
     description: interaction.options.getString('description') || '',
-    winnersCount: interaction.options.getInteger('winners') || 1,
+    winnersCount:
+      interaction.options.getInteger('winners') ??
+      Math.min(20, Math.max(1, cfg?.defaultWinners || 1)),
     durationMs,
     requirements: {
-      roleIds: requiredRole ? [requiredRole.id] : [],
-      minLevel: interaction.options.getInteger('min_level') || 0,
-      minAccountAgeDays: interaction.options.getInteger('min_account_age_days') || 0,
-      minInvites: interaction.options.getInteger('min_invites') || 0,
+      roleIds: requiredRole ? [requiredRole.id] : defaultRoles,
+      minLevel:
+        interaction.options.getInteger('min_level') ?? Math.max(0, cfg?.defaultMinLevel || 0),
+      minAccountAgeDays:
+        interaction.options.getInteger('min_account_age_days') ??
+        Math.max(0, cfg?.defaultMinAccountAgeDays || 0),
+      minInvites:
+        interaction.options.getInteger('min_invites') ?? Math.max(0, cfg?.defaultMinInvites || 0),
     },
   });
 

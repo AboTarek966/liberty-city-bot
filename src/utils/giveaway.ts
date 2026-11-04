@@ -15,7 +15,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { randomInt } from 'crypto';
-import { Giveaway, IGiveaway, IGiveawayRequirements, UserProfile } from '../models';
+import { Giveaway, IGiveaway, IGiveawayRequirements, UserProfile, getGuildSettings } from '../models';
 import { createLogger, formatDuration } from './helpers';
 import { Colors } from './embeds';
 
@@ -230,6 +230,41 @@ export async function refreshGiveawayMessage(client: Client, giveaway: IGiveaway
 }
 
 // --------------------------------------------
+// Settings helpers
+// --------------------------------------------
+interface GiveawayOptions {
+  dmWinners: boolean;
+  pingWinners: boolean;
+  logChannelId?: string;
+}
+
+async function getGiveawayOptions(guildId: string): Promise<GiveawayOptions> {
+  const settings = await getGuildSettings(guildId).catch(() => null);
+  const cfg = settings?.giveaways;
+  return {
+    dmWinners: cfg?.dmWinners !== false,
+    pingWinners: cfg?.pingWinners !== false,
+    logChannelId: cfg?.logChannelId,
+  };
+}
+
+async function sendGiveawayLog(
+  client: Client,
+  giveaway: IGiveaway,
+  logChannelId: string | undefined,
+  embed: EmbedBuilder
+): Promise<void> {
+  if (!logChannelId) return;
+  try {
+    const channel = await client.channels.fetch(logChannelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) return;
+    await (channel as TextChannel).send({ embeds: [embed] }).catch(() => {});
+  } catch (error: any) {
+    logger.debug(`Could not send giveaway log: ${error.message}`);
+  }
+}
+
+// --------------------------------------------
 // Create
 // --------------------------------------------
 export async function createGiveaway(input: CreateGiveawayInput): Promise<IGiveaway> {
@@ -393,6 +428,8 @@ async function finishGiveaway(client: Client, giveaway: IGiveaway): Promise<Give
 
   await refreshGiveawayMessage(client, giveaway);
 
+  const options = await getGiveawayOptions(giveaway.guildId);
+
   const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
   if (channel && channel.isTextBased()) {
     const announcement = new EmbedBuilder()
@@ -410,20 +447,43 @@ async function finishGiveaway(client: Client, giveaway: IGiveaway): Promise<Give
       .setTimestamp();
 
     await (channel as TextChannel).send({
-      content: winners.length ? winners.map(id => `<@${id}>`).join(' ') : undefined,
+      content:
+        options.pingWinners && winners.length
+          ? winners.map(id => `<@${id}>`).join(' ')
+          : undefined,
       embeds: [announcement],
     }).catch(() => {});
   }
 
-  for (const winnerId of winners) {
-    const member = guild.members.cache.get(winnerId);
-    if (member) {
-      await member.send(
-        `🎉 مبروك! لقد فزت في سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
-          `تواصل مع الإدارة لاستلام جائزتك.`
-      ).catch(() => {});
+  if (options.dmWinners) {
+    for (const winnerId of winners) {
+      const member = guild.members.cache.get(winnerId);
+      if (member) {
+        await member.send(
+          `🎉 مبروك! لقد فزت في سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
+            `تواصل مع الإدارة لاستلام جائزتك.`
+        ).catch(() => {});
+      }
     }
   }
+
+  await sendGiveawayLog(
+    client,
+    giveaway,
+    options.logChannelId,
+    new EmbedBuilder()
+      .setTitle('🏁 سجل سحب — انتهى')
+      .setColor(winners.length ? Colors.success : Colors.warning)
+      .setDescription(
+        `> 🎁 **الجائزة:** ${giveaway.prize}\n` +
+          `> 🆔 **المعرّف:** \`${giveaway.shortId}\`\n` +
+          `> 👥 **المشاركون:** \`${giveaway.entries.length}\`\n` +
+          `> 🎩 **صاحب السحب:** <@${giveaway.hostId}>\n` +
+          `> 🏆 **الفائزون:** ${winners.length ? winners.map(id => `<@${id}>`).join('، ') : 'لا يوجد'}`
+      )
+      .setFooter({ text: guild.name })
+      .setTimestamp()
+  );
 
   logger.info(`Giveaway ${giveaway.shortId} ended — winners: ${winners.join(', ') || 'none'}`);
   return { ok: true, winners, giveaway };
@@ -465,6 +525,8 @@ export async function rerollGiveaway(
   await giveaway.save();
   await refreshGiveawayMessage(client, giveaway);
 
+  const options = await getGiveawayOptions(giveaway.guildId);
+
   const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
   if (channel && channel.isTextBased()) {
     const embed = new EmbedBuilder()
@@ -478,10 +540,38 @@ export async function rerollGiveaway(
       .setTimestamp();
 
     await (channel as TextChannel).send({
-      content: winners.map(id => `<@${id}>`).join(' '),
+      content: options.pingWinners ? winners.map(id => `<@${id}>`).join(' ') : undefined,
       embeds: [embed],
     }).catch(() => {});
   }
+
+  if (options.dmWinners) {
+    for (const winnerId of winners) {
+      const member = guild.members.cache.get(winnerId);
+      if (member) {
+        await member.send(
+          `🎉 مبروك! لقد فزت في إعادة سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
+            `تواصل مع الإدارة لاستلام جائزتك.`
+        ).catch(() => {});
+      }
+    }
+  }
+
+  await sendGiveawayLog(
+    client,
+    giveaway,
+    options.logChannelId,
+    new EmbedBuilder()
+      .setTitle('🔄 سجل سحب — إعادة سحب')
+      .setColor(Colors.success)
+      .setDescription(
+        `> 🎁 **الجائزة:** ${giveaway.prize}\n` +
+          `> 🆔 **المعرّف:** \`${giveaway.shortId}\`\n` +
+          `> 🏆 **الفائزون الجدد:** ${winners.map(id => `<@${id}>`).join('، ')}`
+      )
+      .setFooter({ text: guild.name })
+      .setTimestamp()
+  );
 
   logger.info(`Giveaway ${giveaway.shortId} rerolled — winners: ${winners.join(', ')}`);
   return { ok: true, winners, giveaway };
