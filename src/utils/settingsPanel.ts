@@ -315,7 +315,7 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
   ].filter(Boolean).length;
 
   const embed = new EmbedBuilder()
-    .setTitle('🎛️ ${guild.name} — لوحة التحكم')
+    .setTitle(`🎛️ ${guild.name} — لوحة التحكم`)
     .setDescription(
       `**مرحباً <@${userId}> 👋**\n` +
       `اختر القسم الذي تريده، وكل شيء يتم بضغطة واحدة ⚡\n\n` +

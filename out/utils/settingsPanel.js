@@ -295,7 +295,7 @@ function buildHome(guild, userId, s) {
         s.protection.antiEmoji.enabled,
     ].filter(Boolean).length;
     const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('🎛️ ${guild.name} — لوحة التحكم')
+        .setTitle(`🎛️ ${guild.name} — لوحة التحكم`)
         .setDescription(`**مرحباً <@${userId}> 👋**\n` +
         `اختر القسم الذي تريده، وكل شيء يتم بضغطة واحدة ⚡\n\n` +
         `━━━━━━━━━━━ **حالة السيرفر** ━━━━━━━━━━━`)
