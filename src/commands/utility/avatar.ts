@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Avatar Command
+// Omni Bot - Avatar Command
 // ============================================
 
 import {
@@ -49,7 +49,7 @@ const command: Command = {
           inline: true,
         },
       )
-      .setFooter({ text: 'Liberty City Bot' })
+      .setFooter({ text: interaction.guild?.name || 'Omni' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });

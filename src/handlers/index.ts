@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Handlers Index
+// Omni Bot - Handlers Index
 // ============================================
 
 export { CommandHandler, Command } from './CommandHandler';

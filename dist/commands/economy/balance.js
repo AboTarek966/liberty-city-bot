@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Balance Command (الرصيد)
+// Omni Bot - Balance Command (الرصيد)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

@@ -25,7 +25,7 @@ export declare function checkGiveawayRequirements(guild: Guild, member: GuildMem
 export declare function buildGiveawayPayload(giveaway: IGiveaway, state?: {
     ended?: boolean;
     winners?: string[];
-}): {
+}, guildName?: string): {
     embeds: EmbedBuilder[];
     components: ActionRowBuilder<ButtonBuilder>[];
 };

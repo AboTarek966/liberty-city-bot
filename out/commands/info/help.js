@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Help Command
+// Omni Bot - Help Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -43,7 +43,7 @@ async function showHelpMenu(interaction, client) {
         roles: { name: '📛 الرتب', emoji: '📛' },
     };
     const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('📚 أوامر Liberty City')
+        .setTitle(`📚 أوامر ${interaction.guild.name}`)
         .setColor(embeds_1.Colors.primary)
         .setThumbnail(interaction.client.user?.displayAvatarURL() || '');
     // قائمة مختصرة بالتصنيفات والأوامر

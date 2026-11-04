@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Type Definitions
+// Omni Bot - Type Definitions
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseEvent = exports.BaseCommand = void 0;

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Leaderboard Command
+// Omni Bot - Leaderboard Command
 // قائمة متصدرين بتبويب (يومي/أسبوعي/شهري/إجمالي) + ترقيم صفحات
 // الشكل:  #1 @user — 📝 رسائل • 🔊 صوت
 // الأزرار: ⬅️ | رقم الصفحة | ➡️ | 🔄 تحديث
@@ -15,7 +15,7 @@ import {
   Guild,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 export type LBType = 'all' | 'messages' | 'voiceMinutes';
@@ -70,7 +70,7 @@ export interface LBRow {
 }
 
 export async function fetchLeaderboardRows(
-  client: LibertyClient,
+  client: OmniClient,
   guildId: string,
   period: LBPeriod,
   type: LBType,
@@ -141,7 +141,7 @@ export function clampPage(page: number, totalPages: number): number {
 }
 
 export async function buildLeaderboardPage(
-  client: LibertyClient,
+  client: OmniClient,
   guild: Guild,
   type: LBType,
   period: LBPeriod,
@@ -340,7 +340,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const type = sanitizeType(interaction.options.getString('type'));
     const period = sanitizePeriod(interaction.options.getString('period'));
     const limit = sanitizeLimit(interaction.options.getString('limit'));

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Darts (رمي السهم)
+// Omni Bot - Darts (رمي السهم)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

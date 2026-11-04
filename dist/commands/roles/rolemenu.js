@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Menu Command (قوائم الرتب)
+// Omni Bot - Role Menu Command (قوائم الرتب)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -127,7 +127,7 @@ async function handleCreate(interaction, settings) {
         .setDescription(`${description}\n\n${roles.map(r => `• ${r}`).join('\n')}`)
         .setColor(embeds_1.Colors.primary)
         .setThumbnail(guild.iconURL({ size: 128 }) || null)
-        .setFooter({ text: 'Liberty City • اضغط الزر للحصول على الرتبة / إزالتها' })
+        .setFooter({ text: `${guild.name} • اضغط الزر للحصول على الرتبة / إزالتها` })
         .setTimestamp();
     const channel = interaction.channel;
     const message = await channel.send({ embeds: [embed], components: rows });
@@ -156,7 +156,7 @@ async function handleList(interaction, settings) {
             `📝 معرف الرسالة: \`${m.messageId}\` (${m.roleIds.length} رول)`)
             .join('\n\n')
         : 'لا توجد قوائم بعد. أنشئ واحدة بـ `/rolemenu create`')
-        .setFooter({ text: 'Liberty City Role Menu' })
+        .setFooter({ text: `${interaction.guild.name} • Role Menu` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }

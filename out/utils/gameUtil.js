@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Game Utilities (أدوات الألعاب المشتركة)
+// Omni Bot - Game Utilities (أدوات الألعاب المشتركة)
 // تُستخدم من أوامر الترفيه — بلا اعتماديات خارجية
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

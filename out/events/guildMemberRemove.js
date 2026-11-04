@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Guild Member Remove Event
+// Omni Bot - Guild Member Remove Event
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleLeave = handleLeave;

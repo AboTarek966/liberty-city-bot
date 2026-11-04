@@ -1,5 +1,5 @@
 import { GuildMember } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 interface AltCheckResult {
     isAlt: boolean;
     reason: string;
@@ -8,7 +8,7 @@ interface AltCheckResult {
 }
 export declare class AntiAltHandler {
     private client;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     onMemberJoin(member: GuildMember): Promise<void>;
     private checkForAlts;
     private calculateSimilarity;

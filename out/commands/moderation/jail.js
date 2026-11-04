@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Jail Command (سجن عضو)
+// Omni Bot - Jail Command (سجن عضو)
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;

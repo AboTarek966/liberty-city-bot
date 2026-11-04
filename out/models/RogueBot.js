@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Cross-Guild Rogue Bot Blacklist
+// Omni Bot - Cross-Guild Rogue Bot Blacklist
 // بوتات تمت تحييدها في سيرفر واحد → تُحظر فوراً في كل السيرفرات (تخزين دائم).
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {

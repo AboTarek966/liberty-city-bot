@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Whitelist Command
+// Omni Bot - Whitelist Command
 // ============================================
 
 import {

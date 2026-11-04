@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Permission Utilities
+// Omni Bot - Permission Utilities
 // ============================================
 
 import { 

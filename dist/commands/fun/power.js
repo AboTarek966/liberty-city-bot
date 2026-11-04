@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Power (تدريب القوة)
+// Omni Bot - Power (تدريب القوة)
 // ضربة واحدة تقيس قوتك — ويمكنك مواجهة صديق
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

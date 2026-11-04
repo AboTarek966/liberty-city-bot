@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Speak Command
+// Omni Bot - Speak Command
 // ============================================
 // السماح لعضو بالكلام بعد منع الكتابة:
 // 1) يزيل منع الكتابة من صلاحيات القناة (overwrite)
@@ -14,7 +14,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { MuteRole } from '../../models';
 
 const command: Command = {
@@ -47,7 +47,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ManageChannels],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const target = interaction.options.getUser('user', true);
     const reason = interaction.options.getString('reason') || 'السماح بالكلام';
 

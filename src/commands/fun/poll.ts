@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Poll Command (الاستطلاعات)
+// Omni Bot - Poll Command (الاستطلاعات)
 // ============================================
 
 import {
@@ -12,7 +12,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { Poll } from '../../models';
 
@@ -35,7 +35,7 @@ const command: Command = {
   cooldown: 10,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const question = interaction.options.getString('question', true);
 
     const optionTexts: string[] = [];

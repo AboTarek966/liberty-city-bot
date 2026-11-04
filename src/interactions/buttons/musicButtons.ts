@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Music Button Handlers
+// Omni Bot - Music Button Handlers
 // ============================================
 
 import { ButtonInteraction, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { MusicHandler } from '../../handlers/MusicHandler';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -35,7 +35,7 @@ const handler: ButtonHandler = {
       return;
     }
 
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const music = client.musicHandler;
     const guildId = interaction.guild.id;
     const action = interaction.customId.split(':')[1];
@@ -197,7 +197,7 @@ const handler: ButtonHandler = {
 const queuePageHandler: ButtonHandler = {
   id: 'music:queue:',
   async execute(interaction: ButtonInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const music = client.musicHandler;
     const guildId = interaction.guild!.id;
     const page = parseInt(interaction.customId.split(':')[2]);

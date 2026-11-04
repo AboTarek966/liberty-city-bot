@@ -1,14 +1,14 @@
 ﻿// ============================================
-// Liberty City Bot - Sticker Delete Logging
+// Omni Bot - Sticker Delete Logging
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'stickerDelete',
   async execute(sticker: any) {
-    const client = sticker.client as LibertyClient;
+    const client = sticker.client as OmniClient;
     // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
     client.loggingHandler.handleStickerDelete(sticker).catch((err) => client.loggingHandler.reportFailure('stickerDelete', err));
   },

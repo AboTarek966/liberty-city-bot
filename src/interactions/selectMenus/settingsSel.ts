@@ -23,7 +23,7 @@ import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevel
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { setPendingWarnRoles } from '../../utils/pendingWarnRoles';
 import { flipEmojiPage, resolveEmojiChoice, buildCommandAddModal } from '../../utils/emojiPicker';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 type AnySelect =
   | RoleSelectMenuInteraction
@@ -224,7 +224,7 @@ const handler: SelectMenuHandler = {
         // إنشاء/نقل لوحة التذاكر — يستبدل اللوحة القديمة ويرث محتواها وأنواعها
         const newChannelId = values[0] || null;
         if (newChannelId) {
-          const client = interaction.client as LibertyClient;
+          const client = interaction.client as OmniClient;
           const channel = interaction.guild!.channels.cache.get(newChannelId);
           if (!channel || channel.type !== ChannelType.GuildText) {
             await interaction.editReply({ content: '❌ اختر قناة نصية صالحة' });
@@ -352,7 +352,7 @@ const handler: SelectMenuHandler = {
         (settings.logging as any).channels = channels;
         await settings.save();
         {
-          const client = interaction.client as LibertyClient;
+          const client = interaction.client as OmniClient;
           client.loggingHandler?.invalidateCache?.(guildId);
         }
         const splitPanel = buildLoggingSplitPanel(interaction.guild!, settings);
@@ -516,7 +516,7 @@ const handler: SelectMenuHandler = {
     await settings.save();
 
     if (section === 'logging') {
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       client.loggingHandler?.invalidateCache?.(guildId);
     }
 

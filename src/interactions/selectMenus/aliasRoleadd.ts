@@ -1,17 +1,17 @@
 // ============================================
-// Liberty City Bot - Alias Role Add (RoleSelectMenu)
+// Omni Bot - Alias Role Add (RoleSelectMenu)
 // اختيار رول من قائمة عند استخدام اختصار roleadd بدون تحديد رول
 // ============================================
 
 import { RoleSelectMenuInteraction } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const handler: SelectMenuHandler = {
   id: 'alias_roleadd',
   async execute(interaction) {
     const roleSelect = interaction as RoleSelectMenuInteraction;
-    const client = roleSelect.client as LibertyClient;
+    const client = roleSelect.client as OmniClient;
     if (!roleSelect.guild) return;
 
     await roleSelect.deferReply({ ephemeral: true });

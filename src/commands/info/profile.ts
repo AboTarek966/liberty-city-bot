@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Profile Command (بطاقة العضو)
+// Omni Bot - Profile Command (بطاقة العضو)
 // ============================================
 
 import {
@@ -8,7 +8,7 @@ import {
   GuildMember,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { UserProfile, Warning } from '../../models';
 import { getXpProgress, calculateLevel, formatNumber } from '../../utils/helpers';
 
@@ -24,7 +24,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const target = interaction.options.getUser('user') || interaction.user;
 
     await interaction.deferReply();

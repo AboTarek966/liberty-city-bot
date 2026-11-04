@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Rank Command (بطاقة المستوى التفاعلية)
+// Omni Bot - Rank Command (بطاقة المستوى التفاعلية)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildTopEmbed = buildTopEmbed;

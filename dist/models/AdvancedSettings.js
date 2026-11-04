@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Advanced Settings Model
+// Omni Bot - Advanced Settings Model
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -79,7 +79,7 @@ const WelcomeConfigSchema = new mongoose_1.Schema({
         color: { type: String, default: '#00D4FF' },
         thumbnail: { type: Boolean, default: true },
         image: { type: String },
-        footer: { type: String, default: 'Liberty City Bot' },
+        footer: { type: String, default: 'Omni Bot' },
     },
     dmEnabled: { type: Boolean, default: false },
     dmMessage: { type: String, default: 'أهلاً بك في {server}! استمتع بإقامتك 🎉' },

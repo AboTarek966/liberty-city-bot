@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Knowledge Base Command
+// Omni Bot - AI Knowledge Base Command
 // ============================================
 // /knowledge add | remove | list | search
 // يدير قاعدة المعرفة التي تُحقن في سياق AI (الدردشة + التذاكر).
@@ -234,7 +234,7 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
         )
         .join('\n\n')
     )
-    .setFooter({ text: `صفحة ${safePage}/${pages} • ${total} معلومة • Liberty City AI` })
+    .setFooter({ text: `صفحة ${safePage}/${pages} • ${total} معلومة • ${interaction.guild!.name} AI` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -271,7 +271,7 @@ async function handleSearch(interaction: ChatInputCommandInteraction): Promise<v
         )
         .join('\n\n')
     )
-    .setFooter({ text: `${matches.length} نتيجة • Liberty City AI` })
+    .setFooter({ text: `${matches.length} نتيجة • ${interaction.guild!.name} AI` })
     .setTimestamp();
 
   // عدّاد الاستخدام — في الخلفية

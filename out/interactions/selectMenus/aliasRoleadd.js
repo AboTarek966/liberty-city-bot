@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Alias Role Add (RoleSelectMenu)
+// Omni Bot - Alias Role Add (RoleSelectMenu)
 // اختيار رول من قائمة عند استخدام اختصار roleadd بدون تحديد رول
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

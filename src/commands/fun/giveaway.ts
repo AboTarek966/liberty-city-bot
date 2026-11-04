@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Giveaway Command
+// Omni Bot - Giveaway Command
 // ============================================
 // /giveaway start | end | reroll | list
 // السحب محفوظ في MongoDB ويُستأنف بعد إعادة تشغيل البوت.
@@ -15,7 +15,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Giveaway } from '../../models';
 import { Colors } from '../../utils/embeds';
 import { parseDuration } from '../../utils/helpers';
@@ -142,7 +142,7 @@ const command: Command = {
   },
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'start') {
@@ -193,7 +193,7 @@ const command: Command = {
 // --------------------------------------------
 async function handleStart(
   interaction: ChatInputCommandInteraction,
-  client: LibertyClient
+  client: OmniClient
 ): Promise<void> {
   const guild = interaction.guild!;
   const prize = interaction.options.getString('prize', true);
@@ -253,7 +253,7 @@ async function handleStart(
   });
 
   try {
-    const payload = buildGiveawayPayload(giveaway);
+    const payload = buildGiveawayPayload(giveaway, {}, interaction.guild!.name);
     const message = await channel.send({
       embeds: payload.embeds,
       components: payload.components,
@@ -295,7 +295,7 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
   const embed = new EmbedBuilder()
     .setTitle('🎉 السحوبات')
     .setColor(Colors.primary)
-    .setFooter({ text: `${interaction.guild!.name} • Liberty City Giveaways` })
+    .setFooter({ text: `${interaction.guild!.name} • Giveaways` })
     .setTimestamp();
 
   if (active.length) {

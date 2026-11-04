@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Promote Command (ترقية رول)
+// Omni Bot - Promote Command (ترقية رول)
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;

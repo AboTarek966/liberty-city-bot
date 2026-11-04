@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
-export declare function handleTopCommand(message: Message, client: LibertyClient): Promise<boolean>;
+import { OmniClient } from '../OmniClient';
+export declare function handleTopCommand(message: Message, client: OmniClient): Promise<boolean>;
 export default handleTopCommand;
 //# sourceMappingURL=topCommand.d.ts.map

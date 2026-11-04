@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Interaction Create Event
+// Omni Bot - Interaction Create Event
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const helpers_1 = require("../utils/helpers");

@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - 8ball Command
+// Omni Bot - 8ball Command
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const ANSWERS = [
   '🔮 بلا شك — نعم!',

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Embed Builder Command
+// Omni Bot - Embed Builder Command
 // ============================================
 
 import {

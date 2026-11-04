@@ -1,16 +1,16 @@
 // ============================================
-// Liberty City Bot - Rank Buttons (تفاعل بطاقة المستوى)
+// Omni Bot - Rank Buttons (تفاعل بطاقة المستوى)
 // ============================================
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { buildTopEmbed } from '../../commands/info/rank';
 
 const handler: ButtonHandler = {
   id: 'rank',
   async execute(interaction: ButtonInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     if (!interaction.guild) {
       await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
       return;

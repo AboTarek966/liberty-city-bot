@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Handlers Index
+// Omni Bot - Handlers Index
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardCommandWorker = exports.MusicHandler = exports.GameHandler = exports.EconomyHandler = exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIInvestigator = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;

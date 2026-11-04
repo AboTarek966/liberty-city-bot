@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Help Command
+// Omni Bot - Help Command
 // ============================================
 
 import {
@@ -11,7 +11,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const command: Command = {
@@ -28,7 +28,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const commandName = interaction.options.getString('command');
 
     // Show specific command info
@@ -44,7 +44,7 @@ const command: Command = {
 // --------------------------------------------
 // Show Help Menu
 // --------------------------------------------
-async function showHelpMenu(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function showHelpMenu(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   const commands = client.commandHandler.getCommands();
   const categories = client.commandHandler.getCategories();
 
@@ -61,7 +61,7 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Li
   };
 
   const embed = new EmbedBuilder()
-    .setTitle('📚 أوامر Liberty City')
+    .setTitle(`📚 أوامر ${interaction.guild!.name}`)
     .setColor(Colors.primary)
     .setThumbnail(interaction.client.user?.displayAvatarURL() || '');
 
@@ -151,7 +151,7 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Li
 // --------------------------------------------
 async function showCommandInfo(
   interaction: ChatInputCommandInteraction,
-  client: LibertyClient,
+  client: OmniClient,
   commandName: string
 ): Promise<void> {
   const command = client.commandHandler.getCommand(commandName);

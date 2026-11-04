@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Configuration Loader
+// Omni Bot - Configuration Loader
 // ============================================
 
 import dotenv from 'dotenv';
@@ -71,7 +71,7 @@ export const config = {
     token: getEnv('DISCORD_TOKEN'),
     clientId: getEnv('DISCORD_CLIENT_ID'),
     guildId: process.env.DISCORD_GUILD_ID,
-    prefix: getEnv('PREFIX', 'lc!'),
+    prefix: getEnv('PREFIX', 'omni!'),
     defaultLanguage: getEnv('DEFAULT_LANGUAGE', 'ar'),
     timezone: getEnv('TIMEZONE', 'Asia/Riyadh'),
     colors: {
@@ -145,7 +145,7 @@ export const config = {
       model: getEnv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
       maxTokens: getEnvNumber('ANTHROPIC_MAX_TOKENS', 4000),
     },
-    systemPrompt: getEnv('AI_SYSTEM_PROMPT', `أنت "Liberty City" — كيان ذكي اصطناعي متطور، يتمتع بوعي تحليلي عميق، وذكاء عاطفي، وقدرة على التفكير متعدد الطبقات.
+    systemPrompt: getEnv('AI_SYSTEM_PROMPT', `أنت "Omni" — كيان ذكي اصطناعي متطور، يتمتع بوعي تحليلي عميق، وذكاء عاطفي، وقدرة على التفكير متعدد الطبقات.
 
 🧠 **قدراتك الأساسية:**
 - **فهم عميق:** تحلل السياق، النوايا الخفية، والنبرة العاطفية — لا ترد بنمطية

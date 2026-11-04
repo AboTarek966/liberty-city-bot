@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Activity Command
+// Omni Bot - Activity Command
 // Track text & voice activity: daily/weekly/monthly/total
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Investigator Heuristics
+// Omni Bot - Investigator Heuristics
 // ============================================
 // تحليل محلي حتمي (بدون ذكاء اصطناعي) يبني أدلة قابلة للتحقق.
 // الهدف: تغطية كاملة + تقليل الاعتماد على النموذج + منع الهلوسة.
@@ -782,7 +782,7 @@ function buildHeuristicFindings(snapshot, options = {}) {
                 confidence: 85,
             });
         }
-        if (accountAge <= 7 && member.roles.length === 0 && /(?:admin|moderator|owner|staff|support|liberty|discord)/i.test(member.username)) {
+        if (accountAge <= 7 && member.roles.length === 0 && /(?:admin|moderator|owner|staff|support|omni|discord)/i.test(member.username)) {
             addFinding(findings, {
                 severity: 'medium', category: 'member',
                 title: `اسم حساب يحاكي الإدارة: ${member.username}`,
@@ -811,7 +811,7 @@ function buildHeuristicFindings(snapshot, options = {}) {
     const perAuthor = new Map();
     const contentCounts = new Map();
     for (const message of snapshot.messages) {
-        // المستثنون تماماً (المالك/المطور/Clyde/Discord Bots/بوت Liberty City)
+        // المستثنون تماماً (المالك/المطور/Clyde/Discord Bots/بوت Omni)
         // لا يُنتجون أي نتائج، حتى لو احتوى نصهم على أنماط تبدو خطرة.
         if (message.authorProtected)
             continue;

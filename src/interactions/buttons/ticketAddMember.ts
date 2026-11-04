@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Ticket Add Member Button (Modal)
+// Omni Bot - Ticket Add Member Button (Modal)
 // ============================================
 
 import {

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Anti-Alt Detection Handler
+// Omni Bot - Anti-Alt Detection Handler
 // ============================================
 // يكشف الحسابات البديلة (Alts) عبر IP/جهاز/تاريخ الإنشاء
 Object.defineProperty(exports, "__esModule", { value: true });

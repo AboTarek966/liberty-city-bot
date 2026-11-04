@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Riddle (لغز)
+// Omni Bot - Riddle (لغز)
 // سؤال + أربعة أزرار إجابات — أول من يجيب يفوز
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

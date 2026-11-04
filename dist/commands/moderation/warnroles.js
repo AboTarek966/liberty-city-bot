@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - WarnRoles Debug Command
+// Omni Bot - WarnRoles Debug Command
 // تشخيص إعدادات رولات التحذير التسلسلية
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {

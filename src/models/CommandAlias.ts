@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Command Alias Model
+// Omni Bot - Command Alias Model
 // ============================================
 
 import mongoose, { Document, Schema } from 'mongoose';

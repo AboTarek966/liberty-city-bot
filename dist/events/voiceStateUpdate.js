@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Voice State (Logging + Leveling XP)
+// Omni Bot - Voice State (Logging + Leveling XP)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

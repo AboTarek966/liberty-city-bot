@@ -220,7 +220,7 @@ const handler = {
                     return openModal('📋 حد القائمة', 'أقصى عدد أغاني في قائمة الانتظار', discord_js_1.TextInputStyle.Short, 5, String(mq));
                 }
                 case 'general:prefix':
-                    return openModal('تغيير بادئة الأوامر', 'مثال: lc! أو ! أو ?', discord_js_1.TextInputStyle.Short, 5);
+                    return openModal('تغيير بادئة الأوامر', 'مثال: omni! أو ! أو ?', discord_js_1.TextInputStyle.Short, 5);
                 case 'general:tz':
                     return openModal('المنطقة الزمنية', 'مثال: Asia/Riyadh أو Europe/London', discord_js_1.TextInputStyle.Short, 50);
                 case 'welcome:msg':
@@ -568,7 +568,7 @@ const handler = {
                             title: v.title || '✅ توثيق العضوية',
                             description: v.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو',
                             ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
-                            footer: { text: 'Liberty City Verification' },
+                            footer: { text: `${interaction.guild.name} • Verification` },
                         },
                     ],
                     components: [
@@ -816,7 +816,7 @@ const handler = {
                     .setTitle('📜 سجل الإعلانات')
                     .setColor(0xf39c12)
                     .setDescription(annHistory.slice(-10).reverse().map((a, i) => `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('\n'))
-                    .setFooter({ text: `${interaction.guild.name} • Liberty City` })
+                    .setFooter({ text: interaction.guild.name })
                     .setTimestamp();
                 await interaction.followUp({ embeds: [embed], ephemeral: true });
                 return;

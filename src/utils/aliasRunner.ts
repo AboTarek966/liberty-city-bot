@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Alias Runner
+// Omni Bot - Alias Runner
 // تنفيذ أي أمر سلاش من رسالة عادية عبر الاختصار:
 // يبني "تفاعل وهمي" (Mock Interaction) بنفس بنية أمر السلاش،
 // ويحول نص الرسالة إلى خيارات الأمر تلقائياً.
@@ -10,7 +10,7 @@ import {
   ChatInputCommandInteraction,
   ApplicationCommandOptionType,
 } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from './helpers';
 
 const logger = createLogger('AliasRunner');
@@ -230,7 +230,7 @@ class AliasInteraction {
 // --------------------------------------------
 export async function executeCommandFromMessage(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   commandName: string,
   args: string[]
 ): Promise<boolean> {

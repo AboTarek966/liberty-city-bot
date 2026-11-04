@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %> | Liberty City</title>
+  <title><%= title %> | <%= locals.guild?.name || 'Omni' %></title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/css/dashboard.css?v=21">
 </head>
@@ -15,7 +15,7 @@
     <div class="brand">
       <div class="brand-logo"><i class="bi bi-shield-lock-fill"></i></div>
       <div>
-        <div class="brand-text">Liberty City</div>
+        <div class="brand-text"><%= locals.guild?.name || 'Omni' %></div>
         <div class="brand-sub">لوحة تحكّم متقدّمة</div>
       </div>
     </div>
@@ -91,7 +91,7 @@
       <button class="icon-btn mobile-btn" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="bi bi-list"></i></button>
       <div>
         <h1><%= title %></h1>
-        <div class="sub">Liberty City Bot — لوحة تحكم القنصل</div>
+        <div class="sub"><%= locals.guild?.name || 'Omni' %> — لوحة التحكم</div>
       </div>
       <div class="spacer"></div>
       <% if (locals.guild) { %>

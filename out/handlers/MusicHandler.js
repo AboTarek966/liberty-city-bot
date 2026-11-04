@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Music Handler
+// Omni Bot - Music Handler
 // نظام موسيقى حقيقي: SoundCloud (عبر ffmpeg) أساسي + يوتيوب Innertube احتياطي
 // SoundCloud يعمل من أي IP بما فيها سيرفرات الاستضافة المجانية التي يحجبها يوتيوب
 // البحث عبر youtube-sr، ودعم كامل: تشغيل/إيقاف/استئناف/تخطي/seek/صوت/تكرار
@@ -1306,6 +1306,7 @@ class MusicHandler {
                 : `${m}:${String(ss).padStart(2, '0')}`;
         };
         const loopLabel = queue.loop === 'track' ? '🔁 الأغنية' : queue.loop === 'queue' ? '🔂 القائمة' : '❌ معطل';
+        const guildName = this.client.guilds.cache.get(guildId)?.name || 'Omni';
         const embed = new discord_js_1.EmbedBuilder()
             .setColor(queue.isPlaying ? discord_js_1.Colors.Green : discord_js_1.Colors.Yellow)
             .setTitle(queue.isPlaying ? '🎵 تشغيل الآن' : '⏸️ إيقاف مؤقت')
@@ -1313,7 +1314,7 @@ class MusicHandler {
             .setURL(track.url)
             .setThumbnail(track.thumbnail || null)
             .addFields({ name: '⏱️ المدة', value: fmt(track.duration), inline: true }, { name: '👤 طلبها', value: track.requestedBy || '؟', inline: true }, { name: '🔊 الصوت', value: `${queue.volume}%`, inline: true }, { name: '🔁 التكرار', value: loopLabel, inline: true }, { name: '📥 بالقائمة', value: String(queue.tracks.length), inline: true })
-            .setFooter({ text: userTag ? `Liberty Music • ${userTag}` : 'Liberty Music' })
+            .setFooter({ text: userTag ? `${guildName} • Music • ${userTag}` : `${guildName} • Music` })
             .setTimestamp();
         return embed;
     }

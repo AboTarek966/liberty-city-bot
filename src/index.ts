@@ -1,8 +1,8 @@
 // ============================================
-// Liberty City Bot - Main Entry Point
+// Omni Bot - Main Entry Point
 // ============================================
 
-import { LibertyClient } from './LibertyClient';
+import { OmniClient } from './OmniClient';
 import { createLogger } from './utils/helpers';
 import fs from 'fs';
 import path from 'path';
@@ -60,12 +60,12 @@ const banner = `
 // --------------------------------------------
 async function main(): Promise<void> {
   console.log(banner);
-  logger.info('🎆 Welcome to Liberty City Bot!');
+  logger.info('🎆 Welcome to Omni Bot!');
   
   const startTime = Date.now();
   
   // Create client
-  const client = new LibertyClient();
+  const client = new OmniClient();
 
   // Graceful shutdown handling
   const gracefulShutdown = async (signal: string) => {

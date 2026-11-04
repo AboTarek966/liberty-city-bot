@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - RoleRemove Command (إزالة رول)
+// Omni Bot - RoleRemove Command (إزالة رول)
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;

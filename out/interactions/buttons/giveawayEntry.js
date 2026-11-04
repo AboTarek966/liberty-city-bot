@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Giveaway Entry Button
+// Omni Bot - Giveaway Entry Button
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const giveaway_1 = require("../../utils/giveaway");

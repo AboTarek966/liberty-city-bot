@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Game Handler
+// Omni Bot - Game Handler
 // ============================================
 // إدارة الألعاب الجماعية: UNO، Trivia، Wordle، Blackjack، Connect4
 
@@ -23,7 +23,7 @@ import {
 import { createLogger } from '../utils/helpers';
 import { getGuildSettings } from '../models';
 import { EconomyHandler } from './EconomyHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const logger = createLogger('GameHandler');
 
@@ -75,12 +75,12 @@ const DEFAULT_CONFIGS: Record<string, GameConfig> = {
 };
 
 export class GameHandler {
-  private client: LibertyClient;
+  private client: OmniClient;
   private economyHandler: EconomyHandler;
   private sessions: Map<string, GameSession> = new Map();
   private playerSessions: Map<string, string> = new Map(); // userId -> sessionId
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
     this.economyHandler = client.economyHandler;
   }

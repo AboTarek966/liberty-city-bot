@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Verify Modal (كابتشا التوثيق)
+// Omni Bot - Verify Modal (كابتشا التوثيق)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const models_1 = require("../../models");

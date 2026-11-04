@@ -1,12 +1,12 @@
 // ============================================
-// Liberty City Bot - Anti-Alt Detection Handler
+// Omni Bot - Anti-Alt Detection Handler
 // ============================================
 // يكشف الحسابات البديلة (Alts) عبر IP/جهاز/تاريخ الإنشاء
 
 import { GuildMember, Guild, Role, TextChannel } from 'discord.js';
 import { getGuildSettings } from '../models';
 import { createLogger } from '../utils/helpers';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const logger = createLogger('AntiAltHandler');
 
@@ -18,9 +18,9 @@ interface AltCheckResult {
 }
 
 export class AntiAltHandler {
-  private client: LibertyClient;
+  private client: OmniClient;
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
   }
 

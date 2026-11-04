@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - High / Low (أعلى أم أقل)
+// Omni Bot - High / Low (أعلى أم أقل)
 // بطاقة مخفية — خمن أعلى أو أقل من رقم البوت
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

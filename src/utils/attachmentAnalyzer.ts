@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - محلّل الوسائط للذكاء الاصطناعي
+// Omni Bot - محلّل الوسائط للذكاء الاصطناعي
 // يفهم: الصور (رؤية) · الرسائل الصوتية (تفريغ) · الفيديو (إطارات + صوت) · الملفات النصية
 //
 // يعمل على Groq المجاني:
@@ -82,7 +82,7 @@ async function download(url: string): Promise<Buffer> {
     responseType: 'arraybuffer',
     maxContentLength: MAX_DOWNLOAD_BYTES,
     timeout: REQUEST_TIMEOUT,
-    headers: { 'User-Agent': 'LibertyCityBot/2.0' },
+    headers: { 'User-Agent': 'OmniBot/2.0' },
   });
   return Buffer.from(res.data);
 }

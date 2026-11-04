@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Message Create Event
+// Omni Bot - Message Create Event
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -283,8 +283,8 @@ const event = {
 // --------------------------------------------
 async function handleAliasCommand(message, client) {
     const settings = await (0, models_1.getGuildSettings)(message.guild.id);
-    const prefix = settings.prefix || 'lc!';
-    // Check prefix command (e.g., "lc!تايم @user")
+    const prefix = settings.prefix || 'omni!';
+    // Check prefix command (e.g., "omni!تايم @user")
     // يدعم الاختصارات متعددة الكلمات (مسافات) — الأطول أولاً
     if (message.content.startsWith(prefix)) {
         const words = message.content.slice(prefix.length).trim().split(/\s+/);
@@ -489,7 +489,7 @@ async function messageTriggersAfkCommand(message, guildId) {
         if (!raw)
             return false;
         const settings = await (0, models_1.getGuildSettings)(guildId);
-        const prefix = settings.prefix || 'lc!';
+        const prefix = settings.prefix || 'omni!';
         let content = raw;
         if (content.toLowerCase().startsWith(prefix.toLowerCase())) {
             content = content.slice(prefix.length).trim();
@@ -593,7 +593,7 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
                 .setDescription(`👤 ${message.author}\n\n` +
                 `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
                 `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`)
-                .setFooter({ text: 'Liberty City Tickets' })
+                .setFooter({ text: `${message.guild.name} • Tickets` })
                 .setTimestamp();
             await respond(message, { embeds: [embed] });
             return;

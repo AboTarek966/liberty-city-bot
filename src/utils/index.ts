@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Utils Index
+// Omni Bot - Utils Index
 // ============================================
 
 export * from './embeds';

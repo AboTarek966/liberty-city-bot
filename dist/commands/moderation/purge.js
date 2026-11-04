@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Purge Command
+// Omni Bot - Purge Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Role Menu Command (قوائم الرتب)
+// Omni Bot - Role Menu Command (قوائم الرتب)
 // ============================================
 
 import {
@@ -13,7 +13,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings } from '../../models';
 
@@ -164,7 +164,7 @@ async function handleCreate(interaction: ChatInputCommandInteraction, settings: 
     .setDescription(`${description}\n\n${roles.map(r => `• ${r}`).join('\n')}`)
     .setColor(Colors.primary)
     .setThumbnail(guild.iconURL({ size: 128 }) || null)
-    .setFooter({ text: 'Liberty City • اضغط الزر للحصول على الرتبة / إزالتها' })
+    .setFooter({ text: `${guild.name} • اضغط الزر للحصول على الرتبة / إزالتها` })
     .setTimestamp();
 
   const channel = interaction.channel as TextChannel;
@@ -203,7 +203,7 @@ async function handleList(interaction: ChatInputCommandInteraction, settings: an
             .join('\n\n')
         : 'لا توجد قوائم بعد. أنشئ واحدة بـ `/rolemenu create`'
     )
-    .setFooter({ text: 'Liberty City Role Menu' })
+    .setFooter({ text: `${interaction.guild!.name} • Role Menu` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

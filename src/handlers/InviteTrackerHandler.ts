@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Invite Tracker Handler
+// Omni Bot - Invite Tracker Handler
 // ============================================
 // يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين
 
@@ -14,7 +14,7 @@ import {
 } from 'discord.js';
 import { getGuildSettings } from '../models';
 import { createLogger } from '../utils/helpers';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const logger = createLogger('InviteTrackerHandler');
 
@@ -28,11 +28,11 @@ interface InviteData {
 }
 
 export class InviteTrackerHandler {
-  private client: LibertyClient;
+  private client: OmniClient;
   private inviteCache: Map<string, Map<string, InviteData>> = new Map(); // guildId -> code -> data
   private joinTracker: Map<string, { memberId: string; inviteCode: string; timestamp: number }[]> = new Map();
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
     this.initializeTracking();
   }

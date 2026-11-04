@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Giveaway Engine
+// Omni Bot - Giveaway Engine
 // ============================================
 // سحب كامل: إنشاء، مشاركة، سحب الفائز، إعادة السحب، واستعادة بعد
 // إعادة تشغيل البوت. كل الحالة محفوظة في MongoDB.
@@ -161,7 +161,8 @@ export async function checkGiveawayRequirements(
 // --------------------------------------------
 export function buildGiveawayPayload(
   giveaway: IGiveaway,
-  state: { ended?: boolean; winners?: string[] } = {}
+  state: { ended?: boolean; winners?: string[] } = {},
+  guildName?: string
 ): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
   const ended = state.ended ?? giveaway.ended;
   const winners = state.winners ?? giveaway.winnerIds ?? [];
@@ -171,7 +172,7 @@ export function buildGiveawayPayload(
   const embed = new EmbedBuilder()
     .setTitle(ended ? `🏁 انتهى السحب — ${giveaway.prize}` : `🎉 ${giveaway.prize}`)
     .setColor(ended ? Colors.Grey : Colors.primary)
-    .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • Liberty City` })
+    .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guildName || 'Omni'}` })
     .setTimestamp();
 
   const lines: string[] = [];
@@ -221,7 +222,7 @@ export async function refreshGiveawayMessage(client: Client, giveaway: IGiveaway
     if (!channel || !channel.isTextBased()) return;
     const message = await (channel as TextChannel).messages.fetch(giveaway.messageId).catch(() => null);
     if (!message) return;
-    const payload = buildGiveawayPayload(giveaway);
+    const payload = buildGiveawayPayload(giveaway, {}, client.guilds.cache.get(giveaway.guildId)?.name);
     await message.edit({ embeds: payload.embeds, components: payload.components }).catch(() => {});
   } catch (error: any) {
     logger.debug(`Could not refresh giveaway ${giveaway.shortId}: ${error.message}`);
@@ -405,7 +406,7 @@ async function finishGiveaway(client: Client, giveaway: IGiveaway): Promise<Give
               `> 📩 سيتم التواصل معكم لاستلام الجائزة. مبروك!`
             : `😔 **لا يوجد فائز** — لم يستوفِ أحد الشروط أو لم يشارك أحد.`)
       )
-      .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • Liberty City` })
+      .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guild.name}` })
       .setTimestamp();
 
     await (channel as TextChannel).send({
@@ -473,7 +474,7 @@ export async function rerollGiveaway(
         `**الجائزة:** ${giveaway.prize}\n\n` +
           `🎉 **الفائزون الجدد:** ${winners.map(id => `<@${id}>`).join('، ')}`
       )
-      .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • Liberty City` })
+      .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guild.name}` })
       .setTimestamp();
 
     await (channel as TextChannel).send({

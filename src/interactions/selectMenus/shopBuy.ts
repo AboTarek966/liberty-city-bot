@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - شراء عنصر من المتجر (shop_buy)
+// Omni Bot - شراء عنصر من المتجر (shop_buy)
 // ============================================
 
 import { StringSelectMenuInteraction, EmbedBuilder } from 'discord.js';
@@ -67,7 +67,7 @@ const handler: SelectMenuHandler = {
     profile.balance -= item.price;
     await profile.save();
 
-    const added = await member.roles.add(role, 'Liberty City - Shop purchase').catch(() => null);
+    const added = await member.roles.add(role, 'Omni - Shop purchase').catch(() => null);
     if (!added) {
       // إرجاع المبلغ إذا فشلت إضافة الرول
       profile.balance += item.price;

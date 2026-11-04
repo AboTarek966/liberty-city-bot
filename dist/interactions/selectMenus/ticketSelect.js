@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Type Select Menu
+// Omni Bot - Ticket Type Select Menu
 // القيمة المختارة = اسم النوع، ويصبح اسم قناة التذكرة بذلك الاسم
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Ticket Reset (إعادة تعيين الطلب)
+// Omni Bot - Ticket Reset (إعادة تعيين الطلب)
 // يحذف تذكرتك المفتوحة حتى تتمكن من فتح تذكرة جديدة
 // ============================================
 
@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Ticket } from '../../models';
 
 const handler: ButtonHandler = {
@@ -21,7 +21,7 @@ const handler: ButtonHandler = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
 
     try {
       // البحث عن أي تذكرة مفتوحة لهذا العضو

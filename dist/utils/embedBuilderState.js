@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Embed Builder (State + UI)
+// Omni Bot - Embed Builder (State + UI)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EB_COLOR_PRESETS = exports.EB_MAIN_CONTENT = exports.EB_FOOTER_TEXT = exports.EB_PLACEHOLDER_DESCRIPTION = exports.EB_PLACEHOLDER_TITLE = exports.EB_MAX_FIELDS = exports.EB_MODAL_PREFIX = exports.EB_BUTTON_PREFIX = void 0;
@@ -26,7 +26,7 @@ exports.EB_MODAL_PREFIX = 'ebm|';
 exports.EB_MAX_FIELDS = 25;
 exports.EB_PLACEHOLDER_TITLE = '✨ منشئ الإمبد';
 exports.EB_PLACEHOLDER_DESCRIPTION = '💡 ابدأ بإضافة العنوان أو الوصف';
-exports.EB_FOOTER_TEXT = 'Liberty City Embed Builder';
+exports.EB_FOOTER_TEXT = 'Omni Embed Builder';
 exports.EB_MAIN_CONTENT = '🛠️ لوحة إنشاء الإمبد — استخدم الأزرار أدناه';
 exports.EB_COLOR_PRESETS = [
     { label: 'أسود', emoji: '⚫', hex: '#000000' },

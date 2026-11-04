@@ -1,4 +1,4 @@
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export interface GameSession {
     id: string;
     type: 'uno' | 'trivia' | 'wordle' | 'blackjack' | 'connect4';
@@ -40,7 +40,7 @@ export declare class GameHandler {
     private economyHandler;
     private sessions;
     private playerSessions;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     createSession(type: GameSession['type'], guildId: string, channelId: string, hostId: string, bet?: number): GameSession;
     getSession(sessionId: string): GameSession | undefined;
     getSessionByChannel(channelId: string): GameSession | undefined;

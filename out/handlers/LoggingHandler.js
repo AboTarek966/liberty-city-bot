@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Logging Handler (Complete)
+// Omni Bot - Logging Handler (Complete)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoggingHandler = exports.LOG_EVENTS = void 0;
@@ -186,7 +186,7 @@ class LoggingHandler {
             const targetId = config.splits[eventType] || config.channelId;
             if (!targetId)
                 return;
-            embed.setFooter({ text: `Liberty City • ${eventType}` });
+            embed.setFooter({ text: `${guild.name} • ${eventType}` });
             embed.setTimestamp();
             this.sanitizeEmbed(embed);
             // ⚡ طابور السيرفر: ترتيب تام + استقلال عن الحدث (لا بطء ولا ضياع)

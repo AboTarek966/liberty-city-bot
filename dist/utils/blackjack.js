@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Blackjack Utilities (أدوات بلك جاك)
+// Omni Bot - Blackjack Utilities (أدوات بلك جاك)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SUITS = exports.RANKS = void 0;

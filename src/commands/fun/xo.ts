@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - XO Command (إكس أو — ضد لاعب)
+// Omni Bot - XO Command (إكس أو — ضد لاعب)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Delete Logging
+// Omni Bot - Role Delete Logging
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

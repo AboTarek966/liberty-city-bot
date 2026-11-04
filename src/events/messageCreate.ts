@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Message Create Event
+// Omni Bot - Message Create Event
 // ============================================
 
 import {
@@ -15,7 +15,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger, formatDuration } from '../utils/helpers';
 import { getGuildSettings, Warning, MuteRole } from '../models';
 import { ICommandAlias } from '../models/CommandAlias';
@@ -105,7 +105,7 @@ const event: Event = {
     }
     // ============================================
 
-    const client = message.client as LibertyClient;
+    const client = message.client as OmniClient;
 
     // 🍯 قناة الطعم — أول فحص بعد أوامر التخريب: أي رسالة فيها = مخالفة فورية
     if (message.guild) {
@@ -284,11 +284,11 @@ const event: Event = {
 // --------------------------------------------
 // Alias / Prefix Command Handler
 // --------------------------------------------
-async function handleAliasCommand(message: Message, client: LibertyClient): Promise<boolean> {
+async function handleAliasCommand(message: Message, client: OmniClient): Promise<boolean> {
   const settings = await getGuildSettings(message.guild!.id);
-  const prefix = settings.prefix || 'lc!';
+  const prefix = settings.prefix || 'omni!';
 
-  // Check prefix command (e.g., "lc!تايم @user")
+  // Check prefix command (e.g., "omni!تايم @user")
   // يدعم الاختصارات متعددة الكلمات (مسافات) — الأطول أولاً
   if (message.content.startsWith(prefix)) {
     const words = message.content.slice(prefix.length).trim().split(/\s+/);
@@ -333,7 +333,7 @@ async function handleAliasCommand(message: Message, client: LibertyClient): Prom
 // --------------------------------------------
 async function runMatchedAliases(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   matches: ICommandAlias[],
   args: string[],
   shortcut: string
@@ -439,7 +439,7 @@ interface AliasPickState {
   shortcut: string;
   userId: string;
   message: Message;
-  client: LibertyClient;
+  client: OmniClient;
   createdAt: number;
 }
 
@@ -470,7 +470,7 @@ function cleanupAliasPick(): void {
 
 async function showAliasPickMenu(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   matches: ICommandAlias[],
   args: string[],
   shortcut: string
@@ -543,7 +543,7 @@ async function messageTriggersAfkCommand(message: Message, guildId: string): Pro
     const raw = message.content.trim();
     if (!raw) return false;
     const settings = await getGuildSettings(guildId);
-    const prefix = settings.prefix || 'lc!';
+    const prefix = settings.prefix || 'omni!';
     let content = raw;
     if (content.toLowerCase().startsWith(prefix.toLowerCase())) {
       content = content.slice(prefix.length).trim();
@@ -640,7 +640,7 @@ function parseUserId(token?: string): string | null {
 // --------------------------------------------
 export async function executeAliasCommand(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   commandName: string,
   args: string[],
   shortcut: string
@@ -665,7 +665,7 @@ export async function executeAliasCommand(
           `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
           `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`
         )
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${message.guild!.name} • Tickets` })
         .setTimestamp();
       await respond(message, { embeds: [embed] });
       return;
@@ -728,7 +728,7 @@ export async function executeAliasCommand(
 // --------------------------------------------
 async function runMusicAlias(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   commandName: string,
   args: string[],
   shortcut: string,
@@ -881,7 +881,7 @@ async function runMusicAlias(
 // --------------------------------------------
 async function runAliasCommand(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   commandName: string,
   args: string[],
   shortcut: string,
@@ -1471,7 +1471,7 @@ async function handleMusicGeneration(message: Message, prompt: string, question:
     .catch(() => {});
 }
 
-async function handleAIResponse(message: Message, client: LibertyClient): Promise<void> {
+async function handleAIResponse(message: Message, client: OmniClient): Promise<void> {
   if (!client.aiHandler) return;
 
   const botId = client.user?.id;

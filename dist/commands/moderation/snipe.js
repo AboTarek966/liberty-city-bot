@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Snipe Command (سنايب)
+// Omni Bot - Snipe Command (سنايب)
 // استرجاع آخر رسالة محذوفة في القناة
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

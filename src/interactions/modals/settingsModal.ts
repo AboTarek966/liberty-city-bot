@@ -6,7 +6,7 @@ import { ModalSubmitInteraction, PermissionFlagsBits, ChannelSelectMenuBuilder, 
 import { ModalHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { renderTicketWelcome } from '../../utils/ticketMessages';
 import { sleep } from '../../utils/helpers';
 
@@ -422,7 +422,7 @@ const handler: ModalHandler = {
         await settings.save();
 
         // إرسال للجميع
-        const client = interaction.client as LibertyClient;
+        const client = interaction.client as OmniClient;
         const guild = interaction.guild!;
         const members = await guild.members.fetch().catch(() => null);
         if (!members) {
@@ -584,7 +584,7 @@ const handler: ModalHandler = {
 
     // تحديث رسالة لوحة التذاكر مباشرة بعد تعديل محتواها (+ رابط قفز للتأكد)
     if (panelEdited) {
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       const activePanel = getActivePanel(settings);
       await client.ticketHandler
         .updatePanelMessage(interaction.guild!, activePanel as any)

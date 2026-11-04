@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Promote Command (ترقية رول)
+// Omni Bot - Promote Command (ترقية رول)
 // ============================================
 
 import {
@@ -11,7 +11,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const command: Command = {
@@ -34,7 +34,7 @@ const command: Command = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const executorMember = interaction.member as GuildMember;
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     const member = interaction.options.getMember('user') as GuildMember;
     const targetRole = interaction.options.getRole('role');

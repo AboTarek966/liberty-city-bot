@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Economy Handler
+// Omni Bot - Economy Handler
 // ============================================
 // نظام الاقتصاد الكامل: رصيد، بنك، متجر، تحويلات، صوت، مقامرة
 
@@ -18,7 +18,7 @@ import {
 } from 'discord.js';
 import { getGuildSettings, UserProfile, getGuildSettings as getSettings } from '../models';
 import { createLogger } from '../utils/helpers';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const logger = createLogger('EconomyHandler');
 
@@ -56,10 +56,10 @@ export interface EconomyConfig {
 }
 
 export class EconomyHandler {
-  private client: LibertyClient;
+  private client: OmniClient;
   private cooldowns: Map<string, Map<string, number>> = new Map();
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
   }
 

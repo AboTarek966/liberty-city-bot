@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Settings Panel UI Builder
+// Omni Bot - Settings Panel UI Builder
 // (Professional ProBot-style design)
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -277,7 +277,7 @@ function categoryEmbed(category, guild, desc) {
         .setTitle(`${exports.ICONS[category]} ${exports.TITLES[category]}`)
         .setDescription(`━━━━━━━━━━━━━━━━━━━━━\n${desc}\n━━━━━━━━━━━━━━━━━━━━━`)
         .setColor(exports.CATEGORY_COLORS[category])
-        .setFooter({ text: `${guild.name} • Liberty City Settings` })
+        .setFooter({ text: `${guild.name} • Settings` })
         .setTimestamp();
 }
 // --------------------------------------------
@@ -294,7 +294,7 @@ function buildHome(guild, userId, s) {
         s.protection.antiEmoji.enabled,
     ].filter(Boolean).length;
     const embed = new discord_js_1.EmbedBuilder()
-        .setTitle('🎛️ Liberty City — لوحة التحكم')
+        .setTitle('🎛️ ${guild.name} — لوحة التحكم')
         .setDescription(`**مرحباً <@${userId}> 👋**\n` +
         `اختر القسم الذي تريده، وكل شيء يتم بضغطة واحدة ⚡\n\n` +
         `━━━━━━━━━━━ **حالة السيرفر** ━━━━━━━━━━━`)
@@ -400,7 +400,7 @@ function buildVerificationPanel(guild, s) {
         `💡 **الخطوات:** حدد الرول ← حدد القناة ← اضغط **📤 إرسال رسالة التوثيق**\n` +
         `⚠️ *ارفع رتبة البوت فوق رول التوثيق حتى يعمل*`)
         .setColor(v.enabled ? 0x2ecc71 : 0xe74c3c)
-        .setFooter({ text: `${guild.name} • Liberty City` })
+        .setFooter({ text: `${guild.name}` })
         .setTimestamp();
     const roleSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.RoleSelectMenuBuilder()
         .setCustomId('settings_sel:verification:role')
@@ -503,7 +503,7 @@ function buildWarnRolesPanel(guild, s) {
         inline: false,
     })
         .setColor(isPending ? 0xf1c40f : countOf(staged.members) + countOf(staged.admins) + staged.sequential.filter(Boolean).length ? 0x2ecc71 : 0xe74c3c)
-        .setFooter({ text: `${guild.name} • ${isPending ? 'لم يُحفظ بعد' : 'Liberty City Settings'}` });
+        .setFooter({ text: `${guild.name} • ${isPending ? 'لم يُحفظ بعد' : 'Settings'}` });
     if (isPending) {
         embed.addFields({ name: '⏳ التغييرات المُعلّقة', value: pendingLines.join('\n').slice(0, 1024), inline: false });
         embed.setTimestamp();
@@ -762,7 +762,7 @@ function buildTicketMovePanel(guild, s) {
         `━━━ **اللوحة الحالية** ━━━\n${panelLine}\n\n` +
         `💡 *عدّل النصوص من أزرار **محتوى اللوحة** و**أنواع التذاكر** — التغييرات تظهر في رسالة اللوحة فوراً*`)
         .setColor('#5865F2')
-        .setFooter({ text: `${guild.name} • Liberty City Tickets` })
+        .setFooter({ text: `${guild.name} • Tickets` })
         .setTimestamp();
     const channelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:tickets:panel')

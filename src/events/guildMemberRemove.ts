@@ -1,10 +1,10 @@
 ﻿// ============================================
-// Liberty City Bot - Guild Member Remove Event
+// Omni Bot - Guild Member Remove Event
 // ============================================
 
 import { GuildMember, ChannelType, TextChannel } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { resolveEmojiShortcodes } from '../utils/emoji';
 import { getGuildSettings, Ticket, UserProfile, Warning, ModerationCase } from '../models';
@@ -19,12 +19,12 @@ const event: Event = {
       // 🛡️ Anti-Nuke: رصد الطرد الجماعي + ربط المطرودين برابط الدعوة
       //    (لا يُعطّل رحلة المغادرة — ينفّذ بمعزل عن باقي العمل)
       //    ⚠️ قبل هذه الإضافة كان الطرد الجماعي يمرّ بلا أي استجابة
-      ;(member.client as LibertyClient).securityHandler
+      ;(member.client as OmniClient).securityHandler
         .onMemberKick(member)
         .catch(err => logger.warn(`onMemberKick failed: ${err?.message ?? err}`));
 
       // 📨 Invite Tracker — تحديث إحصائيات المغادرة
-      (member.client as LibertyClient).inviteTrackerHandler
+      (member.client as OmniClient).inviteTrackerHandler
         .onMemberLeave(member)
         .catch(err => logger.warn(`inviteTracker onMemberLeave failed: ${err?.message ?? err}`));
 
@@ -102,7 +102,7 @@ export async function handleLeave(
 // Log Member Leave
 // --------------------------------------------
 async function logMemberLeave(member: GuildMember): Promise<void> {
-  const client = member.client as LibertyClient;
+  const client = member.client as OmniClient;
   // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
   client.loggingHandler.handleMemberLeave(member).catch((err) => client.loggingHandler.reportFailure('guildMemberRemove', err));
 

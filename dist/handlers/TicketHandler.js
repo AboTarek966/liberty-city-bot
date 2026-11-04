@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Handler (Enhanced)
+// Omni Bot - Ticket Handler (Enhanced)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TicketHandler = exports.DEFAULT_TICKET_TYPES = void 0;
@@ -141,7 +141,7 @@ class TicketHandler {
         const category = await guild.channels.create({
             name,
             type: discord_js_1.ChannelType.GuildCategory,
-            reason: 'Liberty City - Ticket System',
+            reason: 'Omni - Ticket System',
         });
         logger.info(`Created ticket category: ${category.name}`);
         return category;
@@ -160,7 +160,7 @@ class TicketHandler {
             permissionOverwrites: [
                 { id: guild.roles.everyone.id, deny: [discord_js_1.PermissionFlagsBits.ViewChannel] },
             ],
-            reason: 'Liberty City - Ticket Logs',
+            reason: 'Omni - Ticket Logs',
         });
         logger.info(`Created ticket log channel: ${channel.name}`);
         return channel;
@@ -265,7 +265,7 @@ class TicketHandler {
             type: discord_js_1.ChannelType.GuildText,
             parent: category.id,
             permissionOverwrites,
-            reason: `Liberty City - Ticket created by ${user.user.tag}`,
+            reason: `Omni - Ticket created by ${user.user.tag}`,
         });
         const ticket = await models_1.Ticket.create({
             guildId: guild.id,
@@ -349,7 +349,7 @@ class TicketHandler {
             description: `تم الإغلاق بواسطة ${closedBy} • السبب: ${reason || 'غير محدد'}\n` +
                 `🔓 إعادة الفتح: ${closerName} أو فريق الدعم/الإدارة — Administrator يتجاوز القفل.`,
             color: embeds_1.Colors.error,
-            footer: { text: 'Liberty City Tickets' },
+            footer: { text: `${guild.name} • Tickets` },
         });
         const actionRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
             .setCustomId(`ticket_reopen:${ticket._id}`)
@@ -475,7 +475,7 @@ class TicketHandler {
         }
         // Delete channel
         if (channel) {
-            await channel.delete('Liberty City - Ticket deleted').catch(() => { });
+            await channel.delete('Omni - Ticket deleted').catch(() => { });
         }
         this.activeTickets.delete(channelId);
         this.logTicketEvent(guild, 'delete', ticket, deletedBy.user);
@@ -550,7 +550,7 @@ class TicketHandler {
                             ? `📊 إجمالي تذاكرك المستلمة: ${currentCount + 1}`
                             : `📊 إجمالي تذاكرك المستلمة: ${currentCount} (بدون احتساب مكرر)`),
                     color: embeds_1.Colors.success,
-                    footer: { text: 'Liberty City Tickets' },
+                    footer: { text: `${guild.name} • Tickets` },
                 });
                 jobs.push(channel.send({ embeds: [claimEmbed] }));
                 // Update buttons (show unclaim instead of claim)
@@ -603,7 +603,7 @@ class TicketHandler {
                     description: `تم إلغاء الاستلام بواسطة ${unclaimedBy}${previousClaimer ? ` • المستلم السابق: ${previousClaimer}` : ''}\n` +
                         `🔓 القفل أُلغي — يمكن لفريق الدعم الكتابة واستلام التذكرة.`,
                     color: embeds_1.Colors.warning,
-                    footer: { text: 'Liberty City Tickets' },
+                    footer: { text: `${guild.name} • Tickets` },
                 });
                 jobs.push(channel.send({ embeds: [embed] }));
                 jobs.push(this.updateTicketButtons(channel, false));
@@ -672,7 +672,7 @@ class TicketHandler {
                     title: '🔓 تم إعادة فتح التذكرة',
                     description: `تمت إعادة الفتح بواسطة ${reopenedBy} — يمكن لفريق الدعم المتابعة.`,
                     color: embeds_1.Colors.success,
-                    footer: { text: 'Liberty City Tickets' },
+                    footer: { text: `${guild.name} • Tickets` },
                 });
                 jobs.push(channel.send({ embeds: [reopenEmbed] }));
                 // الاستلام محفوظ → نعرض زر "إلغاء الاستلام" لا زر "استلام"
@@ -880,7 +880,7 @@ class TicketHandler {
             title: '🔔 استدعاء الإدارة العليا',
             description: `${calledBy} يستدعي الإدارة العليا — ${channel}`,
             color: embeds_1.Colors.warning,
-            footer: { text: 'Liberty City Tickets | استدعاء الإدارة' },
+            footer: { text: `${guild.name} • Tickets | استدعاء الإدارة` },
         });
         await channel.send({
             content: mentions.length > 0 ? mentions.join(' ') : undefined,
@@ -923,7 +923,7 @@ class TicketHandler {
             title: '➕ تمت إضافة عضو',
             description: `تمت إضافة ${member} بواسطة ${addedBy}`,
             color: embeds_1.Colors.info,
-            footer: { text: 'Liberty City Tickets' },
+            footer: { text: `${member.guild.name} • Tickets` },
         });
         await channel.send({ embeds: [embed] });
     }
@@ -975,6 +975,7 @@ class TicketHandler {
                 status: 'closed',
                 messages: [],
                 closeReason: ticket.closeReason,
+                guildName: guild.name,
             });
             const { AttachmentBuilder } = require('discord.js');
             const attachment = new AttachmentBuilder(Buffer.from(transcript, 'utf-8'), { name: `transcript-${ticket.channelId.slice(-6)}.txt` });
@@ -1044,7 +1045,7 @@ class TicketHandler {
                 title: `${eventEmojis[event] || '📌'} ${eventNames[event] || event} تذكرة`,
                 color: event === 'close' || event === 'delete' ? embeds_1.Colors.error : embeds_1.Colors.success,
                 fields,
-                footer: { text: 'Liberty City Ticket Logs' },
+                footer: { text: `${guild.name} • Ticket Logs` },
             });
             // الكاش أولاً ثم الجلب الفعلي — يمنع ضياع السجل إذا لم تكن القناة مخزّنة
             let channel = guild.channels.cache.get(logChannelId);
@@ -1118,7 +1119,7 @@ class TicketHandler {
                 : [...settings.tickets.supportRoleIds],
         };
         const message = await channel.send({
-            embeds: [this.buildPanelEmbed(panel)],
+            embeds: [this.buildPanelEmbed(panel, guild.name)],
             components: this.buildPanelComponents(panel),
         });
         panel.messageId = message.id;
@@ -1159,7 +1160,7 @@ class TicketHandler {
     // --------------------------------------------
     // بناء إمبد اللوحة (مشترك: إنشاء / تعديل / نقل)
     // --------------------------------------------
-    buildPanelEmbed(panel) {
+    buildPanelEmbed(panel, guildName) {
         const types = this.getPanelTypes(panel).slice(0, 25);
         const typeList = types
             .map(o => `> • ${o.emoji || '🎫'} **${o.label}**${o.description ? ` — ${o.description}` : ''}`)
@@ -1170,7 +1171,7 @@ class TicketHandler {
                 `${typeList}`,
             image: panel.image || undefined,
             color: embeds_1.Colors.primary,
-            footer: { text: 'Liberty City Tickets' },
+            footer: { text: `${guildName || 'Omni'} • Tickets` },
             timestamp: true,
         });
     }
@@ -1229,7 +1230,7 @@ class TicketHandler {
             return;
         await message
             .edit({
-            embeds: [this.buildPanelEmbed(panel)],
+            embeds: [this.buildPanelEmbed(panel, guild.name)],
             components: this.buildPanelComponents(panel),
         })
             .catch(() => { });
@@ -1250,7 +1251,7 @@ class TicketHandler {
             }
         }
         const message = await newChannel.send({
-            embeds: [this.buildPanelEmbed(panel)],
+            embeds: [this.buildPanelEmbed(panel, guild.name)],
             components: this.buildPanelComponents(panel),
         });
         panel.channelId = newChannel.id;

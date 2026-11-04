@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Picker Select (قائمة اختيار الرولات)
+// Omni Bot - Role Picker Select (قائمة اختيار الرولات)
 // تحديث العدد المحدد عند تغيير الاختيارات
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Games Menu (قائمة الألعاب)
+// Omni Bot - Games Menu (قائمة الألعاب)
 // اختصار لكل الألعاب في قائمة واحدة
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

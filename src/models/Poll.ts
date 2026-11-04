@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Poll Model
+// Omni Bot - Poll Model
 // ============================================
 
 import mongoose, { Document, Schema } from 'mongoose';

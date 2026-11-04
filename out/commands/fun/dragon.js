@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Dragon Battle (معركة التنين)
+// Omni Bot - Dragon Battle (معركة التنين)
 // معركة RPG ضد التنين — اضرب، انتقد، واستمر حتى النهاية
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

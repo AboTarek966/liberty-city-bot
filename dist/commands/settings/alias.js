@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Alias Command
+// Omni Bot - Alias Command
 // Custom shortcuts for commands (e.g., "b" -> /ban)
 // ============================================
 // واجهة واحدة باختيار ذكي (Autocomplete) بدل عدة قوائم ثابتة.

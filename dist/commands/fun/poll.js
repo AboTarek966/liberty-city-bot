@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Poll Command (الاستطلاعات)
+// Omni Bot - Poll Command (الاستطلاعات)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildPollEmbed = buildPollEmbed;

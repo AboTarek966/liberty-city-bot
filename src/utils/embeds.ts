@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Embed Utilities
+// Omni Bot - Embed Utilities
 // ============================================
 
 import { EmbedBuilder, Colors as DiscordColors, Guild, User, GuildMember, TextChannel, ColorResolvable } from 'discord.js';
@@ -111,6 +111,7 @@ export function moderationEmbed(data: {
   duration?: string;
   proof?: string;
   extraFields?: { name: string; value: string; inline?: boolean }[];
+  guildName?: string;
 }): EmbedBuilder {
   const typeEmojis: Record<string, string> = {
     ban: '🔨',
@@ -153,7 +154,7 @@ export function moderationEmbed(data: {
       { name: '📋 السبب', value: data.reason, inline: false },
       { name: '🔢 رقم القضية', value: `#${data.caseId}`, inline: true },
     ],
-    footer: { text: `Liberty City | ${moment().format('YYYY/MM/DD HH:mm:ss')}` },
+    footer: { text: `${data.guildName || 'Omni'} | ${moment().format('YYYY/MM/DD HH:mm:ss')}` },
     timestamp: true,
   });
 
@@ -184,6 +185,7 @@ export function ticketEmbed(data: {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   claimedBy?: User;
   fields?: Array<{ question: string; answer: string }>;
+  guildName?: string;
 }): EmbedBuilder {
   const statusEmojis = {
     open: '🟢',
@@ -215,7 +217,7 @@ export function ticketEmbed(data: {
       { name: '📂 النوع', value: data.type, inline: true },
       { name: '🎯 الأولوية', value: priorityNames[data.priority], inline: true },
     ],
-    footer: { text: 'Liberty City Tickets' },
+    footer: { text: `${data.guildName || 'Omni'} • Tickets` },
     timestamp: true,
   });
 
@@ -240,6 +242,7 @@ export function ticketTranscriptEmbed(data: {
   messages: Array<{ author: User; content: string; timestamp: Date }>;
   closedBy?: User;
   closeReason?: string;
+  guildName?: string;
 }): EmbedBuilder {
   const embed = createEmbed({
     title: `📜 نسخة التذكرة #${data.ticketId}`,
@@ -249,7 +252,7 @@ export function ticketTranscriptEmbed(data: {
       { name: '📂 النوع', value: data.type, inline: true },
       { name: '📊 الحالة', value: data.status, inline: true },
     ],
-    footer: { text: `Liberty City | ${moment().format('YYYY/MM/DD HH:mm:ss')}` },
+    footer: { text: `${data.guildName || 'Omni'} | ${moment().format('YYYY/MM/DD HH:mm:ss')}` },
   });
 
   if (data.closedBy) {
@@ -324,13 +327,14 @@ export function logEmbed(data: {
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   user?: User;
   channel?: TextChannel;
+  guild?: Guild;
 }): EmbedBuilder {
   const embed = createEmbed({
     title: data.title,
     description: data.description,
     color: data.color,
     fields: data.fields,
-    footer: { text: 'Liberty City Logs' },
+    footer: { text: `${data.guild?.name || 'Omni'} • Logs` },
     timestamp: true,
   });
 
@@ -418,7 +422,7 @@ export function userInfoEmbed(data: {
       { name: '🆔 المعرف', value: `\`${data.user.id}\``, inline: true },
       { name: '📅 إنشاء الحساب', value: `<t:${Math.floor(data.createdAt.getTime() / 1000)}:F> (<t:${Math.floor(data.createdAt.getTime() / 1000)}:R>)`, inline: true },
     ],
-    footer: { text: 'Liberty City' },
+    footer: { text: data.member?.guild.name || 'Omni' },
     timestamp: true,
   });
 
@@ -473,7 +477,7 @@ export function serverInfoEmbed(data: {
       { name: '😀 الإيموجيز', value: `${data.emojiCount}`, inline: true },
       { name: '💎 مستوى البوست', value: `المستوى ${data.boostLevel} (${data.boostCount} بوست)`, inline: true },
     ],
-    footer: { text: 'Liberty City' },
+    footer: { text: data.guild.name },
     timestamp: true,
   });
 }
@@ -486,12 +490,13 @@ export function helpEmbed(data: {
   description: string;
   categories: Array<{ name: string; commands: string[]; emoji: string }>;
   prefix: string;
+  guildName?: string;
 }): EmbedBuilder {
   const embed = createEmbed({
     title: data.title,
     description: data.description,
     color: Colors.primary,
-    footer: { text: `Liberty City | استخدم ${data.prefix}help <أمر> لمزيد من التفاصيل` },
+    footer: { text: `${data.guildName || 'Omni'} | استخدم ${data.prefix}help <أمر> لمزيد من التفاصيل` },
     timestamp: true,
   });
 
@@ -530,7 +535,7 @@ export function createPaginationEmbeds(
       title,
       description: pageItems.map((item, index) => `${i + index + 1}. ${item}`).join('\n'),
       color,
-      footer: { text: `${footer || 'Liberty City'} | صفحة ${pageNumber}/${totalPages}` },
+      footer: { text: `${footer || 'Omni'} | صفحة ${pageNumber}/${totalPages}` },
     });
     
     pages.push(embed);

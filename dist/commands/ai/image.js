@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Image Generation Command
+// Omni Bot - Image Generation Command
 // توليد صور بالذكاء الاصطناعي — مجاني بالكامل (Pollinations.ai)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

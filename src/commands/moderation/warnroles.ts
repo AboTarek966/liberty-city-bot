@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - WarnRoles Debug Command
+// Omni Bot - WarnRoles Debug Command
 // تشخيص إعدادات رولات التحذير التسلسلية
 // ============================================
 
@@ -10,7 +10,7 @@ import {
   GuildMember,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { GuildSettings } from '../../models';
 
@@ -43,7 +43,7 @@ const command: Command = {
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const subcommand = interaction.options.getSubcommand();
     const guild = interaction.guild!;
 

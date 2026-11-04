@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Help Category Buttons
+// Omni Bot - Help Category Buttons
 // ============================================
 
 import { ButtonInteraction, EmbedBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const categoryInfo: Record<string, { name: string; emoji: string }> = {
@@ -22,7 +22,7 @@ const handler: ButtonHandler = {
   async execute(interaction: ButtonInteraction) {
     await interaction.deferUpdate(); // ✅ منع انتهاء الصلاحية
 
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const category = interaction.customId.replace('help_', '');
     const info = categoryInfo[category] || { name: category, emoji: '📂' };
     const commands = client.commandHandler.getCommandsByCategory(category);
@@ -37,7 +37,7 @@ const handler: ButtonHandler = {
           : 'لا توجد أوامر في هذا التصنيف'
       )
       .setColor(Colors.primary)
-      .setFooter({ text: 'Liberty City Bot' })
+      .setFooter({ text: interaction.guild?.name || 'Omni' })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });

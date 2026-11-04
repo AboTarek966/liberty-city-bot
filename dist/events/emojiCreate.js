@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Emoji Create Logging
+// Omni Bot - Emoji Create Logging
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

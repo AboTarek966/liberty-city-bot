@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Music Handler (نظام موسيقى كامل)
+// Omni Bot - Music Handler (نظام موسيقى كامل)
 // ============================================
 
 import {
@@ -339,7 +339,7 @@ export class MusicHandler {
         { name: '👤 طلبها', value: track.requestedBy, inline: true },
       )
       .setColor(0x5865F2)
-      .setFooter({ text: `Liberty City Music | القائمة: ${queue.tracks.length} أغنية` });
+      .setFooter({ text: `Omni Music | القائمة: ${queue.tracks.length} أغنية` });
   }
 
   private buildControlButtons(queue: Queue): ActionRowBuilder<ButtonBuilder>[] {

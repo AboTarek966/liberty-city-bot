@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Alias Clear Buttons
+// Omni Bot - Alias Clear Buttons
 // أزرار تأكيد/إلغاء حذف جميع الاختصارات (/alias clear)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

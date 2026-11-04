@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Helper Utilities
+// Omni Bot - Helper Utilities
 // ============================================
 
 import { Guild, GuildMember, User, TextChannel, Role, PermissionsBitField, ChannelType, Message, AttachmentBuilder } from 'discord.js';
@@ -217,9 +217,9 @@ export function findRole(guild: Guild, name: string): Role | undefined {
 
 export function createMuteRole(guild: Guild): Promise<Role> {
   return guild.roles.create({
-    name: 'Muted - Liberty City',
+    name: `Muted - ${guild.name}`,
     color: 0x555555,
-    reason: 'إنشاء رول الكتم التلقائي بواسطة Liberty City',
+    reason: `إنشاء رول الكتم التلقائي بواسطة ${guild.name}`,
     permissions: [],
   });
 }
@@ -238,7 +238,7 @@ export async function applyMuteRole(guild: Guild, muteRole: Role): Promise<void>
         SendMessagesInThreads: false,
         CreatePublicThreads: false,
         CreatePrivateThreads: false,
-      }, { reason: 'تطبيق صلاحيات الكتم بواسطة Liberty City' });
+      }, { reason: `تطبيق صلاحيات الكتم بواسطة ${guild.name}` });
     } catch (error) {
       console.error(`Failed to apply mute permissions to ${channel.name}:`, error);
     }

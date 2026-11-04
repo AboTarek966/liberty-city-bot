@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Music Button Handlers
+// Omni Bot - Music Button Handlers
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.queuePageHandler = exports.musicButtons = void 0;

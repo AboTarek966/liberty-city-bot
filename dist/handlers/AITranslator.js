@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Translator
+// Omni Bot - AI Translator
 // ============================================
 // ترجمة فورية لأي رسالة: كشف اللغة التلقائي + 50+ لغة
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -261,7 +261,7 @@ class AITranslator {
             .setColor(embeds_1.Colors.success)
             .setDescription(result.translatedText)
             .addFields({ name: '🌍 من', value: exports.SUPPORTED_LANGUAGES[result.sourceLang]?.name || result.sourceLang, inline: true }, { name: '🎯 إلى', value: exports.SUPPORTED_LANGUAGES[result.targetLang]?.name || result.targetLang, inline: true }, { name: '🎯 ثقة', value: `${result.confidence}%`, inline: true })
-            .setFooter({ text: `Liberty City Translator • ${interaction.user.tag}` })
+            .setFooter({ text: `${interaction.guild.name} • Translator • ${interaction.user.tag}` })
             .setTimestamp();
         if (config.showOriginal) {
             embed.addFields({ name: '📝 النص الأصلي', value: result.originalText.substring(0, 1000) });

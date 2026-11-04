@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Music Generation Command
+// Omni Bot - Music Generation Command
 // توليد أغنية كاملة بالذكاء الاصطناعي — مجاني بالكامل عبر Hugging Face
 // الافتراضي: كلمات + غناء + لحن (ACE-Step) — اختيارياً لحن عزف فقط
 // يتطلب HF_TOKEN (حساب Hugging Face مجاني — بلا بطاقة ائتمان)

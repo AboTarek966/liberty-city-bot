@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Economy Commands
+// Omni Bot - Economy Commands
 // ============================================
 
 import {
@@ -17,7 +17,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { getGuildSettings } from '../../models';
 import { EconomyHandler } from '../../handlers/EconomyHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { createLogger } from '../../utils/helpers';
 
 const logger = createLogger('EconomyCommand');
@@ -193,7 +193,7 @@ const economyCommand: Command = {
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const economy = client.economyHandler;
     const subcommand = interaction.options.getSubcommand();
 
@@ -225,7 +225,7 @@ const economyCommand: Command = {
               { name: '💎 الإجمالي', value: client.economyHandler.formatCurrency(profile.balance + profile.bank, config), inline: true }
             )
             .setThumbnail(targetUser.displayAvatarURL())
-            .setFooter({ text: `Liberty City Economy • ${targetUser.tag}` })
+            .setFooter({ text: `${interaction.guild!.name} • Economy • ${targetUser.tag}` })
             .setTimestamp();
 
           await interaction.editReply({ embeds: [embed] });

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Invite Tracker Handler
+// Omni Bot - Invite Tracker Handler
 // ============================================
 // يتتبع الدعوات، يكشف المشبوهة، يكافئ المدعوين
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Guild Audit Log Entry Create
+// Omni Bot - Guild Audit Log Entry Create
 // ⚡ بثّ سجلات التدقيق الفوري من Gateway:
 //    يصل السجل مع الحدث نفسه (بدون REST) → استجابة فورية جداً
 //    يُستخدم لتحديد المنفّذ فوراً + كشف البوتات وتحييدها قبل أن تكمل

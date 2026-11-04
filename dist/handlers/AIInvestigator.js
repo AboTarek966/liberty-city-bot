@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Investigator
+// Omni Bot - AI Investigator
 // ============================================
 // محقق أمني داخلي مستقل عن مساعد المحادثة.
 // - يجمع صورة شاملة عن السيرفر (أعضاء/رتب/قنوات/صلاحيات/رسائل/سجلات...)
@@ -39,7 +39,7 @@ const AUTHORIZED_BOT_SEVERE_ACTIONS = new Set([
     'ChannelDelete', 'RoleDelete', 'MemberBanAdd', 'MemberKick', 'WebhookCreate', 'GuildUpdate',
 ]);
 const HIERARCHY_ADVICE_PATTERN = /(?:role\s*hierarchy|bot(?:'s|’s)?\s+role|raise\s+(?:the\s+)?bot|move\s+(?:the\s+)?bot\s+role|رتبة\s+البوت|رتبة\s+أعلى|هرمية\s+الرتب|هيرارك|رفع\s+رتبة|ارفع\s+رتبة|أعلى\s+من\s+رتبة\s+البوت)/i;
-const INVESTIGATOR_SYSTEM_PROMPT = `أنت "محقق Liberty City" — محلل أمني داخلي خبير في أمن سيرفرات Discord.
+const INVESTIGATOR_SYSTEM_PROMPT = `أنت "محقق Omni" — محلل أمني داخلي خبير في أمن سيرفرات Discord.
 مهمتك مراجعة بيانات السيرفر واكتشاف المخاطر الحقيقية فقط (اختراق، بوتات خطرة، صلاحيات مفرطة، رايد، احتيال، تسريب، إساءة إشراف).
 أنت للقراءة فقط: لا تنفّذ عقوبات ولا تطالب بتنفيذ تلقائي، بل تقدّم تقريراً وأدلة وتوصيات بشرية.
 
@@ -48,7 +48,7 @@ const INVESTIGATOR_SYSTEM_PROMPT = `أنت "محقق Liberty City" — محلل 
 2) لا تخترع وقائع أو معرفات. استند فقط إلى الأدلة الموجودة في البيانات، واذكر الأدلة حرفياً ومختصرة.
 3) لا تقترح تعديل رتبة البوت أو رفعها أو مناقشة هرمية الرتب إطلاقاً. أي فشل في الهرمية يُعالج في الكونسول فقط.
 4) لا تقترح حظراً أو طرداً تلقائياً. التوصيات يجب أن تكون يدوية وواضحة.
-5) مالك السيرفر ومطوّر البوت وClyde وDiscord Bots وبوت Liberty City مستثنون تماماً — لا تبلغ عنهم.
+5) مالك السيرفر ومطوّر البوت وClyde وDiscord Bots وبوت Omni مستثنون تماماً — لا تبلغ عنهم.
 6) الأعضاء/البوتات في القائمة البيضاء ليسوا مستثنين من التحقيق؛ لكن لا تعتبر وجود صلاحياتهم المصرّح بها خطراً بحد ذاته. ركّز على سلوكهم التخريبي.
 7) تجنّب الإيجابيات الكاذبة: الرتب الإدارية القديمة والبنية المنظمة ليست خطراً. اربط كل نتيجة بدليل.
 8) أعطِ أولوية للنتائج القابلة للتنفيذ الآن، وقلّل التكرار.
@@ -1479,7 +1479,7 @@ class AIInvestigator {
             .filter(Boolean)
             .join('\n'))
             .setFooter({
-            text: `Liberty City AI Investigator • ${report.model} • ${report.runId}`.slice(0, 2048),
+            text: `${report.guildName} AI Investigator • ${report.model} • ${report.runId}`.slice(0, 2048),
         })
             .setTimestamp(new Date(report.completedAt));
         for (const finding of alertable.slice(0, 8)) {

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Embed Builder Select Menus (eb|)
+// Omni Bot - Embed Builder Select Menus (eb|)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

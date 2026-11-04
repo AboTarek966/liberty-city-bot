@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Threat Score (Beast Mode core)
+// Omni Bot - Threat Score (Beast Mode core)
 // درجة تهديد عالمية (in-memory) لكل سيرفر. يجمع إشارات من حماية النيوك/الرويد/البوتات.
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

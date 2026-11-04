@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Embed Builder (State + UI)
+// Omni Bot - Embed Builder (State + UI)
 // ============================================
 
 import {
@@ -54,7 +54,7 @@ export const EB_MAX_FIELDS = 25;
 
 export const EB_PLACEHOLDER_TITLE = '✨ منشئ الإمبد';
 export const EB_PLACEHOLDER_DESCRIPTION = '💡 ابدأ بإضافة العنوان أو الوصف';
-export const EB_FOOTER_TEXT = 'Liberty City Embed Builder';
+export const EB_FOOTER_TEXT = 'Omni Embed Builder';
 export const EB_MAIN_CONTENT = '🛠️ لوحة إنشاء الإمبد — استخدم الأزرار أدناه';
 
 export interface ColorPreset {

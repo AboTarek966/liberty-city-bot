@@ -1,7 +1,7 @@
 {
-  "name": "liberty-city-dashboard",
+  "name": "omni-dashboard",
   "version": "1.0.0",
-  "description": "Express-based dashboard for Liberty City Bot",
+  "description": "Express-based dashboard for Omni Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

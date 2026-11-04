@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Game Handler
+// Omni Bot - Game Handler
 // ============================================
 // إدارة الألعاب الجماعية: UNO، Trivia، Wordle، Blackjack، Connect4
 Object.defineProperty(exports, "__esModule", { value: true });

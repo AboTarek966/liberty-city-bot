@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Mute Command (Role-based)
+// Omni Bot - Mute Command (Role-based)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

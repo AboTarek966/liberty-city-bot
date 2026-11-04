@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Ready Event
+// Omni Bot - Ready Event
 // ============================================
 
 import { Client } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { restoreGiveaways } from '../utils/giveaway';
 
@@ -23,7 +23,7 @@ const event: Event = {
     client.user?.setPresence({
       activities: [
         {
-          name: '/help | Liberty City',
+          name: '/help | Omni',
           type: 0, // Playing
         },
       ],
@@ -31,7 +31,7 @@ const event: Event = {
     });
 
     // 💾 بدء النسخ الاحتياطي التلقائي فوراً (تأخير ثانية واحدة فقط — لا نترك السيرفر بلا نسخة)
-    const lc = client as LibertyClient;
+    const lc = client as OmniClient;
     let index = 0;
     client.guilds.cache.forEach(guild => {
       const delay = 1000 + index * 2000;

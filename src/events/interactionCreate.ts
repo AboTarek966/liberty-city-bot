@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Interaction Create Event
+// Omni Bot - Interaction Create Event
 // ============================================
 
 import { Interaction, ChatInputCommandInteraction, AutocompleteInteraction } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 
 const logger = createLogger('Event:InteractionCreate');
@@ -12,7 +12,7 @@ const logger = createLogger('Event:InteractionCreate');
 const event: Event = {
   name: 'interactionCreate',
   async execute(interaction: Interaction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
 
     try {
       // Handle Slash Commands

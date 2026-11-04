@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Picker Buttons (أزرار لوحة الرولات)
+// Omni Bot - Role Picker Buttons (أزرار لوحة الرولات)
 // السابق ▶ / التالي ◀ / تحديد ✅ / إلغاء ❌
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -181,7 +181,7 @@ const handler = {
                                 inline: false,
                             }, { name: '🛡️ المنفذ', value: `${executor} (\`${executor.id}\`)`, inline: true }, { name: '📝 السبب', value: state.reason, inline: false })
                                 .setTimestamp()
-                                .setFooter({ text: `Liberty City | ${guild.name}` });
+                                .setFooter({ text: `${guild.name}` });
                             await logChannel.send({ embeds: [logEmbed] }).catch(() => { });
                         }
                     }

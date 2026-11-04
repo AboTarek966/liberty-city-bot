@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Reset (إعادة تعيين الطلب)
+// Omni Bot - Ticket Reset (إعادة تعيين الطلب)
 // يحذف تذكرتك المفتوحة حتى تتمكن من فتح تذكرة جديدة
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Top Buttons
+// Omni Bot - Ticket Top Buttons
 // customId: ttop|<period>|<page>[|<mark>]
 //   mark: prev / next / r / p
 // ============================================

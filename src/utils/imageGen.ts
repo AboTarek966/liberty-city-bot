@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - مولّد الصور بالذكاء الاصطناعي
+// Omni Bot - مولّد الصور بالذكاء الاصطناعي
 //
 // مجاني بالكامل: Pollinations.ai
 //   - بلا مفتاح API
@@ -169,7 +169,7 @@ export async function generatePollinationsImage(
   const res = await axios.get<ArrayBuffer>(url, {
     responseType: 'arraybuffer',
     timeout: TIMEOUT_MS,
-    headers: { 'User-Agent': 'Mozilla/5.0 (LibertyCityBot)' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (OmniBot)' },
     maxContentLength: MAX_BYTES,
     validateStatus: (s) => s === 200,
   });

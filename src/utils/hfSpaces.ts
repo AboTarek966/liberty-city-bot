@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - عميل Hugging Face Spaces
+// Omni Bot - عميل Hugging Face Spaces
 // مجاني بالكامل (ZeroGPU) — يتطلب حساب Hugging Face مجاني (بلا بطاقة)
 //
 // كيف يعمل:
@@ -21,7 +21,7 @@ export interface HFResult {
   raw: unknown;
 }
 
-const UA = 'Mozilla/5.0 (LibertyCityBot)';
+const UA = 'Mozilla/5.0 (OmniBot)';
 const RESULT_TIMEOUT_MS = 12 * 60 * 1000; // سقف انتظار النتيجة
 const WAKE_TIMEOUT_MS = 30_000;
 

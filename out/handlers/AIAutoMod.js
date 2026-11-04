@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Auto-Moderation
+// Omni Bot - AI Auto-Moderation
 // ============================================
 // الـ AI يقرأ كل رسالة بنفسه ويقرر: سبام/سم/إباحي/احتيال/تهديد/تسريب بيانات
 // يتصرف تلقائياً: يحذف/يحذر/يكتم/يبن + لاوج كامل
@@ -312,7 +312,7 @@ ${context}
             .setTitle(`🤖 AI Auto-Mod: ${result.action.toUpperCase()}`)
             .setColor(result.severity === 'critical' ? embeds_1.Colors.error : result.severity === 'high' ? embeds_1.Colors.warning : embeds_1.Colors.info)
             .addFields({ name: '👤 المستخدم', value: `${member} (\`${member.id}\`)`, inline: true }, { name: '📍 القناة', value: `${message.channel}`, inline: true }, { name: '🏷️ التصنيف', value: result.categories.join('، '), inline: true }, { name: '⚡ الإجراء', value: result.action, inline: true }, { name: '📊 الخطورة', value: result.severity, inline: true }, { name: '🎯 الثقة', value: `${result.confidence}%`, inline: true }, { name: '📝 السبب', value: result.reason, inline: false }, { name: '💬 الرسالة', value: message.content.substring(0, 500) || '(فارغة/مرفقات)', inline: false })
-            .setFooter({ text: 'Liberty City AI Auto-Mod' })
+            .setFooter({ text: `${message.guild?.name || 'Omni'} • AI Auto-Mod` })
             .setTimestamp();
         await logChannel.send({ embeds: [embed] }).catch(() => { });
     }

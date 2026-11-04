@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - User Info Command
+// Omni Bot - User Info Command
 // ============================================
 
 import {

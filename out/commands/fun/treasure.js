@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Treasure Chests (صناديق الكنز)
+// Omni Bot - Treasure Chests (صناديق الكنز)
 // ثلاثة صناديق — واحد فقط فيه الكنز
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Tools / Function Calling
+// Omni Bot - AI Tools / Function Calling
 // ============================================
 // أدوات يستطيع الـ AI استدعاؤها لتنفيذ إجراءات Discord حقيقية
 
@@ -17,7 +17,7 @@ import {
   EmbedBuilder,
   Colors,
 } from 'discord.js';
-import { LibertyClient } from './../LibertyClient';
+import { OmniClient } from './../OmniClient';
 import { getGuildSettings, ModerationCase } from '../models';
 import { createLogger } from '../utils/helpers';
 import { canManageTarget, isRoleGrantable } from '../utils/rolePicker';
@@ -33,7 +33,7 @@ export interface AIToolResult {
 export interface ToolContext {
   guild: Guild;
   executor: GuildMember; // العضو اللي طلب (المستخدم)
-  client: LibertyClient;
+  client: OmniClient;
   reason?: string;
 }
 

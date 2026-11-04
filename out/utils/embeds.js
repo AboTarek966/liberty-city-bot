@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Embed Utilities
+// Omni Bot - Embed Utilities
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -158,7 +158,7 @@ function moderationEmbed(data) {
             { name: '📋 السبب', value: data.reason, inline: false },
             { name: '🔢 رقم القضية', value: `#${data.caseId}`, inline: true },
         ],
-        footer: { text: `Liberty City | ${(0, moment_1.default)().format('YYYY/MM/DD HH:mm:ss')}` },
+        footer: { text: `${data.guildName || 'Omni'} | ${(0, moment_1.default)().format('YYYY/MM/DD HH:mm:ss')}` },
         timestamp: true,
     });
     if (data.duration) {
@@ -203,7 +203,7 @@ function ticketEmbed(data) {
             { name: '📂 النوع', value: data.type, inline: true },
             { name: '🎯 الأولوية', value: priorityNames[data.priority], inline: true },
         ],
-        footer: { text: 'Liberty City Tickets' },
+        footer: { text: `${data.guildName || 'Omni'} • Tickets` },
         timestamp: true,
     });
     if (data.claimedBy) {
@@ -225,7 +225,7 @@ function ticketTranscriptEmbed(data) {
             { name: '📂 النوع', value: data.type, inline: true },
             { name: '📊 الحالة', value: data.status, inline: true },
         ],
-        footer: { text: `Liberty City | ${(0, moment_1.default)().format('YYYY/MM/DD HH:mm:ss')}` },
+        footer: { text: `${data.guildName || 'Omni'} | ${(0, moment_1.default)().format('YYYY/MM/DD HH:mm:ss')}` },
     });
     if (data.closedBy) {
         embed.addFields({ name: '🔒 أغلق بواسطة', value: `${data.closedBy}`, inline: true });
@@ -285,7 +285,7 @@ function logEmbed(data) {
         description: data.description,
         color: data.color,
         fields: data.fields,
-        footer: { text: 'Liberty City Logs' },
+        footer: { text: `${data.guild?.name || 'Omni'} • Logs` },
         timestamp: true,
     });
     if (data.user) {
@@ -342,7 +342,7 @@ function userInfoEmbed(data) {
             { name: '🆔 المعرف', value: `\`${data.user.id}\``, inline: true },
             { name: '📅 إنشاء الحساب', value: `<t:${Math.floor(data.createdAt.getTime() / 1000)}:F> (<t:${Math.floor(data.createdAt.getTime() / 1000)}:R>)`, inline: true },
         ],
-        footer: { text: 'Liberty City' },
+        footer: { text: data.member?.guild.name || 'Omni' },
         timestamp: true,
     });
     if (data.member && data.joinedAt) {
@@ -380,7 +380,7 @@ function serverInfoEmbed(data) {
             { name: '😀 الإيموجيز', value: `${data.emojiCount}`, inline: true },
             { name: '💎 مستوى البوست', value: `المستوى ${data.boostLevel} (${data.boostCount} بوست)`, inline: true },
         ],
-        footer: { text: 'Liberty City' },
+        footer: { text: data.guild.name },
         timestamp: true,
     });
 }
@@ -392,7 +392,7 @@ function helpEmbed(data) {
         title: data.title,
         description: data.description,
         color: exports.Colors.primary,
-        footer: { text: `Liberty City | استخدم ${data.prefix}help <أمر> لمزيد من التفاصيل` },
+        footer: { text: `${data.guildName || 'Omni'} | استخدم ${data.prefix}help <أمر> لمزيد من التفاصيل` },
         timestamp: true,
     });
     data.categories.forEach(cat => {
@@ -418,7 +418,7 @@ function createPaginationEmbeds(items, options) {
             title,
             description: pageItems.map((item, index) => `${i + index + 1}. ${item}`).join('\n'),
             color,
-            footer: { text: `${footer || 'Liberty City'} | صفحة ${pageNumber}/${totalPages}` },
+            footer: { text: `${footer || 'Omni'} | صفحة ${pageNumber}/${totalPages}` },
         });
         pages.push(embed);
     }

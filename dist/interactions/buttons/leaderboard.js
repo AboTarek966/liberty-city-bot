@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Leaderboard Buttons
+// Omni Bot - Leaderboard Buttons
 // customId: lb|<type>|<period>|<limit>|<page>[|<mark>]
 //   mark: prev / next / r (تحديث) / p (فترة) / t (نوع)
 // التنسيق القديم (بدون صفحة) يُعامَل كصفحة 1

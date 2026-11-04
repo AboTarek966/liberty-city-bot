@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Role Picker Buttons (أزرار لوحة الرولات)
+// Omni Bot - Role Picker Buttons (أزرار لوحة الرولات)
 // السابق ▶ / التالي ◀ / تحديد ✅ / إلغاء ❌
 // ============================================
 
@@ -184,7 +184,7 @@ const handler: ButtonHandler = {
                   { name: '📝 السبب', value: state.reason, inline: false },
                 )
                 .setTimestamp()
-                .setFooter({ text: `Liberty City | ${guild.name}` });
+                .setFooter({ text: `${guild.name}` });
               await (logChannel as any).send({ embeds: [logEmbed] }).catch(() => {});
             }
           }

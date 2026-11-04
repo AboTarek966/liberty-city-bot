@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Sticker Delete Protection
+// Omni Bot - Sticker Delete Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

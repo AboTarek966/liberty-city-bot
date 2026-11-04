@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Protection Command
+// Omni Bot - Protection Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -238,7 +238,7 @@ async function showStatus(interaction, settings) {
             : '❌ معطل',
         inline: true,
     })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -266,7 +266,7 @@ async function configureAntiRaid(interaction, settings) {
         .setTitle('🚨 مضاد الغارات')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
         .addFields({ name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true }, { name: 'الحد', value: `${settings.protection.antiRaid.threshold} عضو/دقيقة`, inline: true }, { name: 'الإجراء', value: getActionName(settings.protection.antiRaid.action), inline: true })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -288,7 +288,7 @@ async function configureAntiSpam(interaction, settings) {
         .setTitle('💬 مضاد السبام')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
         .addFields({ name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true }, { name: 'الحد الأقصى', value: `${settings.protection.antiSpam.maxMessages} رسائل/5 ثوانٍ`, inline: true }, { name: 'الإجراء', value: getActionName(settings.protection.antiSpam.action), inline: true })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -316,7 +316,7 @@ async function configureAntiLink(interaction, settings) {
             : 'لا يوجد',
         inline: false,
     })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -335,7 +335,7 @@ async function configureAntiInvite(interaction, settings) {
         .setTitle('📨 مضاد الدعوات')
         .setColor(enabled ? embeds_1.Colors.success : embeds_1.Colors.error)
         .addFields({ name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true }, { name: 'الإجراء', value: getActionName(settings.protection.antiInvite.action), inline: true })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -399,7 +399,7 @@ async function configureAntiNuke(interaction, settings) {
                 inline: false,
             }]
         : []))
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -441,7 +441,7 @@ async function configureHierarchy(interaction) {
                     '_بعد التصحيح شغّل الأمر مرة ثانية للتأكد._',
                 inline: false,
             }]))
-        .setFooter({ text: 'Liberty City — Hierarchy Guard' })
+        .setFooter({ text: `${interaction.guild.name} — Hierarchy Guard` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -490,7 +490,7 @@ async function configureAntiBot(interaction, settings) {
             '🚨 أي هجوم سريع (حذف/إنشاء/تعديل جماعي أو سبام) يُعاقب فوراً حتى لو كان البوت في القائمة.',
         inline: false,
     })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -516,7 +516,7 @@ async function configureAntiAdmin(interaction, settings) {
         value: 'يراقب أي رول (بما فيه @everyone) يحصل على Administrator — يحدّد المنفّذ من سجلات التدقيق وينبّهك فوراً. لا يعاقب المنفّذ أبداً حتى لو كان admin streiter.',
         inline: false,
     })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -560,7 +560,7 @@ async function configureAutoBackup(interaction, settings) {
         value: '`/backup list` عرض النسخ • `/backup restore` الاستعادة بعد أي هجوم',
         inline: false,
     })
-        .setFooter({ text: 'Liberty City Protection' })
+        .setFooter({ text: `${interaction.guild.name} • Protection` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }

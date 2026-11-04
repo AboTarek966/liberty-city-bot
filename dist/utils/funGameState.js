@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Interactive Game State (حالة الألعاب بأزرار)
+// Omni Bot - Interactive Game State (حالة الألعاب بأزرار)
 // مخزن مؤقت للألعاب التي تحتاج نقرات: لغز / صناديق / قنبلة / بلك جاك
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

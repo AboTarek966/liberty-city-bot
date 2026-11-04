@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Ticket Close Modal Handler
+// Omni Bot - Ticket Close Modal Handler
 // ============================================
 
 import { ModalSubmitInteraction, PermissionFlagsBits } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Ticket } from '../../models';
 
 const handler: ModalHandler = {
@@ -38,7 +38,7 @@ const handler: ModalHandler = {
 
       const reason = interaction.fields.getTextInputValue('reason').trim() || 'غير محدد';
 
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       await client.ticketHandler.closeTicket(ticket.channelId, member, reason);
 
       // لا نرد هنا لأن closeTicket ترسل رسالة في القناة مع الأزرار

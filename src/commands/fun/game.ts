@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Game Commands
+// Omni Bot - Game Commands
 // ============================================
 
 import {
@@ -19,7 +19,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { GameHandler, GameSession } from '../../handlers/GameHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { createLogger } from '../../utils/helpers';
 
 const logger = createLogger('GameCommand');

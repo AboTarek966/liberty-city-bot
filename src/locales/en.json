@@ -182,7 +182,7 @@
     "message": "{user} left the server. We now have {count} members 😢"
   },
   "help": {
-    "title": "📚 Liberty City Commands",
+    "title": "📚 Omni Commands",
     "description": "Hello {user}! Here are the available commands",
     "noCommand": "Command {command} not found",
     "categories": {
@@ -196,7 +196,7 @@
     }
   },
   "bot": {
-    "name": "Liberty City",
+    "name": "Omni",
     "description": "Comprehensive Discord bot with protection, tickets, AI and advanced settings",
     "version": "Version 2.0.0",
     "ping": "🏓 Pong!",

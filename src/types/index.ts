@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Type Definitions
+// Omni Bot - Type Definitions
 // ============================================
 
 import { Client, Guild, TextChannel, CategoryChannel, Role, User, Message, Interaction, ButtonInteraction, ModalSubmitInteraction, StringSelectMenuInteraction, ChatInputCommandInteraction, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder } from 'discord.js';

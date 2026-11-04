@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Flip Command
+// Omni Bot - Flip Command
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const command: Command = {
   data: new SlashCommandBuilder()

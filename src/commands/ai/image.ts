@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Image Generation Command
+// Omni Bot - Image Generation Command
 // توليد صور بالذكاء الاصطناعي — مجاني بالكامل (Pollinations.ai)
 // ============================================
 

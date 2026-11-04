@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Internationalization (i18n)
+// Omni Bot - Internationalization (i18n)
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };

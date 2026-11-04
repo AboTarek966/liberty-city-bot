@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Giveaway Entry Button
+// Omni Bot - Giveaway Entry Button
 // ============================================
 
 import { ButtonInteraction } from 'discord.js';

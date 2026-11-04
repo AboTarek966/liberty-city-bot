@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Translator
+// Omni Bot - AI Translator
 // ============================================
 // ترجمة فورية لأي رسالة: كشف اللغة التلقائي + 50+ لغة
 
@@ -17,7 +17,7 @@ import {
   ButtonInteraction,
   MessageFlags,
 } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { AIHandler } from './AIHandler';
 import { createLogger } from '../utils/helpers';
 import { Colors } from '../utils/embeds';
@@ -108,12 +108,12 @@ const DEFAULT_CONFIG: TranslatorConfig = {
 };
 
 export class AITranslator {
-  private client: LibertyClient;
+  private client: OmniClient;
   private aiHandler: AIHandler;
   private translationCache: Map<string, TranslationResult> = new Map();
   private readonly CACHE_TTL = 10 * 60 * 1000; // 10 دقائق
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
     this.aiHandler = client.aiHandler;
   }
@@ -310,7 +310,7 @@ export class AITranslator {
         { name: '🎯 إلى', value: SUPPORTED_LANGUAGES[result.targetLang]?.name || result.targetLang, inline: true },
         { name: '🎯 ثقة', value: `${result.confidence}%`, inline: true }
       )
-      .setFooter({ text: `Liberty City Translator • ${interaction.user.tag}` })
+      .setFooter({ text: `${interaction.guild!.name} • Translator • ${interaction.user.tag}` })
       .setTimestamp();
 
     if (config.showOriginal) {

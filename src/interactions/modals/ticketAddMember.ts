@@ -1,15 +1,15 @@
 // ============================================
-// Liberty City Bot - Ticket Add Member Modal
+// Omni Bot - Ticket Add Member Modal
 // ============================================
 
 import { ModalSubmitInteraction, PermissionFlagsBits } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const handler: ModalHandler = {
   id: 'ticket_add_member_modal',
   async execute(interaction: ModalSubmitInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     if (!interaction.guild) return;
 
     await interaction.deferReply({ ephemeral: true }); // ✅ منع انتهاء الصلاحية

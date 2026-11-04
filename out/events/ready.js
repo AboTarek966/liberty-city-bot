@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ready Event
+// Omni Bot - Ready Event
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const helpers_1 = require("../utils/helpers");
@@ -18,7 +18,7 @@ const event = {
         client.user?.setPresence({
             activities: [
                 {
-                    name: '/help | Liberty City',
+                    name: '/help | Omni',
                     type: 0, // Playing
                 },
             ],

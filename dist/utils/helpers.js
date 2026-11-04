@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Helper Utilities
+// Omni Bot - Helper Utilities
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -254,9 +254,9 @@ function findRole(guild, name) {
 }
 function createMuteRole(guild) {
     return guild.roles.create({
-        name: 'Muted - Liberty City',
+        name: `Muted - ${guild.name}`,
         color: 0x555555,
-        reason: 'إنشاء رول الكتم التلقائي بواسطة Liberty City',
+        reason: `إنشاء رول الكتم التلقائي بواسطة ${guild.name}`,
         permissions: [],
     });
 }
@@ -271,7 +271,7 @@ async function applyMuteRole(guild, muteRole) {
                 SendMessagesInThreads: false,
                 CreatePublicThreads: false,
                 CreatePrivateThreads: false,
-            }, { reason: 'تطبيق صلاحيات الكتم بواسطة Liberty City' });
+            }, { reason: `تطبيق صلاحيات الكتم بواسطة ${guild.name}` });
         }
         catch (error) {
             console.error(`Failed to apply mute permissions to ${channel.name}:`, error);

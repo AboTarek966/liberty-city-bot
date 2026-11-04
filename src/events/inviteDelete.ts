@@ -1,14 +1,14 @@
 ﻿// ============================================
-// Liberty City Bot - Invite Delete Logging
+// Omni Bot - Invite Delete Logging
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'inviteDelete',
   async execute(invite: any) {
-    const client = invite.client as LibertyClient;
+    const client = invite.client as OmniClient;
     // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
     client.loggingHandler.handleInviteDelete(invite).catch((err) => client.loggingHandler.reportFailure('inviteDelete', err));
   },

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Ticket Assistant Admin Approval
+// Omni Bot - AI Ticket Assistant Admin Approval
 // ============================================
 // معالج أزرار موافقة/رفض الأدمن لإجراءات الـ AI في التذاكر
 // الصيغة: ticket_ai:approve:<approvalId> | deny | details
@@ -15,7 +15,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { createLogger } from '../../utils/helpers';
 import { getGuildSettings } from '../../models';
 import { Colors } from '../../utils/embeds';
@@ -86,7 +86,7 @@ const handler: ButtonHandler = {
       return;
     }
 
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const assistant = client.aiTicketAssistant;
 
     // --------------------------------------------
@@ -139,7 +139,7 @@ const handler: ButtonHandler = {
             inline: true
           }
         )
-        .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+        .setFooter({ text: `${interaction.guild!.name} • AI Ticket Assistant` })
         .setTimestamp();
 
       if (details.approvedBy) {

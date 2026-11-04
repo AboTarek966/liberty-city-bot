@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Settings Command (UI Panel)
+// Omni Bot - Settings Command (UI Panel)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

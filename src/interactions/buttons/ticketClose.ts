@@ -1,16 +1,16 @@
 // ============================================
-// Liberty City Bot - Ticket Close Button
+// Omni Bot - Ticket Close Button
 // ============================================
 
 import { ButtonInteraction, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Ticket } from '../../models';
 
 const handler: ButtonHandler = {
   id: 'ticket_close',
   async execute(interaction: ButtonInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     if (!interaction.guild) return;
 
     try {

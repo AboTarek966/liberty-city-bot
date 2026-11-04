@@ -1,16 +1,16 @@
 ﻿// ============================================
-// Liberty City Bot - Logging Events (All-in-one)
+// Omni Bot - Logging Events (All-in-one)
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { recordDeletedMessage } from '../utils/snipeCache';
 
 // Message Delete
 const messageDeleteEvent: Event = {
   name: 'messageDelete',
   async execute(message: any) {
-    const client = message.client as LibertyClient;
+    const client = message.client as OmniClient;
     // 🕵️ حفظ نسخة من الرسالة محذوفة (سنايب) قبل معالجة السجلات
     recordDeletedMessage(message);
     // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)

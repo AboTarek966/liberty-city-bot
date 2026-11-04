@@ -20,7 +20,7 @@ import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { buildEmojiSelectRows, buildCommandAddModal } from '../../utils/emojiPicker';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { DEFAULT_TICKET_WELCOME_MESSAGE } from '../../utils/ticketMessages';
 import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
@@ -279,7 +279,7 @@ const handler: ButtonHandler = {
           return openModal('📋 حد القائمة', 'أقصى عدد أغاني في قائمة الانتظار', TextInputStyle.Short, 5, String(mq));
         }
         case 'general:prefix':
-          return openModal('تغيير بادئة الأوامر', 'مثال: lc! أو ! أو ?', TextInputStyle.Short, 5);
+          return openModal('تغيير بادئة الأوامر', 'مثال: omni! أو ! أو ?', TextInputStyle.Short, 5);
         case 'general:tz':
           return openModal('المنطقة الزمنية', 'مثال: Asia/Riyadh أو Europe/London', TextInputStyle.Short, 50);
         case 'welcome:msg':
@@ -714,7 +714,7 @@ const handler: ButtonHandler = {
                 title: v.title || '✅ توثيق العضوية',
                 description: v.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو',
                 ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
-                footer: { text: 'Liberty City Verification' },
+                footer: { text: `${interaction.guild!.name} • Verification` },
               },
             ],
             components: [
@@ -819,7 +819,7 @@ const handler: ButtonHandler = {
       }
       case 'levels:test': {
         // إرسال معاينة رسالة الترقية للقناة الحالية
-        const client = interaction.client as LibertyClient;
+        const client = interaction.client as OmniClient;
         await client.levelingHandler
           .sendLevelUpMessage(interaction.member as any, 99, interaction.channelId)
           .catch(() => {});
@@ -974,7 +974,7 @@ const handler: ButtonHandler = {
               `${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 80)}... (${new Date(a.at).toLocaleString('ar-SA')})`
             ).join('\n')
           )
-          .setFooter({ text: `${interaction.guild!.name} • Liberty City` })
+          .setFooter({ text: interaction.guild!.name })
           .setTimestamp();
         await interaction.followUp({ embeds: [embed], ephemeral: true });
         return;

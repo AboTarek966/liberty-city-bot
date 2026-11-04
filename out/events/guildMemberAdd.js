@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Guild Member Add Event
+// Omni Bot - Guild Member Add Event
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -108,7 +108,7 @@ async function handleAutoRole(member) {
         const role = member.guild.roles.cache.get(settings.autorole.roleId);
         if (!role)
             return;
-        await member.roles.add(role, 'Liberty City - Auto-Role');
+        await member.roles.add(role, 'Omni - Auto-Role');
         logger.info(`Auto-role ${role.name} given to ${member.user.tag}`);
     }
     catch (error) {
@@ -132,7 +132,7 @@ async function sendWelcomeDm(member, settings) {
                 title: `👋 مرحباً بك في ${member.guild.name}!`,
                 description: dmMessage,
                 ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
-                footer: { text: 'Liberty City' },
+                footer: { text: member.guild.name },
                 timestamp: new Date().toISOString(),
             },
         ],
@@ -228,6 +228,7 @@ async function logRaid(member, reason) {
         description: reason,
         color: '#FF3366',
         user: member.user,
+        guild: member.guild,
         fields: [
             { name: '👤 العضو', value: `${member}`, inline: true },
             { name: '🆔 المعرف', value: `\`${member.id}\``, inline: true },

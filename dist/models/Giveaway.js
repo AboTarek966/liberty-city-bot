@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Giveaway Model
+// Omni Bot - Giveaway Model
 // ============================================
 // سحب محفوظ في قاعدة البيانات — يبقى شغّالاً بعد إعادة تشغيل البوت
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {

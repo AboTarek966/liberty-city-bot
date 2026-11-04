@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Interaction Handler
+// Omni Bot - Interaction Handler
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };

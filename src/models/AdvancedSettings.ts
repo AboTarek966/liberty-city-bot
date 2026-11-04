@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Advanced Settings Model
+// Omni Bot - Advanced Settings Model
 // ============================================
 
 import mongoose, { Document, Schema } from 'mongoose';
@@ -173,7 +173,7 @@ const WelcomeConfigSchema = new Schema<IWelcomeConfig>({
     color: { type: String, default: '#00D4FF' },
     thumbnail: { type: Boolean, default: true },
     image: { type: String },
-    footer: { type: String, default: 'Liberty City Bot' },
+    footer: { type: String, default: 'Omni Bot' },
   },
   dmEnabled: { type: Boolean, default: false },
   dmMessage: { type: String, default: 'أهلاً بك في {server}! استمتع بإقامتك 🎉' },

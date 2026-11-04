@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Moderation Handler
+// Omni Bot - Moderation Handler
 // ============================================
 
 import {
@@ -85,6 +85,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'ban',
       moderator: moderator.user,
       target,
@@ -146,6 +147,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'kick',
       moderator: moderator.user,
       target,
@@ -211,6 +213,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'timeout',
       moderator: moderator.user,
       target,
@@ -273,6 +276,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'untimeout',
       moderator: moderator.user,
       target,
@@ -335,6 +339,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'warn',
       moderator: moderator.user,
       target,
@@ -412,6 +417,7 @@ export class ModerationHandler {
     })();
 
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'unwarn',
       moderator: moderator.user,
       target,
@@ -475,6 +481,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'mute',
       moderator: moderator.user,
       target,
@@ -538,6 +545,7 @@ export class ModerationHandler {
 
     // Create embed
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'unmute',
       moderator: moderator.user,
       target,
@@ -602,6 +610,7 @@ export class ModerationHandler {
     const caseId = await caseIdPromise;
 
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'role_add',
       moderator: moderator.user,
       target,
@@ -711,6 +720,7 @@ export class ModerationHandler {
     }
     const caseId = await caseIdPromise;
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'role_add',
       moderator: moderator.user,
       target,
@@ -784,6 +794,7 @@ export class ModerationHandler {
     const caseId = await caseIdPromise;
 
     const embed = moderationEmbed({
+      guildName: guild.name,
       type: 'role_remove',
       moderator: moderator.user,
       target,

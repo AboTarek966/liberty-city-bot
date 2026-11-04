@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Pay Command (تحويل الرصيد)
+// Omni Bot - Pay Command (تحويل الرصيد)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

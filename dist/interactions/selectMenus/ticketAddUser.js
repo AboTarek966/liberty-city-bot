@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Add User (UserSelectMenu)
+// Omni Bot - Ticket Add User (UserSelectMenu)
 // اختيار أعضاء من قائمة لإضافتهم للتذكرة (بديل حديث عن المودال)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

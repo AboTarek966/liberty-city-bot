@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Backup Command
+// Omni Bot - Backup Command
 // النسخ الاحتياطي: إنشاء، عرض، استعادة بنية السيرفر
 // ============================================
 
@@ -10,7 +10,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const command: Command = {
@@ -45,7 +45,7 @@ const command: Command = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const subcommand = interaction.options.getSubcommand();
-    const lc = interaction.client as LibertyClient;
+    const lc = interaction.client as OmniClient;
     const guild = interaction.guild!;
 
     await interaction.deferReply({ ephemeral: true });
@@ -71,7 +71,7 @@ const command: Command = {
               inline: false,
             }
           )
-          .setFooter({ text: 'Liberty City Backup' })
+          .setFooter({ text: `${guild.name} • Backup` })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
@@ -107,7 +107,7 @@ const command: Command = {
           .setTitle('📦 النسخ الاحتياطية المحفوظة')
           .setDescription(`${lines}\n\n*لاستعادة نسخة محددة: \`/backup restore number:<رقم>\`*`)
           .setColor(Colors.primary)
-          .setFooter({ text: 'Liberty City Backup' })
+          .setFooter({ text: `${guild.name} • Backup` })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
@@ -147,7 +147,7 @@ const command: Command = {
               inline: true,
             }
           )
-          .setFooter({ text: 'Liberty City Backup' })
+          .setFooter({ text: `${guild.name} • Backup` })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
@@ -183,7 +183,7 @@ const command: Command = {
                 { name: '🎭 رولات أُعيدت', value: `${result.roles}`, inline: true },
                 { name: '⏭️ تخطّي (موجود)', value: `${result.skipped}`, inline: true }
               )
-              .setFooter({ text: 'Liberty City Backup' })
+              .setFooter({ text: `${guild.name} • Backup` })
               .setTimestamp();
 
             const target = guild.channels.cache.get(channelId);

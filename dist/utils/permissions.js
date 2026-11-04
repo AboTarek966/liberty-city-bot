@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Permission Utilities
+// Omni Bot - Permission Utilities
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.COMMAND_PERMISSIONS = exports.PERMISSION_GROUPS = exports.PERMISSIONS = void 0;

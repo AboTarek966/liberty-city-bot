@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Translate Buttons
+// Omni Bot - Translate Buttons
 // ============================================
 // أزرار نتيجة /translate: 📋 نسخ | 🔄 إعادة | 🌐 تغيير اللغة
 // (كان مفقوداً تماماً → "This interaction failed")

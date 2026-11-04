@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Configuration Model
+// Omni Bot - AI Configuration Model
 // ============================================
 
 import mongoose, { Document, Schema } from 'mongoose';

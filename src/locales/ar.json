@@ -182,7 +182,7 @@
     "message": "{user} غادر السيرفر. أصبح عدد الأعضاء {count} 😢"
   },
   "help": {
-    "title": "📚 أوامر Liberty City",
+    "title": "📚 أوامر Omni",
     "description": "مرحباً {user}! إليك قائمة الأوامر المتاحة",
     "noCommand": "الأمر {command} غير موجود",
     "categories": {
@@ -196,7 +196,7 @@
     }
   },
   "bot": {
-    "name": "Liberty City",
+    "name": "Omni",
     "description": "بوت ديسكورد شامل مع حماية، تكتات، AI وإعدادات متقدمة",
     "version": "الإصدار 2.0.0",
     "ping": "🏓 Pong!",

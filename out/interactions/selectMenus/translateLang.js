@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Translate Language Picker
+// Omni Bot - Translate Language Picker
 // ============================================
 // قائمة اختيار اللغة لأزرار /translate (ترجمة النص الأصلي بلغة جديدة)
 Object.defineProperty(exports, "__esModule", { value: true });

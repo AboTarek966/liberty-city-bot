@@ -1,14 +1,14 @@
 ﻿// ============================================
-// Liberty City Bot - Voice State (Logging + Leveling XP)
+// Omni Bot - Voice State (Logging + Leveling XP)
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'voiceStateUpdate',
   async execute(oldState: any, newState: any) {
-    const client = (oldState.client || newState.client) as LibertyClient;
+    const client = (oldState.client || newState.client) as OmniClient;
 
     // سجلات الصوت
     // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)

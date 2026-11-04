@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Economy Handler
+// Omni Bot - Economy Handler
 // ============================================
 // نظام الاقتصاد الكامل: رصيد، بنك، متجر، تحويلات، صوت، مقامرة
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {

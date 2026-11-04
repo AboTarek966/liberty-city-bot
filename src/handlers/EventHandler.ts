@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Event Handler
+// Omni Bot - Event Handler
 // ============================================
 
 import { Client, Collection } from 'discord.js';

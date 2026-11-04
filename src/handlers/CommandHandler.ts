@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Command Handler
+// Omni Bot - Command Handler
 // ============================================
 
 import { 

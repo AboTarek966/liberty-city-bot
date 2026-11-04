@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Roulette (روليت)
+// Omni Bot - Roulette (روليت)
 // يختار شخصاً عشوائياً من المذكورين (أو من الأعضاء النشطين)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

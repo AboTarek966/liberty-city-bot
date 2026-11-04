@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - توليد الموسيقى والفيديو
+// Omni Bot - توليد الموسيقى والفيديو
 //
 // مجاني بالكامل عبر Hugging Face Spaces (ZeroGPU)
 //   ⚠️ يتطلب حساب Hugging Face مجاني (بلا بطاقة ائتمان) — HF_TOKEN
@@ -379,7 +379,7 @@ async function getAceParams() {
     try {
         const { data } = await axios_1.default.get(`https://${(0, hfSpaces_1.spaceHost)(ACE_INFO_URL)}.hf.space/gradio_api/info`, {
             timeout: 25_000,
-            headers: { 'User-Agent': 'LibertyCityBot' },
+            headers: { 'User-Agent': 'OmniBot' },
         });
         const params = data?.named_endpoints?.['/__call__']?.parameters;
         if (Array.isArray(params) && params.length >= 3) {

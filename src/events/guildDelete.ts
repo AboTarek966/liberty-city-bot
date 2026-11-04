@@ -1,12 +1,12 @@
 // ============================================
-// Liberty City Bot - Guild Delete
+// Omni Bot - Guild Delete
 // عند خروج البوت من سيرفر: تنظيف كل الموارد المرتبطة به
 // (مؤقتات الفحص/النسخ، كاش الدعوات، كاش الإعدادات، الصوت)
 // حتى لا يبقى للبوت أي أثر أو معرفة بذلك السيرفر
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 
 const logger = createLogger('GuildDelete');
@@ -16,7 +16,7 @@ const guildDeleteEvent: Event = {
   async execute(guild: any) {
     logger.info(`📤 Bot left guild: ${guild.name || guild.id} (${guild.id})`);
 
-    const client = (guild.client || undefined) as LibertyClient | undefined;
+    const client = (guild.client || undefined) as OmniClient | undefined;
     if (!client) return;
 
     try {

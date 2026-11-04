@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Duel (مبارزة)
+// Omni Bot - Duel (مبارزة)
 // معركة جولة بجولة مع شريط صحة متحرك
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

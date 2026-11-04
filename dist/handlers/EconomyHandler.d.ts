@@ -1,5 +1,5 @@
 import { Guild, GuildMember, User } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export interface EconomyConfig {
     enabled: boolean;
     currency: string;
@@ -40,7 +40,7 @@ export interface EconomyConfig {
 export declare class EconomyHandler {
     private client;
     private cooldowns;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     getConfig(guildId: string): Promise<EconomyConfig>;
     getProfile(guildId: string, userId: string): Promise<any>;
     private checkCooldown;

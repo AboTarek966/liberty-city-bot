@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - AI Command
+// Omni Bot - AI Command
 // ============================================
 
 import {
@@ -9,7 +9,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, AIConfig } from '../../models';
 import { config } from '../../config';
@@ -93,7 +93,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const subcommand = interaction.options.getSubcommand();
 
     switch (subcommand) {
@@ -115,7 +115,7 @@ const command: Command = {
 // --------------------------------------------
 async function handleChat(
   interaction: ChatInputCommandInteraction,
-  client: LibertyClient,
+  client: OmniClient,
   type: 'chat' | 'ask'
 ): Promise<void> {
   const message = interaction.options.getString(type === 'chat' ? 'message' : 'question', true);
@@ -247,7 +247,7 @@ async function handleChat(
 // --------------------------------------------
 // Clear
 // --------------------------------------------
-async function handleClear(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleClear(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
 
   await client.aiHandler.clearHistory(
@@ -264,7 +264,7 @@ async function handleClear(interaction: ChatInputCommandInteraction, client: Lib
 // --------------------------------------------
 // Info
 // --------------------------------------------
-async function handleInfo(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleInfo(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
 
   const providerInfo = client.aiHandler.getProviderInfo();
@@ -285,7 +285,7 @@ async function handleInfo(interaction: ChatInputCommandInteraction, client: Libe
 // --------------------------------------------
 // Config
 // --------------------------------------------
-async function handleConfig(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleConfig(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   // Check permissions
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     await interaction.reply({

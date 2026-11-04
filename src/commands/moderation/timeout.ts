@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Timeout Command
+// Omni Bot - Timeout Command
 // ============================================
 
 import {
@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -39,7 +39,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ModerateMembers],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const target = interaction.options.getUser('user', true);
     const duration = interaction.options.getString('duration', true);
     const reason = interaction.options.getString('reason') || 'لم يتم تحديد سبب';

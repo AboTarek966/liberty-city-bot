@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Ticket Assistant
+// Omni Bot - AI Ticket Assistant
 // ============================================
 // الـ AI يستلم التذكرة، يحلل المشكلة، يحاول يحلها
 // لو محتاج يعطي رول → يطلب موافقة أدمن أولاً
@@ -143,7 +143,7 @@ class AITicketAssistant {
                 .setTitle('🤖 AI Assistant — استلام التذكرة')
                 .setDescription('تم استلام التذكرة تلقائياً بواسطة الذكاء الاصطناعي. جاري تحليل المشكلة...')
                 .setColor(0x5865f2)
-                .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+                .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
                 .setTimestamp();
             await channel.send({ embeds: [embed] }).catch(() => { });
             logger.info(`AI auto-claimed ticket in ${channel.guild.name}`);
@@ -179,7 +179,7 @@ class AITicketAssistant {
                     .setTitle('🤖 AI Assistant — رد أولي')
                     .setDescription(response.content.slice(0, 4000))
                     .setColor(0x5865f2)
-                    .setFooter({ text: 'Liberty City AI • جاري تحليل المشكلة...' })
+                    .setFooter({ text: `${channel.guild.name} • AI • جاري تحليل المشكلة...` })
                     .setTimestamp();
                 await channel.send({ embeds: [embed] }).catch(() => { });
                 logger.info(`AI auto-response sent in ${channel.guild.name}`);
@@ -202,7 +202,7 @@ class AITicketAssistant {
 محتوى التذكرة: "${message.content}"
 المرفقات: ${message.attachments?.size > 0 ? [...message.attachments.values()].map((a) => a.name).join(', ') : 'لا توجد'}
     `.trim();
-        const prompt = `أنت مساعد دعم تقني ذكي (AI Ticket Assistant) في بوت Liberty City.
+        const prompt = `أنت مساعد دعم تقني ذكي (AI Ticket Assistant) في بوت Omni.
 
 **السياق:**
 ${context}
@@ -322,7 +322,7 @@ ${context}
                 ? embeds_1.Colors.warning
                 : embeds_1.Colors.info)
             .addFields({ name: '📂 التصنيف', value: this.getCategoryLabel(analysis.category), inline: true }, { name: '⚡ الخطورة', value: analysis.severity, inline: true }, { name: '🎯 الثقة', value: `${analysis.confidence}% (الحد ${threshold}%)`, inline: true }, { name: '📋 الملخص', value: analysis.summary || '—', inline: false }, { name: '💡 الحل المقترح', value: analysis.suggestedSolution || '—', inline: false })
-            .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+            .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
             .setTimestamp();
         await channel.send({ embeds: [initialEmbed] }).catch(() => { });
         const context = {
@@ -365,7 +365,7 @@ ${context}
                 .setTitle('⚙️ نتائج الإجراءات التلقائية')
                 .setColor(failedAuto > 0 ? embeds_1.Colors.warning : embeds_1.Colors.success)
                 .setDescription(autoResults.map(r => `> ${r}`).join('\n').slice(0, 4000))
-                .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+                .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
                 .setTimestamp();
             await channel.send({ embeds: [resultsEmbed] }).catch(() => { });
         }
@@ -536,7 +536,7 @@ ${context}
             value: analysis.suggestedSolution || 'لم يتم اقتراح حل آلي',
             inline: false,
         }, { name: '🎯 ثقة الـ AI', value: `${analysis.confidence}%`, inline: true })
-            .setFooter({ text: 'Liberty City AI Ticket Assistant — يتطلب مراجعة بشرية' })
+            .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant — يتطلب مراجعة بشرية` })
             .setTimestamp();
         await channel
             .send({
@@ -563,7 +563,7 @@ ${context}
                 .setTitle(data.title)
                 .setColor(data.color)
                 .addFields(data.fields)
-                .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+                .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
                 .setTimestamp();
             await logChannel.send({ embeds: [embed] }).catch(() => { });
         }

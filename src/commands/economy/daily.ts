@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Daily Command (المكافأة اليومية)
+// Omni Bot - Daily Command (المكافأة اليومية)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Interactive Games Button (ألعاب الأزرار)
+// Omni Bot - Interactive Games Button (ألعاب الأزرار)
 // يخدم 4 ألعاب عبر بادئة واحدة: fun:<لعبة>:<id>:<اختيار>
 //   fun:riddle    → لغز (أول إجابة صحيحة يفوز)
 //   fun:treasure  → صناديق الكنز (أول ضغطة تكشف)

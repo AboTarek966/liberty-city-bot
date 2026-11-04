@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - XO Button (حركات اللاعبين)
+// Omni Bot - XO Button (حركات اللاعبين)
 // ============================================
 
 import { ButtonInteraction, EmbedBuilder } from 'discord.js';

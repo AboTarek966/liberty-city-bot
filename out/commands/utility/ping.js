@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ping Command
+// Omni Bot - Ping Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

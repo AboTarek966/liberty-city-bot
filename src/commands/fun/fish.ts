@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Fishing (صيد السمك)
+// Omni Bot - Fishing (صيد السمك)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

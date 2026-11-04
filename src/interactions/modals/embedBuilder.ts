@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Embed Builder Modals (ebm|)
+// Omni Bot - Embed Builder Modals (ebm|)
 // ============================================
 
 import { ModalSubmitInteraction } from 'discord.js';

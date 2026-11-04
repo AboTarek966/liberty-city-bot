@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Ping Command
+// Omni Bot - Ping Command
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

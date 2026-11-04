@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Logging Events (All-in-one)
+// Omni Bot - Logging Events (All-in-one)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const snipeCache_1 = require("../utils/snipeCache");

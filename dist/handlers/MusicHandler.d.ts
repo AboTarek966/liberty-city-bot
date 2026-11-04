@@ -1,5 +1,5 @@
 import { GuildMember, VoiceBasedChannel, EmbedBuilder, ButtonBuilder, ActionRowBuilder } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export interface Track {
     title: string;
     url: string;
@@ -42,7 +42,7 @@ export declare class MusicHandler {
     private profStarted;
     private idleLeaveTimers;
     private static readonly IDLE_LEAVE_MS;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     private prewarm;
     private cpuTick;
     private startProfile;
@@ -100,5 +100,5 @@ export declare class MusicHandler {
     isConnected(guildId: string): boolean;
     leave(guildId: string): void;
 }
-export declare const musicHandler: (client: LibertyClient) => MusicHandler;
+export declare const musicHandler: (client: OmniClient) => MusicHandler;
 //# sourceMappingURL=MusicHandler.d.ts.map

@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Interaction Handler
+// Omni Bot - Interaction Handler
 // ============================================
 
 import {

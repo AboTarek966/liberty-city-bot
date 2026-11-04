@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Web Search Utility (مع fallback)
+// Omni Bot - Web Search Utility (مع fallback)
 // يدعم: SerpAPI (مفتاح في .env) أو DuckDuckGo HTML fallback
 // ============================================
 
@@ -155,7 +155,7 @@ async function wikiFetch(url: string, timeoutMs = 12_000): Promise<Response> {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastWikiCallAt = Date.now();
   return fetch(url, {
-    headers: { 'User-Agent': 'LibertyCityBot/2.0 (Discord bot)' },
+    headers: { 'User-Agent': 'OmniBot/2.0 (Discord bot)' },
     signal: AbortSignal.timeout(timeoutMs),
   });
 }

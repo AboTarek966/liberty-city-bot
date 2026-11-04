@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Animal Race (سباق الحيوانات)
+// Omni Bot - Animal Race (سباق الحيوانات)
 // سباق متحرك بين 2-6 مشاركين
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

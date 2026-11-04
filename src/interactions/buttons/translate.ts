@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Translate Buttons
+// Omni Bot - Translate Buttons
 // ============================================
 // أزرار نتيجة /translate: 📋 نسخ | 🔄 إعادة | 🌐 تغيير اللغة
 // (كان مفقوداً تماماً → "This interaction failed")
@@ -13,7 +13,7 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { SUPPORTED_LANGUAGES } from '../../handlers/AITranslator';
 import { getTranslation } from '../../utils/translateStore';
 
@@ -25,7 +25,7 @@ const LANG_CHOICES = Object.entries(SUPPORTED_LANGUAGES)
 const handler: ButtonHandler = {
   id: 'translate',
   async execute(interaction: ButtonInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const parts = interaction.customId.split(':'); // translate:action:extra?
     const action = parts[1];
     const extra = parts[2];

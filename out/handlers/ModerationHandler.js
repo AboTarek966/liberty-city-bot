@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Moderation Handler
+// Omni Bot - Moderation Handler
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -71,6 +71,7 @@ class ModerationHandler {
         const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'ban',
             moderator: moderator.user,
             target,
@@ -121,6 +122,7 @@ class ModerationHandler {
         const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'kick',
             moderator: moderator.user,
             target,
@@ -174,6 +176,7 @@ class ModerationHandler {
         const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'timeout',
             moderator: moderator.user,
             target,
@@ -225,6 +228,7 @@ class ModerationHandler {
         const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'untimeout',
             moderator: moderator.user,
             target,
@@ -278,6 +282,7 @@ class ModerationHandler {
         });
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'warn',
             moderator: moderator.user,
             target,
@@ -347,6 +352,7 @@ class ModerationHandler {
             }
         })();
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'unwarn',
             moderator: moderator.user,
             target,
@@ -398,6 +404,7 @@ class ModerationHandler {
         const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'mute',
             moderator: moderator.user,
             target,
@@ -449,6 +456,7 @@ class ModerationHandler {
         const caseId = await caseIdPromise;
         // Create embed
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'unmute',
             moderator: moderator.user,
             target,
@@ -500,6 +508,7 @@ class ModerationHandler {
         await target.roles.add(role, `${reason} | بواسطة ${moderator.user.tag}`);
         const caseId = await caseIdPromise;
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'role_add',
             moderator: moderator.user,
             target,
@@ -588,6 +597,7 @@ class ModerationHandler {
         }
         const caseId = await caseIdPromise;
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'role_add',
             moderator: moderator.user,
             target,
@@ -650,6 +660,7 @@ class ModerationHandler {
         await target.roles.remove(role, `${reason} | بواسطة ${moderator.user.tag}`);
         const caseId = await caseIdPromise;
         const embed = (0, embeds_1.moderationEmbed)({
+            guildName: guild.name,
             type: 'role_remove',
             moderator: moderator.user,
             target,

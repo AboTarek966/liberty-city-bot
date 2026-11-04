@@ -1,14 +1,14 @@
 // ============================================
-// Liberty City Bot - Emoji Delete Protection
+// Omni Bot - Emoji Delete Protection
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'guildEmojiDelete',
   async execute(emoji: any) {
-    const client = emoji.client as LibertyClient;
+    const client = emoji.client as OmniClient;
     await client.securityHandler.onGuildEmojiDelete(emoji).catch(() => {});
   },
 };

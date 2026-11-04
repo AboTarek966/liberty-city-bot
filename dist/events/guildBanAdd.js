@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ban Logging
+// Omni Bot - Ban Logging
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

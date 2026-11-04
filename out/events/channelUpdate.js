@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Channel Update Protection
+// Omni Bot - Channel Update Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Scam Link Filter (فلتر الروابط الاحتيالية)
+// Omni Bot - Scam Link Filter (فلتر الروابط الاحتيالية)
 // حماية من روابط صيد النيترو والمشاريع المزيفة (ديسكورد/ستيم/إيлон ماسك...)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -103,7 +103,7 @@ async function handleScamFilter(message, client) {
                             { name: '🔗 المطابقة', value: `\`${result.matched || '—'}\` — ${result.reason}`, inline: false },
                             { name: '📄 النص', value: message.content.substring(0, 500) || '—', inline: false },
                         ],
-                        footer: { text: 'Liberty City Security' },
+                        footer: { text: `${message.guild?.name || 'Omni'} • Security` },
                         timestamp: new Date().toISOString(),
                     },
                 ],

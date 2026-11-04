@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Bomb (اقطع السلك)
+// Omni Bot - Bomb (اقطع السلك)
 // قنبلة بسلك صحيح واحد — تحديد الرياضيات ينقذك
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Activity Tracker
+// Omni Bot - Activity Tracker
 // Daily / Weekly / Monthly / Total stats for
 // text messages and voice time
 // ============================================

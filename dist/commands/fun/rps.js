@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Rock Paper Scissors (حجر ورقة مقص)
+// Omni Bot - Rock Paper Scissors (حجر ورقة مقص)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

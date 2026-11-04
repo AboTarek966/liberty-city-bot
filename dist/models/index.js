@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Database Models
+// Omni Bot - Database Models
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -125,7 +125,7 @@ const ShopItemSchema = new mongoose_1.Schema({
 }, { _id: false });
 const GuildSettingsSchema = new mongoose_1.Schema({
     guildId: { type: String, required: true, unique: true, index: true },
-    prefix: { type: String, default: 'lc!' },
+    prefix: { type: String, default: 'omni!' },
     language: { type: String, default: 'ar' },
     timezone: { type: String, default: 'Asia/Riyadh' },
     settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
@@ -479,7 +479,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         enabled: { type: Boolean, default: true },
         provider: { type: String, enum: ['openai', 'anthropic', 'both'], default: 'openai' },
         model: { type: String, default: 'gpt-4-turbo-preview' },
-        systemPrompt: { type: String, default: 'أنت مساعد ذكي لبوت Liberty City. أنت ودود، مفيد، وتتكلم العربية بطلاقة.' },
+        systemPrompt: { type: String, default: 'أنت مساعد ذكي لبوت Omni. أنت ودود، مفيد، وتتكلم العربية بطلاقة.' },
         temperature: { type: Number, default: 0.7 },
         maxTokens: { type: Number, default: 2000 },
         cooldown: { type: Number, default: 3000 },

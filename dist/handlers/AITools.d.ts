@@ -1,5 +1,5 @@
 import { Guild, GuildMember } from 'discord.js';
-import { LibertyClient } from './../LibertyClient';
+import { OmniClient } from './../OmniClient';
 export interface AIToolResult {
     success: boolean;
     message: string;
@@ -8,7 +8,7 @@ export interface AIToolResult {
 export interface ToolContext {
     guild: Guild;
     executor: GuildMember;
-    client: LibertyClient;
+    client: OmniClient;
     reason?: string;
 }
 export declare function executeAITool(toolName: string, args: any, context: ToolContext): Promise<AIToolResult>;

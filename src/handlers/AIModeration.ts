@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Moderation
+// Omni Bot - AI Moderation
 // أوامر العقوبات باللغة الطبيعية عبر المحادثة
 // مثال: "أريدك أن تعطي تايم أوت لهذا العضو @user لمدة 5m"
 //
@@ -8,7 +8,7 @@
 // ============================================
 
 import { Message, Guild, GuildMember, User, PermissionFlagsBits, EmbedBuilder, ChannelType, TextChannel, ColorResolvable } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { getGuildSettings } from '../models';
 import { Colors } from '../utils/embeds';
@@ -168,7 +168,7 @@ function extractDurationMs(text: string): number | null {
 // --------------------------------------------
 async function resolveTarget(
   message: Message,
-  client: LibertyClient
+  client: OmniClient
 ): Promise<{ user: User; member?: GuildMember } | null> {
   const guild = message.guild!;
 
@@ -320,7 +320,7 @@ export async function runSequentialWarn(opts: {
 // --------------------------------------------
 export async function executeAIModeration(
   message: Message,
-  client: LibertyClient,
+  client: OmniClient,
   question: string
 ): Promise<boolean> {
   if (!message.guild || !message.member) return false;

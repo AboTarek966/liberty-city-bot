@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Darts (رمي السهم)
+// Omni Bot - Darts (رمي السهم)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

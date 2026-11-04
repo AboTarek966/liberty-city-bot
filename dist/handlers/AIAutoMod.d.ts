@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export interface AutoModConfig {
     enabled: boolean;
     categories: {
@@ -44,7 +44,7 @@ export declare class AIAutoModHandler {
     private aiHandler;
     private warningCounts;
     private recentMessages;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     scanMessage(message: Message): Promise<AutoModResult | null>;
     private getConfig;
     private buildContext;

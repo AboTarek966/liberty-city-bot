@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Music Commands
+// Omni Bot - Music Commands
 // أوامر الموسيقى
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -80,7 +80,7 @@ const musicCommand = {
                             .setDescription(`**${track.title}**`)
                             .setURL(track.url)
                             .setThumbnail(track.thumbnail)
-                            .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
+                            .setFooter({ text: `${interaction.guild.name} • Music • ${interaction.user.tag}` })
                             .setTimestamp()
                         : music.panelEmbed(guildId, interaction.user.tag));
                     await interaction.editReply({
@@ -170,7 +170,7 @@ const musicCommand = {
                         .setURL(track.url)
                         .setThumbnail(track.thumbnail)
                         .addFields({ name: '⏱️ المدة', value: formatDuration(track.duration), inline: true }, { name: '👤 طلبها', value: track.requestedBy, inline: true }, { name: '🔁 التكرار', value: queue.loop === 'track' ? '🔁 الأغنية' : queue.loop === 'queue' ? '🔂 القائمة' : '❌ معطل', inline: true }, { name: '🔊 الصوت', value: `${queue.volume}%`, inline: true })
-                        .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
+                        .setFooter({ text: `${interaction.guild.name} • Music • ${interaction.user.tag}` })
                         .setTimestamp();
                     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder().setCustomId('music:pause').setLabel('⏸️').setStyle(discord_js_1.ButtonStyle.Secondary), new discord_js_1.ButtonBuilder().setCustomId('music:resume').setLabel('▶️').setStyle(discord_js_1.ButtonStyle.Success), new discord_js_1.ButtonBuilder().setCustomId('music:skip').setLabel('⏭️').setStyle(discord_js_1.ButtonStyle.Primary), new discord_js_1.ButtonBuilder().setCustomId('music:stop').setLabel('⏹️').setStyle(discord_js_1.ButtonStyle.Danger));
                     await interaction.editReply({ embeds: [embed], components: [row] });

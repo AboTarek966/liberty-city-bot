@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Sticker Delete Logging
+// Omni Bot - Sticker Delete Logging
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Register Commands Script
+// Omni Bot - Register Commands Script
 // ============================================
 
 import { REST, Routes } from 'discord.js';

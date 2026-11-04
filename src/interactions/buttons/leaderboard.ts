@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Leaderboard Buttons
+// Omni Bot - Leaderboard Buttons
 // customId: lb|<type>|<period>|<limit>|<page>[|<mark>]
 //   mark: prev / next / r (تحديث) / p (فترة) / t (نوع)
 // التنسيق القديم (بدون صفحة) يُعامَل كصفحة 1
@@ -7,7 +7,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import {
   buildLeaderboardPage,
   sanitizeType,
@@ -34,7 +34,7 @@ const handler: ButtonHandler = {
     if (mark === 'prev') page -= 1;
     else if (mark === 'next') page += 1;
 
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
 
     // (تجميع الصفوف ثم تقسيمها إلى صفحات يتم داخل الباني،
     //  ورقم الصفحة يُصحَّح تلقائياً إذا تجاوز الإجمالي)

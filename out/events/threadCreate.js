@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Thread Create Protection
+// Omni Bot - Thread Create Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

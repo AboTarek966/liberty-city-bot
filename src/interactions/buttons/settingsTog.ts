@@ -6,7 +6,7 @@ import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerificationPanel, buildShop, sendWelcomeCardPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, invalidateGuildSettings, AIConfig } from '../../models';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { setLockdown } from '../../utils/lockdown';
 import { gateProtectionOff } from '../../utils/ownerApproval';
 
@@ -221,20 +221,20 @@ const handler: ButtonHandler = {
     // ♻️ أبطِل كاش الإعدادات فوراً حتى يُطبَّق التبديل في كل معالجات الحماية بلا تأخير
     invalidateGuildSettings(interaction.guild.id);
     if (section === 'logging') {
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       client.loggingHandler?.invalidateCache?.(interaction.guild.id);
     }
 
     // 💾 مزامنة مؤقت النسخ الاحتياطي التلقائي فور تبديلته
     if (section === 'protection' && field === 'autoBackup') {
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       const nowEnabled = (settings.protection as any).autoBackup?.enabled;
       await client.securityHandler?.syncAutoBackup(interaction.guild, !!nowEnabled).catch(() => {});
     }
 
     // 🔍 مزامنة مؤقت الفحص الدوري فور تبديلته
     if (section === 'protection' && field === 'autoScan') {
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       if (!(settings.protection as any).autoScan) {
         (settings.protection as any).autoScan = { enabled: true, interval: 6 };
         await settings.save();
@@ -244,7 +244,7 @@ const handler: ButtonHandler = {
 
     // 📨 تحديث كاش الدعوات عند تفعيل/تعطيل Invite Tracker
     if (section === 'protection' && field === 'inviteTracker') {
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       if (!(settings.protection as any).inviteTracker) {
         (settings.protection as any).inviteTracker = { enabled: true };
         await settings.save();

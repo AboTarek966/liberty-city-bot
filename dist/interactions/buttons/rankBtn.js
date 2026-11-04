@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Rank Buttons (تفاعل بطاقة المستوى)
+// Omni Bot - Rank Buttons (تفاعل بطاقة المستوى)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const rank_1 = require("../../commands/info/rank");

@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Protection Command
+// Omni Bot - Protection Command
 // ============================================
 
 import {
@@ -9,7 +9,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { gateProtectionOff } from '../../utils/ownerApproval';
@@ -357,7 +357,7 @@ async function showStatus(interaction: ChatInputCommandInteraction, settings: an
         inline: true,
       },
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -391,7 +391,7 @@ async function configureAntiRaid(interaction: ChatInputCommandInteraction, setti
       { name: 'الحد', value: `${settings.protection.antiRaid.threshold} عضو/دقيقة`, inline: true },
       { name: 'الإجراء', value: getActionName(settings.protection.antiRaid.action), inline: true },
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -420,7 +420,7 @@ async function configureAntiSpam(interaction: ChatInputCommandInteraction, setti
       { name: 'الحد الأقصى', value: `${settings.protection.antiSpam.maxMessages} رسائل/5 ثوانٍ`, inline: true },
       { name: 'الإجراء', value: getActionName(settings.protection.antiSpam.action), inline: true },
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -455,7 +455,7 @@ async function configureAntiLink(interaction: ChatInputCommandInteraction, setti
         inline: false,
       },
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -481,7 +481,7 @@ async function configureAntiInvite(interaction: ChatInputCommandInteraction, set
       { name: 'الحالة', value: enabled ? '✅ مفعل' : '❌ معطل', inline: true },
       { name: 'الإجراء', value: getActionName(settings.protection.antiInvite.action), inline: true },
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -519,7 +519,7 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
 
   // 🛡️ قراءة تسلّم البوت — أهم مؤشر يحدّد إن كانت العقوبة ستنجح أصلاً
   const hierarchy = interaction.guild
-    ? (interaction.client as LibertyClient).securityHandler.checkHierarchy(interaction.guild)
+    ? (interaction.client as OmniClient).securityHandler.checkHierarchy(interaction.guild)
     : null;
 
   const hierarchyLine = !hierarchy
@@ -558,7 +558,7 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
           }]
         : [])
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -574,7 +574,7 @@ async function configureHierarchy(interaction: ChatInputCommandInteraction): Pro
     return;
   }
 
-  const client = interaction.client as LibertyClient;
+  const client = interaction.client as OmniClient;
   const s = client.securityHandler.checkHierarchy(guild);
 
   const embed = new EmbedBuilder()
@@ -613,7 +613,7 @@ async function configureHierarchy(interaction: ChatInputCommandInteraction): Pro
             inline: false,
           }])
     )
-    .setFooter({ text: 'Liberty City — Hierarchy Guard' })
+    .setFooter({ text: `${interaction.guild!.name} — Hierarchy Guard` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -674,7 +674,7 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
         inline: false,
       }
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -708,7 +708,7 @@ async function configureAntiAdmin(interaction: ChatInputCommandInteraction, sett
         inline: false,
       }
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -731,7 +731,7 @@ async function configureAutoBackup(interaction: ChatInputCommandInteraction, set
   await settings.save();
   invalidateGuildSettings(interaction.guildId!);
 
-  const lc = interaction.client as LibertyClient;
+  const lc = interaction.client as OmniClient;
   await lc.securityHandler.syncAutoBackup(interaction.guild!, false);
 
   let backupLine = '—';
@@ -761,7 +761,7 @@ async function configureAutoBackup(interaction: ChatInputCommandInteraction, set
         inline: false,
       }
     )
-    .setFooter({ text: 'Liberty City Protection' })
+    .setFooter({ text: `${interaction.guild!.name} • Protection` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

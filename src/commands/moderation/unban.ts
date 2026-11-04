@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Unban Command
+// Omni Bot - Unban Command
 // ============================================
 
 import {
@@ -9,7 +9,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const command: Command = {
@@ -28,7 +28,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.BanMembers],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     const user = interaction.options.getUser('user', true);
     const reason = interaction.options.getString('reason') || 'إلغاء حظر';

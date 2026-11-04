@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Tools / Function Calling
+// Omni Bot - AI Tools / Function Calling
 // ============================================
 // أدوات يستطيع الـ AI استدعاؤها لتنفيذ إجراءات Discord حقيقية
 Object.defineProperty(exports, "__esModule", { value: true });

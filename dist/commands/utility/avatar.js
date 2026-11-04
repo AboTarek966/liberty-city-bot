@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Avatar Command
+// Omni Bot - Avatar Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -35,7 +35,7 @@ const command = {
                 : 'غير متاح (ليست متحركة)',
             inline: true,
         })
-            .setFooter({ text: 'Liberty City Bot' })
+            .setFooter({ text: interaction.guild?.name || 'Omni' })
             .setTimestamp();
         await interaction.reply({ embeds: [embed] });
     },

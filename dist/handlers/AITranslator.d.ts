@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export declare const SUPPORTED_LANGUAGES: Record<string, {
     name: string;
     flag: string;
@@ -27,7 +27,7 @@ export declare class AITranslator {
     private aiHandler;
     private translationCache;
     private readonly CACHE_TTL;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     translate(text: string, targetLang: string, sourceLang?: string, guildId?: string): Promise<TranslationResult | null>;
     private buildTranslationPrompt;
     private extractTranslation;

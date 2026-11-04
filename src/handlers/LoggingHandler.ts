@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Logging Handler (Complete)
+// Omni Bot - Logging Handler (Complete)
 // ============================================
 
 import {
@@ -219,7 +219,7 @@ const EVENT_COLORS: Record<LogEventType, number> = {
       const targetId = config.splits[eventType] || config.channelId;
       if (!targetId) return;
 
-      embed.setFooter({ text: `Liberty City • ${eventType}` });
+      embed.setFooter({ text: `${guild.name} • ${eventType}` });
       embed.setTimestamp();
       this.sanitizeEmbed(embed);
 

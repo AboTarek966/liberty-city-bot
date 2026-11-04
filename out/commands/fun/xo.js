@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - XO Command (إكس أو — ضد لاعب)
+// Omni Bot - XO Command (إكس أو — ضد لاعب)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

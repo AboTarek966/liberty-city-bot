@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Verify Modal (كابتشا التوثيق)
+// Omni Bot - Verify Modal (كابتشا التوثيق)
 // ============================================
 
 import { ModalSubmitInteraction } from 'discord.js';

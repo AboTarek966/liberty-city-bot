@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Warn Command
+// Omni Bot - Warn Command
 // ============================================
 
 import {
@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -33,7 +33,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ModerateMembers],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const target = interaction.options.getUser('user', true);
     const reason = interaction.options.getString('reason', true);
 

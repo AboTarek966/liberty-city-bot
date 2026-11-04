@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Game Stats Model
+// Omni Bot - Game Stats Model
 // ============================================
 
 import mongoose, { Document, Schema } from 'mongoose';

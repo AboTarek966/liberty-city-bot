@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Protection Handler
+// Omni Bot - Protection Handler
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -101,7 +101,7 @@ class ProtectionHandler {
                 const webhooks = await channel.webhooks.fetch();
                 const target = webhooks.find((w) => w.id === message.webhookId);
                 if (target) {
-                    await target.delete('Liberty City — Anti-Webhook-Spam');
+                    await target.delete('Omni — Anti-Webhook-Spam');
                     webhookDeleted = true;
                 }
             }
@@ -125,7 +125,7 @@ class ProtectionHandler {
             try {
                 const member = await message.guild.members.fetch(executor.id).catch(() => null);
                 if (member && !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
-                    await member.kick('Liberty City — Anti-Webhook-Spam (Death Note)');
+                    await member.kick('Omni — Anti-Webhook-Spam (Death Note)');
                     punished = true;
                 }
             }
@@ -379,7 +379,7 @@ class ProtectionHandler {
                 color: 0xff3366,
                 title: '⚠️ تم حذف رسالتك',
                 description: `سبب: ${action.reason}`,
-                footer: { text: 'Liberty City Protection' },
+                footer: { text: `${message.guild?.name || 'Omni'} • Protection` },
                 timestamp: new Date().toISOString(),
             };
             const warningMessage = message.channel.isTextBased() && 'send' in message.channel
@@ -452,7 +452,7 @@ class ProtectionHandler {
                 { name: '⚙️ الإجراء', value: action.type, inline: true },
                 { name: '📝 الرسالة', value: message.content.substring(0, 1000) || 'N/A', inline: false },
             ],
-            footer: { text: 'Liberty City Protection Logs' },
+            footer: { text: `${message.guild?.name || 'Omni'} • Protection Logs` },
             timestamp: new Date().toISOString(),
         };
         await logChannel.send({ embeds: [logEmbed] }).catch(() => { });
@@ -567,7 +567,7 @@ class ProtectionHandler {
                     : discord_js_1.GuildVerificationLevel.High;
                 if (escalate && currentLevel < targetLevel) {
                     try {
-                        await guild.setVerificationLevel(targetLevel, 'Liberty City Beast Mode');
+                        await guild.setVerificationLevel(targetLevel, 'Omni Beast Mode');
                         this.verificationState.set(guildId, { applied: targetLevel, previous: currentLevel, at: Date.now() });
                     }
                     catch (e) {
@@ -613,7 +613,7 @@ class ProtectionHandler {
                 const state = this.verificationState.get(guildId);
                 if (state && guild.verificationLevel === state.applied) {
                     try {
-                        await guild.setVerificationLevel(state.previous, 'Liberty City Beast Mode recovery');
+                        await guild.setVerificationLevel(state.previous, 'Omni Beast Mode recovery');
                     }
                     catch { }
                 }

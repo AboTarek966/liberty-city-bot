@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - XO Button (حركات اللاعبين)
+// Omni Bot - XO Button (حركات اللاعبين)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

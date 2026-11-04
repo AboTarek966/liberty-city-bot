@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Command
+// Omni Bot - Ticket Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -230,7 +230,7 @@ async function handleAddRole(interaction) {
         `🤝 استلام التذاكر واستلام إشعاراتها\n` +
         `📂 رؤية جميع قنوات التذاكر\n` +
         `🔒 إغلاق وحذف التذاكر`)
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${interaction.guild.name} • Tickets` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -266,7 +266,7 @@ async function handleListRoles(interaction) {
         ? roleIds.map((id) => `• <@&${id}>`).join('\n')
         : 'لا توجد رولات مُضافة بعد.\nاستخدم `/ticket addrole role:@الرول` لإضافة رول.')
         .addFields({ name: '📁 فئة التذاكر', value: settings.tickets.categoryId ? `<#${settings.tickets.categoryId}>` : 'غير محددة', inline: true }, { name: '📋 قناة السجلات', value: settings.tickets.logChannelId ? `<#${settings.tickets.logChannelId}>` : 'غير محددة', inline: true }, { name: '🔢 الحد الأقصى/عضو', value: `${settings.tickets.maxPerUser}`, inline: true })
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${interaction.guild.name} • Tickets` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -292,7 +292,7 @@ async function handleSetup(interaction, client) {
         .setTitle('✅ تم إعداد نظام التذاكر')
         .setColor(embeds_1.Colors.success)
         .addFields({ name: '📁 الفئة', value: `${category}`, inline: true }, { name: '📋 قناة السجلات', value: logChannel ? `${logChannel}` : 'غير محددة', inline: true }, { name: '🛡️ رول الدعم', value: supportRole ? `${supportRole}` : 'غير محدد', inline: true }, { name: '📊 الحد الأقصى للمستخدم', value: `${settings.tickets.maxPerUser}`, inline: true })
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${interaction.guild.name} • Tickets` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -324,7 +324,7 @@ async function handlePanel(interaction, client) {
             '> • عدّل النصوص والأنواع من `/settings` → 🎫 التذاكر',
         inline: false,
     })
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${interaction.guild.name} • Tickets` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -403,7 +403,7 @@ async function handleStats(interaction, client) {
         .setTitle('📊 إحصائيات التذاكر')
         .setColor(embeds_1.Colors.primary)
         .addFields({ name: '📦 إجمالي التذاكر', value: `${stats.total}`, inline: true }, { name: '🟢 مفتوحة', value: `${stats.open}`, inline: true }, { name: '🔵 مستلمة', value: `${stats.claimed}`, inline: true }, { name: '🟡 بالانتظار', value: `${stats.waiting}`, inline: true }, { name: '🔴 مغلقة', value: `${stats.closed}`, inline: true })
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${interaction.guild.name} • Tickets` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -420,7 +420,7 @@ async function handleMyStats(interaction) {
         .setDescription(`👤 ${interaction.user}\n\n` +
         `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
         `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`)
-        .setFooter({ text: 'Liberty City Tickets' })
+        .setFooter({ text: `${interaction.guild.name} • Tickets` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }

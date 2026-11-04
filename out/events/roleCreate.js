@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Create Protection
+// Omni Bot - Role Create Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

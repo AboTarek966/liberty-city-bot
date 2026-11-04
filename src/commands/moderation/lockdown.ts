@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Lockdown Command (وضع الطوارئ)
+// Omni Bot - Lockdown Command (وضع الطوارئ)
 // يقفل الكتابة في القنوات النصية والدخول في الصوتية
 // ============================================
 
@@ -10,7 +10,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { getGuildSettings } from '../../models';
 import { setLockdown } from '../../utils/lockdown';
 import { Colors } from '../../utils/embeds';
@@ -96,7 +96,7 @@ const command: Command = {
           inline: false,
         }
       )
-      .setFooter({ text: 'Liberty City Security' })
+      .setFooter({ text: `${interaction.guild!.name} • Security` })
       .setTimestamp();
 
     // تسجيل في قناة السجلات

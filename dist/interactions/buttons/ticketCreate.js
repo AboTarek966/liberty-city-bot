@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Create Button
+// Omni Bot - Ticket Create Button
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const handler = {

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Auto-Moderation
+// Omni Bot - AI Auto-Moderation
 // ============================================
 // الـ AI يقرأ كل رسالة بنفسه ويقرر: سبام/سم/إباحي/احتيال/تهديد/تسريب بيانات
 // يتصرف تلقائياً: يحذف/يحذر/يكتم/يبن + لاوج كامل
@@ -13,7 +13,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { AIHandler } from './AIHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { getGuildSettings, ModerationCase } from '../models';
 import { createLogger } from '../utils/helpers';
 import { Colors } from '../utils/embeds';
@@ -101,12 +101,12 @@ const DEFAULT_CONFIG: AutoModConfig = {
 };
 
 export class AIAutoModHandler {
-  private client: LibertyClient;
+  private client: OmniClient;
   private aiHandler: AIHandler;
   private warningCounts: Map<string, Map<string, number>> = new Map(); // guildId -> userId -> count
   private recentMessages: Map<string, { content: string; timestamp: number; userId: string }[]> = new Map();
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
     this.aiHandler = client.aiHandler;
   }
@@ -425,7 +425,7 @@ ${context}
         { name: '📝 السبب', value: result.reason, inline: false },
         { name: '💬 الرسالة', value: message.content.substring(0, 500) || '(فارغة/مرفقات)', inline: false },
       )
-      .setFooter({ text: 'Liberty City AI Auto-Mod' })
+      .setFooter({ text: `${message.guild?.name || 'Omni'} • AI Auto-Mod` })
       .setTimestamp();
 
     await logChannel.send({ embeds: [embed] }).catch(() => {});

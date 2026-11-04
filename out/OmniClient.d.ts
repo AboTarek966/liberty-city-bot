@@ -1,0 +1,47 @@
+import { Client, Collection } from 'discord.js';
+import { CommandHandler, EventHandler, InteractionHandler, AIHandler, AIInvestigator, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, DashboardCommandWorker } from './handlers';
+import { Express } from 'express';
+export declare class OmniClient extends Client {
+    commandHandler: CommandHandler;
+    eventHandler: EventHandler;
+    interactionHandler: InteractionHandler;
+    aiHandler: AIHandler;
+    aiInvestigator: AIInvestigator;
+    protectionHandler: ProtectionHandler;
+    ticketHandler: TicketHandler;
+    moderationHandler: ModerationHandler;
+    loggingHandler: LoggingHandler;
+    activityTracker: ActivityTracker;
+    securityHandler: SecurityHandler;
+    levelingHandler: LevelingHandler;
+    antiAltHandler: AntiAltHandler;
+    inviteTrackerHandler: InviteTrackerHandler;
+    messageScannerHandler: MessageScannerHandler;
+    aiAutoModHandler: AIAutoModHandler;
+    aiTicketAssistant: AITicketAssistant;
+    aiTranslator: AITranslator;
+    economyHandler: EconomyHandler;
+    gameHandler: GameHandler;
+    musicHandler: MusicHandler;
+    dashboardCommandWorker: DashboardCommandWorker;
+    expressApp: Express;
+    private restTokenTimer?;
+    cooldowns: Collection<string, Collection<string, number>>;
+    guildSettingsCache: Collection<string, any>;
+    constructor();
+    private setupExpress;
+    private setupApiRoutes;
+    private getGuildSettings;
+    private updateGuildSettings;
+    private getGuildStats;
+    private getDashboardStats;
+    initialize(): Promise<void>;
+    private startRestTokenGuard;
+    private connectDatabase;
+    private loadHandlers;
+    registerCommands(): Promise<void>;
+    setStatus(): void;
+    cleanup(): Promise<void>;
+}
+export default OmniClient;
+//# sourceMappingURL=OmniClient.d.ts.map

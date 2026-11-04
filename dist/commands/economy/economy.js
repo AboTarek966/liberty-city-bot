@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Economy Commands
+// Omni Bot - Economy Commands
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -112,7 +112,7 @@ const economyCommand = {
                         .setColor(discord_js_1.Colors.Gold)
                         .addFields({ name: '💵 الرصيد', value: client.economyHandler.formatCurrency(profile.balance, config), inline: true }, { name: '🏦 البنك', value: client.economyHandler.formatCurrency(profile.bank, config), inline: true }, { name: '💎 الإجمالي', value: client.economyHandler.formatCurrency(profile.balance + profile.bank, config), inline: true })
                         .setThumbnail(targetUser.displayAvatarURL())
-                        .setFooter({ text: `Liberty City Economy • ${targetUser.tag}` })
+                        .setFooter({ text: `${interaction.guild.name} • Economy • ${targetUser.tag}` })
                         .setTimestamp();
                     await interaction.editReply({ embeds: [embed] });
                     break;

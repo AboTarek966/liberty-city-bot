@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Verify Setup Command
+// Omni Bot - Verify Setup Command
 // ============================================
 // /verify setup | send | disable | status
 // بوابة تحقق كاملة: رول + قناة + عمر الحساب + كابتشا + رول حجر + سجل
@@ -183,7 +183,7 @@ const command: Command = {
           inline: true,
         }
       )
-      .setFooter({ text: `${guild.name} • Liberty City Verification` })
+      .setFooter({ text: `${guild.name} • Verification` })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -222,7 +222,7 @@ export async function sendVerificationPanel(
     .setTitle(v.title || '✅ توثيق العضوية')
     .setDescription(v.description || 'اضغط الزر بالأسفل للحصول على رتبة العضو')
     .setColor(Colors.success)
-    .setFooter({ text: `${guild.name} • Liberty City Verification` })
+    .setFooter({ text: `${guild.name} • Verification` })
     .setTimestamp();
 
   const button = new ButtonBuilder()

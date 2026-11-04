@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Register Commands Script
+// Omni Bot - Register Commands Script
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };

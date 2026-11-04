@@ -42,6 +42,7 @@ export declare function moderationEmbed(data: {
         value: string;
         inline?: boolean;
     }[];
+    guildName?: string;
 }): EmbedBuilder;
 export declare function ticketEmbed(data: {
     title: string;
@@ -55,6 +56,7 @@ export declare function ticketEmbed(data: {
         question: string;
         answer: string;
     }>;
+    guildName?: string;
 }): EmbedBuilder;
 export declare function ticketTranscriptEmbed(data: {
     ticketId: string;
@@ -68,6 +70,7 @@ export declare function ticketTranscriptEmbed(data: {
     }>;
     closedBy?: User;
     closeReason?: string;
+    guildName?: string;
 }): EmbedBuilder;
 export declare function simpleModMessage(action: 'ban' | 'kick' | 'timeout' | 'untimeout' | 'warn' | 'unwarn' | 'mute' | 'unmute' | 'role_add' | 'role_remove' | 'promote' | 'jail' | 'lockdown', target: User | GuildMember, moderator: User | GuildMember, reason: string, duration?: string): string;
 export declare function logEmbed(data: {
@@ -81,6 +84,7 @@ export declare function logEmbed(data: {
     }>;
     user?: User;
     channel?: TextChannel;
+    guild?: Guild;
 }): EmbedBuilder;
 export declare function welcomeEmbed(data: {
     user: User;
@@ -130,6 +134,7 @@ export declare function helpEmbed(data: {
         emoji: string;
     }>;
     prefix: string;
+    guildName?: string;
 }): EmbedBuilder;
 export declare function createPaginationEmbeds(items: string[], options: {
     title: string;

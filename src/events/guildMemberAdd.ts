@@ -1,10 +1,10 @@
 ﻿// ============================================
-// Liberty City Bot - Guild Member Add Event
+// Omni Bot - Guild Member Add Event
 // ============================================
 
 import { GuildMember, ChannelType, TextChannel } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { resolveEmojiShortcodes } from '../utils/emoji';
 import { getGuildSettings } from '../models';
@@ -15,7 +15,7 @@ const logger = createLogger('Event:GuildMemberAdd');
 const event: Event = {
   name: 'guildMemberAdd',
   async execute(member: GuildMember) {
-    const client = member.client as LibertyClient;
+    const client = member.client as OmniClient;
 
     try {
       // Anti-Raid check
@@ -84,7 +84,7 @@ async function handleAutoRole(member: GuildMember): Promise<void> {
     const role = member.guild.roles.cache.get(settings.autorole.roleId);
     if (!role) return;
 
-    await member.roles.add(role, 'Liberty City - Auto-Role');
+    await member.roles.add(role, 'Omni - Auto-Role');
     logger.info(`Auto-role ${role.name} given to ${member.user.tag}`);
   } catch (error) {
     logger.warn(`Failed to give auto-role to ${member.user.tag}:`, error);
@@ -115,7 +115,7 @@ async function sendWelcomeDm(member: GuildMember, settings: any): Promise<void> 
           title: `👋 مرحباً بك في ${member.guild.name}!`,
           description: dmMessage,
           ...(guildIcon ? { thumbnail: { url: guildIcon } } : {}),
-          footer: { text: 'Liberty City' },
+          footer: { text: member.guild.name },
           timestamp: new Date().toISOString(),
         },
       ],
@@ -204,7 +204,7 @@ export async function handleWelcome(
 // Log Member Join
 // --------------------------------------------
 async function logMemberJoin(member: GuildMember): Promise<void> {
-  const client = member.client as LibertyClient;
+  const client = member.client as OmniClient;
   // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
   client.loggingHandler.handleMemberJoin(member).catch((err) => client.loggingHandler.reportFailure('guildMemberAdd', err));
 }
@@ -225,6 +225,7 @@ async function logRaid(member: GuildMember, reason: string): Promise<void> {
     description: reason,
     color: '#FF3366',
     user: member.user,
+    guild: member.guild,
     fields: [
       { name: '👤 العضو', value: `${member}`, inline: true },
       { name: '🆔 المعرف', value: `\`${member.id}\``, inline: true },

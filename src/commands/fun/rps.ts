@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Rock Paper Scissors (حجر ورقة مقص)
+// Omni Bot - Rock Paper Scissors (حجر ورقة مقص)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - RoleAdd Command (إضافة رول)
+// Omni Bot - RoleAdd Command (إضافة رول)
 // ============================================
 
 import {
@@ -11,7 +11,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import {
   createRolePickerState,
@@ -53,7 +53,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     const member = interaction.options.getMember('user') as GuildMember;
     const reason = interaction.options.getString('reason') || 'إضافة رول';

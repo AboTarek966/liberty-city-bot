@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Google Gemini Client (REST — بدون مكتبات إضافية)
+// Omni Bot - Google Gemini Client (REST — بدون مكتبات إضافية)
 // يدعم: نص · رؤية صور · بث مباشر (SSE) · ذاكرة محادثة
 // مجاني: https://aistudio.google.com/apikey
 // ============================================

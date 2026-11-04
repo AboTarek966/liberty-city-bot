@@ -1,4 +1,4 @@
-/* ═══ Liberty UI Kit — tabs, modal, dropdown, toasts, live selectors ═══ */
+/* ═══ Omni UI Kit — tabs, modal, dropdown, toasts, live selectors ═══ */
 window.LC = (() => {
   // ---------- helpers ----------
   const $ = (s, root = document) => root.querySelector(s);

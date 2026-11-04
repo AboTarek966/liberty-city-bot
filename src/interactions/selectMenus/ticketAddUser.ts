@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Ticket Add User (UserSelectMenu)
+// Omni Bot - Ticket Add User (UserSelectMenu)
 // اختيار أعضاء من قائمة لإضافتهم للتذكرة (بديل حديث عن المودال)
 // ============================================
 
@@ -8,13 +8,13 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const handler: SelectMenuHandler = {
   id: 'ticket_add_user',
   async execute(interaction) {
     const userSelect = interaction as UserSelectMenuInteraction;
-    const client = userSelect.client as LibertyClient;
+    const client = userSelect.client as OmniClient;
     if (!userSelect.guild || !userSelect.channelId) return;
 
     await userSelect.deferReply({ ephemeral: true });

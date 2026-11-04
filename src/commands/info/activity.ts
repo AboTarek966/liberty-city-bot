@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Activity Command
+// Omni Bot - Activity Command
 // Track text & voice activity: daily/weekly/monthly/total
 // ============================================
 
@@ -9,7 +9,7 @@ import {
   User,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 function formatMinutes(total: number): string {
   if (total < 60) return `${total} دقيقة`;
@@ -51,7 +51,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const target = interaction.options.getUser('user') || interaction.user;
     const period = interaction.options.getString('period') || 'all';
 

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Message Delete Bulk Event
+// Omni Bot - Message Delete Bulk Event
 // كشف الحذف الجماعي للرسائل (Anti-Mass-Delete)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Ticket Assistant
+// Omni Bot - AI Ticket Assistant
 // ============================================
 // الـ AI يستلم التذكرة، يحلل المشكلة، يحاول يحلها
 // لو محتاج يعطي رول → يطلب موافقة أدمن أولاً
@@ -20,7 +20,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { randomUUID } from 'crypto';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { getGuildSettings, AITicketApproval, IAITicketApproval } from '../models';
 import { createLogger } from '../utils/helpers';
 import { Colors } from '../utils/embeds';
@@ -78,9 +78,9 @@ interface AITicketConfig {
 }
 
 export class AITicketAssistant {
-  private client: LibertyClient;
+  private client: OmniClient;
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
   }
 
@@ -179,7 +179,7 @@ export class AITicketAssistant {
         .setTitle('🤖 AI Assistant — استلام التذكرة')
         .setDescription('تم استلام التذكرة تلقائياً بواسطة الذكاء الاصطناعي. جاري تحليل المشكلة...')
         .setColor(0x5865f2)
-        .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+        .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
         .setTimestamp();
 
       await channel.send({ embeds: [embed] }).catch(() => {});
@@ -231,7 +231,7 @@ export class AITicketAssistant {
           .setTitle('🤖 AI Assistant — رد أولي')
           .setDescription(response.content.slice(0, 4000))
           .setColor(0x5865f2)
-          .setFooter({ text: 'Liberty City AI • جاري تحليل المشكلة...' })
+          .setFooter({ text: `${channel.guild.name} • AI • جاري تحليل المشكلة...` })
           .setTimestamp();
 
         await channel.send({ embeds: [embed] }).catch(() => {});
@@ -256,7 +256,7 @@ export class AITicketAssistant {
 المرفقات: ${message.attachments?.size > 0 ? [...message.attachments.values()].map((a: any) => a.name).join(', ') : 'لا توجد'}
     `.trim();
 
-    const prompt = `أنت مساعد دعم تقني ذكي (AI Ticket Assistant) في بوت Liberty City.
+    const prompt = `أنت مساعد دعم تقني ذكي (AI Ticket Assistant) في بوت Omni.
 
 **السياق:**
 ${context}
@@ -405,7 +405,7 @@ ${context}
         { name: '📋 الملخص', value: analysis.summary || '—', inline: false },
         { name: '💡 الحل المقترح', value: analysis.suggestedSolution || '—', inline: false }
       )
-      .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+      .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
       .setTimestamp();
 
     await channel.send({ embeds: [initialEmbed] }).catch(() => {});
@@ -455,7 +455,7 @@ ${context}
         .setTitle('⚙️ نتائج الإجراءات التلقائية')
         .setColor(failedAuto > 0 ? Colors.warning : Colors.success)
         .setDescription(autoResults.map(r => `> ${r}`).join('\n').slice(0, 4000))
-        .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+        .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
         .setTimestamp();
       await channel.send({ embeds: [resultsEmbed] }).catch(() => {});
     }
@@ -711,7 +711,7 @@ ${context}
         },
         { name: '🎯 ثقة الـ AI', value: `${analysis.confidence}%`, inline: true }
       )
-      .setFooter({ text: 'Liberty City AI Ticket Assistant — يتطلب مراجعة بشرية' })
+      .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant — يتطلب مراجعة بشرية` })
       .setTimestamp();
 
     await channel
@@ -743,7 +743,7 @@ ${context}
         .setTitle(data.title)
         .setColor(data.color)
         .addFields(data.fields)
-        .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+        .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
         .setTimestamp();
 
       await logChannel.send({ embeds: [embed] }).catch(() => {});

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Raid Join Scoring (Beast Mode)
+// Omni Bot - Raid Join Scoring (Beast Mode)
 // تقييم كل منضم: عمر الحساب، أفاتار، اسم، بوت → نقاط "اشتباه".
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

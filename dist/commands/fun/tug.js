@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Tug of War (سحب الحبل)
+// Omni Bot - Tug of War (سحب الحبل)
 // فريقان — الحبل يتحرك حتى يصل أحدهما إلى خط النهاية
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

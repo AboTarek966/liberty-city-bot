@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Games Menu Handler
+// Omni Bot - Games Menu Handler
 // اختيار لعبة من القائمة → إرسال طريقة اللعب
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Knowledge Base Command
+// Omni Bot - AI Knowledge Base Command
 // ============================================
 // /knowledge add | remove | list | search
 // يدير قاعدة المعرفة التي تُحقن في سياق AI (الدردشة + التذاكر).
@@ -177,7 +177,7 @@ async function handleList(interaction) {
         `> 🆔 \`${entry._id.toString()}\`\n` +
         `> ${entry.content.replace(/\s+/g, ' ').slice(0, 110)}${entry.content.length > 110 ? '…' : ''}`)
         .join('\n\n'))
-        .setFooter({ text: `صفحة ${safePage}/${pages} • ${total} معلومة • Liberty City AI` })
+        .setFooter({ text: `صفحة ${safePage}/${pages} • ${total} معلومة • ${interaction.guild.name} AI` })
         .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
 }
@@ -203,7 +203,7 @@ async function handleSearch(interaction) {
         `> ${match.entry.content.replace(/\s+/g, ' ').slice(0, 180)}${match.entry.content.length > 180 ? '…' : ''}\n` +
         `> 🆔 \`${match.entry._id.toString()}\``)
         .join('\n\n'))
-        .setFooter({ text: `${matches.length} نتيجة • Liberty City AI` })
+        .setFooter({ text: `${matches.length} نتيجة • ${interaction.guild.name} AI` })
         .setTimestamp();
     // عدّاد الاستخدام — في الخلفية
     void models_1.KnowledgeEntry.updateMany({ _id: { $in: matches.map(m => m.entry._id) } }, { $inc: { uses: 1 } }).catch(() => { });

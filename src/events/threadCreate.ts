@@ -1,14 +1,14 @@
 ﻿// ============================================
-// Liberty City Bot - Thread Create Protection
+// Omni Bot - Thread Create Protection
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'threadCreate',
   async execute(thread: any) {
-    const client = thread.client as LibertyClient;
+    const client = thread.client as OmniClient;
     await client.securityHandler.onThreadCreate(thread).catch(() => {});
   },
 };

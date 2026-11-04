@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Ticket Command
+// Omni Bot - Ticket Command
 // ============================================
 
 import {
@@ -11,7 +11,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, Ticket } from '../../models';
 import { buildTicketTopPage, sanitizeTicketTopPeriod } from '../../utils/ticketTop';
@@ -194,7 +194,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const subcommand = interaction.options.getSubcommand();
 
     switch (subcommand) {
@@ -233,7 +233,7 @@ const command: Command = {
 // --------------------------------------------
 // Panel Image (صورة/بانر اللوحة — اختياري)
 // --------------------------------------------
-async function handleImage(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleImage(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   const file = interaction.options.getAttachment('file');
   const settings = await getGuildSettings(interaction.guildId!);
   const panels = settings.tickets.panels;
@@ -321,7 +321,7 @@ async function handleAddRole(interaction: ChatInputCommandInteraction): Promise<
       `📂 رؤية جميع قنوات التذاكر\n` +
       `🔒 إغلاق وحذف التذاكر`
     )
-    .setFooter({ text: 'Liberty City Tickets' })
+    .setFooter({ text: `${interaction.guild!.name} • Tickets` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -373,7 +373,7 @@ async function handleListRoles(interaction: ChatInputCommandInteraction): Promis
       { name: '📋 قناة السجلات', value: settings.tickets.logChannelId ? `<#${settings.tickets.logChannelId}>` : 'غير محددة', inline: true },
       { name: '🔢 الحد الأقصى/عضو', value: `${settings.tickets.maxPerUser}`, inline: true },
     )
-    .setFooter({ text: 'Liberty City Tickets' })
+    .setFooter({ text: `${interaction.guild!.name} • Tickets` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -382,7 +382,7 @@ async function handleListRoles(interaction: ChatInputCommandInteraction): Promis
 // --------------------------------------------
 // Setup
 // --------------------------------------------
-async function handleSetup(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleSetup(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   const category = interaction.options.getChannel('category', true) as any;
   const logChannel = interaction.options.getChannel('log_channel') as TextChannel | null;
   const supportRole = interaction.options.getRole('support_role');
@@ -410,7 +410,7 @@ async function handleSetup(interaction: ChatInputCommandInteraction, client: Lib
       { name: '🛡️ رول الدعم', value: supportRole ? `${supportRole}` : 'غير محدد', inline: true },
       { name: '📊 الحد الأقصى للمستخدم', value: `${settings.tickets.maxPerUser}`, inline: true },
     )
-    .setFooter({ text: 'Liberty City Tickets' })
+    .setFooter({ text: `${interaction.guild!.name} • Tickets` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -419,7 +419,7 @@ async function handleSetup(interaction: ChatInputCommandInteraction, client: Lib
 // --------------------------------------------
 // Panel
 // --------------------------------------------
-async function handlePanel(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handlePanel(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   const channel = interaction.options.getChannel('channel', true) as TextChannel;
   const title = interaction.options.getString('title', true);
   const description = interaction.options.getString('description', true);
@@ -456,7 +456,7 @@ async function handlePanel(interaction: ChatInputCommandInteraction, client: Lib
         inline: false,
       }
     )
-    .setFooter({ text: 'Liberty City Tickets' })
+    .setFooter({ text: `${interaction.guild!.name} • Tickets` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -465,7 +465,7 @@ async function handlePanel(interaction: ChatInputCommandInteraction, client: Lib
 // --------------------------------------------
 // Close
 // --------------------------------------------
-async function handleClose(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleClose(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   const reason = interaction.options.getString('reason');
 
   await interaction.deferReply({ ephemeral: true });
@@ -514,7 +514,7 @@ async function handleClose(interaction: ChatInputCommandInteraction, client: Lib
 // --------------------------------------------
 // Claim
 // --------------------------------------------
-async function handleClaim(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleClaim(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
 
   const member = interaction.guild!.members.cache.get(interaction.user.id)!;
@@ -546,7 +546,7 @@ async function handleClaim(interaction: ChatInputCommandInteraction, client: Lib
 // --------------------------------------------
 // Stats
 // --------------------------------------------
-async function handleStats(interaction: ChatInputCommandInteraction, client: LibertyClient): Promise<void> {
+async function handleStats(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
 
   const stats = await client.ticketHandler.getTicketStats(interaction.guildId!);
@@ -561,7 +561,7 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Lib
       { name: '🟡 بالانتظار', value: `${stats.waiting}`, inline: true },
       { name: '🔴 مغلقة', value: `${stats.closed}`, inline: true },
     )
-    .setFooter({ text: 'Liberty City Tickets' })
+    .setFooter({ text: `${interaction.guild!.name} • Tickets` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -583,7 +583,7 @@ async function handleMyStats(interaction: ChatInputCommandInteraction): Promise<
       `🤝 **التذاكر التي استلمتها:** \`${count}\`\n\n` +
       `📌 هذا العداد يشمل فقط التذاكر التي قمت باستلامها (وليس فتحها).`
     )
-    .setFooter({ text: 'Liberty City Tickets' })
+    .setFooter({ text: `${interaction.guild!.name} • Tickets` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

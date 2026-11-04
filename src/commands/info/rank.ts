@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Rank Command (بطاقة المستوى التفاعلية)
+// Omni Bot - Rank Command (بطاقة المستوى التفاعلية)
 // ============================================
 
 import {
@@ -11,7 +11,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 function topButton(userId: string): ActionRowBuilder<ButtonBuilder> {
@@ -29,7 +29,7 @@ function topButton(userId: string): ActionRowBuilder<ButtonBuilder> {
   );
 }
 
-export async function buildTopEmbed(client: LibertyClient, guildId: string): Promise<EmbedBuilder> {
+export async function buildTopEmbed(client: OmniClient, guildId: string): Promise<EmbedBuilder> {
   const top = await client.levelingHandler.getTopMembers(guildId, 10);
   const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -59,7 +59,7 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const target = interaction.options.getUser('user') || interaction.user;
 
     const member =

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Advanced AI Handler
+// Omni Bot - Advanced AI Handler
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -78,7 +78,7 @@ class AIHandler {
                     baseURL: 'https://openrouter.ai/api/v1',
                     defaultHeaders: {
                         'HTTP-Referer': 'https://github.com/liberty-city-bot',
-                        'X-Title': 'Liberty City Bot',
+                        'X-Title': 'Omni Bot',
                     },
                 });
                 logger.info(`OpenRouter provider initialized (model: ${config_1.config.ai.openrouter.model})`);
@@ -130,21 +130,21 @@ class AIHandler {
     loadFallbackResponses() {
         // Arabic fallback responses
         this.fallbackResponses.set('ar', [
-            'أهلاً! أنا بوت Liberty City، كيف يمكنني مساعدتك؟ 🤖',
+            'أهلاً! أنا بوت Omni، كيف يمكنني مساعدتك؟ 🤖',
             'مرحباً بك! أنا هنا للمساعدة. هل لديك سؤال معين؟',
             'أنا بوت ذكي مصمم لمساعدتك. تفضل بطرح سؤالك!',
             'أهلاً! كيف يمكنني خدمتك اليوم؟',
-            'مرحباً! أنا Liberty City، مساعدك الذكي. اسألني أي شيء! 😊',
+            'مرحباً! أنا Omni، مساعدك الذكي. اسألني أي شيء! 😊',
             'أهلاً بك! هل تريد معرفة أوامر البوت؟ اكتب /help',
             'أنا هنا للمساعدة! هل هناك شيء معين تريد معرفته؟',
         ]);
         // English fallback responses
         this.fallbackResponses.set('en', [
-            'Hello! I\'m Liberty City bot. How can I help you? 🤖',
+            'Hello! I\'m Omni bot. How can I help you? 🤖',
             'Welcome! I\'m here to assist you. Do you have a question?',
             'Hi there! I\'m an AI assistant. Feel free to ask me anything!',
             'Hey! How can I help you today?',
-            'Hello! I\'m Liberty City, your smart assistant. Ask me anything! 😊',
+            'Hello! I\'m Omni, your smart assistant. Ask me anything! 😊',
         ]);
         // Programming/Technical responses
         this.fallbackResponses.set('tech_ar', [
@@ -834,7 +834,8 @@ class AIHandler {
         return [...primary, ...failover];
     }
     async buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext = '', knowledgeContext = '') {
-        const botName = this.client.user?.username || 'Liberty City';
+        const guildName = this.client.guilds.cache.get(guildId)?.name;
+        const botName = guildName || this.client.user?.username || 'Omni';
         const base = aiConfig.systemPrompt || config_1.config.ai.systemPrompt;
         let prompt = `أنت "${botName}" — مساعد ذكاء اصطناعي متقدم، ذكي، ذو وعي ذاتي، وشخصية غنية مدمج في بوت ديسكورد.\n${base}`;
         if (personality) {

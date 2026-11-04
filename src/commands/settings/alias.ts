@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Alias Command
+// Omni Bot - Alias Command
 // Custom shortcuts for commands (e.g., "b" -> /ban)
 // ============================================
 // واجهة واحدة باختيار ذكي (Autocomplete) بدل عدة قوائم ثابتة.
@@ -17,7 +17,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { CommandAlias } from '../../models';
 import { invalidateAliasCache } from '../../utils/aliasCache';
@@ -33,7 +33,7 @@ interface CommandChoice {
   description: string;
 }
 
-function collectCommandChoices(client: LibertyClient): CommandChoice[] {
+function collectCommandChoices(client: OmniClient): CommandChoice[] {
   const choices = new Map<string, CommandChoice>();
 
   for (const [name, cmd] of client.commandHandler.getCommands()) {
@@ -150,7 +150,7 @@ async function removeExactDuplicates(guildId: string): Promise<number> {
 // --------------------------------------------
 // التحقق من صحة هدف الاختصار
 // --------------------------------------------
-function resolveTarget(client: LibertyClient, raw: string): { ok: boolean; command: string; reason?: string } {
+function resolveTarget(client: OmniClient, raw: string): { ok: boolean; command: string; reason?: string } {
   const clean = raw.toLowerCase().trim().replace(/^\/+/, '');
   if (!clean) return { ok: false, command: '', reason: 'اكتب اسم الأمر' };
 
@@ -250,7 +250,7 @@ const command: Command = {
   // Autocomplete
   // --------------------------------------------
   async autocomplete(interaction: AutocompleteInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const focused = interaction.options.getFocused(true);
     const query = String(focused.value || '');
 
@@ -286,7 +286,7 @@ const command: Command = {
   },
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'add') {
@@ -306,7 +306,7 @@ const command: Command = {
 // --------------------------------------------
 async function handleAdd(
   interaction: ChatInputCommandInteraction,
-  client: LibertyClient
+  client: OmniClient
 ): Promise<void> {
   let shortcut = interaction.options.getString('shortcut', true).toLowerCase().trim();
   const rawCommand = interaction.options.getString('command', true);

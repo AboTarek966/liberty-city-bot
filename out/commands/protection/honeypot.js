@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Honeypot Command
+// Omni Bot - Honeypot Command
 // ============================================
 // /honeypot setup | disable | status
 // قناة طعم: أي رسالة فيها تُحذف ويُعاقب صاحبها فوراً.
@@ -157,7 +157,7 @@ const command = {
             value: canPunish ? '🟢 يملك الصلاحيات المطلوبة' : '🔴 صلاحيات ناقصة — راجع إعدادات الرول',
             inline: false,
         })
-            .setFooter({ text: `${guild.name} • Liberty City Honeypot` })
+            .setFooter({ text: `${guild.name} • Honeypot` })
             .setTimestamp();
         await interaction.reply({ embeds: [embed], ephemeral: true });
     },

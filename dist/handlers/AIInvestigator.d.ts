@@ -1,5 +1,5 @@
 import { Guild } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { InvestigationConfig, InvestigationReport, InvestigationTrigger } from '../types/investigator';
 export declare function resolveInvestigatorConfig(settings: any): InvestigationConfig;
 interface RunOptions {
@@ -22,7 +22,7 @@ export declare class AIInvestigator {
     private lastEventScanAt;
     private joinEvents;
     private lastReports;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     start(): void;
     cleanup(): void;
     private attachListeners;

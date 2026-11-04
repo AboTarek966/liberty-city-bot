@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Ticket Message Templates
+// Omni Bot - Ticket Message Templates
 // ============================================
 // رسالة الترحيب الافتراضية + استبدال المتغيرات.
 // المتغيرات المدعومة: {user} {ticket} {type} {server}

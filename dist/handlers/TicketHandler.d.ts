@@ -1,6 +1,6 @@
 import { Guild, GuildMember, TextChannel, CategoryChannel, EmbedBuilder, ActionRowBuilder } from 'discord.js';
 import { ITicket } from '../models';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export interface TicketPanelOption {
     label: string;
     description?: string;
@@ -65,7 +65,7 @@ export declare class TicketHandler {
     private callCooldowns;
     /** ⚡ طابور إرسال سجلات التذاكر لكل سيرفر — ترتيب تام + لا يعطّل مسار التذكرة */
     private ticketLogQueues;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     buildTicketControls(claimed: boolean): ActionRowBuilder<any>[];
     createTicketCategory(guild: Guild, name: string): Promise<CategoryChannel>;
     createLogChannel(guild: Guild, name: string, category?: CategoryChannel): Promise<TextChannel>;
@@ -103,7 +103,7 @@ export declare class TicketHandler {
         messageId: string;
     }>;
     private getPanelTypes;
-    buildPanelEmbed(panel: Partial<TicketPanelData>): EmbedBuilder;
+    buildPanelEmbed(panel: Partial<TicketPanelData>, guildName?: string): EmbedBuilder;
     buildPanelComponents(panel: TicketPanelData): any[];
     updatePanelMessage(guild: Guild, panel: TicketPanelData): Promise<void>;
     movePanel(guild: Guild, panel: TicketPanelData, newChannel: TextChannel): Promise<void>;

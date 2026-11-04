@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Main Client
+// Omni Bot - Main Client
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -39,7 +39,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LibertyClient = void 0;
+exports.OmniClient = void 0;
 const discord_js_1 = require("discord.js");
 const config_1 = require("./config");
 const helpers_1 = require("./utils/helpers");
@@ -47,11 +47,11 @@ const handlers_1 = require("./handlers");
 const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const logger = (0, helpers_1.createLogger)('LibertyCity');
+const logger = (0, helpers_1.createLogger)('Omni');
 // --------------------------------------------
-// Liberty Client Class
+// Omni Client Class
 // --------------------------------------------
-class LibertyClient extends discord_js_1.Client {
+class OmniClient extends discord_js_1.Client {
     // Handlers
     commandHandler;
     eventHandler;
@@ -588,7 +588,7 @@ class LibertyClient extends discord_js_1.Client {
     // --------------------------------------------
     async initialize() {
         try {
-            logger.info('🚀 Initializing Liberty City Bot...');
+            logger.info('🚀 Initializing Omni Bot...');
             // Validate configuration
             (0, config_1.validateConfig)();
             // Connect to MongoDB
@@ -608,7 +608,7 @@ class LibertyClient extends discord_js_1.Client {
             catch (e) {
                 logger.warn('Dashboard command worker failed to start:', e);
             }
-            logger.info('✅ Liberty City Bot initialized successfully');
+            logger.info('✅ Omni Bot initialized successfully');
         }
         catch (error) {
             logger.error('❌ Failed to initialize bot:', error);
@@ -686,7 +686,7 @@ class LibertyClient extends discord_js_1.Client {
     // --------------------------------------------
     setStatus() {
         const activities = [
-            { name: 'Liberty City', type: discord_js_1.ActivityType.Playing },
+            { name: 'Omni', type: discord_js_1.ActivityType.Playing },
             { name: 'حماية سيرفرك', type: discord_js_1.ActivityType.Watching },
             { name: 'المساعدة بالأوامر', type: discord_js_1.ActivityType.Listening },
             { name: 'أوامر /help', type: discord_js_1.ActivityType.Competing },
@@ -719,6 +719,6 @@ class LibertyClient extends discord_js_1.Client {
         logger.info('👋 Bot destroyed');
     }
 }
-exports.LibertyClient = LibertyClient;
-exports.default = LibertyClient;
-//# sourceMappingURL=LibertyClient.js.map
+exports.OmniClient = OmniClient;
+exports.default = OmniClient;
+//# sourceMappingURL=OmniClient.js.map

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Bowling (بولينغ)
+// Omni Bot - Bowling (بولينغ)
 // ثلاث كرات لكسر كل الأعمدة
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

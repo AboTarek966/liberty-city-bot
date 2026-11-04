@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Verification Helpers
+// Omni Bot - Verification Helpers
 // ============================================
 // كابتشا رياضية قصيرة العمر + سجل تدقيق للتوثيق.
 
@@ -204,7 +204,7 @@ export async function logVerification(
         { name: '🕰️ عمر الحساب', value: `${getAccountAgeDays(member.user)} يوم`, inline: true },
         { name: '📝 التفاصيل', value: details.slice(0, 1024), inline: false }
       )
-      .setFooter({ text: `${guild.name} • Liberty City Verification` })
+      .setFooter({ text: `${guild.name} • Verification` })
       .setTimestamp();
 
     await channel.send({ embeds: [embed] }).catch(() => {});

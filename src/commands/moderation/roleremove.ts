@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - RoleRemove Command (إزالة رول)
+// Omni Bot - RoleRemove Command (إزالة رول)
 // ============================================
 
 import {
@@ -11,7 +11,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const command: Command = {
@@ -33,7 +33,7 @@ const command: Command = {
   // 🔓 بدون صلاحية مطلوبة — فحص الهرمية فقط
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     const member = interaction.options.getMember('user') as GuildMember;
     const role = interaction.options.getRole('role', true) as Role;

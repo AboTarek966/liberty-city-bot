@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Internationalization (i18n)
+// Omni Bot - Internationalization (i18n)
 // ============================================
 
 import fs from 'fs';

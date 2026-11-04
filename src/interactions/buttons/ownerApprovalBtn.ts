@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - 👑 أزرار موافقة/رفض مالك السيرفر على إطفاء الحماية
+// Omni Bot - 👑 أزرار موافقة/رفض مالك السيرفر على إطفاء الحماية
 //    customId: ownappr:yes:{field} | ownappr:no:{field}
 //    يقرّر: صاحب التاج (المالك 👑) + مطوّر البوت (🛠️ DEVELOPER_USER_ID).
 // ============================================
@@ -7,7 +7,7 @@
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { takePending, PROTECTION_LABELS } from '../../utils/ownerApproval';
 import { isBotOwner } from '../../utils/botOwner';
 
@@ -69,7 +69,7 @@ const handler: ButtonHandler = {
       await settings.save();
       // ♻️ إبطال الكاش فوراً — الإطفاء يُطبَّق مباشرة على كل معالجات الحماية
       invalidateGuildSettings(interaction.guild.id);
-      const client = interaction.client as LibertyClient;
+      const client = interaction.client as OmniClient;
       if (field === 'autoBackup') {
         await client.securityHandler?.syncAutoBackup(interaction.guild, false).catch(() => {});
       } else if (field === 'autoScan') {

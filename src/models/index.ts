@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Database Models
+// Omni Bot - Database Models
 // ============================================
 
 import mongoose, { Document, Schema, Model } from 'mongoose';
@@ -837,7 +837,7 @@ const ShopItemSchema = new Schema<IShopItem>({
 
 const GuildSettingsSchema = new Schema<IGuildSettings>({
   guildId: { type: String, required: true, unique: true, index: true },
-  prefix: { type: String, default: 'lc!' },
+  prefix: { type: String, default: 'omni!' },
   language: { type: String, default: 'ar' },
   timezone: { type: String, default: 'Asia/Riyadh' },
   settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
@@ -1203,7 +1203,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     enabled: { type: Boolean, default: true },
     provider: { type: String, enum: ['openai', 'anthropic', 'both'], default: 'openai' },
     model: { type: String, default: 'gpt-4-turbo-preview' },
-    systemPrompt: { type: String, default: 'أنت مساعد ذكي لبوت Liberty City. أنت ودود، مفيد، وتتكلم العربية بطلاقة.' },
+    systemPrompt: { type: String, default: 'أنت مساعد ذكي لبوت Omni. أنت ودود، مفيد، وتتكلم العربية بطلاقة.' },
     temperature: { type: Number, default: 0.7 },
     maxTokens: { type: Number, default: 2000 },
     cooldown: { type: Number, default: 3000 },

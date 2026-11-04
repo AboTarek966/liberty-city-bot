@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Channel Delete Logging
+// Omni Bot - Channel Delete Logging
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

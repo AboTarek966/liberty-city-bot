@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Help Category Buttons
+// Omni Bot - Help Category Buttons
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -30,7 +30,7 @@ const handler = {
                 .join('\n')
             : 'لا توجد أوامر في هذا التصنيف')
             .setColor(embeds_1.Colors.primary)
-            .setFooter({ text: 'Liberty City Bot' })
+            .setFooter({ text: interaction.guild?.name || 'Omni' })
             .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
     },

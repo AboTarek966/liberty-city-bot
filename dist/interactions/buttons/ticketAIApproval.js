@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Ticket Assistant Admin Approval
+// Omni Bot - AI Ticket Assistant Admin Approval
 // ============================================
 // معالج أزرار موافقة/رفض الأدمن لإجراءات الـ AI في التذاكر
 // الصيغة: ticket_ai:approve:<approvalId> | deny | details
@@ -103,7 +103,7 @@ const handler = {
                 value: `<t:${Math.floor(new Date(details.expiresAt).getTime() / 1000)}:R>`,
                 inline: true
             })
-                .setFooter({ text: 'Liberty City AI Ticket Assistant' })
+                .setFooter({ text: `${interaction.guild.name} • AI Ticket Assistant` })
                 .setTimestamp();
             if (details.approvedBy) {
                 embed.addFields({

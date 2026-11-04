@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Joke Command
+// Omni Bot - Joke Command
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const JOKES = [
   'لماذا لا يحب الحاسوب الرياضيات؟\nلأنه يخاف من المتغيرات! 😄',

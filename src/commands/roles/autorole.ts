@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Autorole Command
+// Omni Bot - Autorole Command
 // ============================================
 
 import {
@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { getGuildSettings } from '../../models';
 
 const command: Command = {
@@ -43,7 +43,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ManageRoles],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const subcommand = interaction.options.getSubcommand();
     const settings = await getGuildSettings(interaction.guildId!);
 

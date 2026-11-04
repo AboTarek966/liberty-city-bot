@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Dice Command
+// Omni Bot - Dice Command
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const command: Command = {
   data: new SlashCommandBuilder()

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Lockdown Command (وضع الطوارئ)
+// Omni Bot - Lockdown Command (وضع الطوارئ)
 // يقفل الكتابة في القنوات النصية والدخول في الصوتية
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -66,7 +66,7 @@ const command = {
             value: `${interaction.user} (${interaction.user.tag})`,
             inline: false,
         })
-            .setFooter({ text: 'Liberty City Security' })
+            .setFooter({ text: `${interaction.guild.name} • Security` })
             .setTimestamp();
         // تسجيل في قناة السجلات
         const logChannelId = settings.logging?.channelId;

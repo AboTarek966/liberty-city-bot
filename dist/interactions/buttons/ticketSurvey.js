@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - استبيان رضا التذاكر (⭐ 1-5)
+// Omni Bot - استبيان رضا التذاكر (⭐ 1-5)
 // يصل للعضو في رسالة خاصة بعد إغلاق تذكرته
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -44,7 +44,7 @@ const handler = {
                                     `> 📂 نوع التذكرة: ${ticket.type}\n` +
                                     `> 📅 أُغلقت: ${ticket.closedAt ? `<t:${Math.floor(ticket.closedAt.getTime() / 1000)}:R>` : 'غير معروف'}`,
                                 color: stars >= 4 ? embeds_1.Colors.success : stars === 3 ? embeds_1.Colors.warning : embeds_1.Colors.error,
-                                footer: { text: 'Liberty City Ticket Surveys' },
+                                footer: { text: `${guild.name} • Ticket Surveys` },
                             }),
                         ],
                     });

@@ -1,5 +1,5 @@
 import { TextChannel } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { TicketAction } from '../utils/aiTicketActions';
 export interface TicketAnalysis {
     category: 'technical' | 'billing' | 'complaint' | 'inquiry' | 'protection' | 'roles' | 'channels' | 'other';
@@ -27,7 +27,7 @@ export interface AdminResponseResult {
 }
 export declare class AITicketAssistant {
     private client;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     private getConfig;
     onTicketCreated(ticket: any, channel: TextChannel): Promise<void>;
     private claimTicket;

@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Settings Command (UI Panel)
+// Omni Bot - Settings Command (UI Panel)
 // ============================================
 
 import {
@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { buildPanel } from '../../utils/settingsPanel';
 
 const command: Command = {

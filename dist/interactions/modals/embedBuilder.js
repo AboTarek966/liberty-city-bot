@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Embed Builder Modals (ebm|)
+// Omni Bot - Embed Builder Modals (ebm|)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const embedBuilderState_1 = require("../../utils/embedBuilderState");

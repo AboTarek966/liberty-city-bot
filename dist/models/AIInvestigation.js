@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Investigator Storage
+// Omni Bot - AI Investigator Storage
 // ============================================
 // تخزين تقارير التحقيق والنتائج بشكل دائم، مع منع التكرار
 // عبر بصمة ثابتة (fingerprint) لكل سيرفر.

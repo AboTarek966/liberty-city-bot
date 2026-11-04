@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Autorole Command
+// Omni Bot - Autorole Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

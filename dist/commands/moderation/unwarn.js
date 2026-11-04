@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Unwarn Command (إزالة تحذير)
+// Omni Bot - Unwarn Command (إزالة تحذير)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

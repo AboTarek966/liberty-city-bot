@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Translate Command
+// Omni Bot - Translate Command
 // ============================================
 
 import {
@@ -102,7 +102,7 @@ const command: Command = {
         { name: '🎯 إلى', value: SUPPORTED_LANGUAGES[result.targetLang]?.name || result.targetLang, inline: true },
         { name: '🎯 ثقة', value: `${result.confidence}%`, inline: true }
       )
-      .setFooter({ text: `Liberty City Translator • ${interaction.user.tag}` })
+      .setFooter({ text: `${interaction.guild!.name} • Translator • ${interaction.user.tag}` })
       .setTimestamp();
 
     // أزرار للغات سريعة

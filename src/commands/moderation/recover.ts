@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Recover Command
+// Omni Bot - Recover Command
 // استعادة الأعضاء المطرودين
 //
 // ⚠️ حقيقة ديسكورد: **ما فيها أمر "إلغاء طرد"** — المطرود يرجع بنفسه
@@ -13,7 +13,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -32,7 +32,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.Administrator],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     const limit = interaction.options.getInteger('limit') ?? 75;
 

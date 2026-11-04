@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Event Handler
+// Omni Bot - Event Handler
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };

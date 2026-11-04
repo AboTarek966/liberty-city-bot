@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Ticket Reopen Button
+// Omni Bot - Ticket Reopen Button
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const models_1 = require("../../models");

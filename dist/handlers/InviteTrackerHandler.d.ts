@@ -1,10 +1,10 @@
 import { Guild, GuildMember } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 export declare class InviteTrackerHandler {
     private client;
     private inviteCache;
     private joinTracker;
-    constructor(client: LibertyClient);
+    constructor(client: OmniClient);
     private initializeTracking;
     clearGuild(guildId: string): void;
     cacheGuildInvites(guild: Guild): Promise<void>;

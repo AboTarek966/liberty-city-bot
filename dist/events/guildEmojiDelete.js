@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Emoji Delete Protection
+// Omni Bot - Emoji Delete Protection
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

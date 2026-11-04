@@ -1,12 +1,12 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Main Entry Point
+// Omni Bot - Main Entry Point
 // ============================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const LibertyClient_1 = require("./LibertyClient");
+const OmniClient_1 = require("./OmniClient");
 const helpers_1 = require("./utils/helpers");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -61,10 +61,10 @@ const banner = `
 // --------------------------------------------
 async function main() {
     console.log(banner);
-    logger.info('🎆 Welcome to Liberty City Bot!');
+    logger.info('🎆 Welcome to Omni Bot!');
     const startTime = Date.now();
     // Create client
-    const client = new LibertyClient_1.LibertyClient();
+    const client = new OmniClient_1.OmniClient();
     // Graceful shutdown handling
     const gracefulShutdown = async (signal) => {
         logger.info(`\n⚠️ Received ${signal}. Starting graceful shutdown...`);

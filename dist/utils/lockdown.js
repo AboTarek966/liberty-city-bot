@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Lockdown Utility (وضع الطوارئ)
+// Omni Bot - Lockdown Utility (وضع الطوارئ)
 // يقفل الكتابة في القنوات النصية والدخول في الصوتية
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

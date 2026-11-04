@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Backup Command
+// Omni Bot - Backup Command
 // النسخ الاحتياطي: إنشاء، عرض، استعادة بنية السيرفر
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -44,7 +44,7 @@ const command = {
                     value: '`/backup restore` — يعيد فقط ما حُذف، بدون هدم شيء موجود',
                     inline: false,
                 })
-                    .setFooter({ text: 'Liberty City Backup' })
+                    .setFooter({ text: `${guild.name} • Backup` })
                     .setTimestamp();
                 await interaction.editReply({ embeds: [embed] });
                 return;
@@ -72,7 +72,7 @@ const command = {
                     .setTitle('📦 النسخ الاحتياطية المحفوظة')
                     .setDescription(`${lines}\n\n*لاستعادة نسخة محددة: \`/backup restore number:<رقم>\`*`)
                     .setColor(embeds_1.Colors.primary)
-                    .setFooter({ text: 'Liberty City Backup' })
+                    .setFooter({ text: `${guild.name} • Backup` })
                     .setTimestamp();
                 await interaction.editReply({ embeds: [embed] });
                 return;
@@ -102,7 +102,7 @@ const command = {
                     value: `${backups.length} / 5 (يُحذف الأقدم تلقائياً)`,
                     inline: true,
                 })
-                    .setFooter({ text: 'Liberty City Backup' })
+                    .setFooter({ text: `${guild.name} • Backup` })
                     .setTimestamp();
                 await interaction.editReply({ embeds: [embed] });
                 return;
@@ -128,7 +128,7 @@ const command = {
                         .setDescription('أُعيد فقط ما كان مفقوداً — راجع ترتيب القنوات حسب الحاجة.')
                         .setColor(embeds_1.Colors.success)
                         .addFields({ name: '📢 قنوات أُعيدت', value: `${result.channels}`, inline: true }, { name: '🎭 رولات أُعيدت', value: `${result.roles}`, inline: true }, { name: '⏭️ تخطّي (موجود)', value: `${result.skipped}`, inline: true })
-                        .setFooter({ text: 'Liberty City Backup' })
+                        .setFooter({ text: `${guild.name} • Backup` })
                         .setTimestamp();
                     const target = guild.channels.cache.get(channelId);
                     const dest = target && 'send' in target ? target : guild.systemChannel;

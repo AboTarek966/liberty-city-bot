@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - شراء عنصر من المتجر (shop_buy)
+// Omni Bot - شراء عنصر من المتجر (shop_buy)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -58,7 +58,7 @@ const handler = {
         }
         profile.balance -= item.price;
         await profile.save();
-        const added = await member.roles.add(role, 'Liberty City - Shop purchase').catch(() => null);
+        const added = await member.roles.add(role, 'Omni - Shop purchase').catch(() => null);
         if (!added) {
             // إرجاع المبلغ إذا فشلت إضافة الرول
             profile.balance += item.price;

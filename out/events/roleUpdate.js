@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Role Update (Logging + Anti-Admin)
+// Omni Bot - Role Update (Logging + Anti-Admin)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

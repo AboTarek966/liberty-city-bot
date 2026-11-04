@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Translate Command
+// Omni Bot - Translate Command
 // ============================================
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -82,7 +82,7 @@ const command = {
             .setColor(0x00FF88)
             .setDescription(result.translatedText)
             .addFields({ name: '🌍 من', value: SUPPORTED_LANGUAGES[result.sourceLang]?.name || result.sourceLang, inline: true }, { name: '🎯 إلى', value: SUPPORTED_LANGUAGES[result.targetLang]?.name || result.targetLang, inline: true }, { name: '🎯 ثقة', value: `${result.confidence}%`, inline: true })
-            .setFooter({ text: `Liberty City Translator • ${interaction.user.tag}` })
+            .setFooter({ text: `${interaction.guild.name} • Translator • ${interaction.user.tag}` })
             .setTimestamp();
         // أزرار للغات سريعة
         const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`translate:copy:${interaction.id}`).setLabel('📋 نسخ').setStyle(ButtonStyle.Secondary), new ButtonBuilder().setCustomId(`translate:retry:${targetLang}`).setLabel('🔄 إعادة').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`translate:lang`).setLabel('🌐 تغيير اللغة').setStyle(ButtonStyle.Success));

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Say Command
+// Omni Bot - Say Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

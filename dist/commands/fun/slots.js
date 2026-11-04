@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Slots (ماكينة الحظ)
+// Omni Bot - Slots (ماكينة الحظ)
 // رهان من الرصيد — ثلاث نفسية = فوز ×5
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

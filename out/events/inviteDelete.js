@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Invite Delete Logging
+// Omni Bot - Invite Delete Logging
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const event = {

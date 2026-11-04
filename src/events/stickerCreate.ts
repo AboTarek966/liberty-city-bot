@@ -1,14 +1,14 @@
 ﻿// ============================================
-// Liberty City Bot - Sticker Create Logging
+// Omni Bot - Sticker Create Logging
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'stickerCreate',
   async execute(sticker: any) {
-    const client = sticker.client as LibertyClient;
+    const client = sticker.client as OmniClient;
     // ⚡ لا ننتظر الإرسال — السجلات تمرّ عبر طابور مستقل (لا بطء ولا ضياع)
     client.loggingHandler.handleStickerCreate(sticker).catch((err) => client.loggingHandler.reportFailure('stickerCreate', err));
   },

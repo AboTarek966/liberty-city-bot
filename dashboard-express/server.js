@@ -346,7 +346,7 @@ app.get('/auth/dev', async (req, res) => {
       }
     } catch {}
     if (guilds.length === 0) {
-      guilds = [{ id: '1481739211143909499', name: 'Liberty City', icon: null, owner: true }];
+      guilds = [{ id: '1481739211143909499', name: 'Omni', icon: null, owner: true }];
     }
     req.session.accessToken = 'dev';
     req.session.user = user;

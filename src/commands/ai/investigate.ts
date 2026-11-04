@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - AI Investigator Command
+// Omni Bot - AI Investigator Command
 // ============================================
 // /investigate run | status | findings | member | dismiss | config
 // المحقق للقراءة فقط: لا ينفّذ أي عقوبة تلقائية.
@@ -12,7 +12,7 @@ import {
   ChannelType,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { getGuildSettings, invalidateGuildSettings, InvestigationFinding } from '../../models';
 import { resolveInvestigatorConfig } from '../../handlers/AIInvestigator';
 import { InvestigationReport, InvestigationSeverity } from '../../types/investigator';
@@ -68,7 +68,7 @@ function buildReportEmbed(report: InvestigationReport, titlePrefix = '🕵️ ت
       ].join('\n')
     )
     .setFooter({
-      text: `Liberty City AI Investigator • ${report.model} • ${report.runId} • ${(report.durationMs / 1000).toFixed(0)}s`,
+      text: `${report.guildName} AI Investigator • ${report.model} • ${report.runId} • ${(report.durationMs / 1000).toFixed(0)}s`,
     })
     .setTimestamp(new Date(report.completedAt));
 
@@ -247,7 +247,7 @@ const command: Command = {
       return;
     }
 
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const investigator = client.aiInvestigator;
     if (!investigator) {
       await interaction.reply({ content: '❌ المحقق الأمني غير مهيأ.', ephemeral: true });

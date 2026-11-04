@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - أمر النصي `top`
+// Omni Bot - أمر النصي `top`
 //   top            → الأسبوعي (الافتراضي)
 //   top يومي       → يومي
 //   top اسبوعي     → أسبوعي
@@ -9,7 +9,7 @@
 // ============================================
 
 import { Message } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from './helpers';
 import {
   buildLeaderboardPage,
@@ -90,7 +90,7 @@ function onCooldown(guildId: string, userId: string): boolean {
 // --------------------------------------------
 export async function handleTopCommand(
   message: Message,
-  client: LibertyClient
+  client: OmniClient
 ): Promise<boolean> {
   try {
     if (!message.guild || message.author.bot) return false;

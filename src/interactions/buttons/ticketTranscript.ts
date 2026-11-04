@@ -1,15 +1,15 @@
 // ============================================
-// Liberty City Bot - Ticket Transcript Button
+// Omni Bot - Ticket Transcript Button
 // ============================================
 
 import { ButtonInteraction, AttachmentBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const handler: ButtonHandler = {
   id: 'ticket_transcript',
   async execute(interaction: ButtonInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     if (!interaction.guild) return;
 
     await interaction.deferReply({ ephemeral: true });

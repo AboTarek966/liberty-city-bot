@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Ticket Options Menu (داخل التذكرة)
+// Omni Bot - Ticket Options Menu (داخل التذكرة)
 // قائمة "خيارات" واحدة لاستبدال أوامر / والأزرار:
 // إضافة عضو/إداري، استدعاء الإدارة العليا، استلام/إلغاء، إغلاق، حذف، نسخة
 // ============================================
@@ -12,14 +12,14 @@ import {
   UserSelectMenuBuilder,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Ticket } from '../../models';
 
 const handler: SelectMenuHandler = {
   id: 'ticket_options',
   async execute(interaction) {
     const selectInteraction = interaction as StringSelectMenuInteraction;
-    const client = selectInteraction.client as LibertyClient;
+    const client = selectInteraction.client as OmniClient;
     if (!selectInteraction.guild || !selectInteraction.channelId) return;
 
     await selectInteraction.deferReply({ ephemeral: true });

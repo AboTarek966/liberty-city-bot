@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Music Handler
+// Omni Bot - Music Handler
 // نظام موسيقى حقيقي: SoundCloud (عبر ffmpeg) أساسي + يوتيوب Innertube احتياطي
 // SoundCloud يعمل من أي IP بما فيها سيرفرات الاستضافة المجانية التي يحجبها يوتيوب
 // البحث عبر youtube-sr، ودعم كامل: تشغيل/إيقاف/استئناف/تخطي/seek/صوت/تكرار
@@ -33,7 +33,7 @@ import fs from 'fs';
 import os from 'os';
 import inspector from 'inspector';
 import { createLogger } from '../utils/helpers';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const logger = createLogger('MusicHandler');
 
@@ -267,7 +267,7 @@ export interface Queue {
 }
 
 export class MusicHandler {
-  private client: LibertyClient;
+  private client: OmniClient;
   private queues = new Map<string, Queue>();
   private players = new Map<string, AudioPlayer>();
   private connections = new Map<string, VoiceConnection>();
@@ -295,7 +295,7 @@ export class MusicHandler {
   private idleLeaveTimers = new Map<string, NodeJS.Timeout>();
   private static readonly IDLE_LEAVE_MS = 10 * 60 * 1000; // 10 دقائق
 
-  constructor(client: LibertyClient) {
+  constructor(client: OmniClient) {
     this.client = client;
     logger.info(`MusicHandler initialized (SoundCloud+ffmpeg primary, YouTube innertube fallback) | ffmpeg: ${FFMPEG_PATH}${FFMPEG_OK ? '' : ' (PROBE FAILED — awaiting static fallback)'}`);
     // 🔊 خط أنابيب الصوت — يُحدَّد مرة عند الإقلاع:
@@ -1354,6 +1354,8 @@ export class MusicHandler {
     const loopLabel =
       queue.loop === 'track' ? '🔁 الأغنية' : queue.loop === 'queue' ? '🔂 القائمة' : '❌ معطل';
 
+    const guildName = this.client.guilds.cache.get(guildId)?.name || 'Omni';
+
     const embed = new EmbedBuilder()
       .setColor(queue.isPlaying ? Colors.Green : Colors.Yellow)
       .setTitle(queue.isPlaying ? '🎵 تشغيل الآن' : '⏸️ إيقاف مؤقت')
@@ -1367,7 +1369,7 @@ export class MusicHandler {
         { name: '🔁 التكرار', value: loopLabel, inline: true },
         { name: '📥 بالقائمة', value: String(queue.tracks.length), inline: true },
       )
-      .setFooter({ text: userTag ? `Liberty Music • ${userTag}` : 'Liberty Music' })
+      .setFooter({ text: userTag ? `${guildName} • Music • ${userTag}` : `${guildName} • Music` })
       .setTimestamp();
 
     return embed;
@@ -1592,4 +1594,4 @@ export class MusicHandler {
   }
 }
 
-export const musicHandler = (client: LibertyClient) => new MusicHandler(client);
+export const musicHandler = (client: OmniClient) => new MusicHandler(client);

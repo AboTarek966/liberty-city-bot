@@ -1,7 +1,7 @@
 {
-  "name": "liberty-city-bot",
+  "name": "omni-bot",
   "version": "2.0.0",
-  "description": "Liberty City - بوت ديسكورد شامل ومتكامل مع حماية، تكتات، AI وإعدادات متقدمة",
+  "description": "Omni - بوت ديسكورد شامل ومتكامل مع حماية، تكتات، AI وإعدادات متقدمة",
   "main": "out/index.js",
   "scripts": {
     "build": "node --max-old-space-size=1024 node_modules/typescript/bin/tsc --outDir out",
@@ -16,13 +16,13 @@
   "keywords": [
     "discord",
     "bot",
-    "liberty-city",
+    "omni",
     "protection",
     "tickets",
     "ai",
     "moderation"
   ],
-  "author": "Liberty City Team",
+  "author": "Omni Team",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AFK Command (وضع عدم الوجود)
+// Omni Bot - AFK Command (وضع عدم الوجود)
 // /afk [السبب] — تفعيل أو إلغاء وضع AFK
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

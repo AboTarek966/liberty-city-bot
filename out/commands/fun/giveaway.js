@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Giveaway Command
+// Omni Bot - Giveaway Command
 // ============================================
 // /giveaway start | end | reroll | list
 // السحب محفوظ في MongoDB ويُستأنف بعد إعادة تشغيل البوت.
@@ -182,7 +182,7 @@ async function handleStart(interaction, client) {
         },
     });
     try {
-        const payload = (0, giveaway_1.buildGiveawayPayload)(giveaway);
+        const payload = (0, giveaway_1.buildGiveawayPayload)(giveaway, {}, interaction.guild.name);
         const message = await channel.send({
             embeds: payload.embeds,
             components: payload.components,
@@ -219,7 +219,7 @@ async function handleList(interaction) {
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('🎉 السحوبات')
         .setColor(embeds_1.Colors.primary)
-        .setFooter({ text: `${interaction.guild.name} • Liberty City Giveaways` })
+        .setFooter({ text: `${interaction.guild.name} • Giveaways` })
         .setTimestamp();
     if (active.length) {
         embed.addFields({

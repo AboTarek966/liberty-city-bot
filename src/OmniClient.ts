@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Main Client
+// Omni Bot - Main Client
 // ============================================
 
 import {
@@ -39,12 +39,12 @@ import mongoose from 'mongoose';
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 
-const logger = createLogger('LibertyCity');
+const logger = createLogger('Omni');
 
 // --------------------------------------------
-// Liberty Client Class
+// Omni Client Class
 // --------------------------------------------
-export class LibertyClient extends Client {
+export class OmniClient extends Client {
   // Handlers
   public commandHandler: CommandHandler;
   public eventHandler: EventHandler;
@@ -599,7 +599,7 @@ export class LibertyClient extends Client {
   // --------------------------------------------
   async initialize(): Promise<void> {
     try {
-      logger.info('🚀 Initializing Liberty City Bot...');
+      logger.info('🚀 Initializing Omni Bot...');
 
       // Validate configuration
       validateConfig();
@@ -625,7 +625,7 @@ export class LibertyClient extends Client {
         logger.warn('Dashboard command worker failed to start:', e);
       }
 
-      logger.info('✅ Liberty City Bot initialized successfully');
+      logger.info('✅ Omni Bot initialized successfully');
     } catch (error) {
       logger.error('❌ Failed to initialize bot:', error);
       process.exit(1);
@@ -709,7 +709,7 @@ export class LibertyClient extends Client {
   // --------------------------------------------
   setStatus(): void {
     const activities = [
-      { name: 'Liberty City', type: ActivityType.Playing },
+      { name: 'Omni', type: ActivityType.Playing },
       { name: 'حماية سيرفرك', type: ActivityType.Watching },
       { name: 'المساعدة بالأوامر', type: ActivityType.Listening },
       { name: 'أوامر /help', type: ActivityType.Competing },
@@ -750,4 +750,4 @@ export class LibertyClient extends Client {
   }
 }
 
-export default LibertyClient;
+export default OmniClient;

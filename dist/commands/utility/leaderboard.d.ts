@@ -1,6 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, Guild } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 export type LBType = 'all' | 'messages' | 'voiceMinutes';
 export type LBPeriod = 'day' | 'week' | 'month' | 'total';
 export type LBLimit = '10' | '25' | 'all';
@@ -15,7 +15,7 @@ export interface LBRow {
     voiceMinutes: number;
     score: number;
 }
-export declare function fetchLeaderboardRows(client: LibertyClient, guildId: string, period: LBPeriod, type: LBType, limit: LBLimit): Promise<LBRow[]>;
+export declare function fetchLeaderboardRows(client: OmniClient, guildId: string, period: LBPeriod, type: LBType, limit: LBLimit): Promise<LBRow[]>;
 export interface LBPage {
     embed: EmbedBuilder;
     components: ActionRowBuilder<ButtonBuilder>[];
@@ -24,7 +24,7 @@ export interface LBPage {
     totalRows: number;
 }
 export declare function clampPage(page: number, totalPages: number): number;
-export declare function buildLeaderboardPage(client: LibertyClient, guild: Guild, type: LBType, period: LBPeriod, limit: LBLimit, page: number): Promise<LBPage>;
+export declare function buildLeaderboardPage(client: OmniClient, guild: Guild, type: LBType, period: LBPeriod, limit: LBLimit, page: number): Promise<LBPage>;
 export declare function buildLeaderboardComponents(type: LBType, period: LBPeriod, limit: LBLimit, page: number, totalPages: number): ActionRowBuilder<ButtonBuilder>[];
 export declare function sanitizeType(v?: string | null): LBType;
 export declare function sanitizePeriod(v?: string | null): LBPeriod;

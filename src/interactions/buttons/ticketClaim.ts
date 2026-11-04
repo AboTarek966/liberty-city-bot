@@ -1,15 +1,15 @@
 // ============================================
-// Liberty City Bot - Ticket Claim Button
+// Omni Bot - Ticket Claim Button
 // ============================================
 
 import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 
 const handler: ButtonHandler = {
   id: 'ticket_claim',
   async execute(interaction: ButtonInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     if (!interaction.guild) return;
 
     await interaction.deferReply({ ephemeral: true });

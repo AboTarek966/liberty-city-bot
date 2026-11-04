@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Verify Button (توثيق العضوية بالزر)
+// Omni Bot - Verify Button (توثيق العضوية بالزر)
 // ============================================
 // يدعم: شرط عمر الحساب · كابتشا رياضية · إزالة رول الحجر · سجل تدقيق
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Jail Command (سجن عضو)
+// Omni Bot - Jail Command (سجن عضو)
 // ============================================
 
 import {
@@ -13,7 +13,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings } from '../../models';
 import { createLogger } from '../../utils/helpers';
@@ -45,7 +45,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ManageRoles],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     // ⚠️ getMember قد يُرجع كائن خام (APIInteractionGuildMember) بدون roles.cache
     // لذلك نجلب العضو من السيرفر مباشرة لضمان كائن GuildMember كامل

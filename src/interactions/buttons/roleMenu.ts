@@ -60,10 +60,10 @@ const handler: ButtonHandler = {
 
     try {
       if (hasRole) {
-        await member.roles.remove(role, 'Liberty City Role Menu');
+        await member.roles.remove(role, 'Omni Role Menu');
         await interaction.editReply({ content: `➖ تم إزالة رتبة **${role.name}**` });
       } else {
-        await member.roles.add(role, 'Liberty City Role Menu');
+        await member.roles.add(role, 'Omni Role Menu');
         await interaction.editReply({ content: `✅ تم إعطاؤك رتبة **${role.name}**` });
       }
     } catch (error: any) {

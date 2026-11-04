@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Untimeout Command (فك الكتم)
+// Omni Bot - Untimeout Command (فك الكتم)
 // ============================================
 
 import {
@@ -10,7 +10,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const command: Command = {
@@ -29,7 +29,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ModerateMembers],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     const member = interaction.options.getMember('user') as GuildMember;
     const reason = interaction.options.getString('reason') || 'إلغاء تايم أوت';

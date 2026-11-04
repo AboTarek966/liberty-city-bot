@@ -1,11 +1,11 @@
 // ============================================
-// Liberty City Bot - Ticket Type Select Menu
+// Omni Bot - Ticket Type Select Menu
 // القيمة المختارة = اسم النوع، ويصبح اسم قناة التذكرة بذلك الاسم
 // ============================================
 
 import { StringSelectMenuInteraction } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { getGuildSettings } from '../../models';
 
 // محاولة مساعدة للألواح القديمة (قيم كانت معرفات حقول)
@@ -19,7 +19,7 @@ const handler: SelectMenuHandler = {
   id: 'ticket_select',
   async execute(interaction) {
     const selectInteraction = interaction as StringSelectMenuInteraction;
-    const client = selectInteraction.client as LibertyClient;
+    const client = selectInteraction.client as OmniClient;
     if (!selectInteraction.guild) return;
 
     await selectInteraction.deferReply({ ephemeral: true });

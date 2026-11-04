@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Balance Command (الرصيد)
+// Omni Bot - Balance Command (الرصيد)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

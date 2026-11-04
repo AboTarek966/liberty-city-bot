@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Message Scanner Handler
+// Omni Bot - Message Scanner Handler
 // ============================================
 // يفحص الروابط والمرفقات عبر VirusTotal API
 Object.defineProperty(exports, "__esModule", { value: true });

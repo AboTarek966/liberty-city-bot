@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Translate Language Picker
+// Omni Bot - Translate Language Picker
 // ============================================
 // قائمة اختيار اللغة لأزرار /translate (ترجمة النص الأصلي بلغة جديدة)
 
@@ -10,7 +10,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { SUPPORTED_LANGUAGES } from '../../handlers/AITranslator';
 import { getTranslation } from '../../utils/translateStore';
 
@@ -19,7 +19,7 @@ const handler: SelectMenuHandler = {
   async execute(interaction) {
     // هذا المُعالج مخصص لقوائم الاختيار النصية فقط
     const i = interaction as StringSelectMenuInteraction;
-    const client = i.client as LibertyClient;
+    const client = i.client as OmniClient;
     const parts = i.customId.split(':'); // translate:lang:messageId
     const messageId = parts[2];
 

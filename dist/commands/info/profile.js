@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Profile Command (بطاقة العضو)
+// Omni Bot - Profile Command (بطاقة العضو)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");

@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Music Commands
+// Omni Bot - Music Commands
 // أوامر الموسيقى
 // ============================================
 
@@ -13,7 +13,7 @@ import {
   Colors,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { Track } from '../../handlers/MusicHandler';
 
 const musicCommand: Command = {
@@ -113,7 +113,7 @@ const musicCommand: Command = {
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const music = client.musicHandler;
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
@@ -149,7 +149,7 @@ const musicCommand: Command = {
                 .setDescription(`**${track.title}**`)
                 .setURL(track.url)
                 .setThumbnail(track.thumbnail)
-                .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
+                .setFooter({ text: `${interaction.guild!.name} • Music • ${interaction.user.tag}` })
                 .setTimestamp()
             : music.panelEmbed(guildId, interaction.user.tag))!;
 
@@ -262,7 +262,7 @@ const musicCommand: Command = {
               { name: '🔁 التكرار', value: queue.loop === 'track' ? '🔁 الأغنية' : queue.loop === 'queue' ? '🔂 القائمة' : '❌ معطل', inline: true },
               { name: '🔊 الصوت', value: `${queue.volume}%`, inline: true },
             )
-            .setFooter({ text: `Liberty City Music • ${interaction.user.tag}` })
+            .setFooter({ text: `${interaction.guild!.name} • Music • ${interaction.user.tag}` })
             .setTimestamp();
 
           const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

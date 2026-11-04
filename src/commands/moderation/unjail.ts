@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Unjail Command (إلغاء سجن عضو)
+// Omni Bot - Unjail Command (إلغاء سجن عضو)
 // ============================================
 
 import {
@@ -10,7 +10,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-import { LibertyClient } from '../../LibertyClient';
+import { OmniClient } from '../../OmniClient';
 import { getGuildSettings } from '../../models';
 import { Colors } from '../../utils/embeds';
 import { createLogger } from '../../utils/helpers';
@@ -33,7 +33,7 @@ const command: Command = {
   permissions: [PermissionFlagsBits.ManageRoles],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const client = interaction.client as LibertyClient;
+    const client = interaction.client as OmniClient;
     const guild = interaction.guild!;
     // ⚠️ getMember قد يُرجع كائن خام — نجلب العضو من السيرفر مباشرة
     const targetUser = interaction.options.getUser('user', true);

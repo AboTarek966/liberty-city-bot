@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Blackjack (بلك جاك)
+// Omni Bot - Blackjack (بلك جاك)
 // ضد الموزع — اسحب أو قف، 21 هو الرقم السحري
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

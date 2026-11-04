@@ -1,14 +1,14 @@
 ﻿// ============================================
-// Liberty City Bot - Webhook Update Protection
+// Omni Bot - Webhook Update Protection
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 
 const event: Event = {
   name: 'webhookUpdate',
   async execute(webhook: any) {
-    const client = webhook.client as LibertyClient;
+    const client = webhook.client as OmniClient;
     await client.securityHandler.onWebhookUpdate(webhook).catch(() => {});
   },
 };

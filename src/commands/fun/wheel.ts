@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Wheel of Fortune (عجلة الحظ)
+// Omni Bot - Wheel of Fortune (عجلة الحظ)
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';

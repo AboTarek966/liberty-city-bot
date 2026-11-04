@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - عميل Hugging Face Spaces
+// Omni Bot - عميل Hugging Face Spaces
 // مجاني بالكامل (ZeroGPU) — يتطلب حساب Hugging Face مجاني (بلا بطاقة)
 //
 // كيف يعمل:
@@ -21,7 +21,7 @@ const axios_1 = __importDefault(require("axios"));
 const helpers_1 = require("./helpers");
 const config_1 = require("../config");
 const logger = (0, helpers_1.createLogger)('HFSpaces');
-const UA = 'Mozilla/5.0 (LibertyCityBot)';
+const UA = 'Mozilla/5.0 (OmniBot)';
 const RESULT_TIMEOUT_MS = 12 * 60 * 1000; // سقف انتظار النتيجة
 const WAKE_TIMEOUT_MS = 30_000;
 /** يحول معرّف المساحة "Org/Name" إلى اسم المضيف "org-name" */

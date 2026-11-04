@@ -1,5 +1,5 @@
 // ============================================
-// Liberty City Bot - Security Handler (Anti-Nuke Suite)
+// Omni Bot - Security Handler (Anti-Nuke Suite)
 // حزمة الحماية الشاملة ضد اختراق السيرفر:
 //  1) Anti-Nuke   : كشف الحذف الجماعي (قنوات/رولات/باند) + معاقبة المخالف
 //  2) Anti-Bot    : طرد البوتات غير المصرح بها
@@ -883,7 +883,7 @@ export class SecurityHandler {
     label: string,
     opts: { forceBan?: boolean; targetId?: string; deleteTargetKind?: 'channel' | 'role' } = {}
   ): Promise<void> {
-    const reason = `Liberty City — ${label} (Anti-Nuke — ردّ فوري)`;
+    const reason = `Omni — ${label} (Anti-Nuke — ردّ فوري)`;
     if (this.executorIsBot(guild, executor) && (opts.forceBan || cfg?.mode !== 'react')) {
       void this.blacklistBot(executor.id, `instant violation: ${label}`, guild.id);
     }
@@ -897,13 +897,13 @@ export class SecurityHandler {
         this.recordArtifact(guild.id, executor.id, 'channels', opts.targetId);
         guild.channels.cache
           .get(opts.targetId)
-          ?.delete('Liberty City — أداة تخريب: هدف أُنشئ أثناء الهجوم')
+          ?.delete('Omni — أداة تخريب: هدف أُنشئ أثناء الهجوم')
           .catch(() => {});
       } else {
         this.recordArtifact(guild.id, executor.id, 'roles', opts.targetId);
         const role = guild.roles.cache.get(opts.targetId);
         if (role && role.id !== guild.id && !role.managed) {
-          role.delete('Liberty City — أداة تخريب: دور أُنشئ أثناء الهجوم').catch(() => {});
+          role.delete('Omni — أداة تخريب: دور أُنشئ أثناء الهجوم').catch(() => {});
         }
       }
     }
@@ -992,7 +992,7 @@ export class SecurityHandler {
       const ch = guild.channels.cache.get(id);
       if (!ch) return;
       try {
-        await ch.delete('Liberty City — حذف قناة أنشأها المهاجم');
+        await ch.delete('Omni — حذف قناة أنشأها المهاجم');
         deleted++;
       } catch {}
     };
@@ -1002,7 +1002,7 @@ export class SecurityHandler {
       const role = guild.roles.cache.get(id);
       if (!role || role.id === guild.id || role.managed) return;
       try {
-        await role.delete('Liberty City — حذف رول أنشأه المهاجم');
+        await role.delete('Omni — حذف رول أنشأه المهاجم');
         deleted++;
       } catch {}
     };
@@ -1014,7 +1014,7 @@ export class SecurityHandler {
         for (const [, wh] of whs) {
           if (!ids.has(wh.id)) continue;
           tasks.push(
-            wh.delete('Liberty City — حذف ويب هوك أنشأه المهاجم')
+            wh.delete('Omni — حذف ويب هوك أنشأه المهاجم')
               .then(() => { deleted++; })
               .catch(() => {})
           );
@@ -1133,11 +1133,11 @@ export class SecurityHandler {
       if (targetId) {
         if (kind === 'channel') {
           this.recordArtifact(guild.id, executor.id, 'channels', targetId);
-          guild.channels.cache.get(targetId)?.delete('Liberty City — بوت غير مصرح').catch(() => {});
+          guild.channels.cache.get(targetId)?.delete('Omni — بوت غير مصرح').catch(() => {});
         } else if (kind === 'role') {
           this.recordArtifact(guild.id, executor.id, 'roles', targetId);
           const role = guild.roles.cache.get(targetId);
-          if (role && role.id !== guild.id && !role.managed) role.delete('Liberty City — بوت غير مصرح').catch(() => {});
+          if (role && role.id !== guild.id && !role.managed) role.delete('Omni — بوت غير مصرح').catch(() => {});
         } else if (kind === 'webhook') {
           this.recordArtifact(guild.id, executor.id, 'webhooks', targetId);
         }
@@ -1153,14 +1153,14 @@ export class SecurityHandler {
       const banned = await this.banUserById(
         guild,
         executor.id,
-        'Liberty City — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)'
+        'Omni — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)'
       );
       // 🛡️ لو فشل الحظر (هرمية/صلاحيات): اسحب كل صلاحياته فوراً حتى لا يكمل
       const stripped = !banned
         ? await this.stripBotPowersById(
             guild,
             executor.id,
-            'Liberty City — سحب صلاحيات بوت تخريبي (Anti-Nuke)'
+            'Omni — سحب صلاحيات بوت تخريبي (Anti-Nuke)'
           )
         : false;
 
@@ -1208,7 +1208,7 @@ export class SecurityHandler {
         if (!antiBot?.enabled && !preventMode) return false;
         if (this.botWhitelist(settings).has(botId)) return false; // fully exempt
         this.startIncident(guild.id, botId);
-        const banned = await this.banUserById(guild, botId, 'Liberty City — بوت مارق (قائمة سوداء عالمية)');
+        const banned = await this.banUserById(guild, botId, 'Omni — بوت مارق (قائمة سوداء عالمية)');
         globalThreat.add(guild.id, 12, 'rogue bot join (blacklisted)');
         void (this.client as any).protectionHandler?.applyBeastMode?.(guild, settings);
         logger.warn(`🌐 Rogue bot (blacklisted) join blocked: ${botId} in ${guild.name} banned=${banned}`);
@@ -1236,8 +1236,8 @@ export class SecurityHandler {
 
       this.startIncident(guild.id, botId);
       const reason = antiBot?.enabled
-        ? 'Liberty City — بوت غير مصرح به (Anti-Bot)'
-        : 'Liberty City — بوت خطِر غير مصرح (Anti-Nuke)';
+        ? 'Omni — بوت غير مصرح به (Anti-Bot)'
+        : 'Omni — بوت خطِر غير مصرح (Anti-Nuke)';
       const banned = await this.banUserById(guild, botId, reason);
       let stripped = false;
       if (!banned) {
@@ -1503,7 +1503,7 @@ export class SecurityHandler {
         // إلغاء حظر الضحية إن أمكن
         if (action === AuditLogEvent.MemberBanAdd && entry.targetId) {
           void guild.members
-            .unban(entry.targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً')
+            .unban(entry.targetId, 'Omni Anti-Nuke: إلغاء حظر الضحية تلقائياً')
             .catch(() => {});
         }
         return;
@@ -1601,7 +1601,7 @@ export class SecurityHandler {
         // استرجاع الاسم القديم فوراً
         const channel = guild.channels.cache.get(entry.targetId);
         if (channel && nameChange.old) {
-          channel.setName(String(nameChange.old), 'Liberty City — استرجاع اسم القناة').catch(() => {});
+          channel.setName(String(nameChange.old), 'Omni — استرجاع اسم القناة').catch(() => {});
         }
 
         await this.handleInstantViolation(guild, executor, settings, cfg, 'تغيير اسم قناة سريع', {
@@ -1664,7 +1664,7 @@ export class SecurityHandler {
         const ok = await this.banUserById(
           guild,
           member.id,
-          'Liberty City — بوت خطِر غير مصرح (حارس البوتات)'
+          'Omni — بوت خطِر غير مصرح (حارس البوتات)'
         );
         if (ok) {
           this.botGuardBackoff.delete(backoffKey);
@@ -1672,7 +1672,7 @@ export class SecurityHandler {
            void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
         } else {
           const stripped = await this
-            .stripBotPowers(guild, member, 'Liberty City — سحب صلاحيات بوت خطِر')
+            .stripBotPowers(guild, member, 'Omni — سحب صلاحيات بوت خطِر')
             .catch(() => false);
           if (stripped) {
             this.botGuardBackoff.delete(backoffKey);
@@ -1749,7 +1749,7 @@ export class SecurityHandler {
         const target = (await guild.fetchWebhooks()).get(message.webhookId);
         whOwnerId = target?.owner?.id;
         whName = target?.name ?? whName;
-        await target?.delete('Liberty City — Anti-Webhook-Spam').catch(() => {});
+        await target?.delete('Omni — Anti-Webhook-Spam').catch(() => {});
       } catch { /* تجاهل */ }
 
       // 3) احذف رسائل الويب هوك السابقة
@@ -1774,7 +1774,7 @@ export class SecurityHandler {
             guild,
             creator,
             nuke,
-            'Liberty City — سبام ويب هوك (Anti-Nuke)',
+            'Omni — سبام ويب هوك (Anti-Nuke)',
             nuke.mode !== 'react'
           );
           actionText += `\n${text}`;
@@ -1785,7 +1785,7 @@ export class SecurityHandler {
             await Promise.allSettled(
               [...all.values()]
                 .filter((w: any) => w?.owner?.id === creator!.id)
-                .map((w: any) => w.delete('Liberty City — حذف ويب هوكات المهاجم'))
+                .map((w: any) => w.delete('Omni — حذف ويب هوكات المهاجم'))
             );
           } catch { /* تجاهل */ }
 
@@ -1849,7 +1849,7 @@ export class SecurityHandler {
       const banned = await this.banUserById(
         guild,
         message.author.id,
-        'Liberty City — سبام من بوت غير مصرح (Anti-Nuke)'
+        'Omni — سبام من بوت غير مصرح (Anti-Nuke)'
       );
       await this.purgeAttackerArtifacts(guild, message.author.id).catch(() => 0);
 
@@ -2085,10 +2085,10 @@ export class SecurityHandler {
       if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id)) return;
 
       this.startIncident(guild.id, executor.id);
-      channel.delete('Liberty City — إنشاء قنوات جماعي (Anti-Nuke)').catch(() => {});
+      channel.delete('Omni — إنشاء قنوات جماعي (Anti-Nuke)').catch(() => {});
 
       if (burst >= 2 || suspiciousName) {
-        const reason = 'Liberty City — إنشاء قنوات جماعي مشبوه (Anti-Nuke)';
+        const reason = 'Omni — إنشاء قنوات جماعي مشبوه (Anti-Nuke)';
         const prevent = cfg.mode !== 'react';
         const text = await this.neutralizeById(guild, executor, cfg, reason, isBot || prevent);
         await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
@@ -2213,7 +2213,7 @@ export class SecurityHandler {
       if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id)) return;
 
       this.startIncident(guild.id, executor.id);
-      role.delete('Liberty City — إنشاء رولات جماعي (Anti-Nuke)').catch(() => {});
+      role.delete('Omni — إنشاء رولات جماعي (Anti-Nuke)').catch(() => {});
 
       if (burst >= 2 || suspiciousName) {
         const prevent = cfg.mode !== 'react';
@@ -2221,7 +2221,7 @@ export class SecurityHandler {
           guild,
           executor,
           cfg,
-          'Liberty City — إنشاء رولات جماعي مشبوه (Anti-Nuke)',
+          'Omni — إنشاء رولات جماعي مشبوه (Anti-Nuke)',
           isBot || prevent
         );
         await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
@@ -2276,7 +2276,7 @@ export class SecurityHandler {
       let nameRestored = false;
       if (canManageChannels) {
         try {
-          await newChannel.setName(oldName, 'Liberty City — استرجاع اسم القناة');
+          await newChannel.setName(oldName, 'Omni — استرجاع اسم القناة');
           nameRestored = true;
         } catch (e: any) {
           logger.warn(`Failed to restore channel name in ${guild.name}: ${e.message}`);
@@ -2296,7 +2296,7 @@ export class SecurityHandler {
         guild,
         entry.executor,
         antiNuke,
-        'Liberty City — تغيير أسماء القنوات بسرعة (Anti-Nuke)',
+        'Omni — تغيير أسماء القنوات بسرعة (Anti-Nuke)',
         isBot || prevent
       );
       await this.purgeAttackerArtifacts(guild, entry.executor.id).catch(() => 0);
@@ -2369,7 +2369,7 @@ export class SecurityHandler {
 
       // 🗑️ حذف فوري — قبل أي انتظار إضافي
       this.recordArtifact(guild.id, executor?.id ?? 'unknown', 'webhooks', webhook.id);
-      await webhook.delete('Liberty City — ويب هوك غير مصرح').catch(() => {});
+      await webhook.delete('Omni — ويب هوك غير مصرح').catch(() => {});
 
       if (!executor) {
         logger.warn(`🚨 Webhook deleted in ${guild.name} — creator unknown (${webhook.id})`);
@@ -2383,7 +2383,7 @@ export class SecurityHandler {
         guild,
         executor,
         cfg,
-        'Liberty City — إنشاء ويب هوك غير مصرح (Anti-Nuke)',
+        'Omni — إنشاء ويب هوك غير مصرح (Anti-Nuke)',
         isBot || prevent
       );
       await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
@@ -2427,7 +2427,7 @@ export class SecurityHandler {
           this.startIncident(guild.id, newMember.id);
           void this.blacklistBot(newMember.id, 'bot gained dangerous powers', guild.id);
           globalThreat.add(guild.id, 10, 'bot gained dangerous powers');
-          const reason = 'Liberty City — بوت خطِر حصل على صلاحيات تخريبية';
+          const reason = 'Omni — بوت خطِر حصل على صلاحيات تخريبية';
           const banned = await this.banUserById(guild, newMember.id, reason);
           if (!banned) {
             await this.stripBotPowers(guild, newMember, reason).catch(() => false);
@@ -2478,7 +2478,7 @@ export class SecurityHandler {
       let rolesRestored = false;
       if (canManageRoles) {
         try {
-          await newMember.roles.remove(addedRoles, 'Liberty City — استرجاع رولات غير مصرح بها');
+          await newMember.roles.remove(addedRoles, 'Omni — استرجاع رولات غير مصرح بها');
           rolesRestored = true;
         } catch {}
       }
@@ -2501,7 +2501,7 @@ export class SecurityHandler {
         guild,
         executor,
         antiNuke,
-        'Liberty City Anti-Nuke: إعطاء رولات خطيرة بدون تصريح',
+        'Omni Anti-Nuke: إعطاء رولات خطيرة بدون تصريح',
         executorIsBot || preventMode
       );
       await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
@@ -2581,7 +2581,7 @@ export class SecurityHandler {
           await newChannel.permissionOverwrites.edit(
             everyoneRoleId,
             oldEveryone,
-            'Liberty City — استرجاع صلاحيات @everyone'
+            'Omni — استرجاع صلاحيات @everyone'
           );
           permsRestored = true;
         } catch (e: any) {
@@ -2596,7 +2596,7 @@ export class SecurityHandler {
         guild,
         entry.executor,
         antiNuke,
-        'Liberty City — منح @everyone صلاحيات خطيرة (Anti-Nuke)',
+        'Omni — منح @everyone صلاحيات خطيرة (Anti-Nuke)',
         isBot || prevent
       );
 
@@ -2766,7 +2766,7 @@ export class SecurityHandler {
           guild,
           executor,
           cfg.action ?? 'ban',
-          `Liberty City Anti-Nuke: حذف جماعي للرسائل (${messages.size} رسالة)`
+          `Omni Anti-Nuke: حذف جماعي للرسائل (${messages.size} رسالة)`
         );
       }
 
@@ -2780,7 +2780,7 @@ export class SecurityHandler {
           { name: 'الإجراء', value: actionText, inline: true },
           { name: '📬 استعادة', value: `أعيد إرسال **${restored}** رسالة`, inline: true },
         )
-        .setFooter({ text: 'Liberty City Anti-Nuke' })
+        .setFooter({ text: `${guild.name} • Anti-Nuke` })
         .setTimestamp();
 
       const alert = await this.getAlertChannel(guild, settings, settings?.protection?.antiNuke?.logChannel);
@@ -2896,10 +2896,10 @@ export class SecurityHandler {
       const isBot = this.executorIsBot(guild, executor);
       const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
       if (isBot && !preWhitelisted) {
-        try { await thread.delete('Liberty City — بوت غير مصرح أنشأ ثريد'); } catch {}
+        try { await thread.delete('Omni — بوت غير مصرح أنشأ ثريد'); } catch {}
         const prevent = cfg.mode !== 'react';
         const action: 'alert' | 'kick' | 'ban' | 'strip' = prevent ? 'ban' : ((cfg.action ?? 'kick') as any);
-        const text = await this.punishById(guild, executor, action, 'Liberty City — بوت أنشأ ثريد (Anti-Nuke)');
+        const text = await this.punishById(guild, executor, action, 'Omni — بوت أنشأ ثريد (Anti-Nuke)');
         await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
 
         void this.getAlertChannel(guild, settings, cfg.logChannel)
@@ -2917,11 +2917,11 @@ export class SecurityHandler {
       if (burst < 3) return;
 
       this.startIncident(guild.id, executor.id);
-      try { await thread.delete('Liberty City — إنشاء ثريدات جماعي'); } catch {}
+      try { await thread.delete('Omni — إنشاء ثريدات جماعي'); } catch {}
       const prevent = cfg.mode !== 'react';
       const action: 'alert' | 'kick' | 'ban' | 'strip' =
         isBot || prevent ? 'ban' : ((cfg.action ?? 'kick') as any);
-      const text = await this.punishById(guild, executor, action, 'Liberty City — إنشاء ثريدات جماعي');
+      const text = await this.punishById(guild, executor, action, 'Omni — إنشاء ثريدات جماعي');
       await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
 
       void this.getAlertChannel(guild, settings, cfg.logChannel)
@@ -3108,7 +3108,7 @@ export class SecurityHandler {
                   { name: '⛔ لم تصل', value: `${queue.length - sent}`, inline: true },
                   { name: '🔗 الرابط', value: invite, inline: false }
                 )
-                .setFooter({ text: 'Liberty City — Kick Recovery' })
+                .setFooter({ text: `${guild.name} — Kick Recovery` })
                 .setTimestamp(),
             ],
           })
@@ -3212,7 +3212,7 @@ export class SecurityHandler {
         maxAge: 0,
         maxUses: 0,
         unique: false,
-        reason: 'Liberty City — استعادة الأعضاء المطرودين',
+        reason: 'Omni — استعادة الأعضاء المطرودين',
       });
       return `https://discord.gg/${inv.code}`;
     } catch (error: any) {
@@ -3274,7 +3274,7 @@ export class SecurityHandler {
 
     // 🔨 الحظر يُلغى فوراً عن الضحية — بالتوازي مع كل شيء
     void (type === 'ban' && targetId && executor && !trusted
-      ? guild.members.unban(targetId, 'Liberty City Anti-Nuke: إلغاء حظر الضحية تلقائياً').catch(() => {})
+      ? guild.members.unban(targetId, 'Omni Anti-Nuke: إلغاء حظر الضحية تلقائياً').catch(() => {})
       : Promise.resolve());
 
     // 🛡️ وضع المنع الوقائي: أول عملية اعتداء = حظر فوري
@@ -3303,7 +3303,7 @@ export class SecurityHandler {
     } else {
       // 🚨 حادث نشط — يمنع أي إنشاء جديد من نفس المهاجم فوراً
       this.startIncident(guild.id, executor.id);
-      const reason = `Liberty City Anti-Nuke: ${labels[type].label} — ردّ فوري${preventMode ? ' (وضع المنع)' : ''}`;
+      const reason = `Omni Anti-Nuke: ${labels[type].label} — ردّ فوري${preventMode ? ' (وضع المنع)' : ''}`;
       // ⚡ عقوبة بالمعرّف مباشرة — أسرع مسار ممكن (بدون جلب عضو أو سحب رولات متسلسل)
       punishP = this.punishById(guild, executor, effectiveAction, reason);
       // 🧹 حذف كل ما أنشأه المهاجم (قنوات/رولات/ويب هوكس) — بالتوازي
@@ -3320,7 +3320,7 @@ export class SecurityHandler {
         void this.stripBotPowersById(
           guild,
           executor.id,
-          'Liberty City — تأكيد سحب صلاحيات بوت تخريبي'
+          'Omni — تأكيد سحب صلاحيات بوت تخريبي'
         ).catch(() => false);
       }
       void purgeP.then(n => {
@@ -3352,7 +3352,7 @@ export class SecurityHandler {
           inline: false,
         }
       )
-      .setFooter({ text: 'Liberty City Anti-Nuke' })
+      .setFooter({ text: `${guild.name} • Anti-Nuke` })
       .setTimestamp();
 
     // ♻️ الاستعادة انطلقت مسبقاً بالتوازي (لا ننتظرها هنا حتى لا نبطئ بقية الأحداث)
@@ -3402,7 +3402,7 @@ export class SecurityHandler {
           { name: '🎭 رولات', value: `+${result.roles}`, inline: true },
           { name: '⏭️ مُتجاوَز', value: `${result.skipped}`, inline: true }
         )
-        .setFooter({ text: 'Liberty City — Auto Restore' })
+        .setFooter({ text: `${guild.name} — Auto Restore` })
         .setTimestamp();
 
       if (channel) await channel.send({ embeds: [embed] }).catch(() => {});
@@ -3422,7 +3422,7 @@ export class SecurityHandler {
                   `**السبب:** ${error.message}\nجرّب يدوياً: \`/backup restore\``
                 )
                 .setColor(Colors.warning)
-                .setFooter({ text: 'Liberty City — Auto Restore' })
+                .setFooter({ text: `${guild.name} — Auto Restore` })
                 .setTimestamp(),
             ],
           })
@@ -3526,7 +3526,7 @@ export class SecurityHandler {
           try {
             await newRole.setPermissions(
               oldRole.permissions,
-              'Liberty City Permission Guard: dangerous permissions reverted'
+              'Omni Permission Guard: dangerous permissions reverted'
             );
             reverted = true;
           } catch (e: any) {
@@ -3538,7 +3538,7 @@ export class SecurityHandler {
           const executorMember = guild.members.cache.get(executor.id);
           if (executorMember && preventMode) {
             await executorMember.roles
-              .set([], 'Liberty City Anti-Nuke: وضع المنع — حجر الصلاحيات')
+              .set([], 'Omni Anti-Nuke: وضع المنع — حجر الصلاحيات')
               .catch(() => {});
           }
           if (executorMember) {
@@ -3549,7 +3549,7 @@ export class SecurityHandler {
               guild,
               executor,
               act,
-              'Liberty City Permission Guard: منح صلاحيات خطيرة (حاجز الصلاحيات)'
+              'Omni Permission Guard: منح صلاحيات خطيرة (حاجز الصلاحيات)'
             );
           }
 
@@ -3571,7 +3571,7 @@ export class SecurityHandler {
                   { name: 'المنفّذ', value: `${executor.bot ? '🤖' : '👤'} ${executor.tag}`, inline: true },
                   { name: 'العقوبة', value: punishText, inline: true }
                 )
-                .setFooter({ text: 'Liberty City — Permission Guard' })
+                .setFooter({ text: `${guild.name} — Permission Guard` })
                 .setTimestamp(),
             ],
           }).catch(() => {});
@@ -3938,7 +3938,7 @@ export class SecurityHandler {
             permissions: BigInt(rd.permissions),
             hoist: !!rd.hoist,
             mentionable: !!rd.mentionable,
-            reason: 'Liberty City — استعادة نسخة احتياطية',
+            reason: 'Omni — استعادة نسخة احتياطية',
           });
           idMap[`role:${rd.id}`] = created.id;
           result.roles++;
@@ -4031,7 +4031,7 @@ export class SecurityHandler {
           ...(cd.topic ? { topic: cd.topic } : {}),
           ...(cd.nsfw ? { nsfw: true } : {}),
           ...(parentId ? { parent: parentId } : {}),
-          reason: 'Liberty City — استعادة نسخة احتياطية',
+          reason: 'Omni — استعادة نسخة احتياطية',
         });
         idMap[`ch:${cd.id}`] = created.id;
         result.channels++;
@@ -4075,7 +4075,7 @@ export class SecurityHandler {
               await gChannel.permissionOverwrites.edit(targetId, {
                 Allow: BigInt(ow.allow),
                 Deny: BigInt(ow.deny),
-              }, 'Liberty City — استعادة أوفررايتس').catch(() => {});
+              }, 'Omni — استعادة أوفررايتس').catch(() => {});
             } catch {}
           }
         }

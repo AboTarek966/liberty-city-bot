@@ -1,10 +1,10 @@
 // ============================================
-// Liberty City Bot - Scam Link Filter (فلتر الروابط الاحتيالية)
+// Omni Bot - Scam Link Filter (فلتر الروابط الاحتيالية)
 // حماية من روابط صيد النيترو والمشاريع المزيفة (ديسكورد/ستيم/إيлон ماسك...)
 // ============================================
 
 import { Message } from 'discord.js';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { getGuildSettings } from '../models';
 import { createLogger } from './helpers';
 
@@ -76,7 +76,7 @@ export function checkScamContent(content: string): ScamCheckResult {
 }
 
 /** معالجة رسالة واحذفها إن كانت احتيالية (يستدعيها messageCreate) */
-export async function handleScamFilter(message: Message, client: LibertyClient): Promise<boolean> {
+export async function handleScamFilter(message: Message, client: OmniClient): Promise<boolean> {
   if (!message.guild || !message.content) return false;
 
   const settings = await getGuildSettings(message.guild.id);
@@ -119,7 +119,7 @@ export async function handleScamFilter(message: Message, client: LibertyClient):
                 { name: '🔗 المطابقة', value: `\`${result.matched || '—'}\` — ${result.reason}`, inline: false },
                 { name: '📄 النص', value: message.content.substring(0, 500) || '—', inline: false },
               ],
-              footer: { text: 'Liberty City Security' },
+              footer: { text: `${message.guild?.name || 'Omni'} • Security` },
               timestamp: new Date().toISOString(),
             },
           ],

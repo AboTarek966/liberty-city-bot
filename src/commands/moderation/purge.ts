@@ -1,5 +1,5 @@
 ﻿// ============================================
-// Liberty City Bot - Purge Command
+// Omni Bot - Purge Command
 // ============================================
 
 import {

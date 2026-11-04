@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - AI Investigator Command
+// Omni Bot - AI Investigator Command
 // ============================================
 // /investigate run | status | findings | member | dismiss | config
 // المحقق للقراءة فقط: لا ينفّذ أي عقوبة تلقائية.
@@ -54,7 +54,7 @@ function buildReportEmbed(report, titlePrefix = '🕵️ تحقيق أمني') {
         `**الملخص:** ${truncate(report.summary, 1500)}`,
     ].join('\n'))
         .setFooter({
-        text: `Liberty City AI Investigator • ${report.model} • ${report.runId} • ${(report.durationMs / 1000).toFixed(0)}s`,
+        text: `${report.guildName} AI Investigator • ${report.model} • ${report.runId} • ${(report.durationMs / 1000).toFixed(0)}s`,
     })
         .setTimestamp(new Date(report.completedAt));
     const counts = report.counts;

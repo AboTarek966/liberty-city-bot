@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Leveling Handler
+// Omni Bot - Leveling Handler
 // نظام المستويات المركزي: XP، الترقيات، مكافآت الرولات، بطاقة الرank
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });

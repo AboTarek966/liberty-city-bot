@@ -1,11 +1,11 @@
 // ============================================
-// Liberty City Bot - Guild Create
+// Omni Bot - Guild Create
 // عند انضمام البوت لسيرفر جديد: تسجيل الأوامر فوراً
 // حتى تظهر أوامر السلاش خلال ثوانٍ في السيرفر الجديد
 // ============================================
 
 import { Event } from '../handlers/EventHandler';
-import { LibertyClient } from '../LibertyClient';
+import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 
 const logger = createLogger('GuildCreate');
@@ -15,7 +15,7 @@ const guildCreateEvent: Event = {
   async execute(guild: any) {
     logger.info(`📥 Bot joined guild: ${guild.name} (${guild.id})`);
 
-    const client = guild.client as LibertyClient;
+    const client = guild.client as OmniClient;
 
     // 🛡️ تأمين السيرفر الجديد فوراً:
     //    1) فحص التسلّم — البوت لازم أعلى رتبة وإلا كل الحماية معطّلة
