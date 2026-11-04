@@ -767,7 +767,7 @@ function buildTicketAIPanel(guild, s) {
     const analyzeOnCreate = aiTicket.analyzeOnCreate !== false;
     const replyToMessages = aiTicket.replyToMessages !== false;
     const embed = categoryEmbed('tickets', guild, `🤖 مساعد التذاكر الذكي — تحليل تلقائي وردود داخل التذاكر\n\n` +
-        `> 🌐 **الذكاء العام:** ${on(s.ai?.enabled)} ${s.ai?.enabled ? 'مفعّل' : 'معطّل — لازم تفعّله من قسم الذكاء الاصطناعي'}\n` +
+        `> 🔓 **مستقل عن الذكاء العام:** يعمل بمفتاحه الخاص حتى لو الذكاء العام معطّل\n` +
         `> ⚡ **مساعد AI:** ${on(aiTicket.enabled)} ${aiTicket.enabled ? 'مفعّل' : 'معطّل'}\n` +
         `> 🤝 **الاستلام التلقائي:** ${on(aiTicket.autoClaim)} ${aiTicket.autoClaim ? 'يستلم التذكرة تلقائياً' : 'بدون استلام تلقائي'}\n` +
         `> 🔍 **تحليل عند الإنشاء:** ${on(analyzeOnCreate)} ${analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +

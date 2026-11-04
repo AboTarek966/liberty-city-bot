@@ -162,7 +162,7 @@ class AIHandler {
     // Main Response Generation
     // --------------------------------------------
     async generateResponse(userId, guildId, channelId, message, userRoles = [], isMention = false, repliedToBot = false, opts = {}) {
-        const { fromCommand = false, userContext, stream, safeMode = false, attachments } = opts;
+        const { fromCommand = false, userContext, stream, safeMode = false, ignoreGlobalToggle = false, attachments, } = opts;
         try {
             // Get AI config for guild (auto-create with defaults if missing)
             let aiConfig = guildId ? await models_1.AIConfig.findOne({ guildId }) : null;
@@ -192,7 +192,8 @@ class AIHandler {
                 };
             }
             // Respect admin's choice: if AI is disabled, don't respond
-            if (!aiConfig.enabled) {
+            // ما عدا الميزات المستقلة (مساعد التذاكر) — لها مفتاحها الخاص في الإعدادات
+            if (!aiConfig.enabled && !ignoreGlobalToggle) {
                 return null;
             }
             // Check cooldown

@@ -181,6 +181,8 @@ export class AIHandler {
       userContext?: AIUserContext;
       stream?: AIStreamHandlers;
       safeMode?: boolean;
+      /** 🔌 تجاهل مفتاح الذكاء العام — للميزات المستقلة مثل مساعد التذاكر */
+      ignoreGlobalToggle?: boolean;
       /** وسائط الرسالة (صور/رسائل صوتية/فيديو/ملفات) — تُحلَّل قبل التوليد */
       attachments?: Array<{
         id: string;
@@ -195,7 +197,14 @@ export class AIHandler {
       }>;
     } = {}
   ): Promise<AIResponse | null> {
-    const { fromCommand = false, userContext, stream, safeMode = false, attachments } = opts;
+    const {
+      fromCommand = false,
+      userContext,
+      stream,
+      safeMode = false,
+      ignoreGlobalToggle = false,
+      attachments,
+    } = opts;
     try {
       // Get AI config for guild (auto-create with defaults if missing)
       let aiConfig: any = guildId ? await AIConfig.findOne({ guildId }) : null;
@@ -227,7 +236,8 @@ export class AIHandler {
       }
 
       // Respect admin's choice: if AI is disabled, don't respond
-      if (!aiConfig.enabled) {
+      // ما عدا الميزات المستقلة (مساعد التذاكر) — لها مفتاحها الخاص في الإعدادات
+      if (!aiConfig.enabled && !ignoreGlobalToggle) {
         return null;
       }
 

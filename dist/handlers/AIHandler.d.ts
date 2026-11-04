@@ -37,6 +37,8 @@ export declare class AIHandler {
         userContext?: AIUserContext;
         stream?: AIStreamHandlers;
         safeMode?: boolean;
+        /** 🔌 تجاهل مفتاح الذكاء العام — للميزات المستقلة مثل مساعد التذاكر */
+        ignoreGlobalToggle?: boolean;
         /** وسائط الرسالة (صور/رسائل صوتية/فيديو/ملفات) — تُحلَّل قبل التوليد */
         attachments?: Array<{
             id: string;

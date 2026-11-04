@@ -69,9 +69,7 @@ class AITicketAssistant {
     // --------------------------------------------
     async getConfig(guildId) {
         const settings = await (0, models_1.getGuildSettings)(guildId);
-        // 🌐 مساعد التذاكر يحتاج الذكاء العام مفعّلاً — نفس مصدر الحقيقة في لوحة الإعدادات
-        if (settings.ai?.enabled === false)
-            return null;
+        // 🔓 مساعد التذاكر مستقل تماماً عن مفتاح الذكاء العام — له مفتاحه الخاص
         const config = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant;
         return config || null;
     }
@@ -202,7 +200,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
                 if ('sendTyping' in channel) {
                     await channel.sendTyping().catch(() => { });
                 }
-                const response = await this.client.aiHandler.generateResponse(`ticket-ai:chat:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true });
+                const response = await this.client.aiHandler.generateResponse(`ticket-ai:chat:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true, ignoreGlobalToggle: true });
                 const content = response?.content?.trim().slice(0, 1900);
                 if (!content)
                     return;
@@ -290,7 +288,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
 - كن مختصراً وودوداً
 
 ردك:`;
-            const response = await this.client.aiHandler.generateResponse(`ticket-ai:reply:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true });
+            const response = await this.client.aiHandler.generateResponse(`ticket-ai:reply:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true, ignoreGlobalToggle: true });
             if (response?.content) {
                 const embed = new discord_js_1.EmbedBuilder()
                     .setTitle('🤖 AI Assistant — رد أولي')
@@ -375,7 +373,7 @@ ${context}
   "confidence": 0-100
 }`;
         try {
-            const response = await this.client.aiHandler.generateResponse(`ticket-ai:analysis:${String(ticket._id)}`, guild.id, message.channel.id, prompt, [], false, false, { fromCommand: true });
+            const response = await this.client.aiHandler.generateResponse(`ticket-ai:analysis:${String(ticket._id)}`, guild.id, message.channel.id, prompt, [], false, false, { fromCommand: true, ignoreGlobalToggle: true });
             if (!response?.content) {
                 return this.getDefaultAnalysis();
             }

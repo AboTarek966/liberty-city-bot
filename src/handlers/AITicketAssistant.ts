@@ -97,9 +97,7 @@ export class AITicketAssistant {
   private async getConfig(guildId: string): Promise<AITicketConfig | null> {
     const settings = await getGuildSettings(guildId);
 
-    // 🌐 مساعد التذاكر يحتاج الذكاء العام مفعّلاً — نفس مصدر الحقيقة في لوحة الإعدادات
-    if ((settings as any).ai?.enabled === false) return null;
-
+    // 🔓 مساعد التذاكر مستقل تماماً عن مفتاح الذكاء العام — له مفتاحه الخاص
     const config =
       (settings as any).protection?.aiTicketAssistant ?? (settings as any).aiTicketAssistant;
     return config || null;
@@ -249,7 +247,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
           [],
           false,
           false,
-          { fromCommand: true }
+          { fromCommand: true, ignoreGlobalToggle: true }
         );
 
         const content = response?.content?.trim().slice(0, 1900);
@@ -359,7 +357,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
         [],
         false,
         false,
-        { fromCommand: true }
+        { fromCommand: true, ignoreGlobalToggle: true }
       );
 
       if (response?.content) {
@@ -457,7 +455,7 @@ ${context}
         [],
         false,
         false,
-        { fromCommand: true }
+        { fromCommand: true, ignoreGlobalToggle: true }
       );
 
       if (!response?.content) {
