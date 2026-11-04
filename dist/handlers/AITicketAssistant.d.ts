@@ -1,5 +1,6 @@
 import { TextChannel } from 'discord.js';
 import { LibertyClient } from '../LibertyClient';
+import { TicketAction } from '../utils/aiTicketActions';
 export interface TicketAnalysis {
     category: 'technical' | 'billing' | 'complaint' | 'inquiry' | 'protection' | 'roles' | 'channels' | 'other';
     severity: 'low' | 'medium' | 'high' | 'critical';
@@ -9,40 +10,51 @@ export interface TicketAnalysis {
     requiredActions: RequiredAction[];
     confidence: number;
 }
-export interface RequiredAction {
-    type: 'give_role' | 'remove_role' | 'create_channel' | 'modify_permissions' | 'check_settings' | 'restore_backup' | 'ban_user' | 'timeout_user' | 'custom';
-    description: string;
-    params: Record<string, any>;
-    requiresAdminApproval: boolean;
-    targetUserId?: string;
-    targetRoleId?: string;
-}
+export type RequiredAction = TicketAction;
 export interface AdminApprovalRequest {
     ticketId: string;
     channelId: string;
     action: RequiredAction;
     requestedBy: 'ai';
-    status: 'pending' | 'approved' | 'denied';
+    status: 'pending' | 'approved' | 'denied' | 'expired';
     requestedAt: Date;
     approvedBy?: string;
     approvedAt?: Date;
 }
+export interface AdminResponseResult {
+    ok: boolean;
+    message: string;
+}
 export declare class AITicketAssistant {
     private client;
     constructor(client: LibertyClient);
+    private getConfig;
     onTicketCreated(ticket: any, channel: TextChannel): Promise<void>;
     private claimTicket;
     private sendAutoResponse;
     private analyzeTicket;
     private getDefaultAnalysis;
     private executeSolution;
-    private executeAction;
     private requestAdminApproval;
-    handleAdminResponse(approvalId: string, adminId: string, approve: boolean): Promise<void>;
+    handleAdminResponse(approvalId: string, adminId: string, approve: boolean, expectedGuildId?: string): Promise<AdminResponseResult>;
     private notifyAdmins;
+    private logAITicketEvent;
     private getCategoryLabel;
+    getApprovalDetails(approvalId: string): Promise<AITicketApprovalDetails | null>;
     learnFromClosedTicket(ticket: any, resolution: string): Promise<void>;
-    getApprovals(): Map<string, AdminApprovalRequest>;
+}
+export interface AITicketApprovalDetails {
+    approvalId: string;
+    guildId: string;
+    ticketId: string;
+    channelId: string;
+    action: RequiredAction;
+    status: 'pending' | 'approved' | 'denied' | 'expired';
+    requestedAt: Date;
+    expiresAt: Date;
+    approvedBy?: string;
+    approvedAt?: Date;
+    resultMessage?: string;
 }
 export default AITicketAssistant;
 //# sourceMappingURL=AITicketAssistant.d.ts.map

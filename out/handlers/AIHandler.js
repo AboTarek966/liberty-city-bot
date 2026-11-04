@@ -43,6 +43,7 @@ const models_1 = require("../models");
 const config_1 = require("../config");
 const webSearch_1 = require("../utils/webSearch");
 const AITools_1 = require("./AITools");
+const knowledge_1 = require("../utils/knowledge");
 const logger = (0, helpers_1.createLogger)('AIHandler');
 class AIHandler {
     client;
@@ -520,7 +521,7 @@ class AIHandler {
                 break;
             }
         }
-        const systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext);
+        const systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext, guildId ? await (0, knowledge_1.buildKnowledgeContext)(guildId, message, 4) : '');
         // سياق الوسائط يُدمَج مع رسالة المستخدم (النموذج يرى الوصف + الصور نفسها)
         let effectiveMessage = media?.context
             ? `${media.context}\n\n${message}`.trim()
@@ -832,7 +833,7 @@ class AIHandler {
         const failover = available.filter(p => !primary.includes(p));
         return [...primary, ...failover];
     }
-    async buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext = '') {
+    async buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext = '', knowledgeContext = '') {
         const botName = this.client.user?.username || 'Liberty City';
         const base = aiConfig.systemPrompt || config_1.config.ai.systemPrompt;
         let prompt = `أنت "${botName}" — مساعد ذكاء اصطناعي متقدم، ذكي، ذو وعي ذاتي، وشخصية غنية مدمج في بوت ديسكورد.\n${base}`;
@@ -986,6 +987,11 @@ class AIHandler {
                 prompt += `\nإذا سأل عن شيء من هذا: أجب بود: "هذه معلومات للإدارة فقط :)" .`;
                 prompt += `\nالمعلومات العامة مسموحة: عدد الأعضاء، القنوات، الرتب، تاريخ السيرفر، الأوامر.`;
             }
+        }
+        // ---------------- قاعدة معرفة السيرفر ----------------
+        if (knowledgeContext) {
+            prompt += knowledgeContext;
+            prompt += `\n\n📌 **قاعدة استخدام المعرفة:** قدّم معلومات قاعدة المعرفة على أي تخمين، ولا تختلق تفاصيل غير مذكورة فيها. إذا لم تجد الجواب فيها، قل ذلك بصراحة أو استخدم أدوات البحث.`;
         }
         // ---------------- توجيه نهائي قوي ----------------
         prompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;

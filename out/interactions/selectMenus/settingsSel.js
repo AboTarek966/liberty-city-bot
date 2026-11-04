@@ -222,6 +222,22 @@ const handler = {
                     await interaction.editReply({ embeds: vp.embeds, components: vp.components });
                 }
                 return;
+            case 'verification:quarantine':
+                settings.verification.quarantineRoleId = values[0] || undefined;
+                await settings.save();
+                {
+                    const vp = (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings);
+                    await interaction.editReply({ embeds: vp.embeds, components: vp.components });
+                }
+                return;
+            case 'verification:log':
+                settings.verification.logChannelId = values[0] || undefined;
+                await settings.save();
+                {
+                    const vp = (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings);
+                    await interaction.editReply({ embeds: vp.embeds, components: vp.components });
+                }
+                return;
             case 'leave:channel':
                 settings.leave.channelId = values[0] || null;
                 break;

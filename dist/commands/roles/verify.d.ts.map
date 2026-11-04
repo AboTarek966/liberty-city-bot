@@ -1,0 +1,1 @@
+{"version":3,"file":"verify.d.ts","sourceRoot":"","sources":["../../../src/commands/roles/verify.ts"],"names":[],"mappings":"AAiBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAKxD,QAAA,MAAM,OAAO,EAAE,OAwKd,CAAC;AAKF,wBAAsB,qBAAqB,CACzC,KAAK,EAAE,GAAG,EACV,QAAQ,EAAE,GAAG,GACZ,OAAO,CAAC;IAAE,EAAE,EAAE,OAAO,CAAC;IAAC,OAAO,EAAE,MAAM,CAAA;CAAE,CAAC,CA0D3C;AAED,eAAe,OAAO,CAAC"}

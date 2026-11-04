@@ -82,7 +82,11 @@ const handler: ButtonHandler = {
         break;
       }
       case 'verification': {
-        settings.verification.enabled = !settings.verification.enabled;
+        const v = settings.verification;
+        if (!v) break;
+        if (field === 'captcha') v.captchaEnabled = !v.captchaEnabled;
+        else if (field === 'kickOnFail') v.kickOnFail = !v.kickOnFail;
+        else v.enabled = !v.enabled;
         break;
       }
       case 'welcome':

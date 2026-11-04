@@ -460,6 +460,32 @@ export interface IGuildSettings extends Document {
     description: string;
     buttonLabel: string;
     buttonEmoji: string;
+    /** 🔞 أقل عمر للحساب بالأيام — 0 = بدون حد */
+    minAccountAgeDays?: number;
+    /** 🧮 كابتشا رياضية قبل منح الرول */
+    captchaEnabled?: boolean;
+    /** 🚧 رول الحجر — يُزال عند التوثيق الناجح */
+    quarantineRoleId?: string;
+    /** 📢 قناة سجل التوثيق (اختياري) */
+    logChannelId?: string;
+    /** 👢 طرد الحساب إذا فشل شرط العمر */
+    kickOnFail?: boolean;
+    /** رسالة التوثيق الحالية — تُحذف عند إعادة الإرسال */
+    messageId?: string;
+  };
+
+  // 🍯 Honeypot Channel (قناة الطعم)
+  honeypot?: {
+    enabled: boolean;
+    channelId?: string;
+    action: 'delete' | 'timeout' | 'kick' | 'ban';
+    timeoutMinutes: number;
+    logChannelId?: string;
+    /** رولات يتم منشنها عند اصطياد مخالف */
+    alertRoleIds: string[];
+    deleteMessage: boolean;
+    /** استثناء الإداريين (Administrator / ManageGuild) من العقوبة */
+    ignoreAdmins: boolean;
   };
 
   // Shop (متجر السيرفر — شراء رولات بالرصيد)
@@ -1229,6 +1255,23 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     },
     buttonLabel: { type: String, default: 'توثيق' },
     buttonEmoji: { type: String, default: '✅' },
+    minAccountAgeDays: { type: Number, default: 0, min: 0, max: 365 },
+    captchaEnabled: { type: Boolean, default: false },
+    quarantineRoleId: { type: String },
+    logChannelId: { type: String },
+    kickOnFail: { type: Boolean, default: false },
+    messageId: { type: String },
+  },
+
+  honeypot: {
+    enabled: { type: Boolean, default: false },
+    channelId: { type: String },
+    action: { type: String, enum: ['delete', 'timeout', 'kick', 'ban'], default: 'ban' },
+    timeoutMinutes: { type: Number, default: 10, min: 1, max: 40320 },
+    logChannelId: { type: String },
+    alertRoleIds: [{ type: String }],
+    deleteMessage: { type: Boolean, default: true },
+    ignoreAdmins: { type: Boolean, default: true },
   },
   shop: {
     enabled: { type: Boolean, default: true },
@@ -1459,6 +1502,9 @@ export { InvestigationRun, InvestigationFinding } from './AIInvestigation';
 export { RogueBot } from './RogueBot';
 export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
+export { Giveaway, IGiveaway, IGiveawayRequirements } from './Giveaway';
+export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
+export { AITicketApproval, IAITicketApproval } from './AITicketApproval';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';
 
 // --------------------------------------------

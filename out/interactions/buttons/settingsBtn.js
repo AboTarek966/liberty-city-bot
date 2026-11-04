@@ -42,7 +42,7 @@ const handler = {
             'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
             'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
             'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-            'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
+            'tickets:types', 'tickets:panel', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
             'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
             'translator:settings',
             'music:volume', 'music:queue_limit',
@@ -103,6 +103,40 @@ const handler = {
             return;
         }
         // مودال خاص: رسالة التوثيق (عنوان + نص + نص الزر)
+        // ⏳ مودال عمر الحساب المطلوب للتوثيق
+        if (`${section}:${action}` === 'verification:age') {
+            const v = settings.verification || {};
+            const input = new discord_js_1.TextInputBuilder()
+                .setCustomId('value')
+                .setLabel('أقل عمر للحساب بالأيام (0 = بدون حد)')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(3)
+                .setRequired(true)
+                .setValue(String(v.minAccountAgeDays || 0));
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:verification:age')
+                .setTitle('🕰️ شرط عمر الحساب')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(input));
+            await interaction.showModal(modal);
+            return;
+        }
+        // 📋 مودال قناة سجل التوثيق (فارغ = تعطيل السجل)
+        if (`${section}:${action}` === 'verification:log') {
+            const v = settings.verification || {};
+            const input = new discord_js_1.TextInputBuilder()
+                .setCustomId('value')
+                .setLabel('آيدي قناة السجل أو منشنها (فارغ = بدون سجل)')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(64)
+                .setRequired(false)
+                .setValue(v.logChannelId ? `<#${v.logChannelId}>` : '');
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:verification:log')
+                .setTitle('📋 قناة سجل التوثيق')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(input));
+            await interaction.showModal(modal);
+            return;
+        }
         if (`${section}:${action}` === 'verification:msg') {
             const v = settings.verification || {};
             const titleInput = new discord_js_1.TextInputBuilder()

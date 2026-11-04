@@ -264,6 +264,43 @@ const handler: ModalHandler = {
         panelEdited = true;
         break;
       }
+      case 'verification:age': {
+        const age = parseInt(value, 10);
+        if (isNaN(age) || age < 0 || age > 365) {
+          await interaction.followUp({ content: '❌ أدخل رقماً بين 0 و 365', ephemeral: true });
+          return;
+        }
+        settings.verification.minAccountAgeDays = age;
+        await settings.save();
+        const vpAge = buildVerificationPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: vpAge.embeds, components: vpAge.components as any });
+        await interaction.followUp({
+          content: `✅ تم تعيين أقل عمر للحساب: **${age}** يوم${age === 0 ? ' (بدون حد)' : ''}`,
+          ephemeral: true,
+        });
+        return;
+      }
+      case 'verification:log': {
+        const channelId = (value.match(/\d{17,20}/) || [])[0];
+        if (channelId) {
+          const channel = interaction.guild!.channels.cache.get(channelId);
+          if (!channel || !channel.isTextBased()) {
+            await interaction.followUp({ content: '❌ لم أجد قناة نصية بهذا الآيدي', ephemeral: true });
+            return;
+          }
+          settings.verification.logChannelId = channelId;
+        } else {
+          settings.verification.logChannelId = undefined;
+        }
+        await settings.save();
+        const vpLog = buildVerificationPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: vpLog.embeds, components: vpLog.components as any });
+        await interaction.followUp({
+          content: channelId ? `✅ قناة السجل: <#${channelId}>` : '✅ تم تعطيل سجل التوثيق',
+          ephemeral: true,
+        });
+        return;
+      }
       case 'verification:msg': {
         const vTitle = interaction.fields.getTextInputValue('title').trim();
         const vDesc = interaction.fields.getTextInputValue('description').trim();

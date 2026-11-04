@@ -62,7 +62,7 @@ const handler: ButtonHandler = {
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-      'tickets:types', 'tickets:panel', 'verification:msg', 'levels:msg',
+      'tickets:types', 'tickets:panel', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
       'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
       'translator:settings',
       'music:volume', 'music:queue_limit',
@@ -142,6 +142,46 @@ const handler: ButtonHandler = {
     }
 
     // مودال خاص: رسالة التوثيق (عنوان + نص + نص الزر)
+    // ⏳ مودال عمر الحساب المطلوب للتوثيق
+    if (`${section}:${action}` === 'verification:age') {
+      const v = settings.verification || {};
+      const input = new TextInputBuilder()
+        .setCustomId('value')
+        .setLabel('أقل عمر للحساب بالأيام (0 = بدون حد)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(3)
+        .setRequired(true)
+        .setValue(String(v.minAccountAgeDays || 0));
+
+      const modal = new ModalBuilder()
+        .setCustomId('settings_modal:verification:age')
+        .setTitle('🕰️ شرط عمر الحساب')
+        .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // 📋 مودال قناة سجل التوثيق (فارغ = تعطيل السجل)
+    if (`${section}:${action}` === 'verification:log') {
+      const v = settings.verification || {};
+      const input = new TextInputBuilder()
+        .setCustomId('value')
+        .setLabel('آيدي قناة السجل أو منشنها (فارغ = بدون سجل)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(64)
+        .setRequired(false)
+        .setValue(v.logChannelId ? `<#${v.logChannelId}>` : '');
+
+      const modal = new ModalBuilder()
+        .setCustomId('settings_modal:verification:log')
+        .setTitle('📋 قناة سجل التوثيق')
+        .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+
+      await interaction.showModal(modal);
+      return;
+    }
+
     if (`${section}:${action}` === 'verification:msg') {
       const v = settings.verification || {};
       const titleInput = new TextInputBuilder()

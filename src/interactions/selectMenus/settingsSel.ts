@@ -267,6 +267,22 @@ const handler: SelectMenuHandler = {
           await interaction.editReply({ embeds: vp.embeds, components: vp.components as any });
         }
         return;
+      case 'verification:quarantine':
+        settings.verification.quarantineRoleId = values[0] || undefined;
+        await settings.save();
+        {
+          const vp = buildVerificationPanel(interaction.guild!, settings);
+          await interaction.editReply({ embeds: vp.embeds, components: vp.components as any });
+        }
+        return;
+      case 'verification:log':
+        settings.verification.logChannelId = values[0] || undefined;
+        await settings.save();
+        {
+          const vp = buildVerificationPanel(interaction.guild!, settings);
+          await interaction.editReply({ embeds: vp.embeds, components: vp.components as any });
+        }
+        return;
       case 'leave:channel':
         (settings.leave as any).channelId = values[0] || null;
         break;

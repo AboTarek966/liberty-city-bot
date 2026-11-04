@@ -17,6 +17,7 @@ import { AIConfig, AIResponseRule, getGuildSettings } from '../models';
 import { config } from '../config';
 import { webSearch, formatSearchResults, formatSearchResultsForContext, searchYouTube, searchTrend, searchNews, searchAcademic, searchTechnical, SearchResult, webSearchEnhanced } from '../utils/webSearch';
 import { executeAITool, getToolsDescription, getAllToolNames } from './AITools';
+import { buildKnowledgeContext } from '../utils/knowledge';
 
 const logger = createLogger('AIHandler');
 
@@ -603,7 +604,14 @@ export class AIHandler {
       }
     }
 
-    const systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext);
+    const systemPrompt = await this.buildSystemPrompt(
+      aiConfig,
+      personality,
+      guildId,
+      userContext,
+      searchContext,
+      guildId ? await buildKnowledgeContext(guildId, message, 4) : ''
+    );
 
     // سياق الوسائط يُدمَج مع رسالة المستخدم (النموذج يرى الوصف + الصور نفسها)
     let effectiveMessage = media?.context
@@ -915,7 +923,8 @@ export class AIHandler {
     personality: string,
     guildId: string,
     userContext?: AIUserContext,
-    searchContext: string = ''
+    searchContext: string = '',
+    knowledgeContext: string = ''
   ): Promise<string> {
     const botName = this.client.user?.username || 'Liberty City';
     const base = aiConfig.systemPrompt || config.ai.systemPrompt;
@@ -1083,6 +1092,12 @@ export class AIHandler {
         prompt += `\nإذا سأل عن شيء من هذا: أجب بود: "هذه معلومات للإدارة فقط :)" .`;
         prompt += `\nالمعلومات العامة مسموحة: عدد الأعضاء، القنوات، الرتب، تاريخ السيرفر، الأوامر.`;
       }
+    }
+
+    // ---------------- قاعدة معرفة السيرفر ----------------
+    if (knowledgeContext) {
+      prompt += knowledgeContext;
+      prompt += `\n\n📌 **قاعدة استخدام المعرفة:** قدّم معلومات قاعدة المعرفة على أي تخمين، ولا تختلق تفاصيل غير مذكورة فيها. إذا لم تجد الجواب فيها، قل ذلك بصراحة أو استخدم أدوات البحث.`;
     }
 
     // ---------------- توجيه نهائي قوي ----------------

@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const helpers_1 = require("../utils/helpers");
+const giveaway_1 = require("../utils/giveaway");
 const logger = (0, helpers_1.createLogger)('Event:Ready');
 const event = {
     name: 'ready',
@@ -79,6 +80,8 @@ const event = {
         setInterval(() => {
             lc.ticketHandler.sweepInactiveTickets(client).catch(err => logger.error('Ticket inactivity sweep error:', err));
         }, 15 * 60 * 1000);
+        // 🎉 استئناف السحوبات النشطة بعد إعادة التشغيل
+        void (0, giveaway_1.restoreGiveaways)(client).catch(err => logger.error('Giveaway restore error:', err));
         // 🏦 فائدة البنك: تطبيق يومي (كل 24 ساعة)
         setInterval(() => {
             client.guilds.cache.forEach(guild => {

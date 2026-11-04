@@ -427,6 +427,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n` +
+    `> ${on(s.honeypot?.enabled)} **قناة الطعم 🍯** — أي رسالة فيها = عقوبة فورية (\`/honeypot\`)\n` +
     `> ${on(p.ownerApproval !== false)} **موافقة المالك 👑 عند الإطفاء** — إطفاء أي حماية يحتاج نقرة مالك السيرفر (التاج)\n\n` +
     `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``
   );
@@ -490,6 +491,8 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
   const v = s.verification || {};
   const role = v.roleId ? guild.roles.cache.get(v.roleId) : null;
   const channel = v.channelId ? guild.channels.cache.get(v.channelId) : null;
+  const quarantine = v.quarantineRoleId ? guild.roles.cache.get(v.quarantineRoleId) : null;
+  const logChannel = v.logChannelId ? guild.channels.cache.get(v.logChannelId) : null;
 
   const embed = new EmbedBuilder()
     .setTitle('✅ نظام التوثيق بالزر')
@@ -499,7 +502,12 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
         `> 🛡️ **رول التوثيق:** ${role ? `${role}` : '❌ غير محدد'}\n` +
         `> 📢 **قناة الرسالة:** ${channel ? `${channel}` : '❌ غير محددة'}\n` +
         `> 🏷️ **نص الزر:** ${v.buttonEmoji || '✅'} ${v.buttonLabel || 'توثيق'}\n` +
-        `> 📝 **العنوان:** ${v.title || '—'}\n\n` +
+        `> 📝 **العنوان:** ${v.title || '—'}\n` +
+        `> 🕰️ **أقل عمر للحساب:** ${v.minAccountAgeDays ? `\`${v.minAccountAgeDays}\` يوم` : 'بدون حد'}\n` +
+        `> 🧮 **كابتشا رياضية:** ${v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة'}\n` +
+        `> 🚧 **رول الحجر:** ${quarantine ? `${quarantine}` : '—'}\n` +
+        `> 👢 **طرد عند فشل العمر:** ${v.kickOnFail ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `💡 **الخطوات:** حدد الرول ← حدد القناة ← اضغط **📤 إرسال رسالة التوثيق**\n` +
         `⚠️ *ارفع رتبة البوت فوق رول التوثيق حتى يعمل*`
@@ -525,6 +533,23 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
       .setMaxValues(1)
   );
 
+  const quarantineSelect = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('settings_sel:verification:quarantine')
+      .setPlaceholder('🚧 اختر رول الحجر (يُزال عند التوثيق الناجح) — اختياري')
+      .setMinValues(0)
+      .setMaxValues(1)
+  );
+
+  const logSelect = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:verification:log')
+      .setPlaceholder('📋 اختر قناة سجل التوثيق — اختياري')
+      .setChannelTypes(ChannelType.GuildText)
+      .setMinValues(0)
+      .setMaxValues(1)
+  );
+
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('verification', 'enabled', 'التوثيق', '⚡', !!v.enabled),
     btn('settings_btn:verification:msg', 'تعديل الرسالة', ButtonStyle.Primary, '📝'),
@@ -532,7 +557,17 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
     btn('settings_cat:protection', 'رجوع', ButtonStyle.Secondary, '↩️'),
   );
 
-  return { embeds: [embed], components: [roleSelect, channelSelect, row1] };
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('verification', 'captcha', 'كابتشا', '🧮', !!v.captchaEnabled),
+    toggleBtn('verification', 'kickOnFail', 'طرد عند الفشل', '👢', !!v.kickOnFail),
+    btn('settings_btn:verification:age', 'عمر الحساب', ButtonStyle.Secondary, '🕰️'),
+    btn('settings_btn:verification:log', 'قناة السجل', ButtonStyle.Secondary, '📋'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [roleSelect, channelSelect, quarantineSelect, row1, row2],
+  };
 }
 
 // --------------------------------------------

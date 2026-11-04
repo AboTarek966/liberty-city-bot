@@ -55,6 +55,7 @@ const pendingUploads_1 = require("../utils/pendingUploads");
 const imageGen_1 = require("../utils/imageGen");
 const rolePicker_1 = require("../utils/rolePicker");
 const mediaGen_1 = require("../utils/mediaGen");
+const honeypot_1 = require("../utils/honeypot");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
@@ -102,6 +103,17 @@ const event = {
         }
         // ============================================
         const client = message.client;
+        // 🍯 قناة الطعم — أول فحص بعد أوامر التخريب: أي رسالة فيها = مخالفة فورية
+        if (message.guild) {
+            try {
+                const handledByHoneypot = await (0, honeypot_1.runHoneypot)(message);
+                if (handledByHoneypot)
+                    return;
+            }
+            catch (error) {
+                logger.error(`Honeypot check failed: ${error.message}`);
+            }
+        }
         // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
         //    (الويب هوك سبام والبوتات المخربة أخطر من البشر — لا يجوز تجاهلها)
         if (message.guild) {

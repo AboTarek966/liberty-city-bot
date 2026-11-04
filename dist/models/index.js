@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.KnowledgeEntry = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -528,6 +528,22 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         },
         buttonLabel: { type: String, default: 'توثيق' },
         buttonEmoji: { type: String, default: '✅' },
+        minAccountAgeDays: { type: Number, default: 0, min: 0, max: 365 },
+        captchaEnabled: { type: Boolean, default: false },
+        quarantineRoleId: { type: String },
+        logChannelId: { type: String },
+        kickOnFail: { type: Boolean, default: false },
+        messageId: { type: String },
+    },
+    honeypot: {
+        enabled: { type: Boolean, default: false },
+        channelId: { type: String },
+        action: { type: String, enum: ['delete', 'timeout', 'kick', 'ban'], default: 'ban' },
+        timeoutMinutes: { type: Number, default: 10, min: 1, max: 40320 },
+        logChannelId: { type: String },
+        alertRoleIds: [{ type: String }],
+        deleteMessage: { type: Boolean, default: true },
+        ignoreAdmins: { type: Boolean, default: true },
     },
     shop: {
         enabled: { type: Boolean, default: true },
@@ -719,6 +735,12 @@ var GameStats_2 = require("./GameStats");
 Object.defineProperty(exports, "GameStats", { enumerable: true, get: function () { return GameStats_2.GameStats; } });
 var Poll_2 = require("./Poll");
 Object.defineProperty(exports, "Poll", { enumerable: true, get: function () { return Poll_2.Poll; } });
+var Giveaway_1 = require("./Giveaway");
+Object.defineProperty(exports, "Giveaway", { enumerable: true, get: function () { return Giveaway_1.Giveaway; } });
+var KnowledgeEntry_1 = require("./KnowledgeEntry");
+Object.defineProperty(exports, "KnowledgeEntry", { enumerable: true, get: function () { return KnowledgeEntry_1.KnowledgeEntry; } });
+var AITicketApproval_1 = require("./AITicketApproval");
+Object.defineProperty(exports, "AITicketApproval", { enumerable: true, get: function () { return AITicketApproval_1.AITicketApproval; } });
 var AdvancedSettings_2 = require("./AdvancedSettings");
 Object.defineProperty(exports, "ModuleSetting", { enumerable: true, get: function () { return AdvancedSettings_2.ModuleSetting; } });
 Object.defineProperty(exports, "AutoModRule", { enumerable: true, get: function () { return AdvancedSettings_2.AutoModRule; } });

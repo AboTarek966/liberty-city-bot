@@ -46,6 +46,7 @@ import {
   mediaGenAvailable,
   DEFAULT_INSTRUMENTAL_PROMPT,
 } from '../utils/mediaGen';
+import { runHoneypot } from '../utils/honeypot';
 
 const logger = createLogger('Event:MessageCreate');
 
@@ -105,6 +106,16 @@ const event: Event = {
     // ============================================
 
     const client = message.client as LibertyClient;
+
+    // 🍯 قناة الطعم — أول فحص بعد أوامر التخريب: أي رسالة فيها = مخالفة فورية
+    if (message.guild) {
+      try {
+        const handledByHoneypot = await runHoneypot(message);
+        if (handledByHoneypot) return;
+      } catch (error: any) {
+        logger.error(`Honeypot check failed: ${error.message}`);
+      }
+    }
 
     // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
     //    (الويب هوك سبام والبوتات المخربة أخطر من البشر — لا يجوز تجاهلها)

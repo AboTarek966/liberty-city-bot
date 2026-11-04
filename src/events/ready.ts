@@ -6,6 +6,7 @@ import { Client } from 'discord.js';
 import { Event } from '../handlers/EventHandler';
 import { LibertyClient } from '../LibertyClient';
 import { createLogger } from '../utils/helpers';
+import { restoreGiveaways } from '../utils/giveaway';
 
 const logger = createLogger('Event:Ready');
 
@@ -102,6 +103,11 @@ const event: Event = {
         logger.error('Ticket inactivity sweep error:', err)
       );
     }, 15 * 60 * 1000);
+
+    // 🎉 استئناف السحوبات النشطة بعد إعادة التشغيل
+    void restoreGiveaways(client).catch(err =>
+      logger.error('Giveaway restore error:', err)
+    );
 
     // 🏦 فائدة البنك: تطبيق يومي (كل 24 ساعة)
     setInterval(() => {
