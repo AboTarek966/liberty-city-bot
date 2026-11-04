@@ -43,6 +43,7 @@ export declare class AITicketAssistant {
     private requestAdminApproval;
     handleAdminResponse(approvalId: string, adminId: string, approve: boolean, expectedGuildId?: string): Promise<AdminResponseResult>;
     private notifyAdmins;
+    private sendToTicketLog;
     private logAITicketEvent;
     private getCategoryLabel;
     getApprovalDetails(approvalId: string): Promise<AITicketApprovalDetails | null>;

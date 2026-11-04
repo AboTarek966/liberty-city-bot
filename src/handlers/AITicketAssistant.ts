@@ -230,8 +230,10 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
 اكتب رداً عربياً طبيعياً ومختصراً:
 - جاوب على سؤاله أو استفساره مباشرة.
 - لو المشكلة تحتاج صلاحية أو إجراء إداري، قل له إنه سيتم تحويلها للإدارة.
+- إذا أساء العضو (شتم/إهانة)، اطلب منه التوقف بأسلوب محترم وحذّره من الإجراءات (كتم/حظر) بعد موافقة الإدارة.
 - لا تخترع معلومات ولا تكرر الترحيب إذا كانت المحادثة مستمرة.
 - لا تذكر أنك نموذج ذكاء اصطناعي إلا لو سألك.
+- كن مختصراً (1-3 جمل).
 
 ردك:`;
 
@@ -418,6 +420,13 @@ ${context}
 - timeout_user: كتم عضو
 - custom: إجراء مخصص
 
+**الإشراف (مهم جداً):**
+- إذا أساء العضو (شتم، تهديد، إهانة، سبام، تحرش) → استخدم timeout_user (10-30 دقيقة) أو ban_user (للإساءة المتكررة/الخطيرة).
+- targetUserId يجب أن يكون معرّف صاحب التذكرة (${message.author.id}) unless specified.
+- أي إجراء إشرافي = requiresAdminApproval: true (لا تنفّذه تلقائياً).
+- اشرح للمستخدم أن الإساءة غير مقبولة وستُحوّل للإدارة.
+- لا تحظر/تكمت بدون سبب واضح.
+
 **قواعد صارمة:**
 - أي إجراء يعطي رول/يعدل صلاحيات/يحظر = requiresAdminApproval: true
 - الإجراءات المعلوماتية (فحص، استشارة) = requiresAdminApproval: false
@@ -542,7 +551,14 @@ ${context}
       .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
       .setTimestamp();
 
-    await channel.send({ embeds: [initialEmbed] }).catch(() => {});
+    const loggedAnalysis = await this.sendToTicketLog(channel, initialEmbed, aiConfig);
+    if (loggedAnalysis) {
+      await channel
+        .send({
+          content: `🤖 **AI:** تم تحليل التذكرة — ${String(analysis.summary || 'جارٍ المراجعة').slice(0, 180)}${analysis.summary && analysis.summary.length > 180 ? '…' : ''}\n> التفاصيل/السجل في قناة لوق التذاكر.`,
+        })
+        .catch(() => {});
+    }
 
     const context: ActionContext = {
       ticketUserId: normalizeId(ticket.userId),
@@ -591,7 +607,14 @@ ${context}
         .setDescription(autoResults.map(r => `> ${r}`).join('\n').slice(0, 4000))
         .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
         .setTimestamp();
-      await channel.send({ embeds: [resultsEmbed] }).catch(() => {});
+      const loggedResults = await this.sendToTicketLog(channel, resultsEmbed, aiConfig);
+      if (loggedResults) {
+        await channel
+          .send({
+            content: `⚙️ **AI:** تم تنفيذ ${Math.max(0, autoResults.length - failedAuto)} إجراء${failedAuto > 0 ? ` (فشل ${failedAuto})` : ''} — التفاصيل في لوق التذاكر.`,
+          })
+          .catch(() => {});
+      }
     }
 
     // 4️⃣ طلبات الموافقة
@@ -856,6 +879,30 @@ ${context}
         embeds: [embed],
       })
       .catch(() => {});
+  }
+
+  // --------------------------------------------
+  // إرسال تحليل/سجلات إلى لوق التذاكر (إن وُجد) — fallback إلى التذكرة
+  // --------------------------------------------
+  private async sendToTicketLog(
+    channel: TextChannel,
+    embed: EmbedBuilder,
+    aiConfig: AITicketConfig
+  ): Promise<boolean> {
+    try {
+      const logId = aiConfig?.logChannel;
+      if (logId && logId !== channel.id) {
+        const logChannel = channel.guild.channels.cache.get(logId) as TextChannel | undefined;
+        if (logChannel && logChannel.isTextBased()) {
+          await logChannel.send({ embeds: [embed] }).catch(() => {});
+          return true;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    await channel.send({ embeds: [embed] }).catch(() => {});
+    return false;
   }
 
   // --------------------------------------------
