@@ -47,6 +47,7 @@ import {
   DEFAULT_INSTRUMENTAL_PROMPT,
 } from '../utils/mediaGen';
 import { runHoneypot } from '../utils/honeypot';
+import { handleBotAbuse } from '../utils/botAbuse';
 
 const logger = createLogger('Event:MessageCreate');
 
@@ -114,6 +115,16 @@ const event: Event = {
         if (handledByHoneypot) return;
       } catch (error: any) {
         logger.error(`Honeypot check failed: ${error.message}`);
+      }
+    }
+
+    // 🤖 مكافحة الإساءة للبوت — يحذر → يسحب الرولات → يحظر
+    if (message.guild) {
+      try {
+        const handled = await handleBotAbuse(message);
+        if (handled) return;
+      } catch (error: any) {
+        logger.error(`AntiBotAbuse check failed: ${error.message}`);
       }
     }
 

@@ -10,6 +10,10 @@ export interface IGuildSettings extends Document {
         logChannel?: string;
         /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
         ownerApproval?: boolean;
+        /** 🤖 مكافحة الإساءة للبوت: يحذر ثم يسحب كل الرولات القابلة للإزالة ثم يحظر */
+        antiBotAbuse?: {
+            enabled: boolean;
+        };
         antiRaid: {
             enabled: boolean;
             threshold: number;
@@ -772,6 +776,7 @@ export { RogueBot } from './RogueBot';
 export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
 export { Giveaway, IGiveaway, IGiveawayRequirements } from './Giveaway';
+export { BotAbuseStrike, IBotAbuseStrike } from './BotAbuseStrike';
 export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { AITicketApproval, IAITicketApproval } from './AITicketApproval';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';

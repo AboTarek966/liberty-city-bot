@@ -418,6 +418,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     p.antiRaid.enabled, p.antiSpam.enabled, p.antiLink.enabled,
     p.antiInvite.enabled, p.antiMention.enabled, p.antiCaps.enabled, p.antiEmoji.enabled,
     p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
+    p.antiBotAbuse?.enabled,
     p.scamFilter?.enabled, p.autoScan?.enabled,
     p.antiAlt?.enabled, p.inviteTracker?.enabled, p.messageScanner?.enabled,
     p.aiAutoMod?.enabled,
@@ -427,7 +428,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     'protection',
     guild,
     `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-    `**المحميات المفعّلة: ${active}/17**\n\n` +
+    `**المحميات المفعّلة: ${active}/18**\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
     `> ${on(p.antiSpam.enabled)} **مكافحة السبام** — يوقف تكرار الرسائل\n` +
@@ -449,7 +450,8 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n` +
     `> ${on(s.honeypot?.enabled)} **قناة الطعم 🍯** — أي رسالة فيها = عقوبة فورية (\`/honeypot\`)\n` +
-    `> ${on(p.ownerApproval !== false)} **موافقة المالك 👑 عند الإطفاء** — إطفاء أي حماية يحتاج نقرة مالك السيرفر (التاج)\n\n` +
+    `> ${on(p.ownerApproval !== false)} **موافقة المالك 👑 عند الإطفاء** — إطفاء أي حماية يحتاج نقرة مالك السيرفر (التاج)\n` +
+    `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n\n` +
     `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``
   );
 
@@ -472,6 +474,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled),
     toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled),
     toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled),
+    toggleBtn('protection', 'antiBotAbuse', 'مكافحة الإساءة للبوت', '🚫', !!p.antiBotAbuse?.enabled),
   );
 
   const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(

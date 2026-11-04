@@ -56,6 +56,7 @@ const imageGen_1 = require("../utils/imageGen");
 const rolePicker_1 = require("../utils/rolePicker");
 const mediaGen_1 = require("../utils/mediaGen");
 const honeypot_1 = require("../utils/honeypot");
+const botAbuse_1 = require("../utils/botAbuse");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
@@ -112,6 +113,17 @@ const event = {
             }
             catch (error) {
                 logger.error(`Honeypot check failed: ${error.message}`);
+            }
+        }
+        // 🤖 مكافحة الإساءة للبوت — يحذر → يسحب الرولات → يحظر
+        if (message.guild) {
+            try {
+                const handled = await (0, botAbuse_1.handleBotAbuse)(message);
+                if (handled)
+                    return;
+            }
+            catch (error) {
+                logger.error(`AntiBotAbuse check failed: ${error.message}`);
             }
         }
         // 🚨 أولاً: تحقق الحماية من رسائل الويب هوك والبوتات — قبل أي return
