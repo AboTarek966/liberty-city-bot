@@ -346,8 +346,7 @@ class TicketHandler {
         // إيمبد الإغلاق + أزرار "إعادة الفتح" و "حذف"
         const closingEmbed = (0, embeds_1.createEmbed)({
             title: '🔒 تم إغلاق التذكرة',
-            description: `تم الإغلاق بواسطة ${closedBy} • السبب: ${reason || 'غير محدد'}\n` +
-                `🔓 إعادة الفتح: ${closerName} أو فريق الدعم/الإدارة — Administrator يتجاوز القفل.`,
+            description: `تم الإغلاق بواسطة ${closedBy} • السبب: ${reason || 'غير محدد'}`,
             color: embeds_1.Colors.error,
             footer: { text: `${guild.name} • Tickets` },
         });

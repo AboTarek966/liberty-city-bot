@@ -470,8 +470,7 @@ export class TicketHandler {
     const closingEmbed = createEmbed({
       title: '🔒 تم إغلاق التذكرة',
       description:
-        `تم الإغلاق بواسطة ${closedBy} • السبب: ${reason || 'غير محدد'}\n` +
-        `🔓 إعادة الفتح: ${closerName} أو فريق الدعم/الإدارة — Administrator يتجاوز القفل.`,
+        `تم الإغلاق بواسطة ${closedBy} • السبب: ${reason || 'غير محدد'}`,
       color: Colors.error,
       footer: { text: `${guild.name} • Tickets` },
     });
