@@ -350,6 +350,26 @@ async function handleAdd(
     return;
   }
 
+  // 🔒/🔓 القفل والفتح أمران منفصلان — لكل واحد اختصار مستقل
+  // لا نسمح بربط نفس الاختصار بـ lock و unlock معاً
+  if (cleanCommand === 'lock' || cleanCommand === 'unlock') {
+    const opposite = cleanCommand === 'lock' ? 'unlock' : 'lock';
+    const conflict = await CommandAlias.findOne({
+      guildId,
+      alias: shortcut,
+      command: opposite,
+    });
+    if (conflict) {
+      await interaction.reply({
+        content:
+          `❌ الاختصار \`${shortcut}\` مستخدم بالفعل لأمر \`/${opposite}\`\n` +
+          `اجعل للقفل اختصاراً وللفتح اختصاراً مختلفاً — مثال: \`قفل\` → /lock و \`فتح\` → /unlock`,
+        ephemeral: true,
+      });
+      return;
+    }
+  }
+
   // ⚡ السماح بنفس الاختصار لأكثر من أمر (نظام التبديل/Toggle)
   // مثال: `ت` → تحذير و `ت` → إزالة تحذير — البوت يحدد أيهما ينفّذ حسب الحالة
   const existingOther = await CommandAlias.findOne({

@@ -1,15 +1,15 @@
 "use strict";
 // ============================================
-// Liberty City Bot - Lock Command (قفل/فتح الروم)
-// تبديل: ضغطة تقفل الروم الحالي (الكتابة للجميع ممنوعة
-// ما عدا من معه أدنمنستريتر) وضغطة تفتحه مرة ثانية
+// Liberty City Bot - Lock Command (قفل الروم)
+// يقفل الروم الحالي فقط — لا يفتحه.
+// لفتح الروم استخدم /unlock أو اختصاره المستقل.
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('lock')
-        .setDescription('قفل/فتح الروم الحالي — القفل يمنع الكتابة للجميع ما عدا الإدارة')
+        .setDescription('قفل الروم الحالي — منع الكتابة للجميع ما عدا الإدارة')
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageChannels)
         .setDMPermission(false),
     cooldown: 3,
@@ -28,21 +28,21 @@ const command = {
         const everyone = interaction.guild.roles.everyone;
         const overwrite = channel.permissionOverwrites.cache.get(everyone.id);
         const isLocked = overwrite ? overwrite.deny.has(discord_js_1.PermissionFlagsBits.SendMessages) : false;
+        if (isLocked) {
+            await interaction.reply({
+                content: `🔒 ${channel} مقفول بالفعل — استخدم \`/unlock\` لفتحه`,
+                ephemeral: true,
+            });
+            return;
+        }
         try {
-            if (isLocked) {
-                // 🔓 فتح — إزالة منع الكتابة (يستعيد الإعداد الطبيعي للرومة)
-                await channel.permissionOverwrites.edit(everyone, { SendMessages: null, SendMessagesInThreads: null, AddReactions: null }, { reason: `فتح الروم بواسطة ${interaction.user.tag}` });
-                await interaction.reply(`🔓 تم فتح ${channel} — الكتابة متاحة للجميع مرة ثانية`);
-            }
-            else {
-                // 🔒 قفل — منع @everyone من الكتابة (من معه أدنمنستريتر يتجاوز القفل تلقائياً)
-                await channel.permissionOverwrites.edit(everyone, { SendMessages: false, SendMessagesInThreads: false, AddReactions: false }, { reason: `قفل الروم بواسطة ${interaction.user.tag}` });
-                await interaction.reply(`🔒 تم قفل ${channel} — الكتابة ممنوعة للجميع **ما عدا الإدارة (أدنمنستريتر)**\nاكتب الأمر مرة ثانية أو استخدم الاختصار لفتحه`);
-            }
+            // 🔒 قفل — منع @everyone من الكتابة (من معه أدنمنستريتر يتجاوز القفل تلقائياً)
+            await channel.permissionOverwrites.edit(everyone, { SendMessages: false, SendMessagesInThreads: false, AddReactions: false }, { reason: `قفل الروم بواسطة ${interaction.user.tag}` });
+            await interaction.reply(`🔒 تم قفل ${channel} — الكتابة ممنوعة للجميع **ما عدا الإدارة (أدنمنستريتر)**\nلفتحه استخدم \`/unlock\``);
         }
         catch (error) {
             await interaction.reply({
-                content: `❌ فشل تغيير صلاحيات الرومة: ${error.message}`,
+                content: `❌ فشل قفل الروم: ${error.message}`,
                 ephemeral: true,
             });
         }
