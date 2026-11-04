@@ -74,6 +74,7 @@ class OmniClient extends discord_js_1.Client {
     economyHandler;
     gameHandler;
     musicHandler;
+    voiceKeeperHandler;
     dashboardCommandWorker;
     // Express server for Dashboard API
     expressApp;
@@ -134,6 +135,7 @@ class OmniClient extends discord_js_1.Client {
         this.economyHandler = new handlers_1.EconomyHandler(this);
         this.gameHandler = new handlers_1.GameHandler(this);
         this.musicHandler = new handlers_1.MusicHandler(this);
+        this.voiceKeeperHandler = new handlers_1.VoiceKeeperHandler(this);
         this.dashboardCommandWorker = new handlers_1.DashboardCommandWorker(this);
     }
     setupExpress() {

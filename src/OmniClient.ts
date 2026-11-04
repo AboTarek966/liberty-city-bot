@@ -33,6 +33,7 @@ import {
   EconomyHandler,
   GameHandler,
   MusicHandler,
+  VoiceKeeperHandler,
   DashboardCommandWorker,
 } from './handlers';
 import mongoose from 'mongoose';
@@ -67,6 +68,7 @@ export class OmniClient extends Client {
   public economyHandler: EconomyHandler;
   public gameHandler: GameHandler;
   public musicHandler: MusicHandler;
+  public voiceKeeperHandler: VoiceKeeperHandler;
   public dashboardCommandWorker: DashboardCommandWorker;
 
   // Express server for Dashboard API
@@ -134,6 +136,7 @@ export class OmniClient extends Client {
     this.economyHandler = new EconomyHandler(this);
     this.gameHandler = new GameHandler(this);
     this.musicHandler = new MusicHandler(this);
+    this.voiceKeeperHandler = new VoiceKeeperHandler(this);
     this.dashboardCommandWorker = new DashboardCommandWorker(this);
   }
 

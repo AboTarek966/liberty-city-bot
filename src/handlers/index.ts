@@ -23,4 +23,5 @@ export { AITranslator, TranslationResult, TranslatorConfig } from './AITranslato
 export { EconomyHandler, EconomyConfig } from './EconomyHandler';
 export { GameHandler, GameSession, GamePlayer, GameConfig } from './GameHandler';
 export { MusicHandler, Track, Queue } from './MusicHandler';
+export { VoiceKeeperHandler } from './VoiceKeeperHandler';
 export { DashboardCommandWorker } from './DashboardCommandWorker';
