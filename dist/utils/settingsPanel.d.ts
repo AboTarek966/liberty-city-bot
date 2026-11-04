@@ -40,6 +40,7 @@ export declare function buildCommands(guild: Guild, s: any): BuiltPanel;
 export declare function buildAnnouncements(guild: Guild, s: any): BuiltPanel;
 export declare function buildMusic(guild: Guild, s: any): BuiltPanel;
 export declare function buildShop(guild: Guild, s: any): BuiltPanel;
+export declare function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel;
 export declare function buildTicketMovePanel(guild: Guild, s: any): BuiltPanel;
 export declare function buildTicketAdvancedPanel(guild: Guild, s: any): BuiltPanel;
 export declare const CARD_ELEMENTS: {

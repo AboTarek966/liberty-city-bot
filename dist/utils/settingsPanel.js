@@ -53,6 +53,7 @@ exports.buildCommands = buildCommands;
 exports.buildAnnouncements = buildAnnouncements;
 exports.buildMusic = buildMusic;
 exports.buildShop = buildShop;
+exports.buildTicketAIPanel = buildTicketAIPanel;
 exports.buildTicketMovePanel = buildTicketMovePanel;
 exports.buildTicketAdvancedPanel = buildTicketAdvancedPanel;
 exports.getCardEditor = getCardEditor;
@@ -732,7 +733,7 @@ function buildTickets(guild, s) {
         .setMinValues(0)
         .setMaxValues(10));
     const rowBtns = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:tickets:max', `الحد/عضو: ${t.maxPerUser}`, discord_js_1.ButtonStyle.Secondary, '🔢'), btn('settings_tog:tickets:survey', `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`, t.surveyEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⭐'), btn('settings_tog:tickets:lockclaim', `قفل: ${t.lockUntilClaim ? '🟢' : '🔴'}`, t.lockUntilClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔒'), btn('settings_tog:tickets:welcome', `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`, t.welcomeEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_btn:tickets:welcomeMsg', 'رسالة الترحيب', discord_js_1.ButtonStyle.Primary, '✏️'));
-    // 🤖 AI Ticket Assistant settings (صف منفصل)
+    // 🤖 AI Ticket Assistant — زر واحد يفتح لوحة فرعية (لتوفير مساحة زر الرجوع)
     const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
         enabled: false,
         autoClaim: false,
@@ -744,8 +745,33 @@ function buildTickets(guild, s) {
         confidenceThreshold: 70,
         notifyAdminsOnFailure: true
     };
-    const rowAITicket = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aienabled', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_tog:tickets:aiclaim', `استلام: ${aiTicket.autoClaim ? '🟢' : '🔴'}`, aiTicket.autoClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⚡'), btn('settings_tog:tickets:aianalyze', `تحليل: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`, aiTicket.analyzeOnCreate ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔍'), btn('settings_tog:tickets:aiadminroles', `رولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`, aiTicket.requireAdminApprovalForRoles ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎭'), btn('settings_btn:tickets:types', 'أنواع التذاكر', discord_js_1.ButtonStyle.Primary, '🏷️'));
+    const rowAITicket = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:tickets:ai', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_btn:tickets:types', 'أنواع التذاكر', discord_js_1.ButtonStyle.Primary, '🏷️'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
     return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket] };
+}
+// --------------------------------------------
+// التذاكر — إعدادات مساعد AI (لوحة فرعية)
+// --------------------------------------------
+function buildTicketAIPanel(guild, s) {
+    const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
+        enabled: false,
+        autoClaim: false,
+        analyzeOnCreate: true,
+        requireAdminApprovalForRoles: true,
+        requireAdminApprovalForPermissions: true,
+        requireAdminApprovalForBans: true,
+        maxAutoActionsPerTicket: 3,
+        confidenceThreshold: 70,
+        notifyAdminsOnFailure: true
+    };
+    const embed = categoryEmbed('tickets', guild, `🤖 مساعد التذاكر الذكي — تحليل تلقائي وردود داخل التذاكر\n\n` +
+        `> ⚡ **مساعد AI:** ${on(aiTicket.enabled)} ${aiTicket.enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 🤝 **الاستلام التلقائي:** ${on(aiTicket.autoClaim)} ${aiTicket.autoClaim ? 'يستلم التذكرة تلقائياً' : 'بدون استلام تلقائي'}\n` +
+        `> 🔍 **تحليل عند الإنشاء:** ${on(aiTicket.analyzeOnCreate)} ${aiTicket.analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
+        `> 🎭 **موافقة الإدارة على الرولات:** ${on(aiTicket.requireAdminApprovalForRoles)} ${aiTicket.requireAdminApprovalForRoles ? 'يطلب موافقة قبل منح الرولات' : 'بدون موافقة'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💡 *فعّل المساعد أولاً، ثم اضبط خياراته من الأزرار بالأسفل*`);
+    const row = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aienabled', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_tog:tickets:aiclaim', `استلام: ${aiTicket.autoClaim ? '🟢' : '🔴'}`, aiTicket.autoClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⚡'), btn('settings_tog:tickets:aianalyze', `تحليل: ${aiTicket.analyzeOnCreate ? '🟢' : '🔴'}`, aiTicket.analyzeOnCreate ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔍'), btn('settings_tog:tickets:aiadminroles', `رولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`, aiTicket.requireAdminApprovalForRoles ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎭'), btn('settings_cat:tickets', 'رجوع للتذاكر', discord_js_1.ButtonStyle.Secondary, '↩️'));
+    return { embeds: [embed], components: [row] };
 }
 // --------------------------------------------
 // Tickets — نقل/إنشاء لوحة التذاكر (لوحة فرعية)

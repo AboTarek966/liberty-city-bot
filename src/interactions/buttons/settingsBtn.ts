@@ -17,7 +17,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildTicketAIPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { buildEmojiSelectRows, buildCommandAddModal } from '../../utils/emojiPicker';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { OmniClient } from '../../OmniClient';
@@ -648,6 +648,12 @@ const handler: ButtonHandler = {
         // لوحة فرعية: صورة اللوحة + رولات الإدارة العليا
         const advPanel = buildTicketAdvancedPanel(interaction.guild!, settings);
         await interaction.editReply({ embeds: advPanel.embeds, components: advPanel.components as any });
+        return;
+      }
+      case 'tickets:ai': {
+        // لوحة فرعية: إعدادات مساعد التذاكر الذكي
+        const aiPanel = buildTicketAIPanel(interaction.guild!, settings);
+        await interaction.editReply({ embeds: aiPanel.embeds, components: aiPanel.components as any });
         return;
       }
       case 'tickets:pupimg': {

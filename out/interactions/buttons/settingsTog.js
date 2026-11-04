@@ -265,11 +265,16 @@ const handler = {
             await (0, settingsPanel_1.sendWelcomeCardPanel)(interaction, settings);
             return;
         }
-        const panel = section === 'verification'
-            ? (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings)
-            : section === 'shop'
-                ? (0, settingsPanel_1.buildShop)(interaction.guild, settings)
-                : await (0, settingsPanel_1.buildPanel)(section, interaction.guild, interaction.user.id);
+        // 🤖 أزرار مساعد التذاكر في اللوحة الفرعية — أعد عرض نفس اللوحة بدل الرجوع للقائمة الرئيسية
+        const isTicketAIField = section === 'tickets' &&
+            ['aienabled', 'aiclaim', 'aianalyze', 'aiadminroles', 'aiadminperms', 'aiadminbans'].includes(field);
+        const panel = isTicketAIField
+            ? (0, settingsPanel_1.buildTicketAIPanel)(interaction.guild, settings)
+            : section === 'verification'
+                ? (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings)
+                : section === 'shop'
+                    ? (0, settingsPanel_1.buildShop)(interaction.guild, settings)
+                    : await (0, settingsPanel_1.buildPanel)(section, interaction.guild, interaction.user.id);
         await interaction.editReply({
             embeds: panel.embeds,
             components: panel.components,

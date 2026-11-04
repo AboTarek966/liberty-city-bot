@@ -1031,7 +1031,7 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     ),
   );
 
-  // 🤖 AI Ticket Assistant settings (صف منفصل)
+  // 🤖 AI Ticket Assistant — زر واحد يفتح لوحة فرعية (لتوفير مساحة زر الرجوع)
   const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
     enabled: false,
     autoClaim: false,
@@ -1044,6 +1044,48 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     notifyAdminsOnFailure: true
   };
   const rowAITicket = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn(
+      'settings_btn:tickets:ai',
+      `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`,
+      aiTicket.enabled ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🤖'
+    ),
+    btn('settings_btn:tickets:types', 'أنواع التذاكر', ButtonStyle.Primary, '🏷️'),
+    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '↩️'),
+  );
+
+  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket] };
+}
+
+// --------------------------------------------
+// التذاكر — إعدادات مساعد AI (لوحة فرعية)
+// --------------------------------------------
+export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
+  const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
+    enabled: false,
+    autoClaim: false,
+    analyzeOnCreate: true,
+    requireAdminApprovalForRoles: true,
+    requireAdminApprovalForPermissions: true,
+    requireAdminApprovalForBans: true,
+    maxAutoActionsPerTicket: 3,
+    confidenceThreshold: 70,
+    notifyAdminsOnFailure: true
+  };
+
+  const embed = categoryEmbed(
+    'tickets',
+    guild,
+    `🤖 مساعد التذاكر الذكي — تحليل تلقائي وردود داخل التذاكر\n\n` +
+    `> ⚡ **مساعد AI:** ${on(aiTicket.enabled)} ${aiTicket.enabled ? 'مفعّل' : 'معطّل'}\n` +
+    `> 🤝 **الاستلام التلقائي:** ${on(aiTicket.autoClaim)} ${aiTicket.autoClaim ? 'يستلم التذكرة تلقائياً' : 'بدون استلام تلقائي'}\n` +
+    `> 🔍 **تحليل عند الإنشاء:** ${on(aiTicket.analyzeOnCreate)} ${aiTicket.analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
+    `> 🎭 **موافقة الإدارة على الرولات:** ${on(aiTicket.requireAdminApprovalForRoles)} ${aiTicket.requireAdminApprovalForRoles ? 'يطلب موافقة قبل منح الرولات' : 'بدون موافقة'}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `💡 *فعّل المساعد أولاً، ثم اضبط خياراته من الأزرار بالأسفل*`
+  );
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn(
       'settings_tog:tickets:aienabled',
       `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`,
@@ -1068,10 +1110,10 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
       aiTicket.requireAdminApprovalForRoles ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🎭'
     ),
-    btn('settings_btn:tickets:types', 'أنواع التذاكر', ButtonStyle.Primary, '🏷️'),
+    btn('settings_cat:tickets', 'رجوع للتذاكر', ButtonStyle.Secondary, '↩️'),
   );
 
-  return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket] };
+  return { embeds: [embed], components: [row] };
 }
 
 // --------------------------------------------

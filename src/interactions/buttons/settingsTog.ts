@@ -4,7 +4,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerificationPanel, buildShop, sendWelcomeCardPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerificationPanel, buildShop, sendWelcomeCardPanel, buildTicketAIPanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, invalidateGuildSettings, AIConfig } from '../../models';
 import { OmniClient } from '../../OmniClient';
 import { setLockdown } from '../../utils/lockdown';
@@ -266,12 +266,19 @@ const handler: ButtonHandler = {
       return;
     }
 
+    // 🤖 أزرار مساعد التذاكر في اللوحة الفرعية — أعد عرض نفس اللوحة بدل الرجوع للقائمة الرئيسية
+    const isTicketAIField =
+      section === 'tickets' &&
+      ['aienabled', 'aiclaim', 'aianalyze', 'aiadminroles', 'aiadminperms', 'aiadminbans'].includes(field);
+
     const panel =
-      section === 'verification'
-        ? buildVerificationPanel(interaction.guild!, settings)
-        : (section as string) === 'shop'
-          ? buildShop(interaction.guild!, settings)
-          : await buildPanel(section, interaction.guild, interaction.user.id);
+      isTicketAIField
+        ? buildTicketAIPanel(interaction.guild!, settings)
+        : section === 'verification'
+          ? buildVerificationPanel(interaction.guild!, settings)
+          : (section as string) === 'shop'
+            ? buildShop(interaction.guild!, settings)
+            : await buildPanel(section, interaction.guild, interaction.user.id);
     await interaction.editReply({
       embeds: panel.embeds,
       components: panel.components as any,

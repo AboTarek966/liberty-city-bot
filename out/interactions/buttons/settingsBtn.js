@@ -507,6 +507,12 @@ const handler = {
                 await interaction.editReply({ embeds: advPanel.embeds, components: advPanel.components });
                 return;
             }
+            case 'tickets:ai': {
+                // لوحة فرعية: إعدادات مساعد التذاكر الذكي
+                const aiPanel = (0, settingsPanel_1.buildTicketAIPanel)(interaction.guild, settings);
+                await interaction.editReply({ embeds: aiPanel.embeds, components: aiPanel.components });
+                return;
+            }
             case 'tickets:pupimg': {
                 // رفع مباشر: أول رسالة مرفقة من المستخدم خلال 60 ثانية = صورة اللوحة
                 if (!(0, settingsPanel_1.getActivePanel)(settings)) {
