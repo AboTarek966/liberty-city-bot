@@ -8,6 +8,10 @@ const event = {
     async execute(webhook) {
         const client = webhook.client;
         await client.securityHandler.onWebhookUpdate(webhook).catch(() => { });
+        // 📋 سجل الـ Webhooks
+        client.loggingHandler?.handleWebhookUpdate(webhook).catch((err) => {
+            client.loggingHandler?.reportFailure('webhookUpdate', err);
+        });
     },
 };
 exports.default = event;

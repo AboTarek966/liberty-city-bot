@@ -8,6 +8,7 @@ const settingsPanel_1 = require("../../utils/settingsPanel");
 const models_1 = require("../../models");
 const pendingWarnRoles_1 = require("../../utils/pendingWarnRoles");
 const emojiPicker_1 = require("../../utils/emojiPicker");
+const LoggingHandler_1 = require("../../handlers/LoggingHandler");
 const handler = {
     id: 'settings_sel',
     async execute(interaction) {
@@ -373,17 +374,13 @@ const handler = {
             }
             case 'logging:events': {
                 const preset = values[0];
-                const ALL = [
-                    'messageDelete', 'messageEdit', 'memberJoin', 'memberLeave',
-                    'memberBan', 'memberUnban', 'memberUpdate', 'memberTimeout',
-                    'channelCreate', 'channelDelete', 'channelUpdate',
-                    'roleCreate', 'roleDelete',
-                    'voiceStateUpdate', 'inviteCreate', 'inviteDelete',
-                ];
+                const ALL = [...LoggingHandler_1.LOG_EVENTS];
                 if (preset === 'all')
                     settings.logging.types = ALL;
+                else if (preset === 'audit')
+                    settings.logging.types = ['auditLogEntryCreate', 'webhookUpdate'];
                 else if (preset === 'none')
-                    settings.logging.types = [];
+                    settings.logging.types = ['__none__'];
                 else if (preset === 'messages')
                     settings.logging.types = ['messageDelete', 'messageEdit'];
                 else if (preset === 'members')

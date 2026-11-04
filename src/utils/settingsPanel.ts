@@ -1808,6 +1808,7 @@ function buildLogging(guild: Guild, s: any): BuiltPanel {
         { label: 'الرتب', value: 'roles', description: 'إنشاء/حذف الرتب', emoji: { name: '📛' } },
         { label: 'الصوت', value: 'voice', description: 'دخول/خروج الغرف الصوتية', emoji: { name: '🔊' } },
         { label: 'الدعوات', value: 'invites', description: 'إنشاء/حذف الدعوات', emoji: { name: '📩' } },
+        { label: 'Audit / Webhooks', value: 'audit', description: 'سجل التدقيق + Webhooks', emoji: { name: '🕵️' } },
         { label: 'لا شيء', value: 'none', description: 'إيقاف كل السجلات', emoji: { name: '🚫' } },
       ])
   );
@@ -1831,9 +1832,14 @@ export const LOG_SPLIT_GROUPS: Array<{ id: string; emoji: string; label: string;
   { id: 'timeout', emoji: '🔇', label: 'الكتم (تايم أوت)', types: ['memberTimeout'] },
   { id: 'members', emoji: '👥', label: 'دخول وخروج الأعضاء', types: ['memberJoin', 'memberLeave'] },
   { id: 'memberupd', emoji: '🔄', label: 'تحديثات الأعضاء (رتب وأسماء)', types: ['memberUpdate'] },
-  { id: 'messages', emoji: '💬', label: 'الرسائل (حذف وتعديل)', types: ['messageDelete', 'messageEdit'] },
+  { id: 'messages', emoji: '💬', label: 'الرسائل (حذف/تعديل/ج Bulk)', types: ['messageDelete', 'messageEdit', 'messageDeleteBulk'] },
+  { id: 'reactions', emoji: '😀', label: 'التفاعلات', types: ['messageReactionAdd', 'messageReactionRemove', 'reactionRemoveAll'] },
   { id: 'roles', emoji: '📛', label: 'الرتب', types: ['roleCreate', 'roleDelete', 'roleUpdate'] },
   { id: 'channels', emoji: '📢', label: 'القنوات', types: ['channelCreate', 'channelDelete', 'channelUpdate'] },
+  { id: 'threads', emoji: '🧵', label: 'Threads', types: ['threadCreate', 'threadUpdate', 'threadDelete'] },
+  { id: 'emojis', emoji: '😀', label: 'Emoji/Stickers', types: ['emojiCreate', 'emojiDelete', 'stickerCreate', 'stickerDelete'] },
+  { id: 'webhooks', emoji: '🪝', label: 'Webhooks', types: ['webhookUpdate'] },
+  { id: 'audit', emoji: '🕵️', label: 'Audit Log', types: ['auditLogEntryCreate'] },
   { id: 'voice', emoji: '🔊', label: 'الصوت', types: ['voiceStateUpdate'] },
   { id: 'invites', emoji: '📩', label: 'الدعوات', types: ['inviteCreate', 'inviteDelete'] },
 ];

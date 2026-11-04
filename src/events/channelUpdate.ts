@@ -13,6 +13,11 @@ const event: Event = {
     await client.securityHandler.onChannelUpdate(oldChannel, newChannel).catch(() => {});
     // 🛡️ Anti-@everyone: منع إضافة صلاحيات خطيرة لـ @everyone
     await client.securityHandler.onChannelPermissionUpdate(oldChannel, newChannel).catch(() => {});
+
+    // 📋 سجل تحديث القناة
+    client.loggingHandler?.handleChannelUpdate(oldChannel, newChannel).catch((err) => {
+      client.loggingHandler?.reportFailure('channelUpdate', err);
+    });
   },
 };
 

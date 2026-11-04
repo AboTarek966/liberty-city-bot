@@ -1,5 +1,5 @@
 import { Client } from 'discord.js';
-export declare const LOG_EVENTS: readonly ["messageDelete", "messageEdit", "memberJoin", "memberLeave", "memberBan", "memberUnban", "memberUpdate", "memberTimeout", "roleCreate", "roleDelete", "roleUpdate", "channelCreate", "channelDelete", "channelUpdate", "voiceStateUpdate", "inviteCreate", "inviteDelete", "webhookUpdate", "threadCreate", "threadDelete", "threadUpdate", "emojiCreate", "emojiDelete", "stickerCreate", "stickerDelete", "ticketCreate", "ticketClose", "ticketReopen", "ticketDelete", "ticketClaim", "ticketTransfer", "ticketAddUser", "ticketRemoveUser"];
+export declare const LOG_EVENTS: readonly ["messageDelete", "messageEdit", "memberJoin", "memberLeave", "memberBan", "memberUnban", "memberUpdate", "memberTimeout", "roleCreate", "roleDelete", "roleUpdate", "channelCreate", "channelDelete", "channelUpdate", "voiceStateUpdate", "inviteCreate", "inviteDelete", "webhookUpdate", "threadCreate", "threadDelete", "threadUpdate", "emojiCreate", "emojiDelete", "stickerCreate", "stickerDelete", "messageDeleteBulk", "auditLogEntryCreate", "messageReactionAdd", "messageReactionRemove", "reactionRemoveAll", "ticketCreate", "ticketClose", "ticketReopen", "ticketDelete", "ticketClaim", "ticketTransfer", "ticketAddUser", "ticketRemoveUser"];
 export type LogEventType = typeof LOG_EVENTS[number];
 export declare class LoggingHandler {
     private client;
@@ -129,6 +129,10 @@ export declare class LoggingHandler {
         remover: any;
         removed: any;
     }): Promise<void>;
+    handleReactionAdd(reaction: any, user: any): Promise<void>;
+    handleReactionRemove(reaction: any, user: any): Promise<void>;
+    handleReactionRemoveAll(message: any, reactions: any[]): Promise<void>;
+    handleAuditLogEntryCreate(entry: any, guild: any): Promise<void>;
     cleanup(): void;
 }
 export default LoggingHandler;

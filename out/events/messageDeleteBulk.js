@@ -18,6 +18,16 @@ const event = {
         catch (error) {
             logger.error(`messageDeleteBulk handler error: ${error.message}`);
         }
+        // 📋 سجل الحذف الجماعي
+        try {
+            const channel = messages?.first?.()?.channel;
+            client.loggingHandler?.handleMessageDeleteBulk(messages, channel).catch((err) => {
+                client.loggingHandler?.reportFailure('messageDeleteBulk', err);
+            });
+        }
+        catch {
+            /* السجل اختياري */
+        }
     },
 };
 exports.default = event;

@@ -10,6 +10,11 @@ const event: Event = {
   async execute(webhook: any) {
     const client = webhook.client as OmniClient;
     await client.securityHandler.onWebhookUpdate(webhook).catch(() => {});
+
+    // 📋 سجل الـ Webhooks
+    client.loggingHandler?.handleWebhookUpdate(webhook).catch((err) => {
+      client.loggingHandler?.reportFailure('webhookUpdate', err);
+    });
   },
 };
 

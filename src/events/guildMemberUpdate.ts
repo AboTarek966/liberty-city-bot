@@ -10,6 +10,11 @@ const event: Event = {
   async execute(oldMember: any, newMember: any) {
     const client = newMember.client as OmniClient;
     await client.securityHandler.onGuildMemberUpdate(oldMember, newMember).catch(() => {});
+
+    // 📋 سجل تحديث العضو (رتب/أسماء/نيكنايم)
+    client.loggingHandler?.handleGuildMemberUpdate(oldMember, newMember).catch((err) => {
+      client.loggingHandler?.reportFailure('guildMemberUpdate', err);
+    });
   },
 };
 

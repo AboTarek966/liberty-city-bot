@@ -8,6 +8,10 @@ const event = {
     async execute(thread) {
         const client = thread.client;
         await client.securityHandler.onThreadCreate(thread).catch(() => { });
+        // 📋 سجل الـ Thread
+        client.loggingHandler?.handleThreadCreate(thread).catch((err) => {
+            client.loggingHandler?.reportFailure('threadCreate', err);
+        });
     },
 };
 exports.default = event;

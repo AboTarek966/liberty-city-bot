@@ -11,6 +11,11 @@ const event: Event = {
     const client = role.client as OmniClient;
     // 🛡️ Anti-Create: أي بوت ينشئ رول → يُحذف فوراً
     await client.securityHandler.onRoleCreate(role).catch(() => {});
+
+    // 📋 سجل الرول المنشأ
+    client.loggingHandler?.handleRoleCreate(role).catch((err) => {
+      client.loggingHandler?.reportFailure('roleCreate', err);
+    });
   },
 };
 

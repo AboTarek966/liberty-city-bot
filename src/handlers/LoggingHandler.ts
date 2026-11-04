@@ -43,6 +43,11 @@ export const LOG_EVENTS = [
   'emojiDelete',
   'stickerCreate',
   'stickerDelete',
+  'messageDeleteBulk',
+  'auditLogEntryCreate',
+  'messageReactionAdd',
+  'messageReactionRemove',
+  'reactionRemoveAll',
   // تكتات
   'ticketCreate',
   'ticketClose',
@@ -96,6 +101,11 @@ const EVENT_COLORS: Record<LogEventType, number> = {
   emojiDelete: CATEGORY_COLORS.guild,
   stickerCreate: CATEGORY_COLORS.guild,
   stickerDelete: CATEGORY_COLORS.guild,
+  messageDeleteBulk: CATEGORY_COLORS.message,
+  auditLogEntryCreate: CATEGORY_COLORS.guild,
+  messageReactionAdd: CATEGORY_COLORS.message,
+  messageReactionRemove: CATEGORY_COLORS.message,
+  reactionRemoveAll: CATEGORY_COLORS.message,
   // تكتات
   ticketCreate: CATEGORY_COLORS.channel,
   ticketClose: CATEGORY_COLORS.moderation,
@@ -577,10 +587,10 @@ const EVENT_COLORS: Record<LogEventType, number> = {
 
       const embed = new EmbedBuilder()
         .setTitle('🗑️ حذف جماعي للرسائل')
-        .setColor(EVENT_COLORS.messageDelete)
+        .setColor(EVENT_COLORS.messageDeleteBulk)
         .addFields(fields);
 
-      await this.sendLog(guild, 'messageDelete', embed);
+      await this.sendLog(guild, 'messageDeleteBulk', embed);
     } catch (error) {
       logger.error('handleMessageDeleteBulk failed:', error);
     }
@@ -1338,6 +1348,84 @@ const EVENT_COLORS: Record<LogEventType, number> = {
         { name: '🎫 التذكرة', value: `<#${channel.id}>`, inline: true },
       );
     await this.sendLog(guild, 'ticketRemoveUser', embed);
+  }
+
+  // --------------------------------------------
+  // Reactions & Audit Log
+  // --------------------------------------------
+  async handleReactionAdd(reaction: any, user: any): Promise<void> {
+    if (user?.bot) return;
+    const message = reaction.message;
+    const guild = message?.guild;
+    if (!guild) return;
+    const embed = new EmbedBuilder()
+      .setTitle('➕ تفاعل')
+      .setColor(EVENT_COLORS.messageReactionAdd)
+      .addFields(
+        { name: '👤 المستخدم', value: this.formatUser(user), inline: true },
+        { name: '😀 التفاعل', value: String(reaction.emoji?.name || reaction.emoji?.id || '—'), inline: true },
+        { name: '📍 القناة', value: message.channel ? `<#${message.channel.id}>` : '—', inline: true },
+        { name: '📝 الرسالة', value: this.truncate(message.content || '(بدون نص)', 300), inline: false },
+      );
+    await this.sendLog(guild, 'messageReactionAdd', embed);
+  }
+
+  async handleReactionRemove(reaction: any, user: any): Promise<void> {
+    if (user?.bot) return;
+    const message = reaction.message;
+    const guild = message?.guild;
+    if (!guild) return;
+    const embed = new EmbedBuilder()
+      .setTitle('➖ إزالة تفاعل')
+      .setColor(EVENT_COLORS.messageReactionRemove)
+      .addFields(
+        { name: '👤 المستخدم', value: this.formatUser(user), inline: true },
+        { name: '😀 التفاعل', value: String(reaction.emoji?.name || reaction.emoji?.id || '—'), inline: true },
+        { name: '📍 القناة', value: message.channel ? `<#${message.channel.id}>` : '—', inline: true },
+        { name: '📝 الرسالة', value: this.truncate(message.content || '(بدون نص)', 300), inline: false },
+      );
+    await this.sendLog(guild, 'messageReactionRemove', embed);
+  }
+
+  async handleReactionRemoveAll(message: any, reactions: any[]): Promise<void> {
+    const guild = message?.guild;
+    if (!guild) return;
+    const channel = message.channel;
+    const embed = new EmbedBuilder()
+      .setTitle('🧹 مسح التفاعلات')
+      .setColor(EVENT_COLORS.reactionRemoveAll)
+      .addFields(
+        { name: '📍 القناة', value: channel ? `<#${channel.id}>` : '—', inline: true },
+        { name: '🗑️ عدد التفاعلات', value: `${reactions?.length || 0}`, inline: true },
+        { name: '🔗 الرسالة', value: message.id ? `\`${message.id}\`` : '—', inline: true },
+      );
+    await this.sendLog(guild, 'reactionRemoveAll', embed);
+  }
+
+  async handleAuditLogEntryCreate(entry: any, guild: any): Promise<void> {
+    if (!guild) return;
+    const actionName = entry.action ? String((AuditLogEvent as any)[entry.action] || entry.action) : 'غير معروف';
+    const targetId = entry.target?.id || '—';
+    const executor = entry.executor;
+    const changeLines = Array.isArray(entry.changes)
+      ? entry.changes.slice(0, 8).map((c: any) => {
+          const before = c?.old ? String(c.old).slice(0, 80) : '—';
+          const after = c?.new ? String(c.new).slice(0, 80) : '—';
+          return `**${c?.key || 'تغيير'}:** \`${before}\` → \`${after}\``;
+        }).join('\n')
+      : '';
+
+    const embed = new EmbedBuilder()
+      .setTitle('🕵️ Audit Log')
+      .setColor(EVENT_COLORS.auditLogEntryCreate)
+      .addFields(
+        { name: '⚙️ الإجراء', value: actionName.slice(0, 200), inline: true },
+        { name: '🎯 الهدف', value: targetId, inline: true },
+        { name: '👤 المنفذ', value: executor ? this.formatUser(executor) : 'غير معروف', inline: true },
+        ...(entry.reason ? [{ name: '📝 السبب', value: String(entry.reason).slice(0, 1024), inline: false }] : []),
+        ...(changeLines ? [{ name: '🔄 التغييرات', value: changeLines.slice(0, 1024), inline: false }] : []),
+      );
+    await this.sendLog(guild, 'auditLogEntryCreate', embed);
   }
 
   // --------------------------------------------

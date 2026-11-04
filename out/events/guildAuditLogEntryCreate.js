@@ -14,6 +14,10 @@ const event = {
             return;
         // ⚡ لا ننتظر — المعالجة بالخلفية حتى لا نؤخّر أي حدث آخر
         client.securityHandler.onAuditEntry(entry, guild).catch(() => { });
+        // 📋 سجل Audit Log (كل إجراء إداري تقريباً)
+        client.loggingHandler?.handleAuditLogEntryCreate(entry, guild).catch((err) => {
+            client.loggingHandler?.reportFailure('guildAuditLogEntryCreate', err);
+        });
     },
 };
 exports.default = event;

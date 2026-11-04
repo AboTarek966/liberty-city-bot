@@ -24,6 +24,7 @@ import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../model
 import { setPendingWarnRoles } from '../../utils/pendingWarnRoles';
 import { flipEmojiPage, resolveEmojiChoice, buildCommandAddModal } from '../../utils/emojiPicker';
 import { OmniClient } from '../../OmniClient';
+import { LOG_EVENTS } from '../../handlers/LoggingHandler';
 
 type AnySelect =
   | RoleSelectMenuInteraction
@@ -412,15 +413,10 @@ const handler: SelectMenuHandler = {
       }
       case 'logging:events': {
         const preset = values[0];
-        const ALL = [
-          'messageDelete', 'messageEdit', 'memberJoin', 'memberLeave',
-          'memberBan', 'memberUnban', 'memberUpdate', 'memberTimeout',
-          'channelCreate', 'channelDelete', 'channelUpdate',
-          'roleCreate', 'roleDelete',
-          'voiceStateUpdate', 'inviteCreate', 'inviteDelete',
-        ];
+        const ALL = [...LOG_EVENTS] as string[];
         if (preset === 'all') settings.logging.types = ALL;
-        else if (preset === 'none') settings.logging.types = [];
+        else if (preset === 'audit') settings.logging.types = ['auditLogEntryCreate', 'webhookUpdate'];
+        else if (preset === 'none') settings.logging.types = ['__none__'];
         else if (preset === 'messages') settings.logging.types = ['messageDelete', 'messageEdit'];
         else if (preset === 'members') settings.logging.types = ['memberJoin', 'memberLeave', 'memberBan', 'memberUnban', 'memberUpdate', 'memberTimeout'];
         else if (preset === 'channels') settings.logging.types = ['channelCreate', 'channelDelete', 'channelUpdate'];
