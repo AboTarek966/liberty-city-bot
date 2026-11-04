@@ -611,6 +611,16 @@ const handler = {
                     return;
                 }
                 const guildIcon = interaction.guild.iconURL();
+                const verifyButton = new discord_js_1.ButtonBuilder()
+                    .setCustomId('verify')
+                    .setLabel((v.buttonLabel || 'توثيق').substring(0, 80))
+                    .setStyle(discord_js_1.ButtonStyle.Success);
+                try {
+                    verifyButton.setEmoji(v.buttonEmoji || '✅');
+                }
+                catch {
+                    /* إيموجي غير صالح — نتجاهله */
+                }
                 const sent = await vChannel
                     .send({
                     embeds: [
@@ -622,13 +632,7 @@ const handler = {
                             footer: { text: `${interaction.guild.name} • Verification` },
                         },
                     ],
-                    components: [
-                        new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
-                            .setCustomId('verify')
-                            .setLabel((v.buttonLabel || 'توثيق').substring(0, 80))
-                            .setStyle(discord_js_1.ButtonStyle.Success)
-                            .setEmoji(v.buttonEmoji || '✅')),
-                    ],
+                    components: [new discord_js_1.ActionRowBuilder().addComponents(verifyButton)],
                 })
                     .catch(() => null);
                 if (!sent) {

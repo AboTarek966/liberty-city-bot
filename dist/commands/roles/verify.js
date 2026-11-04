@@ -121,7 +121,11 @@ const command = {
             name: '🕰️ عمر الحساب',
             value: v.minAccountAgeDays ? `\`${v.minAccountAgeDays}\` يوم` : 'بدون حد',
             inline: true,
-        }, { name: '🧮 كابتشا', value: v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة', inline: true }, { name: '🚧 رول الحجر', value: quarantine ? `${quarantine}` : '—', inline: true }, { name: '👢 طرد عند الفشل', value: v.kickOnFail ? '🟢 نعم' : '🔴 لا', inline: true }, { name: '📋 السجل', value: log ? `${log}` : '—', inline: true }, {
+        }, { name: '🧮 كابتشا', value: v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة', inline: true }, { name: '🚧 رول الحجر', value: quarantine ? `${quarantine}` : '—', inline: true }, {
+            name: '🚧 حجر تلقائي',
+            value: v.autoQuarantine !== false ? '🟢 نعم' : '🔴 لا',
+            inline: true,
+        }, { name: '👢 طرد عند الفشل', value: v.kickOnFail ? '🟢 نعم' : '🔴 لا', inline: true }, { name: '📋 السجل', value: log ? `${log}` : '—', inline: true }, {
             name: '👥 عمر حسابك',
             value: `${(0, verification_1.getAccountAgeDays)(interaction.user)} يوم`,
             inline: true,

@@ -792,6 +792,16 @@ const handler: ButtonHandler = {
         }
 
         const guildIcon = interaction.guild!.iconURL();
+        const verifyButton = new ButtonBuilder()
+          .setCustomId('verify')
+          .setLabel((v.buttonLabel || 'توثيق').substring(0, 80))
+          .setStyle(ButtonStyle.Success);
+        try {
+          verifyButton.setEmoji(v.buttonEmoji || '✅');
+        } catch {
+          /* إيموجي غير صالح — نتجاهله */
+        }
+
         const sent = await vChannel
           .send({
             embeds: [
@@ -803,15 +813,7 @@ const handler: ButtonHandler = {
                 footer: { text: `${interaction.guild!.name} • Verification` },
               },
             ],
-            components: [
-              new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder()
-                  .setCustomId('verify')
-                  .setLabel((v.buttonLabel || 'توثيق').substring(0, 80))
-                  .setStyle(ButtonStyle.Success)
-                  .setEmoji(v.buttonEmoji || '✅')
-              ),
-            ],
+            components: [new ActionRowBuilder<ButtonBuilder>().addComponents(verifyButton)],
           })
           .catch(() => null);
 

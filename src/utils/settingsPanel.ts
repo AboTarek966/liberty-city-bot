@@ -579,17 +579,13 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
     toggleBtn('verification', 'enabled', 'التوثيق', '⚡', !!v.enabled),
     btn('settings_btn:verification:msg', 'تعديل الرسالة', ButtonStyle.Primary, '📝'),
     btn('settings_btn:verification:send', 'إرسال الرسالة', ButtonStyle.Success, '📤'),
-    btn('settings_cat:protection', 'رجوع', ButtonStyle.Secondary, '↩️'),
+    toggleBtn('verification', 'captcha', 'كابتشا', '🧮', !!v.captchaEnabled),
+    toggleBtn('verification', 'kickOnFail', 'طرد عند الفشل', '👢', !!v.kickOnFail)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    toggleBtn('verification', 'captcha', 'كابتشا', '🧮', !!v.captchaEnabled),
-    toggleBtn('verification', 'kickOnFail', 'طرد عند الفشل', '👢', !!v.kickOnFail),
     btn('settings_btn:verification:age', 'عمر الحساب', ButtonStyle.Secondary, '🕰️'),
     btn('settings_btn:verification:log', 'قناة السجل', ButtonStyle.Secondary, '📋'),
-  );
-
-  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn(
       'verification',
       'autoquarantine',
@@ -598,11 +594,12 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
       v.autoQuarantine !== false
     ),
     btn('settings_btn:verification:emoji', 'إيموجي الزر', ButtonStyle.Secondary, '😀'),
+    btn('settings_cat:protection', 'رجوع', ButtonStyle.Secondary, '↩️')
   );
 
   return {
     embeds: [embed],
-    components: [roleSelect, channelSelect, quarantineSelect, row1, row2, row3],
+    components: [roleSelect, channelSelect, quarantineSelect, row1, row2],
   };
 }
 

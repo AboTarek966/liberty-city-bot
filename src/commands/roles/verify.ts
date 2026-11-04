@@ -175,6 +175,11 @@ const command: Command = {
         },
         { name: '🧮 كابتشا', value: v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة', inline: true },
         { name: '🚧 رول الحجر', value: quarantine ? `${quarantine}` : '—', inline: true },
+        {
+          name: '🚧 حجر تلقائي',
+          value: v.autoQuarantine !== false ? '🟢 نعم' : '🔴 لا',
+          inline: true,
+        },
         { name: '👢 طرد عند الفشل', value: v.kickOnFail ? '🟢 نعم' : '🔴 لا', inline: true },
         { name: '📋 السجل', value: log ? `${log}` : '—', inline: true },
         {
