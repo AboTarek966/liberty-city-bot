@@ -391,16 +391,9 @@ export class TicketHandler {
     // 🎫 رسالة الترحيب — يمكن تفعيلها/تعطيلها من الإعدادات (الافتراضي: معطّلة)
     if (settings.tickets.welcomeEnabled) {
       const welcomeMessage =
-        `مرحباً ${user}! تم إنشاء تذكرتك بنجاح ✅\n\n` +
-        `**رقم التذكرة:** \`${ticketId}\`\n` +
-        `**النوع:** ${type}\n\n` +
-        `فريق الدعم سيتواصل معك في أقرب وقت.\n` +
-        `يرجى وصف مشكلتك بالتفصيل.\n\n` +
-        `---\n` +
-        `⚙️ **اختر من قائمة الخيارات بالأسفل:**\n` +
-        `> ➕ إضافة عضو أو إداري • 👑 استدعاء الإدارة العليا\n` +
-        `> 🤝 استلام التذكرة •↩️ إلغاء الاستلام\n` +
-        `> 🔒 إغلاق • 🗑️ حذف • 📄 نسخة المحادثة`;
+        `مرحباً ${user} — تذكرتك جاهزة ✅\n` +
+        `🎫 ${ticketId} • ${type}\n` +
+        `اكتب مشكلتك بالتفصيل وسيتواصل معك فريق الدعم.`;
 
       await channel.send({
         content: `${pingContent}\n\n${welcomeMessage}`,
@@ -470,11 +463,8 @@ export class TicketHandler {
     const closingEmbed = createEmbed({
       title: '🔒 تم إغلاق التذكرة',
       description:
-        `تم إغلاق التذكرة بواسطة ${closedBy}\n` +
-        `السبب: ${reason || 'غير محدد'}\n\n` +
-        `⛔ **القناة مقفلة الآن:** لا يمكن لأحد الكتابة — لا الإدارة ولا صاحب التذكرة.\n` +
-        `🔓 **إعادة الفتح:** لـ **${closerName}** أو لأي إداري معاه رول فريق الدعم/الإدارة.\n` +
-        `🛡️ حاملو **Administrator** يتجاوزون القفل ويقدرون الكتابة دائماً.`,
+        `تم الإغلاق بواسطة ${closedBy} • السبب: ${reason || 'غير محدد'}\n` +
+        `🔓 إعادة الفتح: ${closerName} أو فريق الدعم/الإدارة — Administrator يتجاوز القفل.`,
       color: Colors.error,
       footer: { text: 'Liberty City Tickets' },
     });
@@ -514,9 +504,7 @@ export class TicketHandler {
             embeds: [
               createEmbed({
                 title: '⭐ كيف كانت خدمة الدعم؟',
-                description:
-                  `تم إغلاق تذكرتك في سيرفر **${guild.name}** (النوع: ${ticket.type})\n` +
-                  `قيّم تجربتك مع فريق الدعم — رأيك يساعدنا على التحسين 💙`,
+                description: `تم إغلاق تذكرتك في **${guild.name}** • ${ticket.type} — قيّم تجربتك 💙`,
                 color: Colors.primary,
               }),
             ],
@@ -714,14 +702,14 @@ export class TicketHandler {
         }
 
         const claimEmbed = createEmbed({
-          title: '🤝 تم استلام التذكرة',
+          title: 'تم استلام التذكرة 💛',
           description:
-            `تم استلام التذكرة بواسطة ${claimedBy}\n\n` +
-            `🔒 **تم قفل التذكرة حصرية:** الكتابة للمستلم وصاحب التذكرة فقط — بقية فريق الدعم للقراءة فقط.\n` +
-            `📌 لمنح إداري معيّن صلاحية الكتابة اختر **➕ إضافة عضو أو إداري** من قائمة الخيارات.\n\n` +
+            `تم استلام التذكرة بواسطة ${claimedBy} ⇄ <@${ticket.userId}>\n` +
+            `🔒 التذكرة مقفلة: الكتابة للمستلم وصاحب التذكرة فقط.\n` +
+            `📌 لمنح إداري صلاحية الكتابة اختر ➕ إضافة عضو أو إداري.\n\n` +
             (isNewClaimer
-              ? `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount + 1}\``
-              : `📊 **إجمالي تذاكرك المستلمة:** \`${currentCount}\` (لا تُحتسب نقطة — سبق واستلمت هذه التذكرة)`),
+              ? `📊 إجمالي تذاكرك المستلمة: ${currentCount + 1}`
+              : `📊 إجمالي تذاكرك المستلمة: ${currentCount} (بدون احتساب مكرر)`),
           color: Colors.success,
           footer: { text: 'Liberty City Tickets' },
         });
@@ -793,12 +781,10 @@ export class TicketHandler {
         }
 
         const embed = createEmbed({
-          title: '↩️ تم إلغاء استلام التذكرة',
+          title: '↩️ تم إلغاء الاستلام',
           description:
-            `تم تحرير التذكرة${previousClaimer ? ` من ${previousClaimer}` : ''}\n` +
-            `تم إلغاء الاستلام بواسطة ${unclaimedBy}\n\n` +
-            `🔓 تم إلغاء القفل — يمكن لفريق الدعم الكتابة مجدداً.\n` +
-            `يمكن لأي مشرف استلامها الآن.`,
+            `تم إلغاء الاستلام بواسطة ${unclaimedBy}${previousClaimer ? ` • المستلم السابق: ${previousClaimer}` : ''}\n` +
+            `🔓 القفل أُلغي — يمكن لفريق الدعم الكتابة واستلام التذكرة.`,
           color: Colors.warning,
           footer: { text: 'Liberty City Tickets' },
         });
@@ -888,9 +874,7 @@ export class TicketHandler {
 
         const reopenEmbed = createEmbed({
           title: '🔓 تم إعادة فتح التذكرة',
-          description:
-            `تم إعادة فتح التذكرة بواسطة ${reopenedBy}\n\n` +
-            `يمكن لفريق الدعم استلامها والمتابعة.`,
+          description: `تمت إعادة الفتح بواسطة ${reopenedBy} — يمكن لفريق الدعم المتابعة.`,
           color: Colors.success,
           footer: { text: 'Liberty City Tickets' },
         });
@@ -1136,15 +1120,9 @@ export class TicketHandler {
       if (role && role.id !== guild.roles.everyone.id) mentions.push(`<@&${role.id}>`);
     }
 
-    const isAdminConfig = (settings.tickets.adminRoleIds?.length || 0) > 0;
-
     const embed = createEmbed({
       title: '🔔 استدعاء الإدارة العليا',
-      description:
-        `${calledBy} يستدعي الإدارة العليا!\n\n` +
-        `يرجى الاطلاع على هذه التذكرة في أقرب وقت.\n` +
-        `**القناة:** ${channel}\n` +
-        `**المنشور لـ:** ${isAdminConfig ? 'رولات الإدارة العليا المُعدّدة' : 'رولات فريق الدعم'}`,
+      description: `${calledBy} يستدعي الإدارة العليا — ${channel}`,
       color: Colors.warning,
       footer: { text: 'Liberty City Tickets | استدعاء الإدارة' },
     });
@@ -1478,8 +1456,7 @@ export class TicketHandler {
     return createEmbed({
       title: `${panel.emoji || '🎫'} ${panel.name || 'تذاكر الدعم'}`,
       description:
-        `${panel.description || 'افتح تذكرة جديدة وسيقوم فريق الدعم بالرد عليك في أقرب وقت 💬'}\n\n` +
-        `📋 **اختر نوع التذكرة من القائمة بالأسفل** — سيُفتح التذكرة بنفس الاسم:\n` +
+        `${panel.description || 'افتح تذكرة جديدة وسيقوم فريق الدعم بالرد عليك في أقرب وقت 💬'}\n` +
         `${typeList}`,
       image: panel.image || undefined,
       color: Colors.primary,
