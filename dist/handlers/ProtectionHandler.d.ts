@@ -39,6 +39,7 @@ export declare class ProtectionHandler {
     private hasIgnoredRole;
     private isIgnoredChannel;
     private getProtectionKey;
+    private sendAIRaidSummary;
     cleanup(): void;
 }
 export default ProtectionHandler;

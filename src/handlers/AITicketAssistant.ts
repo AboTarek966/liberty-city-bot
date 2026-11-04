@@ -418,6 +418,7 @@ ${context}
 - restore_backup: استعادة من نسخة احتياطية
 - ban_user: حظر عضو
 - timeout_user: كتم عضو
+- close_ticket: إغلاق التذكرة (فقط إذا تم حل المشكلة فعلاً)
 - custom: إجراء مخصص
 
 **الإشراف (مهم جداً):**
@@ -428,8 +429,9 @@ ${context}
 - لا تحظر/تكمت بدون سبب واضح.
 
 **قواعد صارمة:**
-- أي إجراء يعطي رول/يعدل صلاحيات/يحظر = requiresAdminApproval: true
+- أي إجراء يعطي رول/يعدل صلاحيات/يحظر/يغلق = requiresAdminApproval: true
 - الإجراءات المعلوماتية (فحص، استشارة) = requiresAdminApproval: false
+- close_ticket: أضفه فقط إذا تم حل المشكلة وليست هناك حاجة لمتابعة. requiresAdminApproval: true.
 - استخدم دائماً معرّفات Discord الرقمية (targetUserId / targetRoleId) من السياق — لا تكتب أسماء أو منشن.
 - صاحب التذكرة هو المستخدم الافتراضي لأي إجراء عليه (targetUserId = ${message.author.id}).
 - لو مش متأكد → needsAdminAction: true وقلل confidence.

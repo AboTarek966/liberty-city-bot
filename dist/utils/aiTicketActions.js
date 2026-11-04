@@ -125,6 +125,8 @@ function actionNeedsApproval(action, config) {
         return true;
     if (action.type === 'restore_backup')
         return true;
+    if (action.type === 'close_ticket')
+        return true;
     return false;
 }
 // --------------------------------------------
@@ -255,6 +257,24 @@ async function executeTicketAction(client, guild, action, context = {}) {
                 const ms = clampTimeoutMs(action.params?.duration || action.params?.minutes);
                 await member.timeout(ms, reason);
                 return { ok: true, message: `✅ تم كتم ${member} لمدة ${Math.round(ms / 60_000)} دقيقة` };
+            }
+            case 'close_ticket': {
+                const closeChannelId = normalizeId(action.params?.channelId) || normalizeId(context.ticketChannelId);
+                const closeChannel = closeChannelId
+                    ? guild.channels.cache.get(closeChannelId)
+                    : undefined;
+                if (!closeChannel)
+                    return { ok: false, message: '❌ قناة التذكرة غير موجودة' };
+                const closer = guild.members.me;
+                if (!closer)
+                    return { ok: false, message: '❌ البوت غير متاح' };
+                try {
+                    await client.ticketHandler.closeTicket(closeChannel.id, closer, action.description || 'AI: تم حل المشكلة');
+                    return { ok: true, message: '✅ تم إغلاق التذكرة' };
+                }
+                catch (error) {
+                    return { ok: false, message: `❌ فشل إغلاق التذكرة: ${error.message}` };
+                }
             }
             case 'check_settings': {
                 const settings = await (0, models_1.getGuildSettings)(guild.id);

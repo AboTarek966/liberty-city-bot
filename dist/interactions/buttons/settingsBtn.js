@@ -43,7 +43,7 @@ const handler = {
             'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
             'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
             'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-            'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'levels:msg',
+            'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
             'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
             'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
             'translator:settings',
@@ -162,10 +162,17 @@ const handler = {
                 .setMaxLength(80)
                 .setRequired(true)
                 .setValue((v.buttonLabel || 'توثيق').substring(0, 80));
+            const emojiInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('emoji')
+                .setLabel('إيموجي الزر (اختياري)')
+                .setStyle(discord_js_1.TextInputStyle.Short)
+                .setMaxLength(64)
+                .setRequired(false)
+                .setValue((v.buttonEmoji || '✅').substring(0, 64));
             const modal = new discord_js_1.ModalBuilder()
                 .setCustomId('settings_modal:verification:msg')
                 .setTitle('رسالة التوثيق')
-                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(titleInput), new discord_js_1.ActionRowBuilder().addComponents(descInput), new discord_js_1.ActionRowBuilder().addComponents(labelInput));
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(titleInput), new discord_js_1.ActionRowBuilder().addComponents(descInput), new discord_js_1.ActionRowBuilder().addComponents(labelInput), new discord_js_1.ActionRowBuilder().addComponents(emojiInput));
             await interaction.showModal(modal);
             return;
         }
@@ -243,6 +250,10 @@ const handler = {
         }
         if (`${section}:${action}` === 'honeypot:timeout') {
             return openModal('⏱️ مدة كتم قناة الطعم', 'بالدقائق — من 1 إلى 40320', discord_js_1.TextInputStyle.Short, 5, String(settings.honeypot?.timeoutMinutes || 10));
+        }
+        if (`${section}:${action}` === 'verification:quarantineage') {
+            const v = settings.verification || {};
+            return openModal('⏳ عمر الحجر (بالأيام)', '0 = حجر جميع الأعضاء، >0 = حجر الحسابات الأصغر من X يوم', discord_js_1.TextInputStyle.Short, 3, String(v.autoQuarantineMaxAccountAgeDays ?? 7));
         }
         // الإجراءات التي تفتح مودال → ترجع فوراً (showModal هو الرد)
         const modalActions = [

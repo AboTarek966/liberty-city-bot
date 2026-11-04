@@ -103,9 +103,20 @@ async function handleVerificationQuarantine(member: GuildMember): Promise<void> 
 
     const settings = await getGuildSettings(member.guild.id);
     const v = settings.verification;
-    if (!v?.enabled || !v.roleId || !v.quarantineRoleId) return;
-    if (v.autoQuarantine === false) return;
-    if (member.roles.cache.has(v.roleId)) return;
+    if (!v?.enabled || !v?.roleId || !v?.quarantineRoleId) return;
+
+    const accountAgeDays = Math.floor((Date.now() - member.user.createdTimestamp) / 86_400_000);
+
+    // وضع 1: حجر جميع الأعضاء الجدد حتى التوثيق
+    const quarantineAll = v.autoQuarantine !== false;
+    // وضع 2: حجر الحسابات الجديدة (أقل من X يوم) فقط
+    const quarantineNew =
+      !!v.autoQuarantineNewAccounts &&
+      (v.autoQuarantineMaxAccountAgeDays ?? 7) > 0 &&
+      accountAgeDays < (v.autoQuarantineMaxAccountAgeDays ?? 7);
+
+    if (!quarantineAll && !quarantineNew) return;
+    if (member.roles.cache.has(v.roleId || '')) return;
 
     const role = member.guild.roles.cache.get(v.quarantineRoleId);
     if (!role) {

@@ -126,11 +126,18 @@ async function handleVerificationQuarantine(member) {
             return;
         const settings = await (0, models_1.getGuildSettings)(member.guild.id);
         const v = settings.verification;
-        if (!v?.enabled || !v.roleId || !v.quarantineRoleId)
+        if (!v?.enabled || !v?.roleId || !v?.quarantineRoleId)
             return;
-        if (v.autoQuarantine === false)
+        const accountAgeDays = Math.floor((Date.now() - member.user.createdTimestamp) / 86_400_000);
+        // وضع 1: حجر جميع الأعضاء الجدد حتى التوثيق
+        const quarantineAll = v.autoQuarantine !== false;
+        // وضع 2: حجر الحسابات الجديدة (أقل من X يوم) فقط
+        const quarantineNew = !!v.autoQuarantineNewAccounts &&
+            (v.autoQuarantineMaxAccountAgeDays ?? 7) > 0 &&
+            accountAgeDays < (v.autoQuarantineMaxAccountAgeDays ?? 7);
+        if (!quarantineAll && !quarantineNew)
             return;
-        if (member.roles.cache.has(v.roleId))
+        if (member.roles.cache.has(v.roleId || ''))
             return;
         const role = member.guild.roles.cache.get(v.quarantineRoleId);
         if (!role) {

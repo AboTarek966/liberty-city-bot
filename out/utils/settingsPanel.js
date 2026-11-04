@@ -411,6 +411,7 @@ function buildVerificationPanel(guild, s) {
         `> 🧮 **كابتشا رياضية:** ${v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة'}\n` +
         `> 🚧 **رول الحجر:** ${quarantine ? `${quarantine}` : '—'}\n` +
         `> 🚧 **حجر تلقائي عند الدخول:** ${v.autoQuarantine !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> ⏳ **حجر الحسابات الأصغر من:** ${v.autoQuarantineMaxAccountAgeDays ? `\`${v.autoQuarantineMaxAccountAgeDays}\` يوم` : 'جميع الحسابات'}\n` +
         `> 👢 **طرد عند فشل العمر:** ${v.kickOnFail ? '🟢 نعم' : '🔴 لا'}\n` +
         `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -442,7 +443,7 @@ function buildVerificationPanel(guild, s) {
         .setMinValues(0)
         .setMaxValues(1));
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('verification', 'enabled', 'التوثيق', '⚡', !!v.enabled), btn('settings_btn:verification:msg', 'تعديل الرسالة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_btn:verification:send', 'إرسال الرسالة', discord_js_1.ButtonStyle.Success, '📤'), toggleBtn('verification', 'captcha', 'كابتشا', '🧮', !!v.captchaEnabled), toggleBtn('verification', 'kickOnFail', 'طرد عند الفشل', '👢', !!v.kickOnFail));
-    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:verification:age', 'عمر الحساب', discord_js_1.ButtonStyle.Secondary, '🕰️'), btn('settings_btn:verification:log', 'قناة السجل', discord_js_1.ButtonStyle.Secondary, '📋'), toggleBtn('verification', 'autoquarantine', 'حجر تلقائي', '🚧', v.autoQuarantine !== false), btn('settings_btn:verification:emoji', 'إيموجي الزر', discord_js_1.ButtonStyle.Secondary, '😀'), btn('settings_cat:protection', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:verification:age', 'عمر الحساب', discord_js_1.ButtonStyle.Secondary, '🕰️'), btn('settings_btn:verification:log', 'قناة السجل', discord_js_1.ButtonStyle.Secondary, '📋'), toggleBtn('verification', 'autoquarantine', 'حجر تلقائي', '🚧', v.autoQuarantine !== false), btn('settings_btn:verification:quarantineage', 'عمر الحجر', discord_js_1.ButtonStyle.Secondary, '⏳'), btn('settings_cat:protection', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
     return {
         embeds: [embed],
         components: [roleSelect, channelSelect, quarantineSelect, row1, row2],

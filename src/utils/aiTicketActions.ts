@@ -28,6 +28,7 @@ export interface TicketAction {
     | 'restore_backup'
     | 'ban_user'
     | 'timeout_user'
+    | 'close_ticket'
     | 'custom';
   description: string;
   params: Record<string, any>;
@@ -172,6 +173,7 @@ export function actionNeedsApproval(
   if (PERMISSION_ACTIONS.has(action.type) && config.requireAdminApprovalForPermissions !== false) return true;
   if (PUNISH_ACTIONS.has(action.type) && config.requireAdminApprovalForBans !== false) return true;
   if (action.type === 'restore_backup') return true;
+  if (action.type === 'close_ticket') return true;
   return false;
 }
 
@@ -316,6 +318,27 @@ export async function executeTicketAction(
         const ms = clampTimeoutMs(action.params?.duration || action.params?.minutes);
         await member.timeout(ms, reason);
         return { ok: true, message: `✅ تم كتم ${member} لمدة ${Math.round(ms / 60_000)} دقيقة` };
+      }
+
+      case 'close_ticket': {
+        const closeChannelId =
+          normalizeId(action.params?.channelId) || normalizeId(context.ticketChannelId);
+        const closeChannel = closeChannelId
+          ? (guild.channels.cache.get(closeChannelId) as TextChannel | undefined)
+          : undefined;
+        if (!closeChannel) return { ok: false, message: '❌ قناة التذكرة غير موجودة' };
+        const closer = guild.members.me;
+        if (!closer) return { ok: false, message: '❌ البوت غير متاح' };
+        try {
+          await (client as any).ticketHandler.closeTicket(
+            closeChannel.id,
+            closer,
+            action.description || 'AI: تم حل المشكلة'
+          );
+          return { ok: true, message: '✅ تم إغلاق التذكرة' };
+        } catch (error: any) {
+          return { ok: false, message: `❌ فشل إغلاق التذكرة: ${error.message}` };
+        }
       }
 
       case 'check_settings': {

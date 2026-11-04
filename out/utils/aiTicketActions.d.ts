@@ -1,6 +1,6 @@
 import { Client, Guild } from 'discord.js';
 export interface TicketAction {
-    type: 'give_role' | 'remove_role' | 'create_channel' | 'modify_permissions' | 'check_settings' | 'restore_backup' | 'ban_user' | 'timeout_user' | 'custom';
+    type: 'give_role' | 'remove_role' | 'create_channel' | 'modify_permissions' | 'check_settings' | 'restore_backup' | 'ban_user' | 'timeout_user' | 'close_ticket' | 'custom';
     description: string;
     params: Record<string, any>;
     requiresAdminApproval: boolean;

@@ -530,6 +530,7 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
         `> 🧮 **كابتشا رياضية:** ${v.captchaEnabled ? '🟢 مفعّلة' : '🔴 معطّلة'}\n` +
         `> 🚧 **رول الحجر:** ${quarantine ? `${quarantine}` : '—'}\n` +
         `> 🚧 **حجر تلقائي عند الدخول:** ${v.autoQuarantine !== false ? '🟢 نعم' : '🔴 لا'}\n` +
+        `> ⏳ **حجر الحسابات الأصغر من:** ${v.autoQuarantineMaxAccountAgeDays ? `\`${v.autoQuarantineMaxAccountAgeDays}\` يوم` : 'جميع الحسابات'}\n` +
         `> 👢 **طرد عند فشل العمر:** ${v.kickOnFail ? '🟢 نعم' : '🔴 لا'}\n` +
         `> 📋 **قناة السجل:** ${logChannel ? `${logChannel}` : '—'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -592,7 +593,7 @@ export function buildVerificationPanel(guild: Guild, s: any): BuiltPanel {
       '🚧',
       v.autoQuarantine !== false
     ),
-    btn('settings_btn:verification:emoji', 'إيموجي الزر', ButtonStyle.Secondary, '😀'),
+    btn('settings_btn:verification:quarantineage', 'عمر الحجر', ButtonStyle.Secondary, '⏳'),
     btn('settings_cat:protection', 'رجوع', ButtonStyle.Secondary, '↩️')
   );
 

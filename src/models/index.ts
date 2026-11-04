@@ -471,6 +471,10 @@ export interface IGuildSettings extends Document {
     quarantineRoleId?: string;
     /** 🚧 إعطاء رول الحجر تلقائياً عند دخول العضو (افتراضي: نعم) */
     autoQuarantine?: boolean;
+    /** 🚧 حجر الحسابات الجديدة فقط (أقل من X يوم) */
+    autoQuarantineNewAccounts?: boolean;
+    /** 🚧 أقصى عمر حساب (بالأيام) للحجر التلقائي — 0 = جميع الحسابات */
+    autoQuarantineMaxAccountAgeDays?: number;
     /** 📢 قناة سجل التوثيق (اختياري) */
     logChannelId?: string;
     /** 👢 طرد الحساب إذا فشل شرط العمر */
@@ -1288,6 +1292,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     captchaEnabled: { type: Boolean, default: false },
     quarantineRoleId: { type: String },
     autoQuarantine: { type: Boolean, default: true },
+    autoQuarantineNewAccounts: { type: Boolean, default: false },
+    autoQuarantineMaxAccountAgeDays: { type: Number, default: 7, min: 0, max: 365 },
     logChannelId: { type: String },
     kickOnFail: { type: Boolean, default: false },
     messageId: { type: String },

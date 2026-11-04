@@ -534,6 +534,8 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         captchaEnabled: { type: Boolean, default: false },
         quarantineRoleId: { type: String },
         autoQuarantine: { type: Boolean, default: true },
+        autoQuarantineNewAccounts: { type: Boolean, default: false },
+        autoQuarantineMaxAccountAgeDays: { type: Number, default: 7, min: 0, max: 365 },
         logChannelId: { type: String },
         kickOnFail: { type: Boolean, default: false },
         messageId: { type: String },

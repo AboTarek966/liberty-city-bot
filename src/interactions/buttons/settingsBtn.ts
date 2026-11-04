@@ -63,7 +63,7 @@ const handler: ButtonHandler = {
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'levels:msg',
+      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
       'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
       'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
       'translator:settings',
@@ -207,6 +207,13 @@ const handler: ButtonHandler = {
         .setMaxLength(80)
         .setRequired(true)
         .setValue((v.buttonLabel || 'توثيق').substring(0, 80));
+      const emojiInput = new TextInputBuilder()
+        .setCustomId('emoji')
+        .setLabel('إيموجي الزر (اختياري)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(64)
+        .setRequired(false)
+        .setValue((v.buttonEmoji || '✅').substring(0, 64));
 
       const modal = new ModalBuilder()
         .setCustomId('settings_modal:verification:msg')
@@ -214,7 +221,8 @@ const handler: ButtonHandler = {
         .addComponents(
           new ActionRowBuilder<TextInputBuilder>().addComponents(titleInput),
           new ActionRowBuilder<TextInputBuilder>().addComponents(descInput),
-          new ActionRowBuilder<TextInputBuilder>().addComponents(labelInput)
+          new ActionRowBuilder<TextInputBuilder>().addComponents(labelInput),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(emojiInput)
         );
 
       await interaction.showModal(modal);
@@ -335,6 +343,17 @@ const handler: ButtonHandler = {
         TextInputStyle.Short,
         5,
         String(settings.honeypot?.timeoutMinutes || 10)
+      );
+    }
+
+    if (`${section}:${action}` === 'verification:quarantineage') {
+      const v = settings.verification || {};
+      return openModal(
+        '⏳ عمر الحجر (بالأيام)',
+        '0 = حجر جميع الأعضاء، >0 = حجر الحسابات الأصغر من X يوم',
+        TextInputStyle.Short,
+        3,
+        String(v.autoQuarantineMaxAccountAgeDays ?? 7)
       );
     }
 
