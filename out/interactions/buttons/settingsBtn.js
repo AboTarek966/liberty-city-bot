@@ -7,6 +7,7 @@ const discord_js_1 = require("discord.js");
 const settingsPanel_1 = require("../../utils/settingsPanel");
 const emojiPicker_1 = require("../../utils/emojiPicker");
 const models_1 = require("../../models");
+const ticketMessages_1 = require("../../utils/ticketMessages");
 const guildMemberAdd_1 = require("../../events/guildMemberAdd");
 const guildMemberRemove_1 = require("../../events/guildMemberRemove");
 const pendingUploads_1 = require("../../utils/pendingUploads");
@@ -42,7 +43,7 @@ const handler = {
             'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
             'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
             'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-            'tickets:types', 'tickets:panel', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
+            'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
             'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
             'translator:settings',
             'music:volume', 'music:queue_limit',
@@ -203,7 +204,7 @@ const handler = {
             'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
             'automod:words', 'ai:personality',
             'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
-            'tickets:autotext', 'tickets:pimg', 'tickets:types',
+            'tickets:autotext', 'tickets:pimg', 'tickets:types', 'tickets:max', 'tickets:welcomeMsg',
             'translator:settings',
             'music:volume', 'music:queue_limit',
             'announce:dm', 'announce:channel',
@@ -255,6 +256,10 @@ const handler = {
                     return openModal('رابط خلفية البطاقة', 'https://... — اتركه فارغاً للخلفية الافتراضية', discord_js_1.TextInputStyle.Short, 500, settings.welcome.card?.backgroundUrl || '', false);
                 case 'tickets:autotext':
                     return openModal('الرسالة التلقائية داخل التذكرة', '{user} {ticket} {server}', discord_js_1.TextInputStyle.Paragraph, 1500, settings.tickets.autoMessage || '');
+                case 'tickets:max':
+                    return openModal('🔢 الحد الأقصى للتذاكر لكل عضو', 'من 1 إلى 10', discord_js_1.TextInputStyle.Short, 2, String(settings.tickets.maxPerUser ?? 3));
+                case 'tickets:welcomeMsg':
+                    return openModal('✏️ رسالة الترحيب بالتذاكر', 'المتغيرات: {user} {ticket} {type} {server} — فارغ = الافتراضي', discord_js_1.TextInputStyle.Paragraph, 1800, (settings.tickets.welcomeMessage || '').trim() || ticketMessages_1.DEFAULT_TICKET_WELCOME_MESSAGE, false);
                 case 'tickets:types': {
                     if (!(0, settingsPanel_1.getActivePanel)(settings)) {
                         await interaction.reply({
@@ -692,13 +697,6 @@ const handler = {
                 const panel = (0, settingsPanel_1.buildLevelRewardsPanel)(interaction.guild, settings);
                 await interaction.editReply({ embeds: panel.embeds, components: panel.components });
                 return;
-            }
-            case 'tickets:inc':
-            case 'tickets:dec': {
-                const delta = action === 'inc' ? 1 : -1;
-                settings.tickets.maxPerUser = Math.min(10, Math.max(1, settings.tickets.maxPerUser + delta));
-                await settings.save();
-                break;
             }
             case 'general:shop': {
                 // لوحة فرعية: متجر السيرفر

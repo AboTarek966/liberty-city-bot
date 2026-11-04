@@ -242,6 +242,8 @@ export interface IGuildSettings extends Document {
         lockUntilClaim: boolean;
         /** 🎫 إرسال رسالة الترحيب داخل التذكرة (الزرار والخيارات) */
         welcomeEnabled: boolean;
+        /** ✏️ نص رسالة الترحيب المخصص — يدعم {user} {ticket} {type} {server} */
+        welcomeMessage?: string;
         /** 📊 إحصائيات استلام التذاكر لكل إداري (userId → عدد التذاكر المستلمة) */
         claimStats: Map<string, number>;
         /** 📅 سجل زمني لتذاكر الاستلام (لحساب يومي/أسبوعي/شهري) */

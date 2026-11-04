@@ -20,6 +20,7 @@ import {
 import { createLogger } from '../utils/helpers';
 import { getGuildSettings, Ticket, ITicket, ITicketLockSnapshot, Ticket as TicketModel } from '../models';
 import { ticketEmbed, ticketTranscriptEmbed, createEmbed, Colors } from '../utils/embeds';
+import { DEFAULT_TICKET_WELCOME_MESSAGE, renderTicketWelcome } from '../utils/ticketMessages';
 import { generateId, generateNumericId } from '../utils/helpers';
 import { LibertyClient } from '../LibertyClient';
 
@@ -390,13 +391,19 @@ export class TicketHandler {
 
     // 🎫 رسالة الترحيب — يمكن تفعيلها/تعطيلها من الإعدادات (الافتراضي: معطّلة)
     if (settings.tickets.welcomeEnabled) {
-      const welcomeMessage =
-        `مرحباً ${user} — تذكرتك جاهزة ✅\n` +
-        `🎫 ${ticketId} • ${type}\n` +
-        `اكتب مشكلتك بالتفصيل وسيتواصل معك فريق الدعم.`;
+      const template =
+        (settings.tickets.welcomeMessage || '').trim() || DEFAULT_TICKET_WELCOME_MESSAGE;
+      const welcomeMessage = renderTicketWelcome(template, {
+        user: user.toString(),
+        ticket: ticketId,
+        type,
+        server: guild.name,
+      });
+      // احترام حد ديسكورد 2000 حرف مع بقاء المنشن في الأعلى
+      const safeWelcome = welcomeMessage.slice(0, Math.max(0, 1990 - pingContent.length));
 
       await channel.send({
-        content: `${pingContent}\n\n${welcomeMessage}`,
+        content: `${pingContent}\n\n${safeWelcome}`.trimEnd(),
         components: this.buildTicketControls(false),
       });
     } else {

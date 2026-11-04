@@ -265,6 +265,8 @@ export interface IGuildSettings extends Document {
     lockUntilClaim: boolean;
     /** 🎫 إرسال رسالة الترحيب داخل التذكرة (الزرار والخيارات) */
     welcomeEnabled: boolean;
+    /** ✏️ نص رسالة الترحيب المخصص — يدعم {user} {ticket} {type} {server} */
+    welcomeMessage?: string;
     /** 📊 إحصائيات استلام التذاكر لكل إداري (userId → عدد التذاكر المستلمة) */
     claimStats: Map<string, number>;
     /** 📅 سجل زمني لتذاكر الاستلام (لحساب يومي/أسبوعي/شهري) */
@@ -1067,6 +1069,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     adminRoleIds: { type: [String], default: [] },
     lockUntilClaim: { type: Boolean, default: false },
     welcomeEnabled: { type: Boolean, default: false },
+    welcomeMessage: { type: String },
     claimStats: { type: Map, of: Number, default: {} },
     claimLog: {
       type: [{ _id: false, userId: { type: String }, at: { type: Date } }],

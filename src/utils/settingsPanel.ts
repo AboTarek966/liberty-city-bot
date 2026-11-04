@@ -962,6 +962,7 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
     `> 🎨 **لوحة التذاكر:** ${panelLine}\n` +
     `> 🏷️ **أنواع التذاكر** (اسم الخيار = اسم قناة التذكرة):\n${typesLine}\n` +
     `> 🎫 **رسالة الترحيب:** ${on(t.welcomeEnabled)} ${t.welcomeEnabled ? 'تُرسل عند فتح التذكرة' : 'معطّلة (أزرار فقط)'}\n` +
+    `> ✏️ **نص الترحيب:** ${t.welcomeMessage ? 'مخصص (زر ✏️ للتعديل)' : 'الافتراضي (زر ✏️ للتعديل)'}\n` +
     `> 🔒 **قفل حتى الاستلام:** ${on(t.lockUntilClaim)} ${t.lockUntilClaim ? 'صاحب التذكرة لا يكتب حتى يستلمها إداري' : 'صاحب التذكرة يكتب مباشرة'}\n` +
     `> ⏳ **الإغلاق التلقائي:** ${t.autoCloseHours > 0 ? `\`${t.autoCloseHours}\` ساعة بدون نشاط` : '🔴 معطّل'} *(اضبطه: \`/ticket idle\`)*\n` +
     `> ⭐ **استبيان الرضا:** ${on(t.surveyEnabled)} ${t.surveyEnabled ? 'يُرسل لصاحب التذكرة بعد الإغلاق' : 'معطّل'}\n\n` +
@@ -998,14 +999,12 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
   );
 
   const rowBtns = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId('settings_btn:tickets:dec')
-      .setLabel('−')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('settings_btn:tickets:inc')
-      .setLabel('+')
-      .setStyle(ButtonStyle.Success),
+    btn(
+      'settings_btn:tickets:max',
+      `الحد/عضو: ${t.maxPerUser}`,
+      ButtonStyle.Secondary,
+      '🔢'
+    ),
     btn(
       'settings_tog:tickets:survey',
       `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`,
@@ -1023,6 +1022,12 @@ function buildTickets(guild: Guild, s: any): BuiltPanel {
       `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`,
       t.welcomeEnabled ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🎫'
+    ),
+    btn(
+      'settings_btn:tickets:welcomeMsg',
+      'رسالة الترحيب',
+      ButtonStyle.Primary,
+      '✏️'
     ),
   );
 

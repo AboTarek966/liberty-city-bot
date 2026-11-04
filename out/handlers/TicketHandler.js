@@ -9,6 +9,7 @@ const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
+const ticketMessages_1 = require("../utils/ticketMessages");
 const helpers_2 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('TicketHandler');
 /** الأنواع الافتراضية عندما لا يحدد المشرف أي أنواع */
@@ -283,11 +284,17 @@ class TicketHandler {
             : user.toString();
         // 🎫 رسالة الترحيب — يمكن تفعيلها/تعطيلها من الإعدادات (الافتراضي: معطّلة)
         if (settings.tickets.welcomeEnabled) {
-            const welcomeMessage = `مرحباً ${user} — تذكرتك جاهزة ✅\n` +
-                `🎫 ${ticketId} • ${type}\n` +
-                `اكتب مشكلتك بالتفصيل وسيتواصل معك فريق الدعم.`;
+            const template = (settings.tickets.welcomeMessage || '').trim() || ticketMessages_1.DEFAULT_TICKET_WELCOME_MESSAGE;
+            const welcomeMessage = (0, ticketMessages_1.renderTicketWelcome)(template, {
+                user: user.toString(),
+                ticket: ticketId,
+                type,
+                server: guild.name,
+            });
+            // احترام حد ديسكورد 2000 حرف مع بقاء المنشن في الأعلى
+            const safeWelcome = welcomeMessage.slice(0, Math.max(0, 1990 - pingContent.length));
             await channel.send({
-                content: `${pingContent}\n\n${welcomeMessage}`,
+                content: `${pingContent}\n\n${safeWelcome}`.trimEnd(),
                 components: this.buildTicketControls(false),
             });
         }

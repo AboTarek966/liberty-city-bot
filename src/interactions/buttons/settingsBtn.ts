@@ -21,6 +21,7 @@ import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevel
 import { buildEmojiSelectRows, buildCommandAddModal } from '../../utils/emojiPicker';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
+import { DEFAULT_TICKET_WELCOME_MESSAGE } from '../../utils/ticketMessages';
 import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
 import { setPendingImageUpload } from '../../utils/pendingUploads';
@@ -62,7 +63,7 @@ const handler: ButtonHandler = {
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-      'tickets:types', 'tickets:panel', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
+      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'levels:msg',
       'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
       'translator:settings',
       'music:volume', 'music:queue_limit',
@@ -262,7 +263,7 @@ const handler: ButtonHandler = {
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality',
       'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
-      'tickets:autotext', 'tickets:pimg', 'tickets:types',
+      'tickets:autotext', 'tickets:pimg', 'tickets:types', 'tickets:max', 'tickets:welcomeMsg',
       'translator:settings',
       'music:volume', 'music:queue_limit',
       'announce:dm', 'announce:channel',
@@ -368,6 +369,23 @@ const handler: ButtonHandler = {
             TextInputStyle.Paragraph,
             1500,
             settings.tickets.autoMessage || ''
+          );
+        case 'tickets:max':
+          return openModal(
+            '🔢 الحد الأقصى للتذاكر لكل عضو',
+            'من 1 إلى 10',
+            TextInputStyle.Short,
+            2,
+            String(settings.tickets.maxPerUser ?? 3)
+          );
+        case 'tickets:welcomeMsg':
+          return openModal(
+            '✏️ رسالة الترحيب بالتذاكر',
+            'المتغيرات: {user} {ticket} {type} {server} — فارغ = الافتراضي',
+            TextInputStyle.Paragraph,
+            1800,
+            (settings.tickets.welcomeMessage || '').trim() || DEFAULT_TICKET_WELCOME_MESSAGE,
+            false
           );
         case 'tickets:types': {
           if (!getActivePanel(settings)) {
@@ -833,13 +851,6 @@ const handler: ButtonHandler = {
         const panel = buildLevelRewardsPanel(interaction.guild!, settings);
         await interaction.editReply({ embeds: panel.embeds, components: panel.components as any });
         return;
-      }
-      case 'tickets:inc':
-      case 'tickets:dec': {
-        const delta = action === 'inc' ? 1 : -1;
-        settings.tickets.maxPerUser = Math.min(10, Math.max(1, settings.tickets.maxPerUser + delta));
-        await settings.save();
-        break;
       }
       case 'general:shop': {
         // لوحة فرعية: متجر السيرفر

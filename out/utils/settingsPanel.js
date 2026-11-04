@@ -706,6 +706,7 @@ function buildTickets(guild, s) {
         `> 🎨 **لوحة التذاكر:** ${panelLine}\n` +
         `> 🏷️ **أنواع التذاكر** (اسم الخيار = اسم قناة التذكرة):\n${typesLine}\n` +
         `> 🎫 **رسالة الترحيب:** ${on(t.welcomeEnabled)} ${t.welcomeEnabled ? 'تُرسل عند فتح التذكرة' : 'معطّلة (أزرار فقط)'}\n` +
+        `> ✏️ **نص الترحيب:** ${t.welcomeMessage ? 'مخصص (زر ✏️ للتعديل)' : 'الافتراضي (زر ✏️ للتعديل)'}\n` +
         `> 🔒 **قفل حتى الاستلام:** ${on(t.lockUntilClaim)} ${t.lockUntilClaim ? 'صاحب التذكرة لا يكتب حتى يستلمها إداري' : 'صاحب التذكرة يكتب مباشرة'}\n` +
         `> ⏳ **الإغلاق التلقائي:** ${t.autoCloseHours > 0 ? `\`${t.autoCloseHours}\` ساعة بدون نشاط` : '🔴 معطّل'} *(اضبطه: \`/ticket idle\`)*\n` +
         `> ⭐ **استبيان الرضا:** ${on(t.surveyEnabled)} ${t.surveyEnabled ? 'يُرسل لصاحب التذكرة بعد الإغلاق' : 'معطّل'}\n\n` +
@@ -730,13 +731,7 @@ function buildTickets(guild, s) {
         .setPlaceholder('🛡️ اختر رولات فريق الدعم (يمكنك اختيار عدة رولات)')
         .setMinValues(0)
         .setMaxValues(10));
-    const rowBtns = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
-        .setCustomId('settings_btn:tickets:dec')
-        .setLabel('−')
-        .setStyle(discord_js_1.ButtonStyle.Danger), new discord_js_1.ButtonBuilder()
-        .setCustomId('settings_btn:tickets:inc')
-        .setLabel('+')
-        .setStyle(discord_js_1.ButtonStyle.Success), btn('settings_tog:tickets:survey', `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`, t.surveyEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⭐'), btn('settings_tog:tickets:lockclaim', `قفل: ${t.lockUntilClaim ? '🟢' : '🔴'}`, t.lockUntilClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔒'), btn('settings_tog:tickets:welcome', `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`, t.welcomeEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎫'));
+    const rowBtns = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:tickets:max', `الحد/عضو: ${t.maxPerUser}`, discord_js_1.ButtonStyle.Secondary, '🔢'), btn('settings_tog:tickets:survey', `استبيان: ${t.surveyEnabled ? '🟢' : '🔴'}`, t.surveyEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⭐'), btn('settings_tog:tickets:lockclaim', `قفل: ${t.lockUntilClaim ? '🟢' : '🔴'}`, t.lockUntilClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔒'), btn('settings_tog:tickets:welcome', `ترحيب: ${t.welcomeEnabled ? '🟢' : '🔴'}`, t.welcomeEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_btn:tickets:welcomeMsg', 'رسالة الترحيب', discord_js_1.ButtonStyle.Primary, '✏️'));
     // 🤖 AI Ticket Assistant settings (صف منفصل)
     const aiTicket = (s.protection?.aiTicketAssistant ?? s.aiTicketAssistant) || {
         enabled: false,

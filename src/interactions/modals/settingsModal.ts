@@ -7,6 +7,7 @@ import { ModalHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig } from '../../models';
 import { LibertyClient } from '../../LibertyClient';
+import { renderTicketWelcome } from '../../utils/ticketMessages';
 import { sleep } from '../../utils/helpers';
 
 const handler: ModalHandler = {
@@ -206,6 +207,42 @@ const handler: ModalHandler = {
       case 'tickets:autotext':
         settings.tickets.autoMessage = value.substring(0, 1500);
         break;
+      case 'tickets:max': {
+        const max = Number.parseInt(value, 10);
+        if (!Number.isInteger(max) || max < 1 || max > 10) {
+          await interaction.editReply({ content: '❌ أدخل رقماً بين 1 و 10' });
+          return;
+        }
+        settings.tickets.maxPerUser = max;
+        break;
+      }
+      case 'tickets:welcomeMsg': {
+        const message = value.trim();
+        settings.tickets.welcomeMessage = message ? message.substring(0, 1800) : undefined;
+        await settings.save();
+
+        const panel = await buildPanel('tickets', interaction.guild!, interaction.user.id);
+        await interaction.editReply({ embeds: panel.embeds, components: panel.components as any });
+
+        if (message) {
+          const preview = renderTicketWelcome(message, {
+            user: `<@${interaction.user.id}>`,
+            ticket: '2',
+            type: 'دعم فني',
+            server: interaction.guild!.name,
+          });
+          await interaction.followUp({
+            content: `✅ تم حفظ رسالة الترحيب\n\n**معاينة:**\n${preview.slice(0, 1500)}`,
+            ephemeral: true,
+          });
+        } else {
+          await interaction.followUp({
+            content: '✅ تمت استعادة رسالة الترحيب الافتراضية',
+            ephemeral: true,
+          });
+        }
+        return;
+      }
       case 'tickets:types': {
         const panel = getActivePanel(settings);
         if (!panel) {
