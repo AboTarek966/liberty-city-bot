@@ -579,7 +579,7 @@ export class AIHandler {
     const isCommand = /^[\/!]/i.test(message.trim());
     
     // قرار ذكي: يحتاج بحث إذا كان هناك محفزات + سؤال حقيقي + ليس بوت/تحية/أمر
-    const needsSearch = score >= 1 && (isQuestion || startsWithQuestionWord) && !isBotQuestion && !isGreeting && !isCommand;
+    const needsSearch = score >= 2 && (isQuestion || startsWithQuestionWord) && !isBotQuestion && !isGreeting && !isCommand;
     
     // Log للتشخيص
     if (needsSearch) {
@@ -920,7 +920,7 @@ export class AIHandler {
       case 'openai': preferred = ['openai']; break;
       case 'groq': preferred = ['groq']; break;
       case 'both': preferred = ['gemini', 'openrouter', 'anthropic', 'openai']; break;
-      default: preferred = ['gemini', 'openrouter', 'anthropic', 'openai', 'groq']; // auto: الأفضل أولاً
+      default: preferred = ['groq', 'gemini', 'openrouter', 'anthropic', 'openai']; // auto: الأسرع أولاً
     }
 
     const primary = preferred.filter(p => available.includes(p));
@@ -967,6 +967,14 @@ export class AIHandler {
     prompt += `\n- **أسئلة متابعة ذكية:** إذا كان الموضوع معقداً، اسأل لتوضيح السياق قبل الإجابة.`;
 
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    prompt += `[FAST] **سرعة الرد — لا تُطيل**`;
+    prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    prompt += `- أجب فوراً: أول جملة تعطي المضمون (لا مقدمات).`;
+    prompt += `- كن موجزاً: إجابة قصيرة ثم زيادة فقط إذا طلبت.`;
+    prompt += `- لا تستخدم [[SEARCH]] إلا للضرورة (بحث صريح/حدث حالي) وإلا لا تبحث.`;
+    prompt += `- إذا كان السؤال بسيط، لا تفكّر طويلاً، أجب مباشرة.`;
+
     prompt += `\n[COMPASS] **التفكير المنهجي — كيف تفكر قبل الإجابة**`;
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     prompt += `\nقبل كل إجابة، مرّ بخطوات صامتة (لا تظهرها):`;
