@@ -380,7 +380,6 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
   const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Success, '🎁'),
     btn('settings_cat:honeypot', 'قناة الطعم', ButtonStyle.Secondary, '🍯'),
-    btn('settings_back', '🔄 تحديث', ButtonStyle.Secondary, '🔄'),
   );
 
   return { embeds: [embed], components: [row1, row2, row3, row4] };
