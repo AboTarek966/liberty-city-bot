@@ -182,6 +182,8 @@ export interface IGuildSettings extends Document {
             autoClaim: boolean;
             analyzeOnCreate: boolean;
             replyToMessages?: boolean;
+            /** 🧠 التعلّم التلقائي من حلول الفريق في التذاكر المغلقة (قاعدة المعرفة) */
+            learnFromTickets?: boolean;
             requireAdminApprovalForRoles: boolean;
             requireAdminApprovalForPermissions: boolean;
             requireAdminApprovalForBans: boolean;

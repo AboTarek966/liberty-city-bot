@@ -390,6 +390,10 @@ class TicketHandler {
         await channel.send({ embeds: [closingEmbed], components: [actionRow] });
         await this.saveTranscript(guild, ticket, transcript);
         this.logTicketEvent(guild, 'close', ticket, closedBy.user, reason);
+        // 🧠 تعلّم تلقائي: استخراج حل الفريق إلى قاعدة المعرفة (لا يعطّل الإغلاق)
+        this.client.aiTicketAssistant
+            ?.learnFromClosedTicket(ticket, reason || '')
+            .catch((err) => logger.warn(`Knowledge learning failed: ${err.message}`));
         // ⭐ استبيان الرضا — رسالة خاصة لصاحب التذكرة بعد الإغلاق
         try {
             const settings = await (0, models_1.getGuildSettings)(guild.id);
@@ -504,6 +508,10 @@ class TicketHandler {
         }
         // Delete channel
         if (channel) {
+            // 🧠 تعلّم تلقائي قبل حذف القناة (لا يعطّل الحذف)
+            await this.client.aiTicketAssistant
+                ?.learnFromClosedTicket(ticket, 'حُذفت التذكرة')
+                .catch(() => { });
             await channel.delete('Omni - Ticket deleted').catch(() => { });
         }
         this.activeTickets.delete(channelId);

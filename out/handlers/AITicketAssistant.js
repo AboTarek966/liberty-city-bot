@@ -51,6 +51,7 @@ const discord_js_1 = require("discord.js");
 const crypto_1 = require("crypto");
 const models_1 = require("../models");
 const helpers_1 = require("../utils/helpers");
+const knowledge_1 = require("../utils/knowledge");
 const embeds_1 = require("../utils/embeds");
 const aiTicketActions_1 = require("../utils/aiTicketActions");
 const logger = (0, helpers_1.createLogger)('AITicketAssistant');
@@ -768,11 +769,136 @@ ${context}
         };
     }
     // --------------------------------------------
-    // تعلم من التذاكر المغلقة (المستقبل)
+    // 🧠 التعلّم التلقائي من التذاكر المغلقة
+    // يقرأ سؤال صاحب التذكرة + حل الفريق (أو حل الذكاء الاصطناعي)
+    // ويحوّله إلى معلومة في قاعدة المعرفة تُستخدم في الردود القادمة
     // --------------------------------------------
-    async learnFromClosedTicket(ticket, resolution) {
-        // يمكن ربطه لاحقاً بقاعدة المعرفة (KnowledgeEntry) تلقائياً
-        logger.info(`AI Ticket learning from closed ticket ${ticket._id}: ${resolution.substring(0, 100)}`);
+    async learnFromClosedTicket(ticket, resolution = '') {
+        try {
+            if (!ticket?.guildId || !ticket?.channelId)
+                return;
+            // ⚙️ مفتاح التعلّم — افتراضي مفعّل، ويُعطَّل من لوحة إعدادات مساعد التذاكر
+            const aiConfig = await this.getConfig(String(ticket.guildId)).catch(() => null);
+            if (aiConfig && aiConfig.learnFromTickets === false) {
+                logger.debug(`Learning disabled for guild ${ticket.guildId}`);
+                return;
+            }
+            const channel = (await this.client.channels
+                .fetch(String(ticket.channelId))
+                .catch(() => null));
+            if (!channel)
+                return;
+            const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+            const messages = fetched ? [...fetched.values()].reverse() : []; // الأقدم → الأحدث
+            const ownerId = String(ticket.userId || '');
+            const botId = this.client.user?.id;
+            const clean = (text) => String(text || '').replace(/\s+/g, ' ').trim();
+            const isNoise = (text) => text.length < 12 ||
+                /^(تم|شكرا|شكراً|مشكور|يعطيك العافيه|يعطيك العافية|جزاك الله|بارك الله|الله يعافيك|حياك الله|العفو|ok|okay|تمام|ماشي|طيب)[\s!،.…-]*$/i.test(text);
+            // 📌 السؤال: أول رسالة جدية من صاحب التذكرة (أو وصف التذكرة/النموذج)
+            const ownerMsgs = messages.filter(m => !m.author.bot && m.author.id === ownerId && clean(m.content).length >= 5);
+            let question = clean(ownerMsgs[0]?.content || '');
+            if (question.length < 5)
+                question = clean(String(ticket.subject || ''));
+            if (question.length < 5 && Array.isArray(ticket.fields)) {
+                question = clean(ticket.fields.map((f) => `${f.question || ''}: ${f.answer || ''}`).join(' | '));
+            }
+            if (question.length < 8)
+                return; // لا يوجد ما نتعلّم منه
+            // 🧑💼 الحل: آخر رسائل الفريق (غير البوت وغير صاحب التذكرة) — أو حل الـ AI إن لم يوجد فريق
+            const staffMsgs = messages.filter(m => {
+                const text = clean(m.content);
+                return !m.author.bot && m.author.id !== ownerId && !isNoise(text);
+            });
+            const botMsgs = messages.filter(m => {
+                if (m.author.id !== botId)
+                    return false;
+                // الردود الحوارية فقط (content) — نتجاهل إيمبدات الإشعارات مثل "تم استلام التذكرة"/"تم الإغلاق"
+                const text = clean(m.content);
+                return text.length >= 30 && !isNoise(text);
+            });
+            const solutionParts = [];
+            if (staffMsgs.length) {
+                solutionParts.push(...staffMsgs.slice(-3).map(m => clean(m.content)));
+            }
+            else if (botMsgs.length) {
+                const last = botMsgs[botMsgs.length - 1];
+                solutionParts.push(clean(last.content));
+            }
+            const cleanResolution = clean(resolution);
+            if (cleanResolution.length >= 5 &&
+                cleanResolution !== 'غير محدد' &&
+                !isNoise(cleanResolution)) {
+                solutionParts.push(`سبب الإغلاق: ${cleanResolution}`);
+            }
+            const solution = clean(solutionParts.filter(Boolean).join('\n')).slice(0, 1500);
+            if (solution.length < 15) {
+                logger.debug(`Skipping knowledge learn for ticket ${ticket._id}: no usable solution`);
+                return;
+            }
+            const guildId = String(ticket.guildId);
+            const title = `تذكرة — ${question.slice(0, 80)}`;
+            const content = `المشكلة (تذكرة #${ticket.ticketNumber || String(ticket._id).slice(-6)}):\n` +
+                `${question.slice(0, 900)}\n\n` +
+                `الحل المعتمد من الفريق:\n${solution}`;
+            const tags = [
+                ...new Set([
+                    'تذاكر',
+                    clean(String(ticket.type || '')),
+                    ...(0, knowledge_1.tokenize)(`${question} ${solution}`).slice(0, 12),
+                ].filter(Boolean)),
+            ];
+            const existing = await models_1.KnowledgeEntry.findOne({ guildId, title }).catch(() => null);
+            if (existing) {
+                existing.content = content;
+                existing.tags = tags;
+                existing.enabled = true;
+                await existing.save();
+            }
+            else {
+                await models_1.KnowledgeEntry.create({
+                    guildId,
+                    title,
+                    content,
+                    tags,
+                    category: 'تذاكر (تعلّم تلقائي)',
+                    createdBy: 'auto-learning',
+                    enabled: true,
+                });
+            }
+            (0, knowledge_1.invalidateKnowledgeCache)(guildId);
+            await this.pruneAutoKnowledge(guildId);
+            logger.info(`Learned solution from ticket ${ticket._id} (${question.slice(0, 60)}…) in guild ${guildId}`);
+        }
+        catch (error) {
+            logger.warn(`learnFromClosedTicket failed: ${error.message}`);
+        }
+    }
+    // 🗑️ حد أقصى لمعلومات التعلّم التلقائي لكل سيرفر — حذف الأقدم عند التجاوز
+    async pruneAutoKnowledge(guildId) {
+        try {
+            const MAX_AUTO_ENTRIES = 500;
+            const count = await models_1.KnowledgeEntry.countDocuments({
+                guildId,
+                createdBy: 'auto-learning',
+            });
+            if (count <= MAX_AUTO_ENTRIES)
+                return;
+            const stale = await models_1.KnowledgeEntry.find({
+                guildId,
+                createdBy: 'auto-learning',
+            })
+                .sort({ updatedAt: 1 })
+                .limit(count - MAX_AUTO_ENTRIES)
+                .select('_id');
+            if (stale.length) {
+                await models_1.KnowledgeEntry.deleteMany({ _id: { $in: stale.map(e => e._id) } });
+                (0, knowledge_1.invalidateKnowledgeCache)(guildId);
+            }
+        }
+        catch {
+            /* التنظيف اختياري */
+        }
     }
 }
 exports.AITicketAssistant = AITicketAssistant;

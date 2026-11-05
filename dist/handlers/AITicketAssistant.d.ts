@@ -47,7 +47,8 @@ export declare class AITicketAssistant {
     private logAITicketEvent;
     private getCategoryLabel;
     getApprovalDetails(approvalId: string): Promise<AITicketApprovalDetails | null>;
-    learnFromClosedTicket(ticket: any, resolution: string): Promise<void>;
+    learnFromClosedTicket(ticket: any, resolution?: string): Promise<void>;
+    private pruneAutoKnowledge;
 }
 export interface AITicketApprovalDetails {
     approvalId: string;

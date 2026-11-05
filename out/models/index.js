@@ -297,6 +297,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             autoClaim: { type: Boolean, default: false },
             analyzeOnCreate: { type: Boolean, default: true },
             replyToMessages: { type: Boolean, default: true },
+            learnFromTickets: { type: Boolean, default: true },
             requireAdminApprovalForRoles: { type: Boolean, default: true },
             requireAdminApprovalForPermissions: { type: Boolean, default: true },
             requireAdminApprovalForBans: { type: Boolean, default: true },

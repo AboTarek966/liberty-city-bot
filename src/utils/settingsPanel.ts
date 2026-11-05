@@ -1309,6 +1309,7 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
   };
   const analyzeOnCreate = aiTicket.analyzeOnCreate !== false;
   const replyToMessages = aiTicket.replyToMessages !== false;
+  const learnFromTickets = aiTicket.learnFromTickets !== false;
 
   const embed = categoryEmbed(
     'tickets',
@@ -1319,6 +1320,7 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
     `> 🤝 **الاستلام التلقائي:** ${on(aiTicket.autoClaim)} ${aiTicket.autoClaim ? 'يستلم التذكرة تلقائياً' : 'بدون استلام تلقائي'}\n` +
     `> 🔍 **تحليل عند الإنشاء:** ${on(analyzeOnCreate)} ${analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
     `> 💬 **الرد على متابعة العضو:** ${on(replyToMessages)} ${replyToMessages ? 'يرد على رسائل التذكرة' : 'لا يرد بعد الفتح'}\n` +
+    `> 🧠 **تعلّم من التذاكر المغلقة:** ${on(learnFromTickets)} ${learnFromTickets ? 'يحفظ حلول الفريق في قاعدة المعرفة' : 'معطّل'}\n` +
     `> 🎭 **موافقة الإدارة على الرولات:** ${on(aiTicket.requireAdminApprovalForRoles)} ${aiTicket.requireAdminApprovalForRoles ? 'يطلب موافقة قبل منح الرولات' : 'بدون موافقة'}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `💡 *فعّل المساعد أولاً، ثم اضبط خياراته من الأزرار بالأسفل*`
@@ -1357,6 +1359,12 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
       `ردود المتابعة: ${replyToMessages ? '🟢' : '🔴'}`,
       replyToMessages ? ButtonStyle.Success : ButtonStyle.Secondary,
       '💬'
+    ),
+    btn(
+      'settings_tog:tickets:ailearn',
+      `تعلّم: ${learnFromTickets ? '🟢' : '🔴'}`,
+      learnFromTickets ? ButtonStyle.Success : ButtonStyle.Secondary,
+      '🧠'
     ),
     btn('settings_cat:tickets', 'رجوع للتذاكر', ButtonStyle.Secondary, '↩️'),
   );

@@ -207,6 +207,14 @@ const handler = {
                     s.aiTicketAssistant.replyToMessages = !replyOn;
                     break;
                 }
+                if (field === 'ailearn') {
+                    if (!s.aiTicketAssistant)
+                        s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, replyToMessages: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };
+                    // 🧠 التعلّم من التذاكر المغلقة — الافتراضي مفعّل
+                    const learnOn = s.aiTicketAssistant.learnFromTickets !== false;
+                    s.aiTicketAssistant.learnFromTickets = !learnOn;
+                    break;
+                }
                 if (field === 'aiadminroles') {
                     if (!s.aiTicketAssistant)
                         s.aiTicketAssistant = { enabled: true, autoClaim: false, analyzeOnCreate: true, requireAdminApprovalForRoles: true, requireAdminApprovalForPermissions: true, requireAdminApprovalForBans: true, maxAutoActionsPerTicket: 3, confidenceThreshold: 70, notifyAdminsOnFailure: true };

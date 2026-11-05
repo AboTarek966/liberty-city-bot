@@ -201,6 +201,8 @@ export interface IGuildSettings extends Document {
       autoClaim: boolean;
       analyzeOnCreate: boolean;
       replyToMessages?: boolean;
+      /** 🧠 التعلّم التلقائي من حلول الفريق في التذاكر المغلقة (قاعدة المعرفة) */
+      learnFromTickets?: boolean;
       requireAdminApprovalForRoles: boolean;
       requireAdminApprovalForPermissions: boolean;
       requireAdminApprovalForBans: boolean;
@@ -1043,6 +1045,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       autoClaim: { type: Boolean, default: false },
       analyzeOnCreate: { type: Boolean, default: true },
       replyToMessages: { type: Boolean, default: true },
+      learnFromTickets: { type: Boolean, default: true },
       requireAdminApprovalForRoles: { type: Boolean, default: true },
       requireAdminApprovalForPermissions: { type: Boolean, default: true },
       requireAdminApprovalForBans: { type: Boolean, default: true },
