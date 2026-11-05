@@ -83,7 +83,8 @@ const handler = {
                 .setStyle(discord_js_1.TextInputStyle.Paragraph)
                 .setMaxLength(2000)
                 .setRequired(false)
-                .setPlaceholder('اكتب هنا شخصية المساعد ودوره وطريقة رده داخل التكتات فقط — مثال: أنت موظف دعم رسمي مهذب في سيرفر سعودي، رد بلهجة واضحة، اشرح خطوة بخطوة واقترح حلولاً عملية.')
+                // 🛟 حد ديسكورد = 100 حرف فقط للـplaceholder — أطول من ذلك يجعل المودال يفشل كاملاً
+                .setPlaceholder('مثال: موظف دعم رسمي مهذب — ردود واضحة، اشرح خطوة بخطوة، واقترح الحل قبل التحويل للإدارة.')
                 .setValue(current);
             const modal = new discord_js_1.ModalBuilder()
                 .setCustomId('settings_modal:tickets:aiPersona')
