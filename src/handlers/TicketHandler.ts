@@ -1558,7 +1558,7 @@ export class TicketHandler {
 
     const selectRow = new ActionRowBuilder<any>().addComponents(selectMenu);
 
-    // زر "إعادة تعيين الطلب" — يحذف تذكرتك المفتوحة حتى تتمكن من فتح تذكرة جديدة
+    // زر "إعادة تعيين الطلب" — يمسح اختيار نوع التذكرة فقط (لا يحذف التذكرة ولا يغلقها)
     const resetBtn = new ButtonBuilder()
       .setCustomId('ticket_reset')
       .setLabel('إعادة تعيين الطلب')

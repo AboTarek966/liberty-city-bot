@@ -1,9 +1,11 @@
 "use strict";
 // ============================================
-// Omni Bot - Ticket Reset (إعادة تعيين الطلب)
-// يحذف تذكرتك المفتوحة حتى تتمكن من فتح تذكرة جديدة
+// Omni Bot - Ticket Reset (إعادة تعيين الاختيار)
+// يعيد ضبط اختيار نوع التذكرة في اللوحة فقط —
+// لا يحذف التذكرة المفتوحة ولا يغلقها.
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
+const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const handler = {
     id: 'ticket_reset',
@@ -12,35 +14,71 @@ const handler = {
             await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
             return;
         }
-        await interaction.deferReply({ ephemeral: true });
         const client = interaction.client;
         try {
-            // البحث عن أي تذكرة مفتوحة لهذا العضو
-            const openTicket = await models_1.Ticket.findOne({
-                guildId: interaction.guild.id,
-                userId: interaction.user.id,
-                status: { $in: ['open', 'claimed', 'waiting'] },
-            });
-            if (!openTicket) {
-                await interaction.editReply({
-                    content: '✅ ليس لديك أي تذكرة مفتوحة — اختر نوع التذكرة من القائمة بالأسفل لفتح تذكرة جديدة.',
+            // 🔎 استخراج معرّف اللوحة من قائمة الاختيار داخل الرسالة
+            let selectCustomId;
+            for (const row of interaction.message.components) {
+                for (const comp of row.components || []) {
+                    if (typeof comp.customId === 'string' && comp.customId.startsWith('ticket_select_')) {
+                        selectCustomId = comp.customId;
+                        break;
+                    }
+                }
+                if (selectCustomId)
+                    break;
+            }
+            if (!selectCustomId) {
+                await interaction.reply({
+                    content: '❌ لم أجد قائمة أنواع التذاكر في هذه اللوحة.',
+                    ephemeral: true,
                 });
                 return;
             }
-            // حذف قناة التذكرة
-            const channel = interaction.guild.channels.cache.get(openTicket.channelId);
-            if (channel) {
-                await channel.delete('إعادة تعيين الطلب — بواسطة صاحب التذكرة').catch(() => { });
+            const panelId = selectCustomId.replace('ticket_select_', '');
+            const settings = await (0, models_1.getGuildSettings)(interaction.guild.id).catch(() => null);
+            const panel = (settings?.tickets?.panels || []).find((p) => p.id === panelId);
+            let components;
+            if (panel) {
+                // ✅ إعادة بناء اللوحة من الإعدادات = قائمة اختيار جديدة بلا تحديد
+                components = client.ticketHandler.buildPanelComponents(panel);
             }
-            // تحديث حالة التذكرة في القاعدة
-            openTicket.status = 'deleted';
-            await openTicket.save();
-            await interaction.editReply({
-                content: '🔄 **تم إعادة تعيين طلبك** — تم حذف تذكرتك المفتوحة.\nيمكنك الآن فتح تذكرة جديدة من القائمة بالأسفل.',
-            });
+            else {
+                // 🔁 احتياطي: إعادة بناء قائمة الاختيار من نفس الرسالة
+                components = interaction.message.components.map((row) => {
+                    const comp = (row.components || []).find((c) => typeof c.customId === 'string' && c.customId.startsWith('ticket_select_'));
+                    if (!comp)
+                        return row;
+                    const menu = new discord_js_1.StringSelectMenuBuilder()
+                        .setCustomId(comp.customId)
+                        .setPlaceholder(comp.placeholder || '🎫 اختر نوع التذكرة');
+                    const options = (comp.options || [])
+                        .slice(0, 25)
+                        .map((o) => ({
+                        label: o.label,
+                        value: o.value,
+                        description: o.description || undefined,
+                        emoji: o.emoji?.id ? o.emoji : undefined,
+                    }))
+                        .filter((o) => o.label && o.value);
+                    if (options.length > 0)
+                        menu.addOptions(options);
+                    return new discord_js_1.ActionRowBuilder().addComponents(menu);
+                });
+            }
+            // 🖥️ تحديث نفس رسالة اللوحة — يمسح التحديد من القائمة
+            await interaction.update({ components });
+            await interaction
+                .followUp({
+                content: '🔄 تم إلغاء الاختيار — اختر نوع التذكرة من جديد.\n(تذكرتك المفتوحة لم تُحذف ولم تُغلق)',
+                ephemeral: true,
+            })
+                .catch(() => { });
         }
         catch (error) {
-            await interaction.editReply({ content: `❌ حدث خطأ: ${error.message}` }).catch(() => { });
+            await interaction
+                .followUp({ content: `❌ حدث خطأ: ${error.message || 'غير معروف'}`, ephemeral: true })
+                .catch(() => { });
         }
     },
 };

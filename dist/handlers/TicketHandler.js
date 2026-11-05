@@ -1251,7 +1251,7 @@ class TicketHandler {
             .setPlaceholder('🎫 اختر نوع التذكرة')
             .addOptions(options);
         const selectRow = new discord_js_1.ActionRowBuilder().addComponents(selectMenu);
-        // زر "إعادة تعيين الطلب" — يحذف تذكرتك المفتوحة حتى تتمكن من فتح تذكرة جديدة
+        // زر "إعادة تعيين الطلب" — يمسح اختيار نوع التذكرة فقط (لا يحذف التذكرة ولا يغلقها)
         const resetBtn = new discord_js_1.ButtonBuilder()
             .setCustomId('ticket_reset')
             .setLabel('إعادة تعيين الطلب')
