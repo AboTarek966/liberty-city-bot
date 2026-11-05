@@ -1312,6 +1312,7 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
   const analyzeOnCreate = aiTicket.analyzeOnCreate !== false;
   const replyToMessages = aiTicket.replyToMessages !== false;
   const learnFromTickets = aiTicket.learnFromTickets !== false;
+  const customPersona = String(aiTicket.customPersonality || '').trim();
 
   const embed = categoryEmbed(
     'tickets',
@@ -1323,6 +1324,7 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
     `> 🔍 **تحليل عند الإنشاء:** ${on(analyzeOnCreate)} ${analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
     `> 💬 **الرد على متابعة العضو:** ${on(replyToMessages)} ${replyToMessages ? 'يرد على رسائل التذكرة' : 'لا يرد بعد الفتح'}\n` +
     `> 🧠 **تعلّم من التذاكر المغلقة:** ${on(learnFromTickets)} ${learnFromTickets ? 'يحفظ حلول الفريق في قاعدة المعرفة' : 'معطّل'}\n` +
+    `> 🎭 **شخصية مخصصة (للتكتات فقط):** ${customPersona ? '✅ مفعّلة — يلتزم بها حرفياً' : '⚪ غير محددة — الأسلوب الافتراضي'}\n` +
     `> 🎭 **موافقة الإدارة على الرولات:** ${on(aiTicket.requireAdminApprovalForRoles)} ${aiTicket.requireAdminApprovalForRoles ? 'يطلب موافقة قبل منح الرولات' : 'بدون موافقة'}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `💡 *فعّل المساعد أولاً، ثم اضبط خياراته من الأزرار بالأسفل*`
@@ -1368,6 +1370,7 @@ export function buildTicketAIPanel(guild: Guild, s: any): BuiltPanel {
       learnFromTickets ? ButtonStyle.Success : ButtonStyle.Secondary,
       '🧠'
     ),
+    btn('settings_btn:tickets:aiPersona', 'الشخصية', ButtonStyle.Primary, '🎭'),
     btn('settings_cat:tickets', 'رجوع للتذاكر', ButtonStyle.Secondary, '↩️'),
   );
 
@@ -1474,7 +1477,7 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n\n` +
     `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
-    `🎭 استخدم زر *تعديل الشخصية* لتعريف شخصية البوت`
+    `🎭 استخدم زر **الشخصية** لتعريف شخصية الذكاء العامة (كل الأعضاء) — وميزة **التكتات** لها شخصية مستقلة من: الإعدادات ← التذاكر ← 🤖 AI`
   );
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(

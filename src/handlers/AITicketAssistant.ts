@@ -74,6 +74,8 @@ interface AITicketConfig {
   replyToMessages?: boolean;
   /** 🧠 التعلّم التلقائي من التذاكر المغلقة (افتراضي: مفعّل) */
   learnFromTickets?: boolean;
+  /** 🎭 شخصية/تعليمات مخصصة لمساعد التذاكر — يلتزم بها حرفياً */
+  customPersonality?: string;
   requireAdminApprovalForRoles?: boolean;
   requireAdminApprovalForPermissions?: boolean;
   requireAdminApprovalForBans?: boolean;
@@ -104,6 +106,19 @@ export class AITicketAssistant {
     const config =
       (settings as any).protection?.aiTicketAssistant ?? (settings as any).aiTicketAssistant;
     return config || null;
+  }
+
+  // --------------------------------------------
+  // 🎭 كتلة الشخصية المخصصة — تعليمات السيرفر لمساعد التذاكر
+  // تُحقن في كل مطالبة (رد أولي، ردود المتابعة، التحليل) وتُقدَّم على أي تعليمات أسلوب أخرى
+  // --------------------------------------------
+  private personaBlock(config?: AITicketConfig | null): string {
+    const persona = String(config?.customPersonality || '').trim();
+    if (!persona) return '';
+    return (
+      `\n\n**🎭 شخصية وتعليمات السيرفر المخصصة لمساعد التذاكر — التزم بها حرفياً ولا تخالفها مهما حدث (لها الأولوية على أي تعليمات أسلوب أخرى):**\n` +
+      `${persona.slice(0, 2000)}\n`
+    );
   }
 
   // --------------------------------------------
@@ -160,14 +175,14 @@ export class AITicketAssistant {
       }
 
       // 🤖 رد أولي فوري
-      await this.sendAutoResponse(channel, firstUserMessage, ticket);
+      await this.sendAutoResponse(channel, firstUserMessage, ticket, aiConfig);
       // فترة سماح: لو العضو كتب رسالة تانية بسرعة، التحليل أو الرد الأولي يغطيها
       this.ticketAutoCooldown.set(channel.id, Date.now() + 8000);
       const cooldownTimer = setTimeout(() => this.ticketAutoCooldown.delete(channel.id), 9000);
       cooldownTimer.unref?.();
 
       // تحليل المشكلة
-      const analysis = await this.analyzeTicket(firstUserMessage, channel.guild, ticket);
+      const analysis = await this.analyzeTicket(firstUserMessage, channel.guild, ticket, aiConfig);
 
       // تنفيذ الحل المقترح
       await this.executeSolution(ticket, channel, analysis, aiConfig);
@@ -237,6 +252,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
 - لا تخترع معلومات ولا تكرر الترحيب إذا كانت المحادثة مستمرة.
 - لا تذكر أنك نموذج ذكاء اصطناعي إلا لو سألك.
 - كن مختصراً (1-3 جمل).
+${this.personaBlock(aiConfig)}
 
 ردك:`;
 
@@ -336,7 +352,8 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
   private async sendAutoResponse(
     channel: TextChannel,
     firstMessage: any,
-    ticket: any
+    ticket: any,
+    aiConfig?: AITicketConfig | null
   ): Promise<void> {
     try {
       const prompt = `أنت مساعد دعم ذكي في سيرفر Discord "${channel.guild.name}".
@@ -353,6 +370,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
 - قل إنك ستحلل المشكلة وترد بالحل
 - لا تبالغ في الوعود
 - كن مختصراً وودوداً
+${this.personaBlock(aiConfig)}
 
 ردك:`;
 
@@ -386,7 +404,12 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
   // --------------------------------------------
   // تحليل التذكرة بالـ AI
   // --------------------------------------------
-  private async analyzeTicket(message: any, guild: Guild, ticket: any): Promise<TicketAnalysis> {
+  private async analyzeTicket(
+    message: any,
+    guild: Guild,
+    ticket: any,
+    aiConfig?: AITicketConfig | null
+  ): Promise<TicketAnalysis> {
     const context = `
 السيرفر: ${guild.name} (${guild.id})
 صاحب التذكرة: ${message.author.tag} (${message.author.id})
@@ -441,6 +464,7 @@ ${context}
 - صاحب التذكرة هو المستخدم الافتراضي لأي إجراء عليه (targetUserId = ${message.author.id}).
 - لو مش متأكد → needsAdminAction: true وقلل confidence.
 - لا تخترع إجراءات غير مطلوبة فعلاً.
+${this.personaBlock(aiConfig)}
 
 **أجب بـ JSON فقط:**
 {

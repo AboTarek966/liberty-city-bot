@@ -188,6 +188,8 @@ export interface IGuildSettings extends Document {
             replyToMessages?: boolean;
             /** 🧠 التعلّم التلقائي من حلول الفريق في التذاكر المغلقة (قاعدة المعرفة) */
             learnFromTickets?: boolean;
+            /** 🎭 شخصية/تعليمات مخصصة لمساعد التذاكر فقط — يلتزم بها حرفياً */
+            customPersonality?: string;
             requireAdminApprovalForRoles: boolean;
             requireAdminApprovalForPermissions: boolean;
             requireAdminApprovalForBans: boolean;

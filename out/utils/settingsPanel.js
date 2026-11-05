@@ -925,6 +925,7 @@ function buildTicketAIPanel(guild, s) {
     const analyzeOnCreate = aiTicket.analyzeOnCreate !== false;
     const replyToMessages = aiTicket.replyToMessages !== false;
     const learnFromTickets = aiTicket.learnFromTickets !== false;
+    const customPersona = String(aiTicket.customPersonality || '').trim();
     const embed = categoryEmbed('tickets', guild, `🤖 مساعد التذاكر الذكي — تحليل تلقائي وردود داخل التذاكر\n\n` +
         `> 🔓 **مستقل عن الذكاء العام:** يعمل بمفتاحه الخاص حتى لو الذكاء العام معطّل\n` +
         `> ⚡ **مساعد AI:** ${on(aiTicket.enabled)} ${aiTicket.enabled ? 'مفعّل' : 'معطّل'}\n` +
@@ -932,11 +933,12 @@ function buildTicketAIPanel(guild, s) {
         `> 🔍 **تحليل عند الإنشاء:** ${on(analyzeOnCreate)} ${analyzeOnCreate ? 'يحلل التذكرة فور فتحها' : 'لا يحلل تلقائياً'}\n` +
         `> 💬 **الرد على متابعة العضو:** ${on(replyToMessages)} ${replyToMessages ? 'يرد على رسائل التذكرة' : 'لا يرد بعد الفتح'}\n` +
         `> 🧠 **تعلّم من التذاكر المغلقة:** ${on(learnFromTickets)} ${learnFromTickets ? 'يحفظ حلول الفريق في قاعدة المعرفة' : 'معطّل'}\n` +
+        `> 🎭 **شخصية مخصصة (للتكتات فقط):** ${customPersona ? '✅ مفعّلة — يلتزم بها حرفياً' : '⚪ غير محددة — الأسلوب الافتراضي'}\n` +
         `> 🎭 **موافقة الإدارة على الرولات:** ${on(aiTicket.requireAdminApprovalForRoles)} ${aiTicket.requireAdminApprovalForRoles ? 'يطلب موافقة قبل منح الرولات' : 'بدون موافقة'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `💡 *فعّل المساعد أولاً، ثم اضبط خياراته من الأزرار بالأسفل*`);
     const row = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aienabled', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_tog:tickets:aiclaim', `استلام: ${aiTicket.autoClaim ? '🟢' : '🔴'}`, aiTicket.autoClaim ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '⚡'), btn('settings_tog:tickets:aianalyze', `تحليل: ${analyzeOnCreate ? '🟢' : '🔴'}`, analyzeOnCreate ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🔍'), btn('settings_tog:tickets:aiadminroles', `رولات: ${aiTicket.requireAdminApprovalForRoles ? '🟢' : '🔴'}`, aiTicket.requireAdminApprovalForRoles ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🎭'));
-    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aireply', `ردود المتابعة: ${replyToMessages ? '🟢' : '🔴'}`, replyToMessages ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '💬'), btn('settings_tog:tickets:ailearn', `تعلّم: ${learnFromTickets ? '🟢' : '🔴'}`, learnFromTickets ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🧠'), btn('settings_cat:tickets', 'رجوع للتذاكر', discord_js_1.ButtonStyle.Secondary, '↩️'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_tog:tickets:aireply', `ردود المتابعة: ${replyToMessages ? '🟢' : '🔴'}`, replyToMessages ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '💬'), btn('settings_tog:tickets:ailearn', `تعلّم: ${learnFromTickets ? '🟢' : '🔴'}`, learnFromTickets ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🧠'), btn('settings_btn:tickets:aiPersona', 'الشخصية', discord_js_1.ButtonStyle.Primary, '🎭'), btn('settings_cat:tickets', 'رجوع للتذاكر', discord_js_1.ButtonStyle.Secondary, '↩️'));
     return { embeds: [embed], components: [row, row2] };
 }
 // --------------------------------------------
@@ -1007,7 +1009,7 @@ function buildAI(guild, s) {
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n\n` +
         `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
-        `🎭 استخدم زر *تعديل الشخصية* لتعريف شخصية البوت`);
+        `🎭 استخدم زر **الشخصية** لتعريف شخصية الذكاء العامة (كل الأعضاء) — وميزة **التكتات** لها شخصية مستقلة من: الإعدادات ← التذاكر ← 🤖 AI`);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('ai', 'enabled', 'الذكاء', '⚡', ai.enabled), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(discord_js_1.ButtonStyle.Danger).setEmoji('⏪'), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(discord_js_1.ButtonStyle.Success).setEmoji('⏩'), btn('settings_btn:ai:personality', 'الشخصية', discord_js_1.ButtonStyle.Primary, '🎭'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('aiTranslator', 'enabled', '🌐 Translator', '🌐', tEnabled), btn('settings_btn:translator:settings', 'إعدادات الترجمة', discord_js_1.ButtonStyle.Primary, '⚙️'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const langSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()

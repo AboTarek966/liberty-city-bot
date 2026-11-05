@@ -488,6 +488,28 @@ const handler = {
                 await models_1.AIConfig.findOneAndUpdate({ guildId }, { customPersonality: value }, { upsert: true }).catch(() => { });
                 break;
             }
+            case 'tickets:aiPersona': {
+                // 🎭 شخصية AI التكتات فقط — تُحفظ في إعدادات مساعد التذاكر (protection)
+                const prot = settings.protection || (settings.protection = {});
+                if (!prot.aiTicketAssistant) {
+                    prot.aiTicketAssistant = { enabled: false, customPersonality: '' };
+                }
+                prot.aiTicketAssistant.customPersonality = value.substring(0, 2000);
+                await settings.save();
+                (0, models_1.invalidateGuildSettings)(guildId);
+                const aiPersonaPanel = (0, settingsPanel_1.buildTicketAIPanel)(interaction.guild, settings);
+                await interaction.editReply({
+                    embeds: aiPersonaPanel.embeds,
+                    components: aiPersonaPanel.components,
+                });
+                await interaction.followUp({
+                    content: value
+                        ? '✅ **تم حفظ شخصية AI التكتات** — سيلتزم بها المساعد في تحليل التذاكر وردودها **حرفياً** 🎭'
+                        : '↩️ تمت إزالة الشخصية المخصصة — عاد مساعد التذاكر للأسلوب الافتراضي',
+                    ephemeral: true,
+                });
+                return;
+            }
             case 'translator:settings': {
                 try {
                     const parsed = JSON.parse(value);

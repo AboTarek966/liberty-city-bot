@@ -43,7 +43,7 @@ const handler = {
             'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
             'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
             'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-            'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
+            'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'tickets:aiPersona', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
             'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
             'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
             'translator:settings',
@@ -73,6 +73,25 @@ const handler = {
                 .addComponents(new discord_js_1.ActionRowBuilder().addComponents(input));
             await interaction.showModal(modal);
         };
+        // 🎭 مودال خاص: شخصية AI التكتات (خاص بالتذاكر فقط — يلتزم بها المساعد حرفياً)
+        if (`${section}:${action}` === 'tickets:aiPersona') {
+            const aiTicketCfg = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant ?? {};
+            const current = String(aiTicketCfg.customPersonality || '').substring(0, 2000);
+            const personaInput = new discord_js_1.TextInputBuilder()
+                .setCustomId('value')
+                .setLabel('شخصية مساعد التذاكر — الدور والوضع')
+                .setStyle(discord_js_1.TextInputStyle.Paragraph)
+                .setMaxLength(2000)
+                .setRequired(false)
+                .setPlaceholder('اكتب هنا شخصية المساعد ودوره وطريقة رده داخل التكتات فقط — مثال: أنت موظف دعم رسمي مهذب في سيرفر سعودي، رد بلهجة واضحة، اشرح خطوة بخطوة واقترح حلولاً عملية.')
+                .setValue(current);
+            const modal = new discord_js_1.ModalBuilder()
+                .setCustomId('settings_modal:tickets:aiPersona')
+                .setTitle('🎭 شخصية AI التكتات')
+                .addComponents(new discord_js_1.ActionRowBuilder().addComponents(personaInput));
+            await interaction.showModal(modal);
+            return;
+        }
         // مودال خاص: محتوى لوحة التذاكر (عنوان + وصف معاً)
         if (`${section}:${action}` === 'tickets:panel') {
             const panel = (0, settingsPanel_1.getActivePanel)(settings);
@@ -287,7 +306,7 @@ const handler = {
                     return openModal('الكلمات المحظورة', 'اكتب كل كلمة في سطر جديد:\nكلمة1\nكلمة2\nكلمة3', discord_js_1.TextInputStyle.Paragraph, 1000);
                 case 'ai:personality': {
                     const aiConfig = await models_1.AIConfig.findOne({ guildId }).catch(() => null);
-                    return openModal('شخصية الذكاء الاصطناعي', 'مثال: أنت مساعد ودود يحب الفكاهة...', discord_js_1.TextInputStyle.Paragraph, 1000, aiConfig?.customPersonality || '');
+                    return openModal('شخصية الذكاء العامة (كل الأعضاء)', 'الدور + الوضع + طريقة الرد — يلتزم بها حرفياً. مثال: مساعد سعودي مهذب، ردود قصيرة بلهجة أهل السيرفر.', discord_js_1.TextInputStyle.Paragraph, 2000, aiConfig?.customPersonality || '');
                 }
                 case 'translator:settings': {
                     const prot = settings.protection;

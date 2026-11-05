@@ -75,6 +75,17 @@ class AITicketAssistant {
         return config || null;
     }
     // --------------------------------------------
+    // 🎭 كتلة الشخصية المخصصة — تعليمات السيرفر لمساعد التذاكر
+    // تُحقن في كل مطالبة (رد أولي، ردود المتابعة، التحليل) وتُقدَّم على أي تعليمات أسلوب أخرى
+    // --------------------------------------------
+    personaBlock(config) {
+        const persona = String(config?.customPersonality || '').trim();
+        if (!persona)
+            return '';
+        return (`\n\n**🎭 شخصية وتعليمات السيرفر المخصصة لمساعد التذاكر — التزم بها حرفياً ولا تخالفها مهما حدث (لها الأولوية على أي تعليمات أسلوب أخرى):**\n` +
+            `${persona.slice(0, 2000)}\n`);
+    }
+    // --------------------------------------------
     // نقطة الدخول: عند فتح تذكرة جديدة
     // --------------------------------------------
     async onTicketCreated(ticket, channel) {
@@ -123,13 +134,13 @@ class AITicketAssistant {
                 };
             }
             // 🤖 رد أولي فوري
-            await this.sendAutoResponse(channel, firstUserMessage, ticket);
+            await this.sendAutoResponse(channel, firstUserMessage, ticket, aiConfig);
             // فترة سماح: لو العضو كتب رسالة تانية بسرعة، التحليل أو الرد الأولي يغطيها
             this.ticketAutoCooldown.set(channel.id, Date.now() + 8000);
             const cooldownTimer = setTimeout(() => this.ticketAutoCooldown.delete(channel.id), 9000);
             cooldownTimer.unref?.();
             // تحليل المشكلة
-            const analysis = await this.analyzeTicket(firstUserMessage, channel.guild, ticket);
+            const analysis = await this.analyzeTicket(firstUserMessage, channel.guild, ticket, aiConfig);
             // تنفيذ الحل المقترح
             await this.executeSolution(ticket, channel, analysis, aiConfig);
         }
@@ -198,6 +209,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
 - لا تخترع معلومات ولا تكرر الترحيب إذا كانت المحادثة مستمرة.
 - لا تذكر أنك نموذج ذكاء اصطناعي إلا لو سألك.
 - كن مختصراً (1-3 جمل).
+${this.personaBlock(aiConfig)}
 
 ردك:`;
                 if ('sendTyping' in channel) {
@@ -275,7 +287,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
     // --------------------------------------------
     // Auto-response when ticket is created
     // --------------------------------------------
-    async sendAutoResponse(channel, firstMessage, ticket) {
+    async sendAutoResponse(channel, firstMessage, ticket, aiConfig) {
         try {
             const prompt = `أنت مساعد دعم ذكي في سيرفر Discord "${channel.guild.name}".
 
@@ -291,6 +303,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
 - قل إنك ستحلل المشكلة وترد بالحل
 - لا تبالغ في الوعود
 - كن مختصراً وودوداً
+${this.personaBlock(aiConfig)}
 
 ردك:`;
             const response = await this.client.aiHandler.generateResponse(`ticket-ai:reply:${String(ticket._id)}`, channel.guild.id, channel.id, prompt, [], false, false, { fromCommand: true, ignoreGlobalToggle: true });
@@ -312,7 +325,7 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
     // --------------------------------------------
     // تحليل التذكرة بالـ AI
     // --------------------------------------------
-    async analyzeTicket(message, guild, ticket) {
+    async analyzeTicket(message, guild, ticket, aiConfig) {
         const context = `
 السيرفر: ${guild.name} (${guild.id})
 صاحب التذكرة: ${message.author.tag} (${message.author.id})
@@ -366,6 +379,7 @@ ${context}
 - صاحب التذكرة هو المستخدم الافتراضي لأي إجراء عليه (targetUserId = ${message.author.id}).
 - لو مش متأكد → needsAdminAction: true وقلل confidence.
 - لا تخترع إجراءات غير مطلوبة فعلاً.
+${this.personaBlock(aiConfig)}
 
 **أجب بـ JSON فقط:**
 {

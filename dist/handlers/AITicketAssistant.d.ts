@@ -33,6 +33,7 @@ export declare class AITicketAssistant {
     private ticketAutoCooldown;
     constructor(client: OmniClient);
     private getConfig;
+    private personaBlock;
     onTicketCreated(ticket: any, channel: TextChannel): Promise<void>;
     onTicketMessage(ticket: any, channel: TextChannel, message: Message): Promise<void>;
     private claimTicket;

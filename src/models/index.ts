@@ -207,6 +207,8 @@ export interface IGuildSettings extends Document {
       replyToMessages?: boolean;
       /** 🧠 التعلّم التلقائي من حلول الفريق في التذاكر المغلقة (قاعدة المعرفة) */
       learnFromTickets?: boolean;
+      /** 🎭 شخصية/تعليمات مخصصة لمساعد التذاكر فقط — يلتزم بها حرفياً */
+      customPersonality?: string;
       requireAdminApprovalForRoles: boolean;
       requireAdminApprovalForPermissions: boolean;
       requireAdminApprovalForBans: boolean;
@@ -1053,6 +1055,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       analyzeOnCreate: { type: Boolean, default: true },
       replyToMessages: { type: Boolean, default: true },
       learnFromTickets: { type: Boolean, default: true },
+      customPersonality: { type: String, default: '' },
       requireAdminApprovalForRoles: { type: Boolean, default: true },
       requireAdminApprovalForPermissions: { type: Boolean, default: true },
       requireAdminApprovalForBans: { type: Boolean, default: true },

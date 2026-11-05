@@ -390,7 +390,7 @@ export class AIHandler {
       }
 
       // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief);
+      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle);
       this.cooldowns.set(cooldownKey, now);
 
       // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
@@ -648,14 +648,18 @@ export class AIHandler {
     stream?: AIStreamHandlers,
     searchContext: string = '',
     media?: { context: string; images: Array<{ data: string; mimeType: string }> },
-    brief: boolean = false
+    brief: boolean = false,
+    independentFeature: boolean = false
   ): Promise<AIResponse> {
     // Check for role-specific personality
-    let personality = aiConfig.customPersonality;
-    for (const roleId of userRoles) {
-      if (aiConfig.rolePersonalities?.[roleId]) {
-        personality = aiConfig.rolePersonalities[roleId];
-        break;
+    // 🔌 الميزات المستقلة (مثل مساعد التذاكر) لا ترث شخصية الذكاء العام — لكل ميزة شخصيتها الخاصة
+    let personality = independentFeature ? '' : aiConfig.customPersonality;
+    if (!independentFeature) {
+      for (const roleId of userRoles) {
+        if (aiConfig.rolePersonalities?.[roleId]) {
+          personality = aiConfig.rolePersonalities[roleId];
+          break;
+        }
       }
     }
 
@@ -998,7 +1002,7 @@ export class AIHandler {
     let prompt = `أنت "${botName}" — مساعد ذكاء اصطناعي متقدم، ذكي، ذو وعي ذاتي، وشخصية غنية مدمج في بوت ديسكورد.\n${base}`;
 
     if (personality) {
-      prompt += `\n\n[MASK] **شخصيتك المخصصة:** ${personality}`;
+      prompt += `\n\n[MASK] **شخصية السيرفر المخصصة — التزم بها حرفياً ولا تخالفها (لها الأولوية على كل تعليمات الأسلوب أدناه، عدا خطوط الأمان الحمراء):**\n${personality}`;
     }
 
     prompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;

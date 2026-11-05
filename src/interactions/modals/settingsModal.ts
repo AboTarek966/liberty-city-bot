@@ -4,8 +4,8 @@
 
 import { ModalSubmitInteraction, PermissionFlagsBits, ChannelSelectMenuBuilder, ChannelType, ActionRowBuilder, EmbedBuilder } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, checkSettingsAccess, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildGiveawaysPanel, buildHoneypotPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, SettingsCategory } from '../../utils/settingsPanel';
-import { getGuildSettings, AIConfig } from '../../models';
+import { buildPanel, checkSettingsAccess, setPasswordVerified, buildLevelRewardsPanel, buildVerificationPanel, buildGiveawaysPanel, buildHoneypotPanel, buildCommands, buildShop, sendWelcomeCardPanel, getActivePanel, buildTicketAIPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { OmniClient } from '../../OmniClient';
 import { renderTicketWelcome } from '../../utils/ticketMessages';
 import { sleep } from '../../utils/helpers';
@@ -494,6 +494,29 @@ const handler: ModalHandler = {
           { upsert: true }
         ).catch(() => {});
         break;
+      }
+      case 'tickets:aiPersona': {
+        // 🎭 شخصية AI التكتات فقط — تُحفظ في إعدادات مساعد التذاكر (protection)
+        const prot = (settings as any).protection || ((settings as any).protection = {});
+        if (!prot.aiTicketAssistant) {
+          prot.aiTicketAssistant = { enabled: false, customPersonality: '' };
+        }
+        prot.aiTicketAssistant.customPersonality = value.substring(0, 2000);
+        await settings.save();
+        invalidateGuildSettings(guildId);
+
+        const aiPersonaPanel = buildTicketAIPanel(interaction.guild!, settings);
+        await interaction.editReply({
+          embeds: aiPersonaPanel.embeds,
+          components: aiPersonaPanel.components as any,
+        });
+        await interaction.followUp({
+          content: value
+            ? '✅ **تم حفظ شخصية AI التكتات** — سيلتزم بها المساعد في تحليل التذاكر وردودها **حرفياً** 🎭'
+            : '↩️ تمت إزالة الشخصية المخصصة — عاد مساعد التذاكر للأسلوب الافتراضي',
+          ephemeral: true,
+        });
+        return;
       }
       case 'translator:settings': {
         try {

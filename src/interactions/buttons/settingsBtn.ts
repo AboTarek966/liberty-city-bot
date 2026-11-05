@@ -63,7 +63,7 @@ const handler: ButtonHandler = {
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
       'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
-      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
+      'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'tickets:aiPersona', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
       'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
       'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
       'translator:settings',
@@ -104,6 +104,32 @@ const handler: ButtonHandler = {
 
       await interaction.showModal(modal);
     };
+
+    // 🎭 مودال خاص: شخصية AI التكتات (خاص بالتذاكر فقط — يلتزم بها المساعد حرفياً)
+    if (`${section}:${action}` === 'tickets:aiPersona') {
+      const aiTicketCfg =
+        (settings as any).protection?.aiTicketAssistant ?? (settings as any).aiTicketAssistant ?? {};
+      const current = String(aiTicketCfg.customPersonality || '').substring(0, 2000);
+
+      const personaInput = new TextInputBuilder()
+        .setCustomId('value')
+        .setLabel('شخصية مساعد التذاكر — الدور والوضع')
+        .setStyle(TextInputStyle.Paragraph)
+        .setMaxLength(2000)
+        .setRequired(false)
+        .setPlaceholder(
+          'اكتب هنا شخصية المساعد ودوره وطريقة رده داخل التكتات فقط — مثال: أنت موظف دعم رسمي مهذب في سيرفر سعودي، رد بلهجة واضحة، اشرح خطوة بخطوة واقترح حلولاً عملية.'
+        )
+        .setValue(current);
+
+      const modal = new ModalBuilder()
+        .setCustomId('settings_modal:tickets:aiPersona')
+        .setTitle('🎭 شخصية AI التكتات')
+        .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(personaInput));
+
+      await interaction.showModal(modal);
+      return;
+    }
 
     // مودال خاص: محتوى لوحة التذاكر (عنوان + وصف معاً)
     if (`${section}:${action}` === 'tickets:panel') {
@@ -390,10 +416,10 @@ const handler: ButtonHandler = {
         case 'ai:personality': {
           const aiConfig = await AIConfig.findOne({ guildId }).catch(() => null);
           return openModal(
-            'شخصية الذكاء الاصطناعي',
-            'مثال: أنت مساعد ودود يحب الفكاهة...',
+            'شخصية الذكاء العامة (كل الأعضاء)',
+            'الدور + الوضع + طريقة الرد — يلتزم بها حرفياً. مثال: مساعد سعودي مهذب، ردود قصيرة بلهجة أهل السيرفر.',
             TextInputStyle.Paragraph,
-            1000,
+            2000,
             aiConfig?.customPersonality || ''
           );
         }

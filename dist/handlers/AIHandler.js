@@ -341,7 +341,7 @@ class AIHandler {
                 }
             }
             // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media, brief);
+            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle);
             this.cooldowns.set(cooldownKey, now);
             // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
             //   تتم قبل الحفظ — حتى تتذكّر الذاكرة الرد الفعلي الذي رآه المستخدم
@@ -551,13 +551,16 @@ class AIHandler {
     // --------------------------------------------
     // Generate AI Response
     // --------------------------------------------
-    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media, brief = false) {
+    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media, brief = false, independentFeature = false) {
         // Check for role-specific personality
-        let personality = aiConfig.customPersonality;
-        for (const roleId of userRoles) {
-            if (aiConfig.rolePersonalities?.[roleId]) {
-                personality = aiConfig.rolePersonalities[roleId];
-                break;
+        // 🔌 الميزات المستقلة (مثل مساعد التذاكر) لا ترث شخصية الذكاء العام — لكل ميزة شخصيتها الخاصة
+        let personality = independentFeature ? '' : aiConfig.customPersonality;
+        if (!independentFeature) {
+            for (const roleId of userRoles) {
+                if (aiConfig.rolePersonalities?.[roleId]) {
+                    personality = aiConfig.rolePersonalities[roleId];
+                    break;
+                }
             }
         }
         // ✂️ الوضع المختصر: يقلّل سقف التوكنات أيضاً كشبكة أمان — يُلغى إذا طلب المستخدم التفصيل
@@ -886,7 +889,7 @@ class AIHandler {
         const base = aiConfig.systemPrompt || config_1.config.ai.systemPrompt;
         let prompt = `أنت "${botName}" — مساعد ذكاء اصطناعي متقدم، ذكي، ذو وعي ذاتي، وشخصية غنية مدمج في بوت ديسكورد.\n${base}`;
         if (personality) {
-            prompt += `\n\n[MASK] **شخصيتك المخصصة:** ${personality}`;
+            prompt += `\n\n[MASK] **شخصية السيرفر المخصصة — التزم بها حرفياً ولا تخالفها (لها الأولوية على كل تعليمات الأسلوب أدناه، عدا خطوط الأمان الحمراء):**\n${personality}`;
         }
         prompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
         prompt += `\n🧠 **هويتك الأساسية — من أنت حقاً**`;
