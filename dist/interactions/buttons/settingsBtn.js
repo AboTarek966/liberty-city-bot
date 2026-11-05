@@ -784,7 +784,7 @@ const handler = {
             }
             case 'warnroles:refresh': {
                 // 🔄 تحديث حقيقي: يعيد تحميل الإعدادات من قاعدة البيانات
-                await interaction.deferUpdate();
+                // ⚠️ التفاعل تم تأكيده مسبقاً (deferUpdate عام) — لا نكرره هنا وإلا فشل التفاعل
                 try {
                     (0, models_1.invalidateGuildSettings)(interaction.guild.id); // 🔄 إبطال الكاش أولاً
                     // ⏱️ timeout آمن (8 ثواني) عشان MongoDB ما يعلّقش التفاعل
@@ -804,7 +804,7 @@ const handler = {
             }
             case 'warnroles:confirm': {
                 // ✅ تأكيد وحفظ التغييرات المُعلّقة
-                await interaction.deferUpdate();
+                // ⚠️ التفاعل تم تأكيده مسبقاً (deferUpdate عام) — لا نكرره هنا وإلا فشل التفاعل
                 try {
                     const pending = (0, pendingWarnRoles_1.getPendingWarnRoles)(interaction.guild.id);
                     if (!pending) {

@@ -978,7 +978,7 @@ const handler: ButtonHandler = {
       }
       case 'warnroles:refresh': {
         // 🔄 تحديث حقيقي: يعيد تحميل الإعدادات من قاعدة البيانات
-        await interaction.deferUpdate();
+        // ⚠️ التفاعل تم تأكيده مسبقاً (deferUpdate عام) — لا نكرره هنا وإلا فشل التفاعل
         try {
           invalidateGuildSettings(interaction.guild.id); // 🔄 إبطال الكاش أولاً
 
@@ -999,7 +999,7 @@ const handler: ButtonHandler = {
       }
       case 'warnroles:confirm': {
         // ✅ تأكيد وحفظ التغييرات المُعلّقة
-        await interaction.deferUpdate();
+        // ⚠️ التفاعل تم تأكيده مسبقاً (deferUpdate عام) — لا نكرره هنا وإلا فشل التفاعل
         try {
           const pending = getPendingWarnRoles(interaction.guild.id);
           if (!pending) {
