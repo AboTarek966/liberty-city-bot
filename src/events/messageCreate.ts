@@ -1705,7 +1705,7 @@ async function handleAIResponse(message: Message, client: OmniClient): Promise<v
     memberRoles,
     isMention,
     repliedToBot,
-    { userContext, stream, safeMode: isDM, attachments }
+    { userContext, stream, safeMode: isDM, attachments, brief: true }
   );
 
   if (response) {

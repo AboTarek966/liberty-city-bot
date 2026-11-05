@@ -203,7 +203,7 @@ async function handleChat(
       [],
       true,
       false,
-      { stream, safeMode }
+      { stream, safeMode, brief: true }
     );
 
     if (!response) {

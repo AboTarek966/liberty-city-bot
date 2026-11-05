@@ -146,7 +146,7 @@ async function handleChat(interaction, client, type) {
             },
         };
         // Generate response (isMention=true for slash command usage)
-        const response = await client.aiHandler.generateResponse(interaction.user.id, interaction.guildId || undefined, interaction.channelId, message, [], true, false, { stream, safeMode });
+        const response = await client.aiHandler.generateResponse(interaction.user.id, interaction.guildId || undefined, interaction.channelId, message, [], true, false, { stream, safeMode, brief: true });
         if (!response) {
             await interaction.editReply({
                 content: '❌ لم أتمكن من توليد رد. حاول مرة أخرى لاحقاً',

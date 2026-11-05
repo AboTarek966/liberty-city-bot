@@ -1552,7 +1552,7 @@ async function handleAIResponse(message, client) {
         }
         catch { }
     }
-    const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM, attachments });
+    const response = await client.aiHandler.generateResponse(message.author.id, guildId, message.channel.id, question, memberRoles, isMention, repliedToBot, { userContext, stream, safeMode: isDM, attachments, brief: true });
     if (response) {
         // 🎨 اختصارات الإيموجي (:اسم:) → إيموجي حقيقي قبل الإرسال (ديسكورد لا يحوّلها في رسائل البوت)
         const parts = splitAiText((0, emoji_1.resolveEmojiShortcodes)(response.content, message.guild), 1900);

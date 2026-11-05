@@ -39,6 +39,8 @@ export declare class AIHandler {
         safeMode?: boolean;
         /** 🔌 تجاهل مفتاح الذكاء العام — للميزات المستقلة مثل مساعد التذاكر */
         ignoreGlobalToggle?: boolean;
+        /** ✂️ ردود قصيرة للذكاء العام — تُلغى تلقائياً إذا طلب المستخدم التفصيل */
+        brief?: boolean;
         /** وسائط الرسالة (صور/رسائل صوتية/فيديو/ملفات) — تُحلَّل قبل التوليد */
         attachments?: Array<{
             id: string;
@@ -65,6 +67,11 @@ export declare class AIHandler {
     private checkCustomRules;
     private checkTrigger;
     private shouldAutoReply;
+    /**
+     * هل طلب المستخدم تفصيلاً صريحاً؟ — يُلغي وضع الاختصار للذكاء العام.
+     * الطلب الصريح للاختصار يتقدّم على أي كلمة أخرى.
+     */
+    private wantsDetailedAnswer;
     private needsWebSearch;
     private generateAIResponse;
     /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */

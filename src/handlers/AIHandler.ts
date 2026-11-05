@@ -183,6 +183,8 @@ export class AIHandler {
       safeMode?: boolean;
       /** 🔌 تجاهل مفتاح الذكاء العام — للميزات المستقلة مثل مساعد التذاكر */
       ignoreGlobalToggle?: boolean;
+      /** ✂️ ردود قصيرة للذكاء العام — تُلغى تلقائياً إذا طلب المستخدم التفصيل */
+      brief?: boolean;
       /** وسائط الرسالة (صور/رسائل صوتية/فيديو/ملفات) — تُحلَّل قبل التوليد */
       attachments?: Array<{
         id: string;
@@ -203,6 +205,7 @@ export class AIHandler {
       stream,
       safeMode = false,
       ignoreGlobalToggle = false,
+      brief = false,
       attachments,
     } = opts;
     try {
@@ -365,7 +368,7 @@ export class AIHandler {
       }
 
       // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media);
+      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief);
       this.cooldowns.set(cooldownKey, now);
 
       // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
@@ -524,6 +527,23 @@ export class AIHandler {
     return false;
   }
 
+  /**
+   * هل طلب المستخدم تفصيلاً صريحاً؟ — يُلغي وضع الاختصار للذكاء العام.
+   * الطلب الصريح للاختصار يتقدّم على أي كلمة أخرى.
+   */
+  private wantsDetailedAnswer(message: string): boolean {
+    const m = (message || '').toLowerCase().trim();
+    if (!m) return false;
+    if (/(باختصار|مختصر|اختصار|قصير|بسرعة|short|brief|briefly|quickly)/i.test(m)) return false;
+
+    const arabic =
+      /(بالتفصيل|بالتفاصيل|مفصل|مفصّل|فصّل|فصل لي|اشرح لي أكثر|اشرح أكثر|شرح كامل|طويل|مطوّل|مقال|مقالة|تقرير|بحث كامل|قائمة كاملة|كل الأمثلة|جميع الأمثلة|خطوات تفصيلية|دليل شامل|مقارنة كاملة|بشكل مفصل|بإسهاب|اكتب لي|اكتبلي|أريد تفاصيل|عايز تفاصيل|تفاصيل أكثر|زودني|وسّع|وسع الشرح|قارن|مقارنة)/i.test(m);
+    const english =
+      /\b(detailed|in detail|elaborate|long answer|full explanation|essay|report|step by step|comprehensive|explain more|tell me more|in depth|compare)\b/i.test(m);
+
+    return arabic || english;
+  }
+
   // --------------------------------------------
   // Web Search Detection (كشف الحاجة للبحث) — محسّن وذكي
   // --------------------------------------------
@@ -603,7 +623,8 @@ export class AIHandler {
     history: HistoryMessage[] = [],
     stream?: AIStreamHandlers,
     searchContext: string = '',
-    media?: { context: string; images: Array<{ data: string; mimeType: string }> }
+    media?: { context: string; images: Array<{ data: string; mimeType: string }> },
+    brief: boolean = false
   ): Promise<AIResponse> {
     // Check for role-specific personality
     let personality = aiConfig.customPersonality;
@@ -614,13 +635,22 @@ export class AIHandler {
       }
     }
 
+    // ✂️ الوضع المختصر: يقلّل سقف التوكنات أيضاً كشبكة أمان — يُلغى إذا طلب المستخدم التفصيل
+    const allowLongAnswer = !brief || this.wantsDetailedAnswer(message);
+    const brevity = brief && !allowLongAnswer;
+    if (brevity) {
+      const configuredMax = typeof aiConfig.maxTokens === 'number' ? aiConfig.maxTokens : 500;
+      aiConfig.maxTokens = Math.min(configuredMax, 320);
+    }
+
     const systemPrompt = await this.buildSystemPrompt(
       aiConfig,
       personality,
       guildId,
       userContext,
       searchContext,
-      guildId ? await buildKnowledgeContext(guildId, message, 4) : ''
+      guildId ? await buildKnowledgeContext(guildId, message, 4) : '',
+      brevity
     );
 
     // سياق الوسائط يُدمَج مع رسالة المستخدم (النموذج يرى الوصف + الصور نفسها)
@@ -934,7 +964,8 @@ export class AIHandler {
     guildId: string,
     userContext?: AIUserContext,
     searchContext: string = '',
-    knowledgeContext: string = ''
+    knowledgeContext: string = '',
+    brevity: boolean = false
   ): Promise<string> {
     const guildName = this.client.guilds.cache.get(guildId)?.name;
     const botName = guildName || this.client.user?.username || 'Omni';
@@ -960,20 +991,32 @@ export class AIHandler {
     prompt += `\n[CHAT] **أسلوب التواصل — كيف تتكلم**`;
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     prompt += `\n- **لغة طبيعية بشرية:** عربية فصحى مبسطة/إنكليزية طبيعية — كأنك تتكلم مع صديق ذكي.`;
-    prompt += `\n- **مُفصّل عند الحاجة، مختصر عند الكفاية:** لا تقتصر على سطرين، ولا تطيل بلا داعي.`;
+    prompt += `\n- **مختصر افتراضياً، مفصل عند الطلب:** ابدأ بالخلاصة، ولا تُطِل إلا إذا طلب المستخدم التفصيل صراحةً.`;
     prompt += `\n- **تنسيق ذكي:** \`كود\` للأكواد، **عريض** للتركيز، قوائم للنقاط، اقتباسات للنقل.`;
     prompt += `\n- **إيموجي بمعنى:** 0-4 إيموجي في المكان المناسب — للتعبير لا للزينة.`;
     prompt += `\n- **لا تكرر السؤال أبداً:** ابدأ بالإجابة مباشرة، لا بـ "سؤالك عن..." أو "بخصوص...".`;
     prompt += `\n- **أسئلة متابعة ذكية:** إذا كان الموضوع معقداً، اسأل لتوضيح السياق قبل الإجابة.`;
 
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-    prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     prompt += `[FAST] **سرعة الرد — لا تُطيل**`;
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-    prompt += `- أجب فوراً: أول جملة تعطي المضمون (لا مقدمات).`;
-    prompt += `- كن موجزاً: إجابة قصيرة ثم زيادة فقط إذا طلبت.`;
-    prompt += `- لا تستخدم [[SEARCH]] إلا للضرورة (بحث صريح/حدث حالي) وإلا لا تبحث.`;
-    prompt += `- إذا كان السؤال بسيط، لا تفكّر طويلاً، أجب مباشرة.`;
+    prompt += `\n- أجب فوراً: أول جملة تعطي المضمون (لا مقدمات).`;
+    prompt += `\n- كن موجزاً: إجابة قصيرة ثم زيادة فقط إذا طلبت.`;
+    prompt += `\n- لا تكرر السؤال ولا تعيد صياغته ولا تلخّص كلامك في النهاية.`;
+    prompt += `\n- لا تستخدم [[SEARCH]] إلا للضرورة (بحث صريح/حدث حالي) وإلا لا تبحث.`;
+    prompt += `\n- إذا كان السؤال بسيط، لا تفكّر طويلاً، أجب مباشرة.`;
+
+    if (brevity) {
+      prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      prompt += `\n[BREVITY] **الاختصار أولاً — طلب المستخدم الحالي لا يحتاج تفصيلاً**`;
+      prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      prompt += `\n- الرد المستهدف: **1–4 أسطر** (حد أقصى نحو 60 كلمة).`;
+      prompt += `\n- لا مقدمات، لا عناوين، لا قوائم طويلة، ولا إعادة للسؤال.`;
+      prompt += `\n- أعطِ الخلاصة أولاً، ثم أهم نقطة أو نقطتين فقط.`;
+      prompt += `\n- إذا كان الموضوع يستحق شرحاً أطول، اختم بسؤال قصير: «تحب أشرح أكثر؟»`;
+      prompt += `\n- استثناء واحد فقط: إذا طلب المستخدم صراحةً تفصيلاً/شرحاً/مقالاً/قائمة/مقارنة كاملة، وسّع حسب طلبه.`;
+      prompt += `\n- للأسئلة الدينية: الحكم + دليل مختصر + نصيحة عملية في 3–6 أسطر، والتوسّع فقط عند الطلب.`;
+    }
 
     prompt += `\n[COMPASS] **التفكير المنهجي — كيف تفكر قبل الإجابة**`;
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
@@ -1572,7 +1615,7 @@ export class AIHandler {
       return;
     }
 
-    const response = await this.generateResponse(userId, guildId!, channelId, prompt, [], false, false, { fromCommand: true });
+    const response = await this.generateResponse(userId, guildId!, channelId, prompt, [], false, false, { fromCommand: true, brief: true });
     
     if (!response) {
       await interaction.editReply({ content: '❌ حدث خطأ في توليد الرد.' });
