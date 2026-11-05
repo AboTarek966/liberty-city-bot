@@ -28,7 +28,8 @@ const handler: ButtonHandler = {
       let selectCustomId: string | undefined;
       for (const row of interaction.message.components as any[]) {
         for (const comp of row.components || []) {
-          if (typeof comp.customId === 'string' && comp.customId.startsWith('ticket_select_')) {
+          // يدعم الصيغة الجديدة ticket_select_<panelId> والقديمة ticket_select
+          if (typeof comp.customId === 'string' && comp.customId.startsWith('ticket_select')) {
             selectCustomId = comp.customId;
             break;
           }
@@ -44,9 +45,13 @@ const handler: ButtonHandler = {
         return;
       }
 
-      const panelId = selectCustomId.replace('ticket_select_', '');
+      const panelId = selectCustomId.startsWith('ticket_select_')
+        ? selectCustomId.slice('ticket_select_'.length)
+        : '';
       const settings = await getGuildSettings(interaction.guild.id).catch(() => null);
-      const panel = (settings?.tickets?.panels || []).find((p: any) => p.id === panelId);
+      const panel = panelId
+        ? (settings?.tickets?.panels || []).find((p: any) => p.id === panelId)
+        : null;
 
       let components: any[];
       if (panel) {

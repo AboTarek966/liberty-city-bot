@@ -20,7 +20,8 @@ const handler = {
             let selectCustomId;
             for (const row of interaction.message.components) {
                 for (const comp of row.components || []) {
-                    if (typeof comp.customId === 'string' && comp.customId.startsWith('ticket_select_')) {
+                    // يدعم الصيغة الجديدة ticket_select_<panelId> والقديمة ticket_select
+                    if (typeof comp.customId === 'string' && comp.customId.startsWith('ticket_select')) {
                         selectCustomId = comp.customId;
                         break;
                     }
@@ -35,9 +36,13 @@ const handler = {
                 });
                 return;
             }
-            const panelId = selectCustomId.replace('ticket_select_', '');
+            const panelId = selectCustomId.startsWith('ticket_select_')
+                ? selectCustomId.slice('ticket_select_'.length)
+                : '';
             const settings = await (0, models_1.getGuildSettings)(interaction.guild.id).catch(() => null);
-            const panel = (settings?.tickets?.panels || []).find((p) => p.id === panelId);
+            const panel = panelId
+                ? (settings?.tickets?.panels || []).find((p) => p.id === panelId)
+                : null;
             let components;
             if (panel) {
                 // ✅ إعادة بناء اللوحة من الإعدادات = قائمة اختيار جديدة بلا تحديد
