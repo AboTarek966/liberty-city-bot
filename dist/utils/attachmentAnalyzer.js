@@ -7,6 +7,39 @@
 //   - رؤية الصور: llama-4-scout / qwen3-vl
 //   - تفريغ الصوت: whisper-large-v3-turbo
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -57,6 +90,14 @@ function classify(att) {
         return att.duration ? 'voice' : 'audio';
     if (/\.(mp4|webm|mov|mkv|avi|m4v)$/.test(name))
         return 'video';
+    // 📄 مستندات PDF
+    if (ct.includes('pdf') || name.endsWith('.pdf'))
+        return 'pdf';
+    // 📝 مستندات Office/OpenDocument/RTF
+    if (/\.(docx?|pptx?|xlsx?|odt|odp|ods|rtf)$/.test(name) ||
+        /officedocument|opendocument|ms-word|ms-excel|ms-powerpoint|rtf/.test(ct)) {
+        return 'document';
+    }
     if (/\.(txt|md|json|js|ts|py|java|c|cpp|cs|html|css|xml|yml|yaml|log|csv|ini|cfg|sh|sql)$/.test(name))
         return 'text';
     return 'other';
@@ -247,7 +288,7 @@ async function analyzeAttachments(attachments, opts) {
     const empty = { context: '', analyzed: false, images: [], processed: 0 };
     if (!attachments?.length)
         return empty;
-    const { apiKey = '', question = '', canSeeImages = true } = opts;
+    const { apiKey = '', question = '', canSeeImages = true, canPassPdf = false, channelId = '' } = opts;
     const parts = [];
     const images = [];
     let processed = 0;
@@ -315,6 +356,40 @@ async function analyzeAttachments(attachments, opts) {
                     parts.push(r.context);
                 for (const im of r.images)
                     images.push(im);
+                processed++;
+                continue;
+            }
+            // ---- 📄 مستندات: PDF / Word / PowerPoint / Excel / ODT / RTF ----
+            if (kind === 'pdf' || kind === 'document') {
+                if ((att.size || 0) > 15 * 1024 * 1024) {
+                    parts.push(`[مستند مرفق: "${name}" — ${sizeKb}KB أكبر من الحد المسموح لقراءته]`);
+                    continue;
+                }
+                const raw = await download(att.url);
+                const { extractDocumentText } = await Promise.resolve().then(() => __importStar(require('./documentText')));
+                const doc = extractDocumentText(raw, name, att.contentType || '');
+                const lines = [`[📄 مستند مرفق: "${name}" — ${sizeKb}KB — النوع: ${doc.kind}]`];
+                const shownText = doc.text && doc.text.trim().length >= 40;
+                const usableText = doc.text && doc.text.trim().length >= 120;
+                if (shownText) {
+                    const head = doc.usable ? '**النص المستخرج:**' : '**النص المستخرج (قد يكون جزئياً):**';
+                    lines.push(`${head}\n\`\`\`\n${doc.text.slice(0, 6000)}\n\`\`\``);
+                }
+                // PDF + مزوّد يدعم قراءة الملفات (Gemini) → نمرّر الصفحات نفسها مباشرة (الأدق للعربية والملفات الممسوحة)
+                const canInlinePdf = kind === 'pdf' && canPassPdf && raw.length <= 10 * 1024 * 1024;
+                if (canInlinePdf) {
+                    images.push({ data: raw.toString('base64'), mimeType: 'application/pdf' });
+                    lines.push('📖 صفحات المستند تظهر لك مباشرة — اقرأها بدقة وأجب عن سؤال المستخدم منها.');
+                }
+                else if (!shownText) {
+                    lines.push('تعذّر استخراج نص كافٍ من المستند (قد يكون صوراً ممسوحة)، ولا تتوفر قراءة مباشرة للصفحات — اطلب من المستخدم لقطة شاشة للصفحة المطلوبة أو وصفاً نصياً.');
+                }
+                parts.push(lines.join('\n'));
+                // 🧠 حفظ نص المستند للأسئلة اللاحقة في نفس القناة
+                if (usableText && channelId) {
+                    const { rememberDocument } = await Promise.resolve().then(() => __importStar(require('./documentMemory')));
+                    rememberDocument(channelId, name, doc.text);
+                }
                 processed++;
                 continue;
             }

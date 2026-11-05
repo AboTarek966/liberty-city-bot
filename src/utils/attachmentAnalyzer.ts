@@ -48,7 +48,7 @@ export interface AttachmentAnalysis {
 }
 
 /** نوع الوسائط */
-type MediaKind = 'image' | 'voice' | 'video' | 'audio' | 'text' | 'other';
+type MediaKind = 'image' | 'voice' | 'video' | 'audio' | 'text' | 'pdf' | 'document' | 'other';
 
 function classify(att: {
   contentType?: string | null;
@@ -71,6 +71,17 @@ function classify(att: {
   if (/\.(png|jpe?g|gif|webp|bmp)$/.test(name)) return 'image';
   if (/\.(ogg|oga|opus|mp3|wav|m4a|aac|flac)$/.test(name)) return att.duration ? 'voice' : 'audio';
   if (/\.(mp4|webm|mov|mkv|avi|m4v)$/.test(name)) return 'video';
+
+  // 📄 مستندات PDF
+  if (ct.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
+  // 📝 مستندات Office/OpenDocument/RTF
+  if (
+    /\.(docx?|pptx?|xlsx?|odt|odp|ods|rtf)$/.test(name) ||
+    /officedocument|opendocument|ms-word|ms-excel|ms-powerpoint|rtf/.test(ct)
+  ) {
+    return 'document';
+  }
+
   if (/\.(txt|md|json|js|ts|py|java|c|cpp|cs|html|css|xml|yml|yaml|log|csv|ini|cfg|sh|sql)$/.test(name)) return 'text';
 
   return 'other';
@@ -284,12 +295,20 @@ export async function analyzeAttachments(
     height?: number | null;
     width?: number | null;
   }>,
-  opts: { apiKey?: string; question?: string; canSeeImages?: boolean }
+  opts: {
+    apiKey?: string;
+    question?: string;
+    canSeeImages?: boolean;
+    /** هل يمكن تمرير ملف PDF نفسه لمزوّد الرؤية (Gemini)؟ */
+    canPassPdf?: boolean;
+    /** قناة الرسالة — لحفظ المستند في الذاكرة القصيرة */
+    channelId?: string;
+  }
 ): Promise<AttachmentAnalysis> {
   const empty: AttachmentAnalysis = { context: '', analyzed: false, images: [], processed: 0 };
   if (!attachments?.length) return empty;
 
-  const { apiKey = '', question = '', canSeeImages = true } = opts;
+  const { apiKey = '', question = '', canSeeImages = true, canPassPdf = false, channelId = '' } = opts;
   const parts: string[] = [];
   const images: AttachmentAnalysis['images'] = [];
   let processed = 0;
@@ -354,6 +373,49 @@ export async function analyzeAttachments(
         const r = await analyzeVideo(raw, name, apiKey, question);
         if (r.context) parts.push(r.context);
         for (const im of r.images) images.push(im);
+        processed++;
+        continue;
+      }
+
+      // ---- 📄 مستندات: PDF / Word / PowerPoint / Excel / ODT / RTF ----
+      if (kind === 'pdf' || kind === 'document') {
+        if ((att.size || 0) > 15 * 1024 * 1024) {
+          parts.push(`[مستند مرفق: "${name}" — ${sizeKb}KB أكبر من الحد المسموح لقراءته]`);
+          continue;
+        }
+
+        const raw = await download(att.url);
+        const { extractDocumentText } = await import('./documentText');
+        const doc = extractDocumentText(raw, name, att.contentType || '');
+
+        const lines: string[] = [`[📄 مستند مرفق: "${name}" — ${sizeKb}KB — النوع: ${doc.kind}]`];
+
+        const shownText = doc.text && doc.text.trim().length >= 40;
+        const usableText = doc.text && doc.text.trim().length >= 120;
+        if (shownText) {
+          const head = doc.usable ? '**النص المستخرج:**' : '**النص المستخرج (قد يكون جزئياً):**';
+          lines.push(`${head}\n\`\`\`\n${doc.text.slice(0, 6000)}\n\`\`\``);
+        }
+
+        // PDF + مزوّد يدعم قراءة الملفات (Gemini) → نمرّر الصفحات نفسها مباشرة (الأدق للعربية والملفات الممسوحة)
+        const canInlinePdf = kind === 'pdf' && canPassPdf && raw.length <= 10 * 1024 * 1024;
+        if (canInlinePdf) {
+          images.push({ data: raw.toString('base64'), mimeType: 'application/pdf' });
+          lines.push('📖 صفحات المستند تظهر لك مباشرة — اقرأها بدقة وأجب عن سؤال المستخدم منها.');
+        } else if (!shownText) {
+          lines.push(
+            'تعذّر استخراج نص كافٍ من المستند (قد يكون صوراً ممسوحة)، ولا تتوفر قراءة مباشرة للصفحات — اطلب من المستخدم لقطة شاشة للصفحة المطلوبة أو وصفاً نصياً.'
+          );
+        }
+
+        parts.push(lines.join('\n'));
+
+        // 🧠 حفظ نص المستند للأسئلة اللاحقة في نفس القناة
+        if (usableText && channelId) {
+          const { rememberDocument } = await import('./documentMemory');
+          rememberDocument(channelId, name, doc.text);
+        }
+
         processed++;
         continue;
       }

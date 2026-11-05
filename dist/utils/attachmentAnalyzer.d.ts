@@ -29,6 +29,10 @@ export declare function analyzeAttachments(attachments: Array<{
     apiKey?: string;
     question?: string;
     canSeeImages?: boolean;
+    /** هل يمكن تمرير ملف PDF نفسه لمزوّد الرؤية (Gemini)؟ */
+    canPassPdf?: boolean;
+    /** قناة الرسالة — لحفظ المستند في الذاكرة القصيرة */
+    channelId?: string;
 }): Promise<AttachmentAnalysis>;
 /** هل يحتوي الرسالة على وسائط قابلة للتحليل؟ */
 export declare function hasAnalyzableAttachments(attachments: Array<{

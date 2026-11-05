@@ -244,6 +244,8 @@ class AIHandler {
                         apiKey: config_1.config.ai.groq.apiKey?.startsWith('gsk_') ? config_1.config.ai.groq.apiKey : '',
                         question: message,
                         canSeeImages: canUseInlineVision,
+                        canPassPdf: this.geminiReady,
+                        channelId,
                     });
                     if (analysis.context) {
                         media = { context: analysis.context, images: analysis.images };
@@ -252,6 +254,25 @@ class AIHandler {
                 }
                 catch (e) {
                     logger.warn(`Attachment analysis failed: ${e?.message || e}`);
+                }
+            }
+            // 📄 متابعة الأسئلة عن مستند أُرسل مؤخراً في نفس القناة (آخر 20 دقيقة)
+            if (!(attachments && attachments.length > 0)) {
+                try {
+                    const { getRememberedDocument } = await Promise.resolve().then(() => __importStar(require('../utils/documentMemory')));
+                    const doc = getRememberedDocument(channelId);
+                    if (doc) {
+                        const block = `\n\n[📄 مستند محفوظ من هذه المحادثة: "${doc.name}"]\n` +
+                            `\`\`\`\n${doc.text.slice(0, 6000)}\n\`\`\`\n` +
+                            `[استخدم محتواه فقط إذا كانت رسالة المستخدم سؤالاً عن هذا المستند، وإلا تجاهله تماماً.]`;
+                        media = media
+                            ? { context: media.context + block, images: media.images }
+                            : { context: block, images: [] };
+                        logger.info(`Document memory attached to AI context: ${doc.name}`);
+                    }
+                }
+                catch (e) {
+                    logger.warn(`Document memory failed: ${e?.message || e}`);
                 }
             }
             // 🔍 كشف الحاجة للبحث: أسئلة عن ترندات، أخبار، ميمز، أسعار، أحداث حالية، يوتيوب
@@ -540,7 +561,8 @@ class AIHandler {
             }
         }
         // ✂️ الوضع المختصر: يقلّل سقف التوكنات أيضاً كشبكة أمان — يُلغى إذا طلب المستخدم التفصيل
-        const allowLongAnswer = !brief || this.wantsDetailedAnswer(message);
+        // 📄 وجود وسائط (مستند/صورة/تفريغ صوتي) يفتح المجال لإجابة أطول — الاختصار للنص العادي فقط
+        const allowLongAnswer = !brief || this.wantsDetailedAnswer(message) || !!media?.context;
         const brevity = brief && !allowLongAnswer;
         if (brevity) {
             const configuredMax = typeof aiConfig.maxTokens === 'number' ? aiConfig.maxTokens : 500;
@@ -1228,12 +1250,14 @@ class AIHandler {
             throw new Error('OpenRouter not configured');
         const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : config_1.config.ai.openrouter.temperature;
         const maxTokens = Math.min(aiConfig.maxTokens || 500, config_1.config.ai.openrouter.maxTokens);
-        const messages = this.buildMessages(systemPrompt, history, message, images);
-        const candidates = images?.length
+        // 🖼️ OpenRouter يدعم الصور فقط في هذا المسار — نستبعد أي ملفات (مثل PDF) لتجنّب رفض الطلب
+        const imageList = (images || []).filter(i => i.mimeType.startsWith('image/'));
+        const messages = this.buildMessages(systemPrompt, history, message, imageList.length ? imageList : undefined);
+        const candidates = imageList.length
             ? this.openrouterVisionCandidates()
             : [config_1.config.ai.openrouter?.model || 'google/gemma-4-26b-a4b-it:free'];
         // 🔭 الرؤية تحتاج توكنز أكبر — الموديلات الاستدلالية تستهلكها في "التفكير" قبل الإجابة
-        const effMaxTokens = images?.length ? Math.max(maxTokens, 1800) : maxTokens;
+        const effMaxTokens = imageList.length ? Math.max(maxTokens, 1800) : maxTokens;
         let lastError = null;
         for (const model of candidates) {
             // الحصة المجانية قد ترجع 429 مؤقتاً → نجرّب الموديل مرتين قبل التالي
@@ -1241,7 +1265,7 @@ class AIHandler {
             for (let attempt = 1; attempt <= attempts; attempt++) {
                 try {
                     // 📡 بث مباشر — لا يُستخدم مع الصور
-                    if (stream?.onFirstChunk && !images?.length) {
+                    if (stream?.onFirstChunk && !imageList.length) {
                         const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: effMaxTokens, stream: true }, { responseType: 'stream' });
                         let full = '';
                         let started = false;
