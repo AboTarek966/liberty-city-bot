@@ -22,19 +22,35 @@ const INSULT_WORDS = [
 function normalize(s) {
     return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }
+const BOT_NAME_PATTERN = /(^|\s)(بوت|البوت|يا\s?بوت|bot|the\s?bot|omni|ليبرتي|liber(ty|ti))(\s|$)/iu;
 function targetsBot(message, client) {
     const meId = client.user?.id;
     if (meId && message.mentions?.users?.has(meId))
         return true;
     if (meId && message.mentions?.members?.has(meId))
         return true;
-    // إشارة/اسم البوت داخل الرسالة
+    // ردّ مباشر على رسالة البوت
+    if (meId && message.reference?.messageId) {
+        const replied = message.mentions?.repliedUser;
+        if (replied?.id === meId)
+            return true;
+    }
+    // إشارة/اسم البوت داخل الرسالة (بحدود كلمة — لا يطابق "both" أو "robot")
     const content = normalize(message.content || '');
-    return /بوت|bot|omni|ليبرتي|لي?برتي/i.test(content);
+    return BOT_NAME_PATTERN.test(content);
 }
+/** مقارنة على مستوى الكلمة — تتجنّب مطابقة "نصب" داخل "نصبر" أو "bot" داخل "both" */
 function hasAbuse(text) {
     const t = normalize(text);
-    return INSULT_WORDS.some(w => t.includes(w));
+    const tokens = t.split(' ').filter(Boolean);
+    return INSULT_WORDS.some((w) => {
+        if (w.includes(' '))
+            return t.includes(w);
+        if (/^[a-z ]+$/i.test(w)) {
+            return tokens.some((tok) => tok === w || tok === `${w}s`);
+        }
+        return tokens.some((tok) => tok === w || tok === `ال${w}` || tok === `${w}ة`);
+    });
 }
 /**
  * يعالج الإساءة المستهدفة للبوت.

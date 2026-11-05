@@ -27,6 +27,7 @@ export const PROTECTION_LABELS: Record<string, string> = {
   antiEmoji: 'مضاد الإيموجي 😀',
   antiNuke: 'مضاد النيوك 💣',
   antiBot: 'مضاد البوتات 🤖',
+  antiBotAbuse: 'مكافحة الإساءة للبوت 🚫',
   antiAdmin: 'مراقبة الأدمن ⚠️',
   autoBackup: 'النسخ التلقائي 💾',
   autoScan: 'الفحص الدوري 🔍',

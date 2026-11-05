@@ -33,6 +33,7 @@ exports.PROTECTION_LABELS = {
     antiEmoji: 'مضاد الإيموجي 😀',
     antiNuke: 'مضاد النيوك 💣',
     antiBot: 'مضاد البوتات 🤖',
+    antiBotAbuse: 'مكافحة الإساءة للبوت 🚫',
     antiAdmin: 'مراقبة الأدمن ⚠️',
     autoBackup: 'النسخ التلقائي 💾',
     autoScan: 'الفحص الدوري 🔍',
