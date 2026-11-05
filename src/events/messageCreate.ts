@@ -1537,13 +1537,18 @@ async function handleAIResponse(message: Message, client: OmniClient): Promise<v
   const isDM = !message.guild;
 
   // Check if bot was mentioned
-  const isMention = message.mentions.has(client.user!);
+  // 🚫 @everyone / @here لا تُعتبر منشن للبوت — بدونها كان يرد على أي رسالة فيها منشن عام
+  const mentionsEveryone = message.mentions.everyone;
+  const isMention = message.mentions.has(client.user!, { ignoreEveryone: true });
 
   // في DMs: يرد على أي رسالة مباشرة (بدون حاجة لمنشن/رد)
   // في السيرفرات: يشترط منشن أو رد على البوت
   let repliedToBot = false;
 
   if (!isDM) {
+    // 🚫 رسائل @everyone / @here — البوت لا يرد عليها إطلاقاً (حتى لو كان منشنّاً أو مردوداً عليها)
+    if (mentionsEveryone) return;
+
     if (!isMention && !message.reference?.messageId) return;
 
     // Check if reply to bot's message (الذاكرة المؤقتة أولاً — بدون طلب API إن أمكن)
