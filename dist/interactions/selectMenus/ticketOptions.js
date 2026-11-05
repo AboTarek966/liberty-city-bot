@@ -21,8 +21,13 @@ const handler = {
             switch (action) {
                 // ---------- 🤝 استلام التذكرة ----------
                 case 'claim': {
-                    if (!member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
-                        await selectInteraction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لاستلام التذاكر' });
+                    const settings = await (0, models_1.getGuildSettings)(selectInteraction.guild.id);
+                    const canClaim = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+                        member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+                        (settings.tickets.adminRoleIds || []).some((id) => member.roles.cache.has(id)) ||
+                        (settings.tickets.supportRoleIds || []).some((id) => member.roles.cache.has(id));
+                    if (!canClaim) {
+                        await selectInteraction.editReply({ content: '❌ تحتاج أن تكون من فريق الدعم أو الإدارة لاستلام التذاكر' });
                         return;
                     }
                     await client.ticketHandler.claimTicket(selectInteraction.channelId, member);

@@ -263,6 +263,8 @@ ${attachments ? `المرفقات: ${attachments}` : ''}
                 .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
                 .setTimestamp();
             await channel.send({ embeds: [embed] }).catch(() => { });
+            // 🤖 تحديث الأزرار: استلام من البوت + إلغاء استلام البوت (للمسؤول فقط)
+            await this.client.ticketHandler.updateTicketButtons(channel, true, true).catch(() => { });
             logger.info(`AI auto-claimed ticket in ${channel.guild.name}`);
         }
         catch (error) {

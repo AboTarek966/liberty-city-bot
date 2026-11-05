@@ -66,7 +66,7 @@ export declare class TicketHandler {
     /** ⚡ طابور إرسال سجلات التذاكر لكل سيرفر — ترتيب تام + لا يعطّل مسار التذكرة */
     private ticketLogQueues;
     constructor(client: OmniClient);
-    buildTicketControls(claimed: boolean): ActionRowBuilder<any>[];
+    buildTicketControls(claimed: boolean, claimedByBot?: boolean): ActionRowBuilder<any>[];
     createTicketCategory(guild: Guild, name: string): Promise<CategoryChannel>;
     createLogChannel(guild: Guild, name: string, category?: CategoryChannel): Promise<TextChannel>;
     createTicket(options: CreateTicketOptions): Promise<ITicket>;
@@ -90,7 +90,7 @@ export declare class TicketHandler {
     private applyCloseLock;
     private restoreSnapshots;
     callAdmin(channelId: string, calledBy: GuildMember): Promise<void>;
-    updateTicketButtons(channel: TextChannel, claimed: boolean): Promise<void>;
+    updateTicketButtons(channel: TextChannel, claimed: boolean, claimedByBot?: boolean): Promise<void>;
     addMemberToTicket(channelId: string, member: GuildMember, addedBy: GuildMember): Promise<void>;
     getTranscript(channelId: string): Promise<string>;
     private generateTranscript;

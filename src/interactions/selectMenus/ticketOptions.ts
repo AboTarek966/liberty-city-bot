@@ -13,7 +13,7 @@ import {
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
-import { Ticket } from '../../models';
+import { Ticket, getGuildSettings } from '../../models';
 
 const handler: SelectMenuHandler = {
   id: 'ticket_options',
@@ -32,8 +32,14 @@ const handler: SelectMenuHandler = {
       switch (action) {
         // ---------- 🤝 استلام التذكرة ----------
         case 'claim': {
-          if (!member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-            await selectInteraction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لاستلام التذاكر' });
+          const settings = await getGuildSettings(selectInteraction.guild.id);
+          const canClaim =
+            member.permissions.has(PermissionFlagsBits.Administrator) ||
+            member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+            (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||
+            (settings.tickets.supportRoleIds || []).some((id: string) => member.roles.cache.has(id));
+          if (!canClaim) {
+            await selectInteraction.editReply({ content: '❌ تحتاج أن تكون من فريق الدعم أو الإدارة لاستلام التذاكر' });
             return;
           }
           await client.ticketHandler.claimTicket(selectInteraction.channelId, member);

@@ -375,7 +375,8 @@ async function handleClaim(interaction, client) {
     // Check permissions
     const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
     const isSupport = settings.tickets.supportRoleIds.some((r) => member.roles.cache.has(r));
-    if (!isSupport && !member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+    const isAdminRole = settings.tickets.adminRoleIds.some((r) => member.roles.cache.has(r));
+    if (!isSupport && !isAdminRole && !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) && !member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
         await interaction.editReply({
             content: '❌ يجب أن تكون من فريق الدعم لاستلام التذاكر',
         });

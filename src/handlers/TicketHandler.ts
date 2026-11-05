@@ -143,7 +143,32 @@ export class TicketHandler {
   // بناء عناصر التحكم داخل التذكرة:
   // قائمة خيارات (Options) + زر استلام سريع
   // --------------------------------------------
-  buildTicketControls(claimed: boolean): ActionRowBuilder<any>[] {
+  buildTicketControls(claimed: boolean, claimedByBot: boolean = false): ActionRowBuilder<any>[] {
+    const claimOptions: Array<{ label: string; value: string; description: string; emoji: string }> = [];
+    if (!claimed) {
+      claimOptions.push({
+        label: 'استلام التذكرة',
+        value: 'claim',
+        description: 'استلام التذكرة والقفل عليها',
+        emoji: '🤝',
+      });
+    } else if (claimedByBot) {
+      // 🤖 استلمها البوت → أي إداري يقدر يأخذها، والإلغاء للمسؤول فقط
+      claimOptions.push({
+        label: 'استلام التذكرة من البوت',
+        value: 'claim',
+        description: 'أخذ التذكرة من البوت واستلامها بنفسك',
+        emoji: '🤝',
+      });
+      claimOptions.push({
+        label: 'إلغاء استلام البوت',
+        value: 'unclaim',
+        description: 'إعادة التذكرة غير مستلمة — صلاحية Administrator فقط',
+        emoji: '↩️',
+      });
+    }
+    // استلام بشري = نهائي: لا نعرض خيار إلغاء الاستلام إطلاقاً
+
     const options: Array<{ label: string; value: string; description: string; emoji: string }> = [
       {
         label: 'إضافة عضو أو إداري',
@@ -157,19 +182,7 @@ export class TicketHandler {
         description: 'إشعار الإدارة العليا بالنظر في التذكرة',
         emoji: '👑',
       },
-      claimed
-        ? {
-            label: 'إلغاء الاستلام',
-            value: 'unclaim',
-            description: 'تحرير التذكرة ليأخذها غيرك',
-            emoji: '↩️',
-          }
-        : {
-            label: 'استلام التذكرة',
-            value: 'claim',
-            description: 'استلام التذكرة والقفل عليها',
-            emoji: '🤝',
-          },
+      ...claimOptions,
       {
         label: 'إغلاق التذكرة',
         value: 'close',
@@ -197,19 +210,39 @@ export class TicketHandler {
         .addOptions(options)
     );
 
-    const claimRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      claimed
-        ? new ButtonBuilder()
-            .setCustomId('ticket_unclaim')
-            .setLabel('إلغاء الاستلام')
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji('↩️')
-        : new ButtonBuilder()
-            .setCustomId('ticket_claim')
-            .setLabel('استلام التذكرة')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('🤝')
-    );
+    const claimRow = new ActionRowBuilder<ButtonBuilder>();
+    if (!claimed) {
+      claimRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId('ticket_claim')
+          .setLabel('استلام التذكرة')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🤝')
+      );
+    } else if (claimedByBot) {
+      claimRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId('ticket_claim')
+          .setLabel('استلام من البوت')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🤝'),
+        new ButtonBuilder()
+          .setCustomId('ticket_unclaim')
+          .setLabel('إلغاء استلام البوت')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('↩️')
+      );
+    } else {
+      // 🔒 استلام بشري نهائي — زر معطّل للتوضيح فقط
+      claimRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId('ticket_claim_locked')
+          .setLabel('تم الاستلام — نهائي ولا يمكن إلغاؤه')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('🔒')
+          .setDisabled(true)
+      );
+    }
 
     return [selectRow, claimRow];
   }
@@ -634,6 +667,17 @@ export class TicketHandler {
     ]);
 
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
+
+    // 🛡️ من يحق له الاستلام؟ أي إداري/دعم موجود (صلاحية إدارية أو رول إداري/دعم)
+    const canClaim =
+      claimedBy.permissions.has(PermissionFlagsBits.Administrator) ||
+      claimedBy.permissions.has(PermissionFlagsBits.ManageChannels) ||
+      (settings.tickets.adminRoleIds || []).some((id: string) => claimedBy.roles.cache.has(id)) ||
+      (settings.tickets.supportRoleIds || []).some((id: string) => claimedBy.roles.cache.has(id));
+    if (!canClaim) {
+      throw new Error('تحتاج أن تكون من فريق الدعم أو الإدارة لاستلام التذاكر');
+    }
+
     if (ticket.status === 'claimed') {
       // 🤖 لو الـ AI هو اللي مستلم التذكرة → نسمح لإداري بشري بأخذها بدل ما تتقفل
       const isAIClaim = ticket.claimedBy === this.client.user?.id;
@@ -747,13 +791,15 @@ export class TicketHandler {
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
     if (ticket.status !== 'claimed') throw new Error('التذكرة غير مستلمة');
 
-    const isClaimer = ticket.claimedBy === unclaimedBy.id;
-    const isAIClaim = ticket.claimedBy === this.client.user?.id;
+    // 🔒 استلام بشري = نهائي: لا أحد يقدر يلغي استلام تذكرة استلمها إداري/عضو
+    const isAIClaim = !!this.client.user?.id && ticket.claimedBy === this.client.user.id;
+    if (!isAIClaim) {
+      throw new Error('لا يمكن إلغاء استلام التذكرة — الاستلام نهائي ولا يمكن التراجع عنه.');
+    }
 
-    // ⛔ إلغاء الاستلام للمستلم فقط — لا يمكن لإداري آخر تحرير تذكرة استلمها زميله
-    //    ما عدا تذكرة استلمها الـ AI → يقدر أي إداري يحررها
-    if (!isClaimer && !isAIClaim) {
-      throw new Error('فقط المستلم هو من يستطيع إلغاء استلام التذكرة');
+    // 🤖 تذكرة استلمها البوت: فقط من يملك صلاحية Administrator يقدر يشيل استلامها
+    if (!unclaimedBy.permissions.has(PermissionFlagsBits.Administrator)) {
+      throw new Error('فقط من يملك صلاحية Administrator يمكنه إلغاء استلام تذكرة استلمها البوت.');
     }
 
     const previousClaimer = guild.members.cache.get(ticket.claimedBy!);
@@ -894,7 +940,7 @@ export class TicketHandler {
 
         jobs.push(channel.send({ embeds: [reopenEmbed] }));
         // الاستلام محفوظ → نعرض زر "إلغاء الاستلام" لا زر "استلام"
-        jobs.push(this.updateTicketButtons(channel, !!ticket.claimedBy));
+        jobs.push(this.updateTicketButtons(channel, !!ticket.claimedBy, ticket.claimedBy === this.client.user?.id));
       }
 
       this.logTicketEvent(guild, 'close', ticket, reopenedBy.user, 'إعادة فتح');
@@ -1152,7 +1198,7 @@ export class TicketHandler {
   // --------------------------------------------
   // Update Ticket Buttons
   // --------------------------------------------
-  async updateTicketButtons(channel: TextChannel, claimed: boolean): Promise<void> {
+  async updateTicketButtons(channel: TextChannel, claimed: boolean, claimedByBot: boolean = false): Promise<void> {
     try {
       const messages = await channel.messages.fetch({ limit: 10 });
       // Find the last message with components (the ticket action message)
@@ -1161,7 +1207,7 @@ export class TicketHandler {
       );
 
       if (actionMessage) {
-        await actionMessage.edit({ components: this.buildTicketControls(claimed) });
+        await actionMessage.edit({ components: this.buildTicketControls(claimed, claimedByBot) });
       }
     } catch (error) {
       logger.warn('Failed to update ticket buttons:', error);

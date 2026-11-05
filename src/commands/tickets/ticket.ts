@@ -522,8 +522,9 @@ async function handleClaim(interaction: ChatInputCommandInteraction, client: Omn
   // Check permissions
   const settings = await getGuildSettings(interaction.guildId!);
   const isSupport = settings.tickets.supportRoleIds.some((r: string) => member.roles.cache.has(r));
+  const isAdminRole = settings.tickets.adminRoleIds.some((r: string) => member.roles.cache.has(r));
 
-  if (!isSupport && !member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+  if (!isSupport && !isAdminRole && !member.permissions.has(PermissionFlagsBits.Administrator) && !member.permissions.has(PermissionFlagsBits.ManageChannels)) {
     await interaction.editReply({
       content: '❌ يجب أن تكون من فريق الدعم لاستلام التذاكر',
     });

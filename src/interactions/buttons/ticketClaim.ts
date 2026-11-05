@@ -5,6 +5,7 @@
 import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
+import { getGuildSettings } from '../../models';
 
 const handler: ButtonHandler = {
   id: 'ticket_claim',
@@ -20,8 +21,15 @@ const handler: ButtonHandler = {
         interaction.guild.members.cache.get(interaction.user.id) ??
         (await interaction.guild.members.fetch(interaction.user.id));
 
-      if (!member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        await interaction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لاستلام التذاكر' });
+      const settings = await getGuildSettings(interaction.guild.id);
+      const canClaim =
+        member.permissions.has(PermissionFlagsBits.Administrator) ||
+        member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+        (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||
+        (settings.tickets.supportRoleIds || []).some((id: string) => member.roles.cache.has(id));
+
+      if (!canClaim) {
+        await interaction.editReply({ content: '❌ تحتاج أن تكون من فريق الدعم أو الإدارة لاستلام التذاكر' });
         return;
       }
 

@@ -68,7 +68,32 @@ class TicketHandler {
     // بناء عناصر التحكم داخل التذكرة:
     // قائمة خيارات (Options) + زر استلام سريع
     // --------------------------------------------
-    buildTicketControls(claimed) {
+    buildTicketControls(claimed, claimedByBot = false) {
+        const claimOptions = [];
+        if (!claimed) {
+            claimOptions.push({
+                label: 'استلام التذكرة',
+                value: 'claim',
+                description: 'استلام التذكرة والقفل عليها',
+                emoji: '🤝',
+            });
+        }
+        else if (claimedByBot) {
+            // 🤖 استلمها البوت → أي إداري يقدر يأخذها، والإلغاء للمسؤول فقط
+            claimOptions.push({
+                label: 'استلام التذكرة من البوت',
+                value: 'claim',
+                description: 'أخذ التذكرة من البوت واستلامها بنفسك',
+                emoji: '🤝',
+            });
+            claimOptions.push({
+                label: 'إلغاء استلام البوت',
+                value: 'unclaim',
+                description: 'إعادة التذكرة غير مستلمة — صلاحية Administrator فقط',
+                emoji: '↩️',
+            });
+        }
+        // استلام بشري = نهائي: لا نعرض خيار إلغاء الاستلام إطلاقاً
         const options = [
             {
                 label: 'إضافة عضو أو إداري',
@@ -82,19 +107,7 @@ class TicketHandler {
                 description: 'إشعار الإدارة العليا بالنظر في التذكرة',
                 emoji: '👑',
             },
-            claimed
-                ? {
-                    label: 'إلغاء الاستلام',
-                    value: 'unclaim',
-                    description: 'تحرير التذكرة ليأخذها غيرك',
-                    emoji: '↩️',
-                }
-                : {
-                    label: 'استلام التذكرة',
-                    value: 'claim',
-                    description: 'استلام التذكرة والقفل عليها',
-                    emoji: '🤝',
-                },
+            ...claimOptions,
             {
                 label: 'إغلاق التذكرة',
                 value: 'close',
@@ -118,17 +131,34 @@ class TicketHandler {
             .setCustomId('ticket_options')
             .setPlaceholder('⚙️ خيارات التذكرة — اختر إجراءً')
             .addOptions(options));
-        const claimRow = new discord_js_1.ActionRowBuilder().addComponents(claimed
-            ? new discord_js_1.ButtonBuilder()
-                .setCustomId('ticket_unclaim')
-                .setLabel('إلغاء الاستلام')
-                .setStyle(discord_js_1.ButtonStyle.Secondary)
-                .setEmoji('↩️')
-            : new discord_js_1.ButtonBuilder()
+        const claimRow = new discord_js_1.ActionRowBuilder();
+        if (!claimed) {
+            claimRow.addComponents(new discord_js_1.ButtonBuilder()
                 .setCustomId('ticket_claim')
                 .setLabel('استلام التذكرة')
                 .setStyle(discord_js_1.ButtonStyle.Primary)
                 .setEmoji('🤝'));
+        }
+        else if (claimedByBot) {
+            claimRow.addComponents(new discord_js_1.ButtonBuilder()
+                .setCustomId('ticket_claim')
+                .setLabel('استلام من البوت')
+                .setStyle(discord_js_1.ButtonStyle.Primary)
+                .setEmoji('🤝'), new discord_js_1.ButtonBuilder()
+                .setCustomId('ticket_unclaim')
+                .setLabel('إلغاء استلام البوت')
+                .setStyle(discord_js_1.ButtonStyle.Danger)
+                .setEmoji('↩️'));
+        }
+        else {
+            // 🔒 استلام بشري نهائي — زر معطّل للتوضيح فقط
+            claimRow.addComponents(new discord_js_1.ButtonBuilder()
+                .setCustomId('ticket_claim_locked')
+                .setLabel('تم الاستلام — نهائي ولا يمكن إلغاؤه')
+                .setStyle(discord_js_1.ButtonStyle.Secondary)
+                .setEmoji('🔒')
+                .setDisabled(true));
+        }
         return [selectRow, claimRow];
     }
     // --------------------------------------------
@@ -491,6 +521,14 @@ class TicketHandler {
         ]);
         if (!ticket)
             throw new Error('لم يتم العثور على التذكرة');
+        // 🛡️ من يحق له الاستلام؟ أي إداري/دعم موجود (صلاحية إدارية أو رول إداري/دعم)
+        const canClaim = claimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+            claimedBy.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+            (settings.tickets.adminRoleIds || []).some((id) => claimedBy.roles.cache.has(id)) ||
+            (settings.tickets.supportRoleIds || []).some((id) => claimedBy.roles.cache.has(id));
+        if (!canClaim) {
+            throw new Error('تحتاج أن تكون من فريق الدعم أو الإدارة لاستلام التذاكر');
+        }
         if (ticket.status === 'claimed') {
             // 🤖 لو الـ AI هو اللي مستلم التذكرة → نسمح لإداري بشري بأخذها بدل ما تتقفل
             const isAIClaim = ticket.claimedBy === this.client.user?.id;
@@ -577,12 +615,14 @@ class TicketHandler {
             throw new Error('لم يتم العثور على التذكرة');
         if (ticket.status !== 'claimed')
             throw new Error('التذكرة غير مستلمة');
-        const isClaimer = ticket.claimedBy === unclaimedBy.id;
-        const isAIClaim = ticket.claimedBy === this.client.user?.id;
-        // ⛔ إلغاء الاستلام للمستلم فقط — لا يمكن لإداري آخر تحرير تذكرة استلمها زميله
-        //    ما عدا تذكرة استلمها الـ AI → يقدر أي إداري يحررها
-        if (!isClaimer && !isAIClaim) {
-            throw new Error('فقط المستلم هو من يستطيع إلغاء استلام التذكرة');
+        // 🔒 استلام بشري = نهائي: لا أحد يقدر يلغي استلام تذكرة استلمها إداري/عضو
+        const isAIClaim = !!this.client.user?.id && ticket.claimedBy === this.client.user.id;
+        if (!isAIClaim) {
+            throw new Error('لا يمكن إلغاء استلام التذكرة — الاستلام نهائي ولا يمكن التراجع عنه.');
+        }
+        // 🤖 تذكرة استلمها البوت: فقط من يملك صلاحية Administrator يقدر يشيل استلامها
+        if (!unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
+            throw new Error('فقط من يملك صلاحية Administrator يمكنه إلغاء استلام تذكرة استلمها البوت.');
         }
         const previousClaimer = guild.members.cache.get(ticket.claimedBy);
         ticket.status = 'open';
@@ -682,7 +722,7 @@ class TicketHandler {
                 });
                 jobs.push(channel.send({ embeds: [reopenEmbed] }));
                 // الاستلام محفوظ → نعرض زر "إلغاء الاستلام" لا زر "استلام"
-                jobs.push(this.updateTicketButtons(channel, !!ticket.claimedBy));
+                jobs.push(this.updateTicketButtons(channel, !!ticket.claimedBy, ticket.claimedBy === this.client.user?.id));
             }
             this.logTicketEvent(guild, 'close', ticket, reopenedBy.user, 'إعادة فتح');
             await Promise.allSettled(jobs);
@@ -898,13 +938,13 @@ class TicketHandler {
     // --------------------------------------------
     // Update Ticket Buttons
     // --------------------------------------------
-    async updateTicketButtons(channel, claimed) {
+    async updateTicketButtons(channel, claimed, claimedByBot = false) {
         try {
             const messages = await channel.messages.fetch({ limit: 10 });
             // Find the last message with components (the ticket action message)
             const actionMessage = messages.find(m => m.components.length > 0 && m.author.id === this.client.user.id);
             if (actionMessage) {
-                await actionMessage.edit({ components: this.buildTicketControls(claimed) });
+                await actionMessage.edit({ components: this.buildTicketControls(claimed, claimedByBot) });
             }
         }
         catch (error) {
