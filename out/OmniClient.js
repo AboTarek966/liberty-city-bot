@@ -67,6 +67,7 @@ class OmniClient extends discord_js_1.Client {
     levelingHandler;
     antiAltHandler;
     inviteTrackerHandler;
+    returnTrackerHandler;
     messageScannerHandler;
     aiAutoModHandler;
     aiTicketAssistant;
@@ -128,6 +129,7 @@ class OmniClient extends discord_js_1.Client {
         this.levelingHandler = new handlers_1.LevelingHandler(this);
         this.antiAltHandler = new handlers_1.AntiAltHandler(this);
         this.inviteTrackerHandler = new handlers_1.InviteTrackerHandler(this);
+        this.returnTrackerHandler = new handlers_1.ReturnTrackerHandler(this);
         this.messageScannerHandler = new handlers_1.MessageScannerHandler(config_1.config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
         this.aiAutoModHandler = new handlers_1.AIAutoModHandler(this);
         this.aiTicketAssistant = new handlers_1.AITicketAssistant(this);

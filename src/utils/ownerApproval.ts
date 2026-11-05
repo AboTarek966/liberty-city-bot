@@ -32,6 +32,7 @@ export const PROTECTION_LABELS: Record<string, string> = {
   autoBackup: 'النسخ التلقائي 💾',
   autoScan: 'الفحص الدوري 🔍',
   inviteTracker: 'تتبع الدعوات 📬',
+  punishmentTracker: 'تتبع العقوبات 🔄',
   aiAutoMod: 'الأوتو مود الذكي 🤖',
   lockdown: 'وضع الطوارئ 🔒',
 };

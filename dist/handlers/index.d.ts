@@ -11,6 +11,7 @@ export { ActivityTracker, ActivityStats } from './ActivityTracker';
 export { SecurityHandler } from './SecurityHandler';
 export { LevelingHandler, RankCardData, LevelUpResult } from './LevelingHandler';
 export { AntiAltHandler } from './AntiAltHandler';
+export { ReturnTrackerHandler } from './ReturnTrackerHandler';
 export { InviteTrackerHandler } from './InviteTrackerHandler';
 export { MessageScannerHandler } from './MessageScannerHandler';
 export { AIAutoModHandler, AutoModConfig } from './AIAutoMod';

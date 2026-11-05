@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.KnowledgeEntry = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.MemberReturnRecord = exports.KnowledgeEntry = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -252,6 +252,9 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             logChannel: { type: String },
             rewardRoleId: { type: String },
             rewardInvites: { type: Number, default: 5 },
+        },
+        punishmentTracker: {
+            enabled: { type: Boolean, default: true },
         },
         messageScanner: {
             enabled: { type: Boolean, default: false },
@@ -763,6 +766,8 @@ var BotAbuseStrike_1 = require("./BotAbuseStrike");
 Object.defineProperty(exports, "BotAbuseStrike", { enumerable: true, get: function () { return BotAbuseStrike_1.BotAbuseStrike; } });
 var KnowledgeEntry_1 = require("./KnowledgeEntry");
 Object.defineProperty(exports, "KnowledgeEntry", { enumerable: true, get: function () { return KnowledgeEntry_1.KnowledgeEntry; } });
+var MemberReturnRecord_1 = require("./MemberReturnRecord");
+Object.defineProperty(exports, "MemberReturnRecord", { enumerable: true, get: function () { return MemberReturnRecord_1.MemberReturnRecord; } });
 var AITicketApproval_1 = require("./AITicketApproval");
 Object.defineProperty(exports, "AITicketApproval", { enumerable: true, get: function () { return AITicketApproval_1.AITicketApproval; } });
 var AdvancedSettings_2 = require("./AdvancedSettings");

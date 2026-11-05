@@ -3,7 +3,7 @@
 // Omni Bot - Handlers Index
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DashboardCommandWorker = exports.VoiceKeeperHandler = exports.MusicHandler = exports.GameHandler = exports.EconomyHandler = exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIInvestigator = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
+exports.DashboardCommandWorker = exports.VoiceKeeperHandler = exports.MusicHandler = exports.GameHandler = exports.EconomyHandler = exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.ReturnTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIInvestigator = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
 var CommandHandler_1 = require("./CommandHandler");
 Object.defineProperty(exports, "CommandHandler", { enumerable: true, get: function () { return CommandHandler_1.CommandHandler; } });
 var EventHandler_1 = require("./EventHandler");
@@ -32,6 +32,8 @@ var LevelingHandler_1 = require("./LevelingHandler");
 Object.defineProperty(exports, "LevelingHandler", { enumerable: true, get: function () { return LevelingHandler_1.LevelingHandler; } });
 var AntiAltHandler_1 = require("./AntiAltHandler");
 Object.defineProperty(exports, "AntiAltHandler", { enumerable: true, get: function () { return AntiAltHandler_1.AntiAltHandler; } });
+var ReturnTrackerHandler_1 = require("./ReturnTrackerHandler");
+Object.defineProperty(exports, "ReturnTrackerHandler", { enumerable: true, get: function () { return ReturnTrackerHandler_1.ReturnTrackerHandler; } });
 var InviteTrackerHandler_1 = require("./InviteTrackerHandler");
 Object.defineProperty(exports, "InviteTrackerHandler", { enumerable: true, get: function () { return InviteTrackerHandler_1.InviteTrackerHandler; } });
 var MessageScannerHandler_1 = require("./MessageScannerHandler");

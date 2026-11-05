@@ -28,6 +28,11 @@ const event: Event = {
         .onMemberLeave(member)
         .catch(err => logger.warn(`inviteTracker onMemberLeave failed: ${err?.message ?? err}`));
 
+      // 🔄 تتبع المغادرة — حفظ حالة العقوبات (سجن/كتم/تحذيرات) قبل ضياعها
+      (member.client as OmniClient).returnTrackerHandler
+        .onMemberLeave(member)
+        .catch(err => logger.warn(`returnTracker onMemberLeave failed: ${err?.message ?? err}`));
+
       // Leave message
       const leaveResult = await handleLeave(member);
       if (leaveResult !== 'sent' && leaveResult !== 'disabled') {

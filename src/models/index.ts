@@ -154,6 +154,10 @@ export interface IGuildSettings extends Document {
       rewardRoleId?: string;
       rewardInvites: number;
     };
+    /** 🔄 تتبع المغادرة والعودة — يكشف تجاوز العقوبات (سجن/كتم/تحذيرات) ويعيد تطبيقها */
+    punishmentTracker?: {
+      enabled: boolean;
+    };
     /** 🔍 Message Scanners — يفحص الرسائل (روابط/ملفات) عبر VirusTotal */
     messageScanner?: {
       enabled: boolean;
@@ -1001,6 +1005,9 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       rewardRoleId: { type: String },
       rewardInvites: { type: Number, default: 5 },
     },
+    punishmentTracker: {
+      enabled: { type: Boolean, default: true },
+    },
     messageScanner: {
       enabled: { type: Boolean, default: false },
       scanLinks: { type: Boolean, default: true },
@@ -1566,6 +1573,7 @@ export { Poll, IPoll } from './Poll';
 export { Giveaway, IGiveaway, IGiveawayRequirements } from './Giveaway';
 export { BotAbuseStrike, IBotAbuseStrike } from './BotAbuseStrike';
 export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
+export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';
 export { AITicketApproval, IAITicketApproval } from './AITicketApproval';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';
 

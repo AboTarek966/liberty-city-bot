@@ -1,5 +1,5 @@
 import { Client, Collection } from 'discord.js';
-import { CommandHandler, EventHandler, InteractionHandler, AIHandler, AIInvestigator, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, VoiceKeeperHandler, DashboardCommandWorker } from './handlers';
+import { CommandHandler, EventHandler, InteractionHandler, AIHandler, AIInvestigator, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, ReturnTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, VoiceKeeperHandler, DashboardCommandWorker } from './handlers';
 import { Express } from 'express';
 export declare class OmniClient extends Client {
     commandHandler: CommandHandler;
@@ -16,6 +16,7 @@ export declare class OmniClient extends Client {
     levelingHandler: LevelingHandler;
     antiAltHandler: AntiAltHandler;
     inviteTrackerHandler: InviteTrackerHandler;
+    returnTrackerHandler: ReturnTrackerHandler;
     messageScannerHandler: MessageScannerHandler;
     aiAutoModHandler: AIAutoModHandler;
     aiTicketAssistant: AITicketAssistant;

@@ -26,6 +26,7 @@ import {
   LevelingHandler,
   AntiAltHandler,
   InviteTrackerHandler,
+  ReturnTrackerHandler,
   MessageScannerHandler,
   AIAutoModHandler,
   AITicketAssistant,
@@ -61,6 +62,7 @@ export class OmniClient extends Client {
   public levelingHandler: LevelingHandler;
   public antiAltHandler: AntiAltHandler;
   public inviteTrackerHandler: InviteTrackerHandler;
+  public returnTrackerHandler: ReturnTrackerHandler;
   public messageScannerHandler: MessageScannerHandler;
   public aiAutoModHandler: AIAutoModHandler;
   public aiTicketAssistant: AITicketAssistant;
@@ -129,6 +131,7 @@ export class OmniClient extends Client {
     this.levelingHandler = new LevelingHandler(this);
     this.antiAltHandler = new AntiAltHandler(this);
     this.inviteTrackerHandler = new InviteTrackerHandler(this);
+    this.returnTrackerHandler = new ReturnTrackerHandler(this);
     this.messageScannerHandler = new MessageScannerHandler(config.apis.virustotal || process.env.VIRUSTOTAL_API_KEY);
     this.aiAutoModHandler = new AIAutoModHandler(this);
     this.aiTicketAssistant = new AITicketAssistant(this);

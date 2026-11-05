@@ -55,11 +55,21 @@ const event: Event = {
       // 📨 Invite Tracker — تتبع الدعوة المستخدمة
       await client.inviteTrackerHandler.onMemberJoin(member);
 
-      // Auto-Role
-      await handleAutoRole(member);
+      // 🔄 تتبع المغادرة/العودة — يعيد العقوبات النشطة لمن غادر هرباً منها
+      const returnTrack = await client.returnTrackerHandler
+        .onMemberJoin(member)
+        .catch((err: any) => {
+          logger.warn(`returnTracker onMemberJoin failed: ${err?.message ?? err}`);
+          return { jailed: false };
+        });
 
-      // 🚧 الحجر التلقائي لحين التوثيق
-      await handleVerificationQuarantine(member);
+      if (!returnTrack?.jailed) {
+        // Auto-Role
+        await handleAutoRole(member);
+
+        // 🚧 الحجر التلقائي لحين التوثيق
+        await handleVerificationQuarantine(member);
+      }
 
       // Welcome message
       const welcomeResult = await handleWelcome(member);
