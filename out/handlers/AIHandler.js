@@ -464,7 +464,10 @@ class AIHandler {
         const m = (message || '').toLowerCase().trim();
         if (!m)
             return false;
-        if (/(باختصار|مختصر|اختصار|قصير|بسرعة|short|brief|briefly|quickly)/i.test(m))
+        // طلب صريح للاختصار (أو نهي عن الإطالة) يتقدّم على أي كلمة أخرى
+        if (/(باختصار|مختصر|اختصار|قصير|بسرعة|بدون إطالة|بلا إطالة|لا تطول|لا تُطل|ماتطولش|متطولش|متبسطش|ماتكتبش|متكتبش|ماتردش|متردش|short|brief|briefly|quickly)/i.test(m))
+            return false;
+        if (/(لا|ما|مش|بدون|من غير)\s*(أريد|اريد|عايز|تحب|تبعت|ترسل|تكتب|ترد)?\s*(رسائل|ردود|رد|رسالة)?\s*(طويلة|طويل|مطولة|مطول)/i.test(m))
             return false;
         const arabic = /(بالتفصيل|بالتفاصيل|مفصل|مفصّل|فصّل|فصل لي|اشرح لي أكثر|اشرح أكثر|شرح كامل|طويل|مطوّل|مقال|مقالة|تقرير|بحث كامل|قائمة كاملة|كل الأمثلة|جميع الأمثلة|خطوات تفصيلية|دليل شامل|مقارنة كاملة|بشكل مفصل|بإسهاب|اكتب لي|اكتبلي|أريد تفاصيل|عايز تفاصيل|تفاصيل أكثر|زودني|وسّع|وسع الشرح|قارن|مقارنة)/i.test(m);
         const english = /\b(detailed|in detail|elaborate|long answer|full explanation|essay|report|step by step|comprehensive|explain more|tell me more|in depth|compare)\b/i.test(m);
