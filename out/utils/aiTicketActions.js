@@ -187,12 +187,15 @@ async function executeTicketAction(client, guild, action, context = {}) {
                     normalizeId(action.params?.categoryId) ||
                     undefined;
                 const parent = parentId ? guild.channels.cache.get(parentId) : null;
+                const security = client.securityHandler;
+                security?.noteSelfCreatedName?.(guild.id, 'channel', name);
                 const channel = await guild.channels.create({
                     name,
                     type,
                     parent: parent && parent.type === discord_js_1.ChannelType.GuildCategory ? parent.id : undefined,
                     reason,
                 });
+                security?.noteSelfCreated?.(guild.id, 'channel', channel.id);
                 return { ok: true, message: `✅ تم إنشاء القناة ${channel}` };
             }
             case 'modify_permissions': {

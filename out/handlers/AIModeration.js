@@ -474,11 +474,14 @@ async function executeAIModeration(message, client, question) {
                 const roleName = question.match(/رول\s+(?:اسمه|اسمه\s*)?([^ل]+?)(?:\s+بلون|\s*$)/i)?.[1]?.trim() || 'رول جديد';
                 const colorMatch = question.match(/لون\s*(?:#?[0-9a-fA-F]{6})/i);
                 const color = colorMatch ? colorMatch[0].replace(/لون\s*/i, '') : '#5865F2';
+                const security = guild.client.securityHandler;
+                security?.noteSelfCreatedName?.(guild.id, 'role', roleName.substring(0, 100));
                 const newRole = await guild.roles.create({
                     name: roleName.substring(0, 100),
                     color: color,
                     reason: `${reason} | بواسطة ${moderator.user.tag}`,
                 });
+                security?.noteSelfCreated?.(guild.id, 'role', newRole.id);
                 embed = new discord_js_1.EmbedBuilder()
                     .setTitle('✅ تم إنشاء الرول')
                     .setColor(embeds_1.Colors.success)

@@ -515,6 +515,13 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
   await settings.save();
   invalidateGuildSettings(interaction.guildId!);
 
+  // ⚡ مزامنة حارس الحذف السريع فوراً (يبدأ عند التفعيل ويتوقف عند الإطفاء)
+  if (interaction.guild) {
+    await (interaction.client as OmniClient).securityHandler
+      .syncRapidGuard(interaction.guild)
+      .catch(() => {});
+  }
+
   const n = settings.protection.antiNuke;
 
   // 🛡️ قراءة تسلّم البوت — أهم مؤشر يحدّد إن كانت العقوبة ستنجح أصلاً
@@ -545,7 +552,8 @@ async function configureAntiNuke(interaction: ChatInputCommandInteraction, setti
         name: 'كيف يعمل؟',
         value:
           'يرصد الحذف المكثف للقنوات/الرولات/الحظر، يحدّد المنفّذ من سجلات التدقيق، ' +
-          'ينفّذ العقوبة **بعد التأكد من التسلّم**، ثم **يعيد البناء تلقائياً** من آخر نسخة احتياطية.',
+          'ينفّذ العقوبة **بعد التأكد من التسلّم**، ثم **يعيد البناء تلقائياً** من آخر نسخة احتياطية.\n' +
+          '⚡ **حارس الحذف السريع:** يحذف فوراً أي قناة أو رول جديد باسم هاكر/تخريب، ويعيد الفحص كل 20 ثانية.',
         inline: false,
       },
       ...(hierarchy && !hierarchy.ok

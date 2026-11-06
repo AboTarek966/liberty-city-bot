@@ -215,13 +215,18 @@ export function findRole(guild: Guild, name: string): Role | undefined {
   return guild.roles.cache.find(r => r.name.toLowerCase() === name.toLowerCase());
 }
 
-export function createMuteRole(guild: Guild): Promise<Role> {
-  return guild.roles.create({
-    name: `Muted - ${guild.name}`,
+export async function createMuteRole(guild: Guild): Promise<Role> {
+  const name = `Muted - ${guild.name}`;
+  const security = (guild.client as any).securityHandler;
+  security?.noteSelfCreatedName?.(guild.id, 'role', name);
+  const role = await guild.roles.create({
+    name,
     color: 0x555555,
     reason: `إنشاء رول الكتم التلقائي بواسطة ${guild.name}`,
     permissions: [],
   });
+  security?.noteSelfCreated?.(guild.id, 'role', role.id);
+  return role;
 }
 
 export async function applyMuteRole(guild: Guild, muteRole: Role): Promise<void> {

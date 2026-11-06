@@ -257,11 +257,13 @@ export class TicketHandler {
 
     if (existingCategory) return existingCategory;
 
+    this.client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name);
     const category = await guild.channels.create({
       name,
       type: ChannelType.GuildCategory,
       reason: 'Omni - Ticket System',
     });
+    this.client.securityHandler?.noteSelfCreated(guild.id, 'channel', category.id);
 
     logger.info(`Created ticket category: ${category.name}`);
     return category;
@@ -277,6 +279,7 @@ export class TicketHandler {
 
     if (existingChannel) return existingChannel;
 
+    this.client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name);
     const channel = await guild.channels.create({
       name,
       type: ChannelType.GuildText,
@@ -286,6 +289,7 @@ export class TicketHandler {
       ],
       reason: 'Omni - Ticket Logs',
     });
+    this.client.securityHandler?.noteSelfCreated(guild.id, 'channel', channel.id);
 
     logger.info(`Created ticket log channel: ${channel.name}`);
     return channel;
@@ -396,6 +400,7 @@ export class TicketHandler {
       });
     }
 
+    this.client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', channelName);
     const channel = await guild.channels.create({
       name: channelName,
       type: ChannelType.GuildText,
@@ -403,6 +408,7 @@ export class TicketHandler {
       permissionOverwrites,
       reason: `Omni - Ticket created by ${user.user.tag}`,
     }) as TextChannel;
+    this.client.securityHandler?.noteSelfCreated(guild.id, 'channel', channel.id);
 
     const ticket = await TicketModel.create({
       guildId: guild.id,

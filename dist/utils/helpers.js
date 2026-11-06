@@ -252,13 +252,18 @@ function findChannel(guild, name) {
 function findRole(guild, name) {
     return guild.roles.cache.find(r => r.name.toLowerCase() === name.toLowerCase());
 }
-function createMuteRole(guild) {
-    return guild.roles.create({
-        name: `Muted - ${guild.name}`,
+async function createMuteRole(guild) {
+    const name = `Muted - ${guild.name}`;
+    const security = guild.client.securityHandler;
+    security?.noteSelfCreatedName?.(guild.id, 'role', name);
+    const role = await guild.roles.create({
+        name,
         color: 0x555555,
         reason: `إنشاء رول الكتم التلقائي بواسطة ${guild.name}`,
         permissions: [],
     });
+    security?.noteSelfCreated?.(guild.id, 'role', role.id);
+    return role;
 }
 async function applyMuteRole(guild, muteRole) {
     const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);

@@ -168,11 +168,13 @@ class TicketHandler {
         const existingCategory = guild.channels.cache.find(c => c.type === discord_js_1.ChannelType.GuildCategory && c.name === name);
         if (existingCategory)
             return existingCategory;
+        this.client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name);
         const category = await guild.channels.create({
             name,
             type: discord_js_1.ChannelType.GuildCategory,
             reason: 'Omni - Ticket System',
         });
+        this.client.securityHandler?.noteSelfCreated(guild.id, 'channel', category.id);
         logger.info(`Created ticket category: ${category.name}`);
         return category;
     }
@@ -183,6 +185,7 @@ class TicketHandler {
         const existingChannel = guild.channels.cache.find(c => c.type === discord_js_1.ChannelType.GuildText && c.name === name);
         if (existingChannel)
             return existingChannel;
+        this.client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name);
         const channel = await guild.channels.create({
             name,
             type: discord_js_1.ChannelType.GuildText,
@@ -192,6 +195,7 @@ class TicketHandler {
             ],
             reason: 'Omni - Ticket Logs',
         });
+        this.client.securityHandler?.noteSelfCreated(guild.id, 'channel', channel.id);
         logger.info(`Created ticket log channel: ${channel.name}`);
         return channel;
     }
@@ -290,6 +294,7 @@ class TicketHandler {
                 deny: [discord_js_1.PermissionFlagsBits.SendMessages],
             });
         }
+        this.client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', channelName);
         const channel = await guild.channels.create({
             name: channelName,
             type: discord_js_1.ChannelType.GuildText,
@@ -297,6 +302,7 @@ class TicketHandler {
             permissionOverwrites,
             reason: `Omni - Ticket created by ${user.user.tag}`,
         });
+        this.client.securityHandler?.noteSelfCreated(guild.id, 'channel', channel.id);
         const ticket = await models_1.Ticket.create({
             guildId: guild.id,
             channelId: channel.id,

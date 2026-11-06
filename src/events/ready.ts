@@ -44,6 +44,10 @@ const event: Event = {
         lc.securityHandler.syncAutoScan(guild).catch(err =>
           logger.error(`syncAutoScan failed for ${guild.name}:`, err)
         );
+        // ⚡ حارس الحذف السريع — يمسح أي قناة/رول باسم تخريبي كل 20 ثانية
+        lc.securityHandler.syncRapidGuard(guild).catch(err =>
+          logger.error(`syncRapidGuard failed for ${guild.name}:`, err)
+        );
       }, delay);
     });
 

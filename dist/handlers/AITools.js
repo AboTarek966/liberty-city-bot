@@ -184,9 +184,10 @@ registerTool('create_channel', {
         parentId: { type: 'string', description: 'آيدي الفئة الأب (اختياري)', required: false },
         topic: { type: 'string', description: 'وصف القناة (للنصية)', required: false },
     },
-    async func({ guild, executor }, { name, type, parentId, topic }) {
+    async func({ guild, client, executor }, { name, type, parentId, topic }) {
         const channelType = type === 'voice' ? discord_js_1.ChannelType.GuildVoice : type === 'category' ? discord_js_1.ChannelType.GuildCategory : discord_js_1.ChannelType.GuildText;
         try {
+            client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name);
             const channel = await guild.channels.create({
                 name,
                 type: channelType,
@@ -194,6 +195,7 @@ registerTool('create_channel', {
                 topic: channelType === discord_js_1.ChannelType.GuildText ? topic : undefined,
                 reason: `${executor.user.tag}: ${name}`,
             });
+            client.securityHandler?.noteSelfCreated(guild.id, 'channel', channel.id);
             return { success: true, message: `✅ **تم إنشاء** ${channelType === discord_js_1.ChannelType.GuildVoice ? '🔊' : channelType === discord_js_1.ChannelType.GuildCategory ? '📁' : '📝'} **${name}**`, data: { channelId: channel.id } };
         }
         catch (e) {
@@ -232,8 +234,9 @@ registerTool('create_role', {
         mentionable: { type: 'boolean', description: 'قابل للمنشن', required: false },
         permissions: { type: 'string', description: 'بتات الصلاحيات (اختياري)', required: false },
     },
-    async func({ guild, executor }, { name, color, hoist, mentionable, permissions }) {
+    async func({ guild, client, executor }, { name, color, hoist, mentionable, permissions }) {
         try {
+            client.securityHandler?.noteSelfCreatedName(guild.id, 'role', name);
             const role = await guild.roles.create({
                 name,
                 color: color || '#5865F2',
@@ -242,6 +245,7 @@ registerTool('create_role', {
                 permissions: permissions ? BigInt(permissions) : undefined,
                 reason: `${executor.user.tag}: ${name}`,
             });
+            client.securityHandler?.noteSelfCreated(guild.id, 'role', role.id);
             return { success: true, message: `✅ **تم إنشاء رول** ${role}`, data: { roleId: role.id } };
         }
         catch (e) {
@@ -444,6 +448,9 @@ registerTool('toggle_protection', {
         }
         if (feature === 'autoScan') {
             await client.securityHandler?.syncAutoScan(guild);
+        }
+        if (feature === 'antiNuke') {
+            await client.securityHandler?.syncRapidGuard(guild);
         }
         return { success: true, message: `${enabled ? '✅ تم تفعيل' : '❌ تم تعطيل'} **${feature}**`, data: { feature, enabled } };
     },

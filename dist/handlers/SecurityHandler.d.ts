@@ -32,6 +32,11 @@ export declare class SecurityHandler {
     private renameTracker;
     private backupTimers;
     private scanTimers;
+    private rapidGuardTimers;
+    private rapidGuardInFlight;
+    private rapidGuardAlertAt;
+    private selfCreatedTargets;
+    private selfCreatedNames;
     private hierarchyState;
     private restoreTimers;
     private restoreLocks;
@@ -56,7 +61,7 @@ export declare class SecurityHandler {
     private recentKicks;
     constructor(client: Client);
     clearGuild(guildId: string): void;
-    cleanup(): void;
+    cleanup(fullCleanup?: boolean): void;
     private getAlertChannel;
     private auditLogCache;
     private static readonly TRUSTED_BOT_IDS;
@@ -78,6 +83,12 @@ export declare class SecurityHandler {
     private startIncident;
     private isActiveAttacker;
     private markHandled;
+    /** تسجيل قناة/رول أنشأه البوت بعد نجاح الإنشاء (حماية طويلة) */
+    noteSelfCreated(guildId: string, kind: 'channel' | 'role', id: string, ttlMs?: number): void;
+    /** تسجيل اسم متوقع BEFORE الإنشاء — يغطي سباق وصول حدث channelCreate قبل رد REST */
+    noteSelfCreatedName(guildId: string, kind: 'channel' | 'role', name: string, ttlMs?: number): void;
+    /** هل هذا الهدف أنشأه البوت؟ (بالمعرّف أو بالاسم المتوقع) */
+    private isSelfCreatedTarget;
     /** 🌐 تحميل القائمة السوداء العالمية للبوتات المارقة (مرة واحدة) */
     loadRogueBots(): Promise<void>;
     /** 🌐 إضافة بوت للقائمة السوداء (تخزين + ذاكرة) */
@@ -174,6 +185,10 @@ export declare class SecurityHandler {
      */
     private trackActionOnce;
     onRoleCreate(role: any): Promise<void>;
+    /** تنبيه موحّد عند حذف قناة/رول باسم تخريبي */
+    private reportMaliciousTarget;
+    /** إعادة محاولة تحديد منشئ أداة التخريب ومعاقبته بعد وصول سجل التدقيق */
+    private retryMaliciousPunishment;
     onChannelUpdate(oldChannel: any, newChannel: any): Promise<void>;
     cleanupSuspicious(guild: Guild): Promise<number>;
     onWebhookUpdate(webhook: any): Promise<void>;
@@ -220,6 +235,8 @@ export declare class SecurityHandler {
     onRoleUpdate(oldRole: Role, newRole: Role): Promise<void>;
     syncAutoBackup(guild: Guild, forceNow?: boolean): Promise<void>;
     syncAutoScan(guild: Guild): Promise<void>;
+    syncRapidGuard(guild: Guild): Promise<void>;
+    runRapidGuard(guild: Guild): Promise<void>;
     runPeriodicScan(guild: Guild): Promise<void>;
     createBackup(guild: Guild): Promise<{
         channels: number;

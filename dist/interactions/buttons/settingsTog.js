@@ -288,6 +288,11 @@ const handler = {
             }
             await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => { });
         }
+        // ⚡ مزامنة حارس الحذف السريع فور تبديل مضاد النيوك
+        if (section === 'protection' && field === 'antiNuke') {
+            const client = interaction.client;
+            await client.securityHandler?.syncRapidGuard(interaction.guild).catch(() => { });
+        }
         // 📨 تحديث كاش الدعوات عند تفعيل/تعطيل Invite Tracker
         if (section === 'protection' && field === 'inviteTracker') {
             const client = interaction.client;

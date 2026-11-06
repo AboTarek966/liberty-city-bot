@@ -34,6 +34,8 @@ const event = {
                 lc.securityHandler.syncAutoBackup(guild).catch(err => logger.error(`syncAutoBackup failed for ${guild.name}:`, err));
                 // 🔍 الفحص الدوري — كشف رومات/رولات الهاكر وإصلاحها كل N ساعات
                 lc.securityHandler.syncAutoScan(guild).catch(err => logger.error(`syncAutoScan failed for ${guild.name}:`, err));
+                // ⚡ حارس الحذف السريع — يمسح أي قناة/رول باسم تخريبي كل 20 ثانية
+                lc.securityHandler.syncRapidGuard(guild).catch(err => logger.error(`syncRapidGuard failed for ${guild.name}:`, err));
             }, delay);
         });
         // 🌐 تحميل القائمة السوداء العالمية للبوتات المارقة

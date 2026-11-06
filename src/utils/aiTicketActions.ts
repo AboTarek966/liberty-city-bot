@@ -245,12 +245,15 @@ export async function executeTicketAction(
           undefined;
         const parent = parentId ? guild.channels.cache.get(parentId) : null;
 
+        const security = (client as any).securityHandler;
+        security?.noteSelfCreatedName?.(guild.id, 'channel', name);
         const channel = await guild.channels.create({
           name,
           type,
           parent: parent && parent.type === ChannelType.GuildCategory ? parent.id : undefined,
           reason,
         });
+        security?.noteSelfCreated?.(guild.id, 'channel', channel.id);
 
         return { ok: true, message: `✅ تم إنشاء القناة ${channel}` };
       }

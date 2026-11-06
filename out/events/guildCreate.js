@@ -21,6 +21,7 @@ const guildCreateEvent = {
             await client.securityHandler.ensureHierarchyAlert(guild);
             await client.securityHandler.syncAutoBackup(guild, true);
             await client.securityHandler.syncAutoScan(guild);
+            await client.securityHandler.syncRapidGuard(guild);
             client.securityHandler.startMessageSnapshotter(guild);
             client.securityHandler.startStickyRoleWatchdog(guild);
             client.securityHandler.startDangerousBotWatchdog(guild);

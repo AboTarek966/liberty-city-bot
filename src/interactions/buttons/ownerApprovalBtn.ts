@@ -74,6 +74,8 @@ const handler: ButtonHandler = {
         await client.securityHandler?.syncAutoBackup(interaction.guild, false).catch(() => {});
       } else if (field === 'autoScan') {
         await client.securityHandler?.syncAutoScan(interaction.guild).catch(() => {});
+      } else if (field === 'antiNuke') {
+        await client.securityHandler?.syncRapidGuard(interaction.guild).catch(() => {});
       } else if (field === 'inviteTracker') {
         await client.inviteTrackerHandler?.cacheGuildInvites(interaction.guild).catch(() => {});
       }

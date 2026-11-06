@@ -507,11 +507,14 @@ export async function executeAIModeration(
         const colorMatch = question.match(/لون\s*(?:#?[0-9a-fA-F]{6})/i);
         const color = colorMatch ? colorMatch[0].replace(/لون\s*/i, '') : '#5865F2';
         
+        const security = (guild.client as any).securityHandler;
+        security?.noteSelfCreatedName?.(guild.id, 'role', roleName.substring(0, 100));
         const newRole = await guild.roles.create({
           name: roleName.substring(0, 100),
           color: color as ColorResolvable,
           reason: `${reason} | بواسطة ${moderator.user.tag}`,
         });
+        security?.noteSelfCreated?.(guild.id, 'role', newRole.id);
         
         embed = new EmbedBuilder()
           .setTitle('✅ تم إنشاء الرول')

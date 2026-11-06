@@ -15,6 +15,7 @@ const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const threatScore_1 = require("../utils/threatScore");
+const securityNames_1 = require("../utils/securityNames");
 const logger = (0, helpers_1.createLogger)('SecurityHandler');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // أنواع القنوات القابلة لإعادة الإنشاء
@@ -84,6 +85,15 @@ class SecurityHandler {
     backupTimers = new Map();
     // 🔍 مؤقتات الفحص الدوري (كشف هاكر كل N ساعات)
     scanTimers = new Map();
+    // ⚡ حارس الحذف السريع: فحص كل 20 ثانية لأي قناة/رول باسم تخريبي
+    rapidGuardTimers = new Map();
+    rapidGuardInFlight = new Set();
+    rapidGuardAlertAt = new Map();
+    // 🛡️ أهداف أنشأها البوت بنفسه (تذاكر / استعادة نسخة / أدوات AI)
+    //    لا يجوز للحارس السريع حذفها حتى لو حمل اسمها كلمة مثل "hacked"
+    //    (مثال: تذكرة موضوعها "تم اختراق حسابي")
+    selfCreatedTargets = new Map(); // guildId:kind:id → انتهاء الحماية
+    selfCreatedNames = new Map(); // guildId:kind:name → انتهاء الحماية
     // آخر حالة تسلّم مُبلَّغ عنها لكل سيرفر (ننبّه فقط عند تغيّر الحالة)
     hierarchyState = new Map();
     // مؤقتات الاستعادة التلقائية المؤجلة (تُجمَّع عدة حذفات في استعادة واحدة)
@@ -130,7 +140,8 @@ class SecurityHandler {
     constructor(client) {
         this.client = client;
         // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
-        setInterval(() => this.cleanup(), 5 * 60 * 1000).unref();
+        // ⚠️ fullCleanup=false: لا نلمس مؤقتات النسخ/الفحص/الاستعادة — كانت تُقتل بعد 5 دقائق!
+        setInterval(() => this.cleanup(false), 5 * 60 * 1000).unref();
     }
     // --------------------------------------------
     // تنظيف كل موارد السيرفر — يُستدعى عند مغادرة البوت (guildDelete)
@@ -147,10 +158,13 @@ class SecurityHandler {
         };
         clearOne(this.backupTimers);
         clearOne(this.scanTimers);
+        clearOne(this.rapidGuardTimers);
         clearOne(this.restoreTimers);
         clearOne(this.kickedTimers);
         clearOne(this.topWatchdogs);
         clearOne(this.messageSnapshotInterval);
+        this.rapidGuardInFlight.delete(guildId);
+        this.rapidGuardAlertAt.delete(guildId);
         this.deletionTracker.delete(guildId);
         this.messageDeletionTracker.delete(guildId);
         this.messageSnapshots.delete(guildId);
@@ -163,6 +177,12 @@ class SecurityHandler {
         for (const key of this.attackerArtifacts.keys())
             if (key.startsWith(`${guildId}:`))
                 this.attackerArtifacts.delete(key);
+        for (const key of this.selfCreatedTargets.keys())
+            if (key.startsWith(`${guildId}:`))
+                this.selfCreatedTargets.delete(key);
+        for (const key of this.selfCreatedNames.keys())
+            if (key.startsWith(`${guildId}:`))
+                this.selfCreatedNames.delete(key);
         this.activeIncidents.delete(guildId);
         this.hierarchyState.delete(guildId);
         const guard = this.botGuardTimers.get(guildId);
@@ -194,21 +214,27 @@ class SecurityHandler {
                 this.slowActionTracker.delete(key);
         logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
     }
-    cleanup() {
-        for (const timer of this.backupTimers.values())
-            clearInterval(timer);
-        this.backupTimers.clear();
-        for (const timer of this.scanTimers.values())
-            clearInterval(timer);
-        this.scanTimers.clear();
-        for (const timer of this.restoreTimers.values())
-            clearTimeout(timer);
-        this.restoreTimers.clear();
-        this.restoreLocks.clear();
-        for (const timer of this.kickedTimers.values())
-            clearTimeout(timer);
-        this.kickedTimers.clear();
-        this.kickedQueue.clear();
+    cleanup(fullCleanup = true) {
+        // 🧹 التنظيف الدوري (fullCleanup=false) يمسح الكاش فقط — ولا يوقف أي مؤقت حماية.
+        if (fullCleanup) {
+            for (const timer of this.backupTimers.values())
+                clearInterval(timer);
+            this.backupTimers.clear();
+            for (const timer of this.scanTimers.values())
+                clearInterval(timer);
+            this.scanTimers.clear();
+            for (const timer of this.rapidGuardTimers.values())
+                clearInterval(timer);
+            this.rapidGuardTimers.clear();
+            for (const timer of this.restoreTimers.values())
+                clearTimeout(timer);
+            this.restoreTimers.clear();
+            this.restoreLocks.clear();
+            for (const timer of this.kickedTimers.values())
+                clearTimeout(timer);
+            this.kickedTimers.clear();
+            this.kickedQueue.clear();
+        }
         // Cleanup message snapshots (older than 1 hour)
         for (const [guildId, channels] of this.messageSnapshots) {
             for (const [channelId, snapshot] of channels) {
@@ -267,6 +293,14 @@ class SecurityHandler {
         for (const [key, at] of this.handledTargets) {
             if (now - at > 30000)
                 this.handledTargets.delete(key);
+        }
+        for (const [key, expiry] of this.selfCreatedTargets) {
+            if (now > expiry)
+                this.selfCreatedTargets.delete(key);
+        }
+        for (const [key, expiry] of this.selfCreatedNames) {
+            if (now > expiry)
+                this.selfCreatedNames.delete(key);
         }
         for (const [key, at] of this.recentBans) {
             if (now - at > 60000)
@@ -482,6 +516,44 @@ class SecurityHandler {
         if (now - (this.handledTargets.get(key) || 0) < 5000)
             return true;
         this.handledTargets.set(key, now);
+        return false;
+    }
+    // --------------------------------------------
+    // 🛡️ حماية أهداف البوت نفسه من الحارس السريع
+    // --------------------------------------------
+    /** تسجيل قناة/رول أنشأه البوت بعد نجاح الإنشاء (حماية طويلة) */
+    noteSelfCreated(guildId, kind, id, ttlMs = 7 * 24 * 60 * 60 * 1000) {
+        if (!guildId || !id)
+            return;
+        this.selfCreatedTargets.set(`${guildId}:${kind}:${id}`, Date.now() + ttlMs);
+    }
+    /** تسجيل اسم متوقع BEFORE الإنشاء — يغطي سباق وصول حدث channelCreate قبل رد REST */
+    noteSelfCreatedName(guildId, kind, name, ttlMs = 5 * 60 * 1000) {
+        const normalized = String(name ?? '').trim().toLowerCase();
+        if (!guildId || !normalized)
+            return;
+        this.selfCreatedNames.set(`${guildId}:${kind}:${normalized}`, Date.now() + ttlMs);
+    }
+    /** هل هذا الهدف أنشأه البوت؟ (بالمعرّف أو بالاسم المتوقع) */
+    isSelfCreatedTarget(guildId, kind, id, name) {
+        const now = Date.now();
+        const idKey = `${guildId}:${kind}:${id}`;
+        const idExpiry = this.selfCreatedTargets.get(idKey);
+        if (idExpiry) {
+            if (now <= idExpiry)
+                return true;
+            this.selfCreatedTargets.delete(idKey);
+        }
+        const normalized = String(name ?? '').trim().toLowerCase();
+        if (normalized) {
+            const nameKey = `${guildId}:${kind}:${normalized}`;
+            const nameExpiry = this.selfCreatedNames.get(nameKey);
+            if (nameExpiry) {
+                if (now <= nameExpiry)
+                    return true;
+                this.selfCreatedNames.delete(nameKey);
+            }
+        }
         return false;
     }
     /** 🌐 تحميل القائمة السوداء العالمية للبوتات المارقة (مرة واحدة) */
@@ -1785,7 +1857,8 @@ class SecurityHandler {
         try {
             if (!channel?.guild)
                 return;
-            if (this.handledTargets.has(`${channel.guild.id}:ch-target:${channel.id}`))
+            const targetKey = `${channel.guild.id}:ch-target:${channel.id}`;
+            if (this.handledTargets.has(targetKey))
                 return;
             const guild = channel.guild;
             const settings = await (0, models_1.getGuildSettings)(guild.id);
@@ -1793,15 +1866,41 @@ class SecurityHandler {
             // 🛑 احترام الإطفاء — لا حماية عندما يكون مضاد النيوك مطفأ
             if (!cfg?.enabled)
                 return;
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.ChannelCreate, channel.id, 1500, 15000);
-            if (!executor)
-                return; // بثّ التدقيق سيصل غالباً — لا نحذف عمياء (قد نحذف قناة استعادة)
+            const whitelistedTarget = Array.isArray(cfg.whitelistedChannels) && cfg.whitelistedChannels.includes(channel.id);
+            const selfCreated = this.isSelfCreatedTarget(guild.id, 'channel', channel.id, channel.name);
+            const maliciousName = !selfCreated && !whitelistedTarget && (0, securityNames_1.isMaliciousSecurityName)(channel.name);
+            // ⚡ حذف فوري قبل انتظار سجل التدقيق — الاسم التخريبي نفسه دليل كافٍ
+            let deletedEarly = false;
+            if (maliciousName) {
+                this.handledTargets.set(targetKey, Date.now());
+                deletedEarly = await channel
+                    .delete('Omni — حذف فوري: اسم قناة تخريبي (Anti-Nuke)')
+                    .then(() => true)
+                    .catch((error) => {
+                    logger.warn(`Instant channel delete failed in ${guild.name}: ${error.message}`);
+                    return false;
+                });
+            }
+            // ⚡ انتظار قصير جداً عند الاسم المشبوه — لا نضيّع ثانية ونصف قبل الحذف
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.ChannelCreate, channel.id, maliciousName ? 400 : 1500, 15000);
+            if (!executor) {
+                if (maliciousName) {
+                    await this.reportMaliciousTarget(guild, settings, cfg, 'channel', channel.name, channel.id, null, deletedEarly);
+                    this.retryMaliciousPunishment(guild, 'channel', channel.id, channel.name);
+                }
+                return;
+            }
             if (executor.id === this.client.user?.id)
                 return;
-            if (await this.isTrustedExecutor(guild, executor.id))
+            // 👑 الموثوق (المالك/المطوّر): لا عقوبة — لكن الاسم التخريبي يُحذف دائماً
+            if (await this.isTrustedExecutor(guild, executor.id)) {
+                if (maliciousName) {
+                    await this.reportMaliciousTarget(guild, settings, cfg, 'channel', channel.name, channel.id, executor, deletedEarly, '👑 منفّذ موثوق — حذف الاسم التخريبي فقط بدون عقوبة');
+                }
                 return;
+            }
             this.recordArtifact(guild.id, executor.id, 'channels', channel.id);
-            this.handledTargets.set(`${guild.id}:ch-target:${channel.id}`, Date.now());
+            this.handledTargets.set(targetKey, Date.now());
             // 🤖 بوت غير مصرح: صفر تسامح — حظر فوري + حذف القناة + كل آثاره
             //    👑 بوت القائمة البيضاء: إنشاء واحد مسموح، والانفجار 2+/5ث = هجوم
             const isBot = this.executorIsBot(guild, executor);
@@ -1813,13 +1912,16 @@ class SecurityHandler {
             // 🧑 إنسان أو 👑 بوت/عضو في القائمة البيضاء: قناة واحدة طبيعية —
             //    نتدخل عند الانفجار (2+ خلال 5 ثوانٍ) أو الاسم المشبوه أو الحادث النشط.
             const burst = this.trackCreateOnce(guild.id, executor.id, 'channel', channel.id, 5000);
-            const suspiciousName = /nuked|hacked|kly|cracked|death.?note|pwned|on.?top|raid|destroy/i.test(channel.name || '');
-            if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id))
+            if (burst < 2 && !maliciousName && !this.isActiveAttacker(guild.id, executor.id))
                 return;
             this.startIncident(guild.id, executor.id);
-            channel.delete('Omni — إنشاء قنوات جماعي (Anti-Nuke)').catch(() => { });
-            if (burst >= 2 || suspiciousName) {
-                const reason = 'Omni — إنشاء قنوات جماعي مشبوه (Anti-Nuke)';
+            if (!deletedEarly) {
+                channel.delete('Omni — إنشاء قنوات جماعي (Anti-Nuke)').catch(() => { });
+            }
+            if (burst >= 2 || maliciousName) {
+                const reason = maliciousName
+                    ? 'Omni — قناة باسم تخريبي (Anti-Nuke)'
+                    : 'Omni — إنشاء قنوات جماعي مشبوه (Anti-Nuke)';
                 const prevent = cfg.mode !== 'react';
                 const text = await this.neutralizeById(guild, executor, cfg, reason, isBot || prevent);
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
@@ -1827,9 +1929,12 @@ class SecurityHandler {
                     .then(ch => ch
                     ?.send({
                     content: `🚨 **هجوم إنشاء قنوات — تم احتواؤه**\n` +
-                        `👤 ${this.userLabel(executor)} (${this.executorIsBot(guild, executor) ? '🤖 بوت' : '🧑 عضو'})\n` +
-                        `📢 أنشأ ${burst} قنوات خلال 5 ثوانٍ\n` +
-                        `${text}\n🧹 حُذفت قنوات المهاجم`,
+                        `👤 ${this.userLabel(executor)} (${isBot ? '🤖 بوت' : '🧑 عضو'})\n` +
+                        (maliciousName
+                            ? `🏷️ اسم تخريبي: \`${String(channel.name).replace(/`/g, "'").slice(0, 100)}\`\n`
+                            : `📢 أنشأ ${burst} قنوات خلال 5 ثوانٍ\n`) +
+                        `🗑️ حذف القناة: ${deletedEarly ? '✅ فوري' : '⏳ جارٍ'}\n` +
+                        `${text}\n🧹 حُذفت آثار المهاجم`,
                 })
                     .catch(() => { }))
                     .catch(() => { });
@@ -1894,19 +1999,52 @@ class SecurityHandler {
         try {
             if (!role?.guild || role.managed)
                 return;
+            const targetKey = `${role.guild.id}:role-target:${role.id}`;
+            if (this.handledTargets.has(targetKey))
+                return;
             const guild = role.guild;
             const settings = await (0, models_1.getGuildSettings)(guild.id);
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return;
-            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleCreate, role.id, 1500, 15000);
-            if (!executor)
+            const whitelistedTarget = Array.isArray(cfg.whitelistedRoles) && cfg.whitelistedRoles.includes(role.id);
+            const selfCreated = this.isSelfCreatedTarget(guild.id, 'role', role.id, role.name);
+            const maliciousName = !selfCreated && !whitelistedTarget && (0, securityNames_1.isMaliciousSecurityName)(role.name);
+            // ⚡ حذف فوري قبل انتظار سجل التدقيق — اسم الرول التخريبي دليل كافٍ
+            let deletedEarly = false;
+            if (maliciousName) {
+                this.handledTargets.set(targetKey, Date.now());
+                if (role.editable) {
+                    deletedEarly = await role
+                        .delete('Omni — حذف فوري: اسم رول تخريبي (Anti-Nuke)')
+                        .then(() => true)
+                        .catch((error) => {
+                        logger.warn(`Instant role delete failed in ${guild.name}: ${error.message}`);
+                        return false;
+                    });
+                }
+                else {
+                    logger.warn(`Instant role delete skipped in ${guild.name}: role ${role.name} is not editable`);
+                }
+            }
+            const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleCreate, role.id, maliciousName ? 400 : 1500, 15000);
+            if (!executor) {
+                if (maliciousName) {
+                    await this.reportMaliciousTarget(guild, settings, cfg, 'role', role.name, role.id, null, deletedEarly);
+                    this.retryMaliciousPunishment(guild, 'role', role.id, role.name);
+                }
                 return;
+            }
             if (executor.id === this.client.user?.id)
                 return;
-            if (await this.isTrustedExecutor(guild, executor.id))
+            if (await this.isTrustedExecutor(guild, executor.id)) {
+                if (maliciousName) {
+                    await this.reportMaliciousTarget(guild, settings, cfg, 'role', role.name, role.id, executor, deletedEarly, '👑 منفّذ موثوق — حذف الاسم التخريبي فقط بدون عقوبة');
+                }
                 return;
+            }
             this.recordArtifact(guild.id, executor.id, 'roles', role.id);
+            this.handledTargets.set(targetKey, Date.now());
             // 🤖 بوت غير مصرح: صفر تسامح
             //    👑 بوت القائمة البيضاء: رول واحد مسموح، والانفجار 2+/5ث = هجوم
             const isBot = this.executorIsBot(guild, executor);
@@ -1917,22 +2055,29 @@ class SecurityHandler {
             }
             // 🧑 إنسان أو 👑 قائمة بيضاء: انفجار 2+ خلال 5 ثوانٍ أو اسم مشبوه أو حادث نشط
             const burst = this.trackCreateOnce(guild.id, executor.id, 'role', role.id, 5000);
-            const suspiciousName = /nuked|hacked|kly|cracked|death.?note|pwned|on.?top|raid|destroy/i.test(role.name || '');
-            if (burst < 2 && !suspiciousName && !this.isActiveAttacker(guild.id, executor.id))
+            if (burst < 2 && !maliciousName && !this.isActiveAttacker(guild.id, executor.id))
                 return;
             this.startIncident(guild.id, executor.id);
-            role.delete('Omni — إنشاء رولات جماعي (Anti-Nuke)').catch(() => { });
-            if (burst >= 2 || suspiciousName) {
+            if (!deletedEarly && role.editable) {
+                role.delete('Omni — إنشاء رولات جماعي (Anti-Nuke)').catch(() => { });
+            }
+            if (burst >= 2 || maliciousName) {
                 const prevent = cfg.mode !== 'react';
-                const text = await this.neutralizeById(guild, executor, cfg, 'Omni — إنشاء رولات جماعي مشبوه (Anti-Nuke)', isBot || prevent);
+                const reason = maliciousName
+                    ? 'Omni — رول باسم تخريبي (Anti-Nuke)'
+                    : 'Omni — إنشاء رولات جماعي مشبوه (Anti-Nuke)';
+                const text = await this.neutralizeById(guild, executor, cfg, reason, isBot || prevent);
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
                 void this.getAlertChannel(guild, settings, cfg.logChannel)
                     .then(ch => ch
                     ?.send({
                     content: `🚨 **هجوم إنشاء رولات — تم احتواؤه**\n` +
-                        `👤 ${this.userLabel(executor)} (${this.executorIsBot(guild, executor) ? '🤖 بوت' : '🧑 عضو'})\n` +
-                        `🎭 أنشأ ${burst} رولات خلال 5 ثوانٍ\n` +
-                        `${text}\n🧹 حُذفت رولات المهاجم`,
+                        `👤 ${this.userLabel(executor)} (${isBot ? '🤖 بوت' : '🧑 عضو'})\n` +
+                        (maliciousName
+                            ? `🏷️ اسم تخريبي: \`${String(role.name).replace(/`/g, "'").slice(0, 100)}\`\n`
+                            : `🎭 أنشأ ${burst} رولات خلال 5 ثوانٍ\n`) +
+                        `🗑️ حذف الرول: ${deletedEarly ? '✅ فوري' : role.editable ? '⏳ جارٍ' : '❌ الرول أعلى من البوت'}\n` +
+                        `${text}\n🧹 حُذفت آثار المهاجم`,
                 })
                     .catch(() => { }))
                     .catch(() => { });
@@ -1945,6 +2090,72 @@ class SecurityHandler {
     // --------------------------------------------
     // 0b) ANTI-RENAME: تغيير اسم قناة → إرجاع فوري + عقوبة
     // --------------------------------------------
+    /** تنبيه موحّد عند حذف قناة/رول باسم تخريبي */
+    async reportMaliciousTarget(guild, settings, cfg, kind, name, id, executor, deleted, actionText) {
+        try {
+            if (this.markHandled(`${guild.id}:malicious-report:${kind}:${id}`))
+                return;
+            const safeName = String(name || '').replace(/`/g, "'").slice(0, 100);
+            const label = kind === 'channel' ? '📢 قناة' : '📛 رول';
+            const executorLine = executor
+                ? `👤 المنفّذ: ${executor} (\`${executor.id}\`) ${this.executorIsBot(guild, executor) ? '🤖' : '🧑'}`
+                : '👤 المنفّذ: غير معروف بعد — جارٍ تتبّع سجل التدقيق';
+            const action = actionText || (executor
+                ? '⚡ الإجراء: عقوبة فورية إن لم يكن موثوقاً'
+                : '⚡ الإجراء: سيُتتبَّع المنفّذ ويُعاقب تلقائياً');
+            const alert = await this.getAlertChannel(guild, settings, cfg?.logChannel);
+            await alert?.send({
+                content: `🚨 **اسم تخريبي — تدخّل حارس الحماية**\n` +
+                    `${label}: \`${safeName}\` (\`${id}\`)\n` +
+                    `${executorLine}\n` +
+                    `🗑️ الحذف: ${deleted ? '✅ تم فوراً' : '❌ فشل — تحقّق من صلاحية البوت وترتيبه'}\n` +
+                    `${action}`,
+            }).catch(() => { });
+        }
+        catch (error) {
+            logger.warn(`reportMaliciousTarget failed in ${guild.name}: ${error.message}`);
+        }
+    }
+    /** إعادة محاولة تحديد منشئ أداة التخريب ومعاقبته بعد وصول سجل التدقيق */
+    retryMaliciousPunishment(guild, kind, targetId, name, attempt = 0) {
+        setTimeout(async () => {
+            try {
+                const settings = await (0, models_1.getGuildSettings)(guild.id);
+                const cfg = settings.protection?.antiNuke;
+                if (!cfg?.enabled)
+                    return;
+                const auditType = kind === 'channel' ? discord_js_1.AuditLogEvent.ChannelCreate : discord_js_1.AuditLogEvent.RoleCreate;
+                const executor = await this.findExecutor(guild, auditType, targetId, 900, 60000);
+                if (!executor || executor.id === this.client.user?.id) {
+                    if (attempt < 3)
+                        this.retryMaliciousPunishment(guild, kind, targetId, name, attempt + 1);
+                    return;
+                }
+                if (await this.isTrustedExecutor(guild, executor.id))
+                    return;
+                if (this.markHandled(`${guild.id}:malicious-punish:${targetId}`))
+                    return;
+                this.recordArtifact(guild.id, executor.id, kind === 'channel' ? 'channels' : 'roles', targetId);
+                this.startIncident(guild.id, executor.id);
+                const isBot = this.executorIsBot(guild, executor);
+                const prevent = cfg.mode !== 'react';
+                const text = await this.neutralizeById(guild, executor, cfg, `Omni — ${kind === 'channel' ? 'قناة' : 'رول'} باسم تخريبي (Anti-Nuke)`, isBot || prevent);
+                await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
+                const alert = await this.getAlertChannel(guild, settings, cfg.logChannel);
+                await alert?.send({
+                    content: `🎯 **تم تحديد منشئ أداة التخريب ومعاقبته**\n` +
+                        `${kind === 'channel' ? '📢' : '📛'} \`${String(name).replace(/`/g, "'").slice(0, 100)}\` (\`${targetId}\`)\n` +
+                        `👤 ${executor} (\`${executor.id}\`) ${isBot ? '🤖 بوت' : '🧑 عضو'}\n` +
+                        `${text}`,
+                }).catch(() => { });
+            }
+            catch (error) {
+                logger.warn(`retryMaliciousPunishment failed in ${guild.name}: ${error.message}`);
+                if (attempt < 3)
+                    this.retryMaliciousPunishment(guild, kind, targetId, name, attempt + 1);
+            }
+        }, attempt === 0 ? 2500 : 4000).unref?.();
+    }
     async onChannelUpdate(oldChannel, newChannel) {
         try {
             if (!newChannel?.guild || oldChannel.name === newChannel.name)
@@ -1966,6 +2177,7 @@ class SecurityHandler {
             const isBot = this.executorIsBot(guild, entry.executor);
             const preWhitelisted = this.isPreemptivelyWhitelisted(settings, entry.executor.id);
             const count = this.trackRename(guild.id, entry.executor.id, 5000);
+            const maliciousRename = (0, securityNames_1.isMaliciousSecurityName)(newChannel.name);
             const nameChange = (entry.changes || []).find((c) => c.key === 'name');
             const oldName = nameChange?.old ? String(nameChange.old) : oldChannel.name;
             // 1️⃣ إرجاع الاسم فوراً — حتى لو لم نعاقب (تغيير واحد قد يكون طبيعياً)
@@ -1983,13 +2195,32 @@ class SecurityHandler {
             }
             // 👑 القائمة البيضاء/الإنسان: تغيير واحد = استرجاع فقط. 2+ خلال 5 ثوانٍ = هجوم.
             // 🤖 البوت غير المصرح: أول تغيير = حظر فوري.
-            if ((!isBot || preWhitelisted) && count < 2 && !this.isActiveAttacker(guild.id, entry.executor.id)) {
+            // 🏷️ الاسم التخريبي: هجوم حتى لو كان تغييراً واحداً — لا تسامح.
+            if ((!isBot || preWhitelisted) &&
+                count < 2 &&
+                !maliciousRename &&
+                !this.isActiveAttacker(guild.id, entry.executor.id)) {
                 logger.info(`✏️ Channel rename reverted in ${guild.name} (single change by ${this.userLabel(entry.executor)})`);
                 return;
             }
+            // 🗑️ القناة حديثة الإنشاء + سُمّيت باسم تخريبي → تُحذف بدل الاكتفاء بإرجاع الاسم
+            //    (ما لم تكن قناة أنشأها البوت نفسه مثل تذكرة — نكتفي بإرجاع اسمها)
+            const selfCreatedChannel = this.isSelfCreatedTarget(guild.id, 'channel', newChannel.id, oldChannel.name);
+            let channelDeleted = false;
+            if (maliciousRename &&
+                !selfCreatedChannel &&
+                (this.isActiveAttacker(guild.id, entry.executor.id) ||
+                    Date.now() - Number(newChannel.createdTimestamp || 0) < 10 * 60 * 1000)) {
+                channelDeleted = await newChannel
+                    .delete('Omni — قناة باسم تخريبي (Anti-Nuke)')
+                    .then(() => true)
+                    .catch(() => false);
+            }
             // 2️⃣ العقوبة — وضع المنع = حظر فوري، ولو فشل نسحب كل الرولات
             const prevent = antiNuke.mode !== 'react';
-            const text = await this.neutralizeById(guild, entry.executor, antiNuke, 'Omni — تغيير أسماء القنوات بسرعة (Anti-Nuke)', isBot || prevent);
+            const text = await this.neutralizeById(guild, entry.executor, antiNuke, maliciousRename
+                ? 'Omni — تسمية قناة باسم تخريبي (Anti-Nuke)'
+                : 'Omni — تغيير أسماء القنوات بسرعة (Anti-Nuke)', isBot || prevent);
             await this.purgeAttackerArtifacts(guild, entry.executor.id).catch(() => 0);
             // 3️⃣ إرسال التقرير
             const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
@@ -1997,7 +2228,13 @@ class SecurityHandler {
             alert?.send({
                 content: `✏️ **${executorType} غيّر اسم قناة${count > 1 ? ` ${count} مرات/5 ثوانٍ` : ''}:** ${entry.executor.tag}\n` +
                     `📝 القناة: <#${newChannel.id}>\n` +
+                    (maliciousRename
+                        ? `🏷️ الاسم التخريبي: \`${String(newChannel.name).replace(/`/g, "'").slice(0, 100)}\`\n`
+                        : '') +
                     `🔄 استرجاع الاسم: ${nameRestored ? '✅ تم' : canManageChannels ? '❌ فشل' : '⚠️ لا توجد صلاحية ManageChannels'}\n` +
+                    (maliciousRename
+                        ? `🗑️ حذف القناة: ${channelDeleted ? '✅ تم' : '⚠️ لم تُحذف — تحقّق من صلاحيات البوت'}\n`
+                        : '') +
                     `🛡️ ${text}`,
             }).catch(() => { });
         }
@@ -2010,31 +2247,50 @@ class SecurityHandler {
     // --------------------------------------------
     async cleanupSuspicious(guild) {
         let deleted = 0;
-        const pattern = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123/i;
+        const settings = await (0, models_1.getGuildSettings)(guild.id);
+        const cfg = settings.protection?.antiNuke;
+        const whitelistedChannels = new Set((cfg?.whitelistedChannels || []).map(String));
+        const whitelistedRoles = new Set((cfg?.whitelistedRoles || []).map(String));
+        const deletedNames = [];
         for (const [, ch] of guild.channels.cache) {
-            if (pattern.test(ch.name)) {
-                try {
-                    await ch.delete('Security: auto-cleanup suspicious channel');
-                    deleted++;
-                }
-                catch { }
+            if (whitelistedChannels.has(String(ch.id)))
+                continue;
+            if (this.isSelfCreatedTarget(guild.id, 'channel', ch.id, ch.name))
+                continue;
+            if (!(0, securityNames_1.isMaliciousSecurityName)(ch.name))
+                continue;
+            try {
+                await ch.delete('Security: auto-cleanup suspicious channel');
+                deleted++;
+                deletedNames.push(`#${String(ch.name).replace(/`/g, "'").slice(0, 80)}`);
             }
+            catch { /* قد تكون أعلى من البوت أو محمية */ }
         }
         for (const [, role] of guild.roles.cache) {
             if (role.id === guild.id || role.managed)
                 continue;
-            if (pattern.test(role.name)) {
-                try {
-                    await role.delete('Security: auto-cleanup suspicious role');
-                    deleted++;
-                }
-                catch { }
+            if (whitelistedRoles.has(String(role.id)))
+                continue;
+            if (this.isSelfCreatedTarget(guild.id, 'role', role.id, role.name))
+                continue;
+            if (!(0, securityNames_1.isMaliciousSecurityName)(role.name))
+                continue;
+            if (!role.editable)
+                continue;
+            try {
+                await role.delete('Security: auto-cleanup suspicious role');
+                deleted++;
+                deletedNames.push(`@${String(role.name).replace(/`/g, "'").slice(0, 80)}`);
             }
+            catch { /* قد تكون أعلى من البوت */ }
         }
         if (deleted > 0) {
-            const settings = await (0, models_1.getGuildSettings)(guild.id);
-            const alert = await this.getAlertChannel(guild, settings);
-            alert?.send({ content: `🧹 **تنظيف تلقائي:** تم حذف ${deleted} روم/رول مشبوه` }).catch(() => { });
+            const alert = await this.getAlertChannel(guild, settings, cfg?.logChannel);
+            alert?.send({
+                content: `🧹 **تنظيف تلقائي:** تم حذف ${deleted} روم/رول مشبوه\n` +
+                    deletedNames.slice(0, 12).join(' • ') +
+                    (deletedNames.length > 12 ? ` • …و${deletedNames.length - 12}` : ''),
+            }).catch(() => { });
         }
         return deleted;
     }
@@ -3053,6 +3309,51 @@ class SecurityHandler {
                     return !oldRole.permissions.has(p) && newRole.permissions.has(p);
                 })
                 : [];
+            // 🏷️ رول سُمّي باسم تخريبي — تأمين فوري: حذف إن كان حديث الإنشاء، وإلا إرجاع الاسم
+            const maliciousRename = !!nukeCfg?.enabled &&
+                (0, securityNames_1.isMaliciousSecurityName)(newRole.name) &&
+                !(0, securityNames_1.isMaliciousSecurityName)(oldRole.name);
+            if (maliciousRename) {
+                const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id, 900, 10000);
+                const trusted = executor ? await this.isTrustedExecutor(guild, executor.id) : false;
+                const freshRole = Date.now() - Number(newRole.createdTimestamp || 0) < 10 * 60 * 1000;
+                // 🛡️ رول أنشأه البوت نفسه؟ نكتفي بإرجاع الاسم بدل حذفه
+                const selfCreatedRole = this.isSelfCreatedTarget(guild.id, 'role', newRole.id, oldRole.name);
+                let roleDeleted = false;
+                let nameRestored = false;
+                if (freshRole && !selfCreatedRole && newRole.editable) {
+                    roleDeleted = await newRole
+                        .delete('Omni — رول حديث باسم تخريبي (Anti-Nuke)')
+                        .then(() => true)
+                        .catch(() => false);
+                }
+                if (!roleDeleted && newRole.editable) {
+                    nameRestored = await newRole
+                        .setName(oldRole.name, 'Omni — استرجاع اسم الرول')
+                        .then(() => true)
+                        .catch(() => false);
+                }
+                let punishText = '⚠️ تعذّر تحديد المنفّذ — تم تأمين الرول';
+                if (executor && executor.id !== this.client.user?.id && !trusted) {
+                    const preventMode = nukeCfg?.mode !== 'react';
+                    punishText = await this.neutralizeById(guild, executor, nukeCfg, 'Omni — تسمية رول باسم تخريبي (Anti-Nuke)', preventMode);
+                    await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
+                }
+                else if (trusted) {
+                    punishText = '👑 منفّذ موثوق — تأمين الاسم فقط بدون عقوبة';
+                }
+                const alert = await this.getAlertChannel(guild, settings, nukeCfg?.logChannel);
+                await alert?.send({
+                    content: `🚨 **رول باسم تخريبي — تم التدخّل**\n` +
+                        `📛 الرول: \`${String(newRole.name).replace(/`/g, "'").slice(0, 100)}\` (\`${newRole.id}\`)\n` +
+                        `👤 المنفّذ: ${executor ? `${executor} (\`${executor.id}\`)` : 'غير معروف'}\n` +
+                        `🗑️ حذف الرول: ${roleDeleted ? '✅ تم' : selfCreatedRole ? '— رول أنشأه البوت (استرجاع الاسم فقط)' : freshRole ? '❌ فشل/غير قابل للحذف' : '— ليس حديث الإنشاء'}\n` +
+                        `🔄 استرجاع الاسم: ${nameRestored ? `✅ ${String(oldRole.name).replace(/`/g, "'").slice(0, 80)}` : roleDeleted ? '—' : '❌ فشل/الرول أعلى من البوت'}\n` +
+                        `🛡️ ${punishText}`,
+                }).catch(() => { });
+                if (!gainedAdmin && gainedDangerous.length === 0)
+                    return;
+            }
             if (!gainedAdmin && gainedDangerous.length === 0)
                 return;
             if (gainedDangerous.length > 0) {
@@ -3242,6 +3543,125 @@ class SecurityHandler {
             logger.error(`syncAutoScan error (${guild.name}): ${error.message}`);
         }
     }
+    // --------------------------------------------
+    // 4b-2) RAPID GUARD: فحص كل 20 ثانية وحذف أي قناة/رول باسم تخريبي
+    // --------------------------------------------
+    // يعمل ضمن مضاد النيوك فقط. ضروري لأن حدث الإنشاء قد يفشل أو يتأخر،
+    // أو يترك المهاجم قنوات/رولات قديمة بعد انتهاء الحادث.
+    async syncRapidGuard(guild) {
+        try {
+            const existing = this.rapidGuardTimers.get(guild.id);
+            if (existing) {
+                clearInterval(existing);
+                this.rapidGuardTimers.delete(guild.id);
+            }
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            if (!settings.protection?.antiNuke?.enabled)
+                return;
+            const timer = setInterval(() => {
+                this.runRapidGuard(guild).catch(err => logger.error(`Rapid guard failed (${guild.name}): ${err.message}`));
+            }, 20_000);
+            timer.unref?.();
+            this.rapidGuardTimers.set(guild.id, timer);
+            // فحص أولي سريع بعد 3 ثوانٍ — لا ننتظر أول 20 ثانية بعد إعادة التشغيل
+            setTimeout(() => {
+                this.runRapidGuard(guild).catch(() => { });
+            }, 3000).unref?.();
+            logger.info(`⚡ Rapid guard scheduled: ${guild.name} (كل 20 ثانية)`);
+        }
+        catch (error) {
+            logger.error(`syncRapidGuard error (${guild.name}): ${error.message}`);
+        }
+    }
+    async runRapidGuard(guild) {
+        if (this.rapidGuardInFlight.has(guild.id))
+            return;
+        this.rapidGuardInFlight.add(guild.id);
+        try {
+            const settings = await (0, models_1.getGuildSettings)(guild.id);
+            const cfg = settings.protection?.antiNuke;
+            if (!cfg?.enabled)
+                return;
+            const whitelistedChannels = new Set((cfg.whitelistedChannels || []).map(String));
+            const whitelistedRoles = new Set((cfg.whitelistedRoles || []).map(String));
+            const deletedChannels = [];
+            const deletedRoles = [];
+            const failed = [];
+            // 1️⃣ القنوات
+            for (const channel of guild.channels.cache.values()) {
+                if (whitelistedChannels.has(String(channel.id)))
+                    continue;
+                if (this.isSelfCreatedTarget(guild.id, 'channel', channel.id, channel.name))
+                    continue;
+                if (!(0, securityNames_1.isMaliciousSecurityName)(channel.name))
+                    continue;
+                const safeName = String(channel.name).replace(/`/g, "'").slice(0, 100);
+                try {
+                    await channel.delete('Omni — حارس الحماية السريع: اسم قناة تخريبية');
+                    deletedChannels.push(`#${safeName} (\`${channel.id}\`)`);
+                }
+                catch (error) {
+                    failed.push(`#${safeName} — ${error?.message || 'تعذّر الحذف'}`);
+                }
+            }
+            // 2️⃣ الرولات
+            for (const role of guild.roles.cache.values()) {
+                if (role.id === guild.id || role.managed)
+                    continue;
+                if (whitelistedRoles.has(String(role.id)))
+                    continue;
+                if (this.isSelfCreatedTarget(guild.id, 'role', role.id, role.name))
+                    continue;
+                if (!(0, securityNames_1.isMaliciousSecurityName)(role.name))
+                    continue;
+                const safeName = String(role.name).replace(/`/g, "'").slice(0, 100);
+                if (!role.editable) {
+                    failed.push(`@${safeName} — الرول أعلى من رتبة البوت أو رول تكامل`);
+                    continue;
+                }
+                try {
+                    await role.delete('Omni — حارس الحماية السريع: اسم رول تخريبي');
+                    deletedRoles.push(`@${safeName} (\`${role.id}\`)`);
+                }
+                catch (error) {
+                    failed.push(`@${safeName} — ${error?.message || 'تعذّر الحذف'}`);
+                }
+            }
+            if (!deletedChannels.length && !deletedRoles.length && !failed.length)
+                return;
+            logger.warn(`⚡ Rapid guard in ${guild.name}: deleted ${deletedChannels.length} channels, ${deletedRoles.length} roles, failed ${failed.length}`);
+            // تنبيه واحد كل 15 ثانية كحد أقصى — حتى لا يغرق السيرفر
+            const now = Date.now();
+            if (now - (this.rapidGuardAlertAt.get(guild.id) || 0) < 15_000)
+                return;
+            this.rapidGuardAlertAt.set(guild.id, now);
+            const lines = ['⚡ **حارس الحماية السريع — تدخّل فوري**'];
+            if (deletedChannels.length) {
+                lines.push(`\n📢 **حُذفت قنوات تخريبية (${deletedChannels.length}):**`);
+                lines.push(...deletedChannels.slice(0, 10).map(x => `• ${x}`));
+                if (deletedChannels.length > 10)
+                    lines.push(`• …و${deletedChannels.length - 10} غيرها`);
+            }
+            if (deletedRoles.length) {
+                lines.push(`\n📛 **حُذفت رولات تخريبية (${deletedRoles.length}):**`);
+                lines.push(...deletedRoles.slice(0, 10).map(x => `• ${x}`));
+                if (deletedRoles.length > 10)
+                    lines.push(`• …و${deletedRoles.length - 10} غيرها`);
+            }
+            if (failed.length) {
+                lines.push(`\n⚠️ **فشل حذف ${failed.length} — تحقّق من صلاحيات البوت وترتيب رولاته:**`);
+                lines.push(...failed.slice(0, 8).map(x => `• ${x}`));
+            }
+            const alert = await this.getAlertChannel(guild, settings, cfg.logChannel);
+            await alert?.send({ content: lines.join('\n').slice(0, 3900) }).catch(() => { });
+        }
+        catch (error) {
+            logger.error(`runRapidGuard error (${guild.name}): ${error.message}`);
+        }
+        finally {
+            this.rapidGuardInFlight.delete(guild.id);
+        }
+    }
     // 🔍 تنفيذ الفحص الدوري — يمسح رومات/رولات الهاكر ويرجّع الناقص
     async runPeriodicScan(guild) {
         try {
@@ -3289,10 +3709,9 @@ class SecurityHandler {
     }
     // إنشاء نسخة احتياطية (بنية القنوات + الرولات)
     async createBackup(guild) {
-        // نمط المشبوه — لا يُحفظ في النسخة الاحتياطية
-        const SUSPICIOUS = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123|vxl.?hak/i;
+        // الأسماء التخريبية لا تُحفظ في النسخة الاحتياطية
         const channels = guild.channels.cache
-            .filter(c => !c.isThread() && !SUSPICIOUS.test(c.name))
+            .filter(c => !c.isThread() && !(0, securityNames_1.isMaliciousSecurityName)(c.name))
             .map(c => {
             const guildChannel = c; // GuildChannel types
             const base = {
@@ -3319,7 +3738,7 @@ class SecurityHandler {
         })
             .sort((a, b) => a.position - b.position);
         const roles = guild.roles.cache
-            .filter(r => r.id !== guild.id && !r.managed && !SUSPICIOUS.test(r.name))
+            .filter(r => r.id !== guild.id && !r.managed && !(0, securityNames_1.isMaliciousSecurityName)(r.name))
             .sort((a, b) => b.position - a.position)
             .map(r => ({
             id: r.id,
@@ -3373,12 +3792,11 @@ class SecurityHandler {
         const data = backup.data;
         const result = { channels: 0, roles: 0, skipped: 0 };
         const idMap = {};
-        // نمط القنوات/الرولات المشبوهة — لا تُستعاد أبداً
-        const SUSPICIOUS_PATTERN = /nuked|hacked|kly|rcl|cracked|death.?note|pwned|owned|here|on.?top|spam|raid|destroy|test.?123|vxl.?hak/i;
+        // الأسماء التخريبية لا تُستعاد أبداً
         // 1) الرولات — إنشاء بالترتيب الدقيق من النسخة الاحتياطية
         const sortedRoles = [...(data.roles || [])].sort((a, b) => (b.position || 0) - (a.position || 0));
         for (const rd of sortedRoles) {
-            if (SUSPICIOUS_PATTERN.test(rd.name)) {
+            if ((0, securityNames_1.isMaliciousSecurityName)(rd.name)) {
                 result.skipped++;
                 continue;
             }
@@ -3398,6 +3816,7 @@ class SecurityHandler {
             while (!created2 && attempts < 10) {
                 attempts++;
                 try {
+                    this.noteSelfCreatedName(guild.id, 'role', rd.name);
                     const created = await guild.roles.create({
                         name: rd.name,
                         color: rd.color,
@@ -3406,6 +3825,7 @@ class SecurityHandler {
                         mentionable: !!rd.mentionable,
                         reason: 'Omni — استعادة نسخة احتياطية',
                     });
+                    this.noteSelfCreated(guild.id, 'role', created.id);
                     idMap[`role:${rd.id}`] = created.id;
                     result.roles++;
                     created2 = true;
@@ -3447,7 +3867,7 @@ class SecurityHandler {
                 const positions = [];
                 // استخدام الترتيب من النسخة الاحتياطية مباشرة
                 for (const rd of sortedRoles) {
-                    if (SUSPICIOUS_PATTERN.test(rd.name))
+                    if ((0, securityNames_1.isMaliciousSecurityName)(rd.name))
                         continue;
                     const role = nameToRole.get(rd.name);
                     if (role && role.id !== guild.id) {
@@ -3477,7 +3897,7 @@ class SecurityHandler {
         for (const cd of sortedChannels) {
             if (!RESTORABLE_CHANNEL_TYPES.includes(cd.type))
                 continue;
-            if (SUSPICIOUS_PATTERN.test(cd.name)) {
+            if ((0, securityNames_1.isMaliciousSecurityName)(cd.name)) {
                 result.skipped++;
                 continue;
             }
@@ -3492,6 +3912,7 @@ class SecurityHandler {
                 const parentId = cd.parentId
                     ? idMap[`ch:${cd.parentId}`] || guild.channels.cache.get(cd.parentId)?.id
                     : undefined;
+                this.noteSelfCreatedName(guild.id, 'channel', cd.name);
                 const created = await guild.channels.create({
                     name: cd.name,
                     type: cd.type,
@@ -3500,6 +3921,7 @@ class SecurityHandler {
                     ...(parentId ? { parent: parentId } : {}),
                     reason: 'Omni — استعادة نسخة احتياطية',
                 });
+                this.noteSelfCreated(guild.id, 'channel', created.id);
                 idMap[`ch:${cd.id}`] = created.id;
                 result.channels++;
                 // ضبط الموقع بدقة من النسخة الاحتياطية
@@ -3520,7 +3942,7 @@ class SecurityHandler {
                 for (const cd of sortedChannels) {
                     if (!RESTORABLE_CHANNEL_TYPES.includes(cd.type))
                         continue;
-                    if (SUSPICIOUS_PATTERN.test(cd.name))
+                    if ((0, securityNames_1.isMaliciousSecurityName)(cd.name))
                         continue;
                     const channelId = idMap[`ch:${cd.id}`] || guild.channels.cache.get(cd.id)?.id;
                     if (!channelId)
