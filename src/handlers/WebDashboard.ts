@@ -8,6 +8,7 @@
 import { Express, Request, Response } from 'express';
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import type { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { getBotOwnerIds } from '../utils/botOwner';
@@ -36,7 +37,19 @@ export class WebDashboard {
 
   constructor(client: OmniClient) {
     this.client = client;
-    this.assetsDir = path.resolve(process.cwd(), 'assets', 'dashboard');
+    // مسار الأصول: حسب مجلد التشغيل ثم بجوار ملف البوت (out/handlers → assets)
+    const candidates = [
+      path.resolve(process.cwd(), 'assets', 'dashboard'),
+      path.resolve(__dirname, '..', '..', 'assets', 'dashboard'),
+    ];
+    this.assetsDir =
+      candidates.find((dir) => {
+        try {
+          return fs.existsSync(path.join(dir, 'index.html'));
+        } catch {
+          return false;
+        }
+      }) || candidates[0];
   }
 
   /** Guard يُركّب على /api قبل الراوتر في OmniClient */

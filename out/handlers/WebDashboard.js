@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebDashboard = void 0;
 const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const helpers_1 = require("../utils/helpers");
 const botOwner_1 = require("../utils/botOwner");
 const webAuth_1 = require("../utils/webAuth");
@@ -21,7 +22,20 @@ class WebDashboard {
     assetsDir;
     constructor(client) {
         this.client = client;
-        this.assetsDir = path_1.default.resolve(process.cwd(), 'assets', 'dashboard');
+        // مسار الأصول: حسب مجلد التشغيل ثم بجوار ملف البوت (out/handlers → assets)
+        const candidates = [
+            path_1.default.resolve(process.cwd(), 'assets', 'dashboard'),
+            path_1.default.resolve(__dirname, '..', '..', 'assets', 'dashboard'),
+        ];
+        this.assetsDir =
+            candidates.find((dir) => {
+                try {
+                    return fs_1.default.existsSync(path_1.default.join(dir, 'index.html'));
+                }
+                catch {
+                    return false;
+                }
+            }) || candidates[0];
     }
     /** Guard يُركّب على /api قبل الراوتر في OmniClient */
     apiGuard() {
