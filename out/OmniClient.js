@@ -637,12 +637,58 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to delete knowledge' });
             }
         });
+        // ===== 🕵️ المحقق الأمني — آخر تشغيل + أحدث النتائج =====
+        router.get('/guilds/:guildId/investigator', async (req, res) => {
+            try {
+                const { InvestigationRun, InvestigationFinding } = await Promise.resolve().then(() => __importStar(require('./models')));
+                const [run, findings] = await Promise.all([
+                    InvestigationRun.findOne({ guildId: req.params.guildId }).sort({ startedAt: -1 }).lean(),
+                    InvestigationFinding.find({ guildId: req.params.guildId })
+                        .sort({ lastSeenAt: -1 })
+                        .limit(80)
+                        .lean(),
+                ]);
+                const rank = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+                const sorted = findings.sort((a, b) => {
+                    const openA = a.status === 'open' ? 0 : 1;
+                    const openB = b.status === 'open' ? 0 : 1;
+                    if (openA !== openB)
+                        return openA - openB;
+                    const sa = rank[a.severity] ?? 9;
+                    const sb = rank[b.severity] ?? 9;
+                    if (sa !== sb)
+                        return sa - sb;
+                    return new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime();
+                });
+                res.json({ run: run || null, findings: sorted });
+            }
+            catch (error) {
+                logger.error('Failed to get investigator data:', error);
+                res.status(500).json({ error: 'Failed to get investigator data' });
+            }
+        });
+        // ===== 🎁 السحوبات — النشطة والمنتهية =====
+        router.get('/guilds/:guildId/giveaways', async (req, res) => {
+            try {
+                const { Giveaway } = await Promise.resolve().then(() => __importStar(require('./models')));
+                const [active, recent] = await Promise.all([
+                    Giveaway.find({ guildId: req.params.guildId, ended: false }).sort({ endsAt: 1 }).limit(30).lean(),
+                    Giveaway.find({ guildId: req.params.guildId, ended: true }).sort({ endedAt: -1 }).limit(15).lean(),
+                ]);
+                res.json({ active, recent });
+            }
+            catch (error) {
+                logger.error('Failed to get giveaways:', error);
+                res.status(500).json({ error: 'Failed to get giveaways' });
+            }
+        });
         // ===== 🎛️ جسر أوامر اللوحة (تنفيذ فوري داخل نفس العملية) =====
         const DASHBOARD_ALLOWED_COMMANDS = new Set([
             'members_list', 'roles_list', 'member_get', 'member_warn', 'member_kick',
             'member_ban', 'member_timeout', 'member_addrole', 'member_removerole',
             'ticket_claim', 'ticket_unclaim', 'ticket_close', 'ticket_delete', 'ticket_reply',
             'ping', 'guild_stats', 'channels_list', 'welcome_test', 'broadcast', 'settings_sync',
+            'investigator_run',
         ]);
         router.post('/guilds/:guildId/command', async (req, res) => {
             try {

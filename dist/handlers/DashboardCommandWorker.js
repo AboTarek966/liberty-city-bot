@@ -345,22 +345,51 @@ class DashboardCommandWorker {
                     }
                 }
                 else {
-                    const chans = guild.channels.cache.filter((c) => c.type === 0 && c.permissionsFor(guild.members.me)?.has('SendMessages'));
-                    for (const [, c] of chans) {
-                        try {
-                            await c.send({ content });
-                            sent++;
+                    if (payload.channelId) {
+                        // 📢 بث لقناة محددة فقط
+                        const channel = guild.channels.cache.get(String(payload.channelId));
+                        if (!channel?.isTextBased())
+                            throw new Error('القناة غير موجودة أو غير نصية');
+                        await channel.send({ content });
+                        sent = 1;
+                    }
+                    else {
+                        const chans = guild.channels.cache.filter((c) => c.type === 0 && c.permissionsFor(guild.members.me)?.has('SendMessages'));
+                        for (const [, c] of chans) {
+                            try {
+                                await c.send({ content });
+                                sent++;
+                            }
+                            catch {
+                                failed++;
+                            }
+                            await new Promise((r) => setTimeout(r, 400));
                         }
-                        catch {
-                            failed++;
-                        }
-                        await new Promise((r) => setTimeout(r, 400));
                     }
                 }
                 await push(guildId, at, sentBy, true);
                 return { success: true, sent, failed, type };
             }
             // ------------- أخرى -------------
+            case 'investigator_run': {
+                const investigator = this.client.aiInvestigator;
+                if (!investigator || typeof investigator.run !== 'function') {
+                    throw new Error('المحقق الأمني غير متاح');
+                }
+                const report = await investigator.run(guild, {
+                    trigger: 'manual',
+                    deep: Boolean(payload.deep),
+                    aiMode: payload.deep ? 'always' : 'if-high',
+                    requestedBy: payload.actor || 'لوحة التحكم',
+                });
+                return {
+                    success: true,
+                    riskLevel: report?.riskLevel ?? null,
+                    riskScore: report?.riskScore ?? null,
+                    findings: Array.isArray(report?.findings) ? report.findings.length : 0,
+                    summary: report?.summary ?? '',
+                };
+            }
             case 'guild_leave': {
                 await guild.leave();
                 return { success: true };
