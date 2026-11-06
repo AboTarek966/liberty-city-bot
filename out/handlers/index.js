@@ -3,7 +3,7 @@
 // Omni Bot - Handlers Index
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DashboardCommandWorker = exports.VoiceKeeperHandler = exports.MusicHandler = exports.GameHandler = exports.EconomyHandler = exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.ReturnTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIInvestigator = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
+exports.WebDashboard = exports.DashboardCommandWorker = exports.VoiceKeeperHandler = exports.MusicHandler = exports.GameHandler = exports.EconomyHandler = exports.AITranslator = exports.AITicketAssistant = exports.AIAutoModHandler = exports.MessageScannerHandler = exports.InviteTrackerHandler = exports.ReturnTrackerHandler = exports.AntiAltHandler = exports.LevelingHandler = exports.SecurityHandler = exports.ActivityStats = exports.ActivityTracker = exports.LOG_EVENTS = exports.LoggingHandler = exports.ModerationHandler = exports.TicketHandler = exports.ProtectionHandler = exports.AIInvestigator = exports.AIHandler = exports.InteractionHandler = exports.EventHandler = exports.CommandHandler = void 0;
 var CommandHandler_1 = require("./CommandHandler");
 Object.defineProperty(exports, "CommandHandler", { enumerable: true, get: function () { return CommandHandler_1.CommandHandler; } });
 var EventHandler_1 = require("./EventHandler");
@@ -54,4 +54,6 @@ var VoiceKeeperHandler_1 = require("./VoiceKeeperHandler");
 Object.defineProperty(exports, "VoiceKeeperHandler", { enumerable: true, get: function () { return VoiceKeeperHandler_1.VoiceKeeperHandler; } });
 var DashboardCommandWorker_1 = require("./DashboardCommandWorker");
 Object.defineProperty(exports, "DashboardCommandWorker", { enumerable: true, get: function () { return DashboardCommandWorker_1.DashboardCommandWorker; } });
+var WebDashboard_1 = require("./WebDashboard");
+Object.defineProperty(exports, "WebDashboard", { enumerable: true, get: function () { return WebDashboard_1.WebDashboard; } });
 //# sourceMappingURL=index.js.map

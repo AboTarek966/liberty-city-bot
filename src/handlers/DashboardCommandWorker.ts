@@ -41,6 +41,11 @@ export class DashboardCommandWorker {
     this.intervalRef = null;
   }
 
+  /** تنفيذ فوري لأمر (تستخدمه واجهة اللوحة المدمجة داخل نفس العملية) */
+  async executeNow(command: string, guildId: string, payload: Record<string, any> = {}): Promise<any> {
+    return this.execute(command, guildId, payload);
+  }
+
   private async poll(): Promise<void> {
     if (this.running) return;
     this.running = true;

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>لوحة تحكم Omni</title>
+  <link rel="stylesheet" href="/dashboard/assets/style.css">
+</head>
+<body>
+
+  <!-- ═══════ شاشة الدخول ═══════ -->
+  <div id="login" class="login-wrap hidden">
+    <div class="login-card">
+      <div class="login-logo">🤖</div>
+      <h1>لوحة تحكم Omni</h1>
+      <p class="dim">دخول آمن — للمالك فقط</p>
+
+      <div id="login-error" class="login-error hidden"></div>
+
+      <div id="login-code-block" class="hidden">
+        <button id="btn-request-code" class="btn primary block">🔑 أرسل كود الدخول على الخاص</button>
+        <div id="code-step" class="hidden mt">
+          <input id="code-input" class="inp center" type="text" inputmode="numeric" maxlength="6" placeholder="● ● ● ● ● ●">
+          <button id="btn-verify-code" class="btn success block mt-sm">تأكيد الكود</button>
+        </div>
+      </div>
+
+      <div id="login-pass-block" class="hidden mt">
+        <div class="or">أو</div>
+        <input id="pass-input" class="inp" type="password" placeholder="كلمة مرور اللوحة">
+        <button id="btn-login-pass" class="btn primary block mt-sm">دخول بكلمة المرور</button>
+      </div>
+
+      <div id="login-none" class="hidden">
+        <p class="dim">لا توجد طريقة دخول مفعّلة. اطلب من البوت كود الدخول أو اضبط <code>DASHBOARD_PASSWORD</code> في البيئة.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ التطبيق ═══════ -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-emoji">🤖</span> <span>Omni</span></div>
+      <nav id="nav"></nav>
+      <div class="side-foot">
+        <button id="btn-logout" class="btn ghost block">🚪 خروج</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="guild-pick">
+          <img id="guild-icon" class="guild-icon" src="" alt="">
+          <select id="guild-select" class="inp"></select>
+        </div>
+        <div class="top-actions">
+          <span id="bot-status" class="chip">…</span>
+          <button id="btn-refresh" class="btn ghost" title="تحديث">🔄</button>
+        </div>
+      </header>
+      <section id="view" class="view"></section>
+    </main>
+  </div>
+
+  <!-- ═══════ مكونات مساعدة ═══════ -->
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="modal" class="modal-wrap hidden">
+    <div class="modal">
+      <div class="modal-head"><h3 id="modal-title"></h3><button id="modal-x" class="btn ghost">✕</button></div>
+      <div id="modal-body" class="modal-body"></div>
+      <div class="modal-foot">
+        <button id="modal-cancel" class="btn ghost">إلغاء</button>
+        <button id="modal-ok" class="btn primary">تأكيد</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/dashboard/assets/app.js"></script>
+</body>
+</html>

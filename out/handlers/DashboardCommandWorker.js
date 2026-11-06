@@ -34,6 +34,10 @@ class DashboardCommandWorker {
             clearInterval(this.intervalRef);
         this.intervalRef = null;
     }
+    /** تنفيذ فوري لأمر (تستخدمه واجهة اللوحة المدمجة داخل نفس العملية) */
+    async executeNow(command, guildId, payload = {}) {
+        return this.execute(command, guildId, payload);
+    }
     async poll() {
         if (this.running)
             return;

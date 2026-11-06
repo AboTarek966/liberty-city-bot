@@ -22,4 +22,5 @@ export { GameHandler, GameSession, GamePlayer, GameConfig } from './GameHandler'
 export { MusicHandler, Track, Queue } from './MusicHandler';
 export { VoiceKeeperHandler } from './VoiceKeeperHandler';
 export { DashboardCommandWorker } from './DashboardCommandWorker';
+export { WebDashboard } from './WebDashboard';
 //# sourceMappingURL=index.d.ts.map

@@ -1,5 +1,5 @@
 import { Client, Collection } from 'discord.js';
-import { CommandHandler, EventHandler, InteractionHandler, AIHandler, AIInvestigator, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, ReturnTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, VoiceKeeperHandler, DashboardCommandWorker } from './handlers';
+import { CommandHandler, EventHandler, InteractionHandler, AIHandler, AIInvestigator, ProtectionHandler, TicketHandler, ModerationHandler, LoggingHandler, ActivityTracker, SecurityHandler, LevelingHandler, AntiAltHandler, InviteTrackerHandler, ReturnTrackerHandler, MessageScannerHandler, AIAutoModHandler, AITicketAssistant, AITranslator, EconomyHandler, GameHandler, MusicHandler, VoiceKeeperHandler, DashboardCommandWorker, WebDashboard } from './handlers';
 import { Express } from 'express';
 export declare class OmniClient extends Client {
     commandHandler: CommandHandler;
@@ -26,6 +26,7 @@ export declare class OmniClient extends Client {
     musicHandler: MusicHandler;
     voiceKeeperHandler: VoiceKeeperHandler;
     dashboardCommandWorker: DashboardCommandWorker;
+    webDashboard: WebDashboard;
     expressApp: Express;
     private restTokenTimer?;
     cooldowns: Collection<string, Collection<string, number>>;

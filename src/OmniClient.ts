@@ -36,6 +36,7 @@ import {
   MusicHandler,
   VoiceKeeperHandler,
   DashboardCommandWorker,
+  WebDashboard,
 } from './handlers';
 import mongoose from 'mongoose';
 import express, { Express, Request, Response } from 'express';
@@ -72,6 +73,7 @@ export class OmniClient extends Client {
   public musicHandler: MusicHandler;
   public voiceKeeperHandler: VoiceKeeperHandler;
   public dashboardCommandWorker: DashboardCommandWorker;
+  public webDashboard: WebDashboard;
 
   // Express server for Dashboard API
   public expressApp: Express;
@@ -114,6 +116,8 @@ export class OmniClient extends Client {
 
     // Initialize Express app
     this.expressApp = express();
+    // لوحة التحكم المدمجة — تُنشأ قبل setupExpress حتى يتمكن من تركيب حارس /api
+    this.webDashboard = new WebDashboard(this);
     this.setupExpress();
 
     // Initialize handlers
@@ -157,6 +161,13 @@ export class OmniClient extends Client {
 
     // API Routes
     this.setupApiRoutes();
+
+    // 🖥️ لوحة التحكم المدمجة (صفحة + أصول + مصادقة) — تُخدم من نفس المنفذ العام
+    try {
+      this.webDashboard.attach(this.expressApp);
+    } catch (e: any) {
+      logger.warn(`⚠️ Web dashboard attach failed: ${e?.message || e}`);
+    }
   }
 
   private setupApiRoutes(): void {
@@ -543,6 +554,130 @@ export class OmniClient extends Client {
       }
     });
 
+    // ===== 🖥️ واجهات لوحة التحكم المدمجة =====
+
+    // معلومات البوت (نظرة عامة)
+    router.get('/bot/info', async (_req: Request, res: Response) => {
+      try {
+        res.json({
+          user: this.user
+            ? { id: this.user.id, tag: this.user.tag, avatar: this.user.displayAvatarURL() }
+            : null,
+          uptimeSeconds: Math.floor(((this as any).uptime || 0) / 1000),
+          ping: Math.round(this.ws.ping),
+          guilds: this.guilds.cache.size,
+          users: this.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0),
+          channels: this.guilds.cache.reduce((a, g) => a + g.channels.cache.size, 0),
+          memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+          commands: (this.commandHandler as any)?.commands?.size || 0,
+        });
+      } catch (error) {
+        logger.error('Failed to get bot info:', error);
+        res.status(500).json({ error: 'Failed to get bot info' });
+      }
+    });
+
+    // قنوات السيرفر (للقوائم المنسدلة)
+    router.get('/guilds/:guildId/channels', async (req: Request, res: Response) => {
+      try {
+        const guild = this.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found' });
+        const channels = Array.from(guild.channels.cache.values() as any)
+          .sort((a: any, b: any) => (a.rawPosition ?? 0) - (b.rawPosition ?? 0))
+          .map((c: any) => ({ id: c.id, name: c.name, type: c.type, parentId: c.parentId || null }));
+        res.json({ channels });
+      } catch (error) {
+        logger.error('Failed to get channels:', error);
+        res.status(500).json({ error: 'Failed to get channels' });
+      }
+    });
+
+    // ===== 📚 قاعدة المعرفة =====
+    router.get('/guilds/:guildId/knowledge', async (req: Request, res: Response) => {
+      try {
+        const { KnowledgeEntry } = await import('./models');
+        const entries = await KnowledgeEntry.find({ guildId: req.params.guildId })
+          .sort({ updatedAt: -1 })
+          .limit(200)
+          .lean();
+        res.json({ entries });
+      } catch (error) {
+        logger.error('Failed to get knowledge:', error);
+        res.status(500).json({ error: 'Failed to get knowledge' });
+      }
+    });
+
+    router.post('/guilds/:guildId/knowledge', async (req: Request, res: Response) => {
+      try {
+        const { KnowledgeEntry } = await import('./models');
+        const { title, content, tags, category } = req.body || {};
+        if (!String(title || '').trim() || !String(content || '').trim()) {
+          return res.status(400).json({ error: 'العنوان والمحتوى مطلوبان' });
+        }
+        const actor =
+          (req as any).webAuth?.username || (req as any).webAuth?.userId || 'لوحة التحكم';
+        const tagList = Array.isArray(tags)
+          ? tags
+          : String(tags || '')
+              .split(',');
+        const entry = await KnowledgeEntry.create({
+          guildId: req.params.guildId,
+          title: String(title).trim().slice(0, 200),
+          content: String(content).trim().slice(0, 8000),
+          tags: tagList
+            .map((t: any) => String(t).toLowerCase().trim())
+            .filter(Boolean)
+            .slice(0, 15),
+          category: String(category || 'عام').trim().slice(0, 50),
+          createdBy: actor,
+          enabled: true,
+        });
+        res.json({ entry });
+      } catch (error) {
+        logger.error('Failed to create knowledge:', error);
+        res.status(500).json({ error: 'Failed to create knowledge' });
+      }
+    });
+
+    router.delete('/guilds/:guildId/knowledge/:entryId', async (req: Request, res: Response) => {
+      try {
+        const { KnowledgeEntry } = await import('./models');
+        await KnowledgeEntry.deleteOne({ _id: req.params.entryId, guildId: req.params.guildId });
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Failed to delete knowledge:', error);
+        res.status(500).json({ error: 'Failed to delete knowledge' });
+      }
+    });
+
+    // ===== 🎛️ جسر أوامر اللوحة (تنفيذ فوري داخل نفس العملية) =====
+    const DASHBOARD_ALLOWED_COMMANDS = new Set([
+      'members_list', 'roles_list', 'member_get', 'member_warn', 'member_kick',
+      'member_ban', 'member_timeout', 'member_addrole', 'member_removerole',
+      'ticket_claim', 'ticket_unclaim', 'ticket_close', 'ticket_delete', 'ticket_reply',
+      'ping', 'guild_stats', 'channels_list', 'welcome_test', 'broadcast', 'settings_sync',
+    ]);
+    router.post('/guilds/:guildId/command', async (req: Request, res: Response) => {
+      try {
+        const { command, payload } = req.body || {};
+        if (!command || !DASHBOARD_ALLOWED_COMMANDS.has(String(command))) {
+          return res.status(400).json({ error: 'أمر غير مسموح' });
+        }
+        const actor =
+          (req as any).webAuth?.username || (req as any).webAuth?.userId || 'لوحة التحكم';
+        const result = await this.dashboardCommandWorker.executeNow(
+          String(command),
+          req.params.guildId,
+          { ...(payload || {}), actor: payload?.actor || actor }
+        );
+        res.json({ success: true, result: result ?? null });
+      } catch (error: any) {
+        res.status(500).json({ error: error?.message || 'فشل تنفيذ الأمر' });
+      }
+    });
+
+    // 🛡️ حراسة كل مسارات /api — لا وصول بدون جلسة داشبورد أو مفتاح خدمة
+    this.expressApp.use('/api', this.webDashboard.apiGuard());
     this.expressApp.use('/api', router);
   }
 
@@ -553,30 +688,37 @@ export class OmniClient extends Client {
   }
 
   private async updateGuildSettings(guildId: string, updates: any): Promise<any> {
-    const { getGuildSettings } = await import('./models');
+    const { getGuildSettings, invalidateGuildSettings } = await import('./models');
     const settings = await getGuildSettings(guildId);
-    // Deep merge (up to 2 levels) so section updates like { protection: { antiRaid: {...} } }
-    // merge into the existing section instead of replacing it entirely.
-    for (const [key, value] of Object.entries(updates)) {
-      if ((key as string).startsWith('$')) continue;
-      const current = (settings as any)[key];
-      if (value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current)) {
-        for (const [subKey, subValue] of Object.entries(value as Record<string, any>)) {
-          const subCurrent = current[subKey];
-          if (subValue && typeof subValue === 'object' && !Array.isArray(subValue) && subCurrent && typeof subCurrent === 'object' && !Array.isArray(subCurrent)) {
-            Object.assign(subCurrent, subValue);
-          } else {
-            current[subKey] = subValue;
-          }
+
+    // دمج عميق حقيقي — أي مسار (حتى 4+ مستويات) يُحدَّث بدون مسح الأشقاء
+    const deepMerge = (target: any, patch: any, depth = 0): void => {
+      if (depth > 10) return;
+      for (const [key, value] of Object.entries(patch)) {
+        if (key.startsWith('$')) continue;
+        const current = target[key];
+        if (
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          current &&
+          typeof current === 'object' &&
+          !Array.isArray(current) &&
+          !(current instanceof Date)
+        ) {
+          deepMerge(current, value, depth + 1);
+        } else {
+          target[key] = value;
         }
-      } else {
-        (settings as any)[key] = value;
       }
+    };
+
+    deepMerge(settings as any, updates);
+    for (const key of Object.keys(updates)) {
+      if (!key.startsWith('$')) settings.markModified(key);
     }
-    settings.markModified('protection');
-    settings.markModified('welcome');
-    settings.markModified('economy');
     await settings.save();
+    invalidateGuildSettings(guildId);
     return settings.toObject();
   }
 
