@@ -433,6 +433,14 @@ export interface IGuildSettings extends Document {
     responseLanguage: string;
   };
 
+  // 📊 أدوات ذكاء إضافية — مقفولة افتراضياً حتى يفعّلها الأدمن من اللوحة
+  aiInsights: {
+    /** /mood — تحليل مزاج قناة */
+    moodEnabled: boolean;
+    /** /summarize — تلخيص الروابط والفيديوهات */
+    summarizeEnabled: boolean;
+  };
+
   // 🕵️ AI Investigator — محقق أمني داخلي مستقل عن مساعد المحادثة
   aiInvestigator: {
     enabled: boolean;
@@ -1262,6 +1270,12 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     ignoredChannels: [{ type: String }],
     ignoredRoles: [{ type: String }],
     responseLanguage: { type: String, default: 'ar' },
+  },
+
+  // 📊 أدوات ذكاء إضافية — مقفولة افتراضياً، تُفعّل من لوحة الإعدادات فقط
+  aiInsights: {
+    moodEnabled: { type: Boolean, default: false },
+    summarizeEnabled: { type: Boolean, default: false },
   },
 
   // 🕵️ AI Investigator — افتراضياً مفعّل، تحليل فقط بدون أي عقوبات تلقائية

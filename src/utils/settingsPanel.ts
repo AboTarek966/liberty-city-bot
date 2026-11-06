@@ -1467,6 +1467,7 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
   const translator = s.protection?.aiTranslator;
   const tEnabled = translator?.enabled ?? false;
   const tDefault = translator?.defaultTargetLang ?? 'ar';
+  const insights = s.aiInsights || {};
 
   const embed = categoryEmbed(
     'ai',
@@ -1476,7 +1477,9 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
     `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
     `> 🧠 **المزود:** Groq (مجاني — gpt-oss-120b)\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n\n` +
+    `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n` +
+    `> 📊 **تحليل المزاج:** ${on(insights.moodEnabled)} ${insights.moodEnabled ? 'مفعّل — /mood' : 'معطّل'}\n` +
+    `> 🔗 **تلخيص الروابط:** ${on(insights.summarizeEnabled)} ${insights.summarizeEnabled ? 'مفعّل — /summarize' : 'معطّل'}\n\n` +
     `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
     `🎭 استخدم زر **الشخصية** لتعريف شخصية الذكاء العامة (كل الأعضاء) — وميزة **التكتات** لها شخصية مستقلة من: الإعدادات ← التذاكر ← 🤖 AI`
   );
@@ -1505,7 +1508,12 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
       ])
   );
 
-  return { embeds: [embed], components: [row1, row2, langSelect] };
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('aiInsights', 'mood', '📊 تحليل المزاج', '📊', !!insights.moodEnabled),
+    toggleBtn('aiInsights', 'summarize', '🔗 تلخيص الروابط', '🔗', !!insights.summarizeEnabled),
+  );
+
+  return { embeds: [embed], components: [row1, row2, langSelect, row3] };
 }
 
 // --------------------------------------------

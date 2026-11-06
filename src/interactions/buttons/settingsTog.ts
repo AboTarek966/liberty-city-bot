@@ -141,6 +141,19 @@ const handler: ButtonHandler = {
           settings.automod.enabled = !settings.automod.enabled;
         }
         break;
+      case 'aiInsights': {
+        if (!(settings as any).aiInsights) {
+          (settings as any).aiInsights = { moodEnabled: false, summarizeEnabled: false };
+        }
+        const insights: any = (settings as any).aiInsights;
+        if (field === 'mood') insights.moodEnabled = !insights.moodEnabled;
+        else if (field === 'summarize') insights.summarizeEnabled = !insights.summarizeEnabled;
+        else {
+          await interaction.editReply({ content: '❌ إعداد غير معروف' });
+          return;
+        }
+        break;
+      }
       case 'ai': {
         settings.ai.enabled = !settings.ai.enabled;
         // مزامنة مع AIConfig (يستخدمه مسار المنشن)
@@ -315,11 +328,13 @@ const handler: ButtonHandler = {
     const panel =
       isTicketAIField
         ? buildTicketAIPanel(interaction.guild!, settings)
-        : section === 'verification'
-          ? buildVerificationPanel(interaction.guild!, settings)
-          : (section as string) === 'shop'
-            ? buildShop(interaction.guild!, settings)
-            : await buildPanel(section, interaction.guild, interaction.user.id);
+        : (section as string) === 'aiInsights'
+          ? await buildPanel('ai', interaction.guild, interaction.user.id)
+          : section === 'verification'
+            ? buildVerificationPanel(interaction.guild!, settings)
+            : (section as string) === 'shop'
+              ? buildShop(interaction.guild!, settings)
+              : await buildPanel(section, interaction.guild, interaction.user.id);
     await interaction.editReply({
       embeds: panel.embeds,
       components: panel.components as any,

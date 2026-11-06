@@ -395,6 +395,12 @@ export interface IGuildSettings extends Document {
         ignoredRoles: string[];
         responseLanguage: string;
     };
+    aiInsights: {
+        /** /mood — تحليل مزاج قناة */
+        moodEnabled: boolean;
+        /** /summarize — تلخيص الروابط والفيديوهات */
+        summarizeEnabled: boolean;
+    };
     aiInvestigator: {
         enabled: boolean;
         /** الفحص التلقائي (بدء التشغيل + الجدولة + الأحداث). إيقافه لا يمنع الفحص اليدوي */

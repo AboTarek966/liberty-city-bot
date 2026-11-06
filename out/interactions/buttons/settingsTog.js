@@ -148,6 +148,21 @@ const handler = {
                     settings.automod.enabled = !settings.automod.enabled;
                 }
                 break;
+            case 'aiInsights': {
+                if (!settings.aiInsights) {
+                    settings.aiInsights = { moodEnabled: false, summarizeEnabled: false };
+                }
+                const insights = settings.aiInsights;
+                if (field === 'mood')
+                    insights.moodEnabled = !insights.moodEnabled;
+                else if (field === 'summarize')
+                    insights.summarizeEnabled = !insights.summarizeEnabled;
+                else {
+                    await interaction.editReply({ content: '❌ إعداد غير معروف' });
+                    return;
+                }
+                break;
+            }
             case 'ai': {
                 settings.ai.enabled = !settings.ai.enabled;
                 // مزامنة مع AIConfig (يستخدمه مسار المنشن)
@@ -319,11 +334,13 @@ const handler = {
             ['aienabled', 'aiclaim', 'aianalyze', 'aireply', 'aiadminroles', 'aiadminperms', 'aiadminbans'].includes(field);
         const panel = isTicketAIField
             ? (0, settingsPanel_1.buildTicketAIPanel)(interaction.guild, settings)
-            : section === 'verification'
-                ? (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings)
-                : section === 'shop'
-                    ? (0, settingsPanel_1.buildShop)(interaction.guild, settings)
-                    : await (0, settingsPanel_1.buildPanel)(section, interaction.guild, interaction.user.id);
+            : section === 'aiInsights'
+                ? await (0, settingsPanel_1.buildPanel)('ai', interaction.guild, interaction.user.id)
+                : section === 'verification'
+                    ? (0, settingsPanel_1.buildVerificationPanel)(interaction.guild, settings)
+                    : section === 'shop'
+                        ? (0, settingsPanel_1.buildShop)(interaction.guild, settings)
+                        : await (0, settingsPanel_1.buildPanel)(section, interaction.guild, interaction.user.id);
         await interaction.editReply({
             embeds: panel.embeds,
             components: panel.components,

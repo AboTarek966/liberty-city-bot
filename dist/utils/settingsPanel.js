@@ -1003,12 +1003,15 @@ function buildAI(guild, s) {
     const translator = s.protection?.aiTranslator;
     const tEnabled = translator?.enabled ?? false;
     const tDefault = translator?.defaultTargetLang ?? 'ar';
+    const insights = s.aiInsights || {};
     const embed = categoryEmbed('ai', guild, `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +
         `> ⚡ **الذكاء الاصطناعي:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
         `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
         `> 🧠 **المزود:** Groq (مجاني — gpt-oss-120b)\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n\n` +
+        `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n` +
+        `> 📊 **تحليل المزاج:** ${on(insights.moodEnabled)} ${insights.moodEnabled ? 'مفعّل — /mood' : 'معطّل'}\n` +
+        `> 🔗 **تلخيص الروابط:** ${on(insights.summarizeEnabled)} ${insights.summarizeEnabled ? 'مفعّل — /summarize' : 'معطّل'}\n\n` +
         `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
         `🎭 استخدم زر **الشخصية** لتعريف شخصية الذكاء العامة (كل الأعضاء) — وميزة **التكتات** لها شخصية مستقلة من: الإعدادات ← التذاكر ← 🤖 AI`);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('ai', 'enabled', 'الذكاء', '⚡', ai.enabled), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(discord_js_1.ButtonStyle.Danger).setEmoji('⏪'), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(discord_js_1.ButtonStyle.Success).setEmoji('⏩'), btn('settings_btn:ai:personality', 'الشخصية', discord_js_1.ButtonStyle.Primary, '🎭'));
@@ -1021,7 +1024,8 @@ function buildAI(guild, s) {
         { label: '🇺🇸 English', value: 'en', description: 'Reply in English' },
         { label: '🌐 كلاهما', value: 'both', description: 'يتبع لغة المستخدم' },
     ]));
-    return { embeds: [embed], components: [row1, row2, langSelect] };
+    const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('aiInsights', 'mood', '📊 تحليل المزاج', '📊', !!insights.moodEnabled), toggleBtn('aiInsights', 'summarize', '🔗 تلخيص الروابط', '🔗', !!insights.summarizeEnabled));
+    return { embeds: [embed], components: [row1, row2, langSelect, row3] };
 }
 // --------------------------------------------
 // Welcome

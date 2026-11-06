@@ -498,6 +498,11 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         ignoredRoles: [{ type: String }],
         responseLanguage: { type: String, default: 'ar' },
     },
+    // 📊 أدوات ذكاء إضافية — مقفولة افتراضياً، تُفعّل من لوحة الإعدادات فقط
+    aiInsights: {
+        moodEnabled: { type: Boolean, default: false },
+        summarizeEnabled: { type: Boolean, default: false },
+    },
     // 🕵️ AI Investigator — افتراضياً مفعّل، تحليل فقط بدون أي عقوبات تلقائية
     aiInvestigator: {
         enabled: { type: Boolean, default: true },
