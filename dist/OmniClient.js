@@ -667,8 +667,23 @@ class OmniClient extends discord_js_1.Client {
         const settings = await getGuildSettings(guildId);
         return settings.toObject();
     }
-    async updateGuildSettings(guildId, updates) {
-        const { getGuildSettings, invalidateGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
+    /**
+     * طابور حفظ متسلسل لكل سيرفر — يمنع تشغيل save() متوازي على نفس وثيقة
+     * Mongoose (الذي يرمي "Can't save() the same doc multiple times in parallel"
+     * عند ضغط مفاتيح متعددة بسرعة من اللوحة).
+     */
+    settingsUpdateQueue = new Map();
+    updateGuildSettings(guildId, updates) {
+        const prev = this.settingsUpdateQueue.get(guildId) || Promise.resolve();
+        const next = prev
+            .catch(() => undefined)
+            .then(() => this.applyGuildSettingsUpdate(guildId, updates));
+        // خزّن السلسلة مع كتم الأخطاء حتى لا تتعطل التحديثات التالية
+        this.settingsUpdateQueue.set(guildId, next.catch(() => undefined));
+        return next;
+    }
+    async applyGuildSettingsUpdate(guildId, updates) {
+        const { getGuildSettings, invalidateGuildSettings, GuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
         const settings = await getGuildSettings(guildId);
         // دمج عميق حقيقي — أي مسار (حتى 4+ مستويات) يُحدَّث بدون مسح الأشقاء
         const deepMerge = (target, patch, depth = 0) => {
@@ -692,14 +707,32 @@ class OmniClient extends discord_js_1.Client {
                 }
             }
         };
-        deepMerge(settings, updates);
-        for (const key of Object.keys(updates)) {
-            if (!key.startsWith('$'))
-                settings.markModified(key);
+        try {
+            deepMerge(settings, updates);
+            for (const key of Object.keys(updates)) {
+                if (!key.startsWith('$'))
+                    settings.markModified(key);
+            }
+            await settings.save();
+            invalidateGuildSettings(guildId);
+            return settings.toObject();
         }
-        await settings.save();
-        invalidateGuildSettings(guildId);
-        return settings.toObject();
+        catch (error) {
+            // إعادة محاولة واحدة بوثيقة نظيفة (تغطي أي تعارض خارجي على نفس الوثيقة)
+            logger.warn(`settings save retry for ${guildId}: ${error?.message || error}`);
+            invalidateGuildSettings(guildId);
+            const fresh = await GuildSettings.findOne({ guildId });
+            if (!fresh)
+                throw error;
+            deepMerge(fresh, updates);
+            for (const key of Object.keys(updates)) {
+                if (!key.startsWith('$'))
+                    fresh.markModified(key);
+            }
+            await fresh.save();
+            invalidateGuildSettings(guildId);
+            return fresh.toObject();
+        }
     }
     async getGuildStats(guildId) {
         const guild = this.guilds.cache.get(guildId);

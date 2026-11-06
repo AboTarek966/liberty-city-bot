@@ -35,7 +35,14 @@ export declare class OmniClient extends Client {
     private setupExpress;
     private setupApiRoutes;
     private getGuildSettings;
+    /**
+     * طابور حفظ متسلسل لكل سيرفر — يمنع تشغيل save() متوازي على نفس وثيقة
+     * Mongoose (الذي يرمي "Can't save() the same doc multiple times in parallel"
+     * عند ضغط مفاتيح متعددة بسرعة من اللوحة).
+     */
+    private settingsUpdateQueue;
     private updateGuildSettings;
+    private applyGuildSettingsUpdate;
     private getGuildStats;
     private getDashboardStats;
     initialize(): Promise<void>;

@@ -130,12 +130,19 @@ function setDeep(obj, path, value) {
   }
   n[parts[parts.length - 1]] = value;
 }
-async function save(path, value) {
-  const patch = {};
-  setDeep(patch, path, value);
-  await api.patch(`/api/guilds/${S.guildId}/settings`, patch);
-  setDeep(S.settings, path, value);
-  toast('تم الحفظ ✓', 'ok');
+// طابور حفظ متسلسل — يمنع إرسال PATCH متوازية عند ضغط مفاتيح متعددة بسرعة
+let saveChain = Promise.resolve();
+function save(path, value) {
+  const doSave = async () => {
+    const patch = {};
+    setDeep(patch, path, value);
+    await api.patch(`/api/guilds/${S.guildId}/settings`, patch);
+    setDeep(S.settings, path, value);
+    toast('تم الحفظ ✓', 'ok');
+  };
+  const next = saveChain.catch(() => {}).then(doSave);
+  saveChain = next.catch(() => {});
+  return next;
 }
 
 // ===== Field builders =====
