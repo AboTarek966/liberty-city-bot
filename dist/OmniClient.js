@@ -580,6 +580,127 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to get channels' });
             }
         });
+        router.get('/commands', async (_req, res) => {
+            try {
+                const commands = this.commandHandler.getCommands();
+                res.json({
+                    commands: Array.from(commands.values()).map((cmd) => ({
+                        name: cmd.data?.name || '',
+                        description: cmd.data?.description || '',
+                        category: cmd.category || '',
+                        ownerOnly: Boolean(cmd.ownerOnly),
+                    })).filter((cmd) => cmd.name),
+                });
+            }
+            catch (error) {
+                logger.error('Failed to get commands:', error);
+                res.status(500).json({ error: 'Failed to get commands' });
+            }
+        });
+        // ===== ⌨️ أسماء مستعارة للأوامر =====
+        router.get('/guilds/:guildId/aliases', async (req, res) => {
+            try {
+                const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
+                const aliases = await CommandAlias.find({ guildId: req.params.guildId })
+                    .sort({ alias: 1, command: 1 })
+                    .limit(500)
+                    .lean();
+                res.json({ aliases });
+            }
+            catch (error) {
+                logger.error('Failed to get command aliases:', error);
+                res.status(500).json({ error: 'Failed to get command aliases' });
+            }
+        });
+        router.post('/guilds/:guildId/aliases', async (req, res) => {
+            try {
+                const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
+                const { invalidateAliasCache } = await Promise.resolve().then(() => __importStar(require('./utils/aliasCache')));
+                let alias = String(req.body?.alias || '').trim().toLowerCase();
+                let command = String(req.body?.command || '').trim().replace(/^\//, '').toLowerCase();
+                const rawOptions = String(req.body?.options || '').trim();
+                let options;
+                if (!alias || alias.length > 30) {
+                    return res.status(400).json({ error: 'الاسم المستعار مطلوب ويجب أن يكون من 1 إلى 30 حرفاً' });
+                }
+                if (/\s/u.test(alias)) {
+                    return res.status(400).json({ error: 'لا يمكن أن يحتوي الاسم المستعار مسافات' });
+                }
+                if (!command) {
+                    return res.status(400).json({ error: 'اختر الأمر المستهدف' });
+                }
+                if (!this.commandHandler.getCommand(command)) {
+                    return res.status(400).json({ error: 'الأمر المستهدف غير موجود' });
+                }
+                if (command === 'lock' || command === 'unlock') {
+                    const opposite = command === 'lock' ? 'unlock' : 'lock';
+                    const conflict = await CommandAlias.findOne({ guildId: req.params.guildId, alias, command: opposite });
+                    if (conflict) {
+                        return res.status(409).json({ error: 'يجب أن يكون لقانون وفتح قفل اختصاران مستقلان' });
+                    }
+                }
+                if (rawOptions) {
+                    try {
+                        options = JSON.parse(rawOptions);
+                        if (!options || typeof options !== 'object' || Array.isArray(options)) {
+                            return res.status(400).json({ error: 'الخيارات يجب أن تكون كائن JSON صالحاً' });
+                        }
+                    }
+                    catch {
+                        return res.status(400).json({ error: 'تعذر تحليل الخيارات كـ JSON' });
+                    }
+                }
+                const duplicate = await CommandAlias.findOne({ guildId: req.params.guildId, alias, command });
+                if (duplicate) {
+                    return res.status(409).json({ error: 'هذا الاسم المستعار مرتبط بالفعل بهذا الأمر' });
+                }
+                const actor = req.webAuth?.username || req.webAuth?.userId || 'لوحة التحكم';
+                const created = await CommandAlias.create({
+                    guildId: req.params.guildId,
+                    alias,
+                    command,
+                    options,
+                    createdBy: actor,
+                });
+                invalidateAliasCache(req.params.guildId);
+                res.json({ alias: created });
+            }
+            catch (error) {
+                logger.error('Failed to create command alias:', error);
+                res.status(500).json({ error: 'Failed to create command alias' });
+            }
+        });
+        router.delete('/guilds/:guildId/aliases/:aliasId', async (req, res) => {
+            try {
+                const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
+                const { invalidateAliasCache } = await Promise.resolve().then(() => __importStar(require('./utils/aliasCache')));
+                const deleted = await CommandAlias.findOneAndDelete({
+                    _id: req.params.aliasId,
+                    guildId: req.params.guildId,
+                }).lean();
+                if (!deleted)
+                    return res.status(404).json({ error: 'الاسم المستعار غير موجود' });
+                invalidateAliasCache(req.params.guildId);
+                res.json({ success: true, alias: deleted });
+            }
+            catch (error) {
+                logger.error('Failed to delete command alias:', error);
+                res.status(500).json({ error: 'Failed to delete command alias' });
+            }
+        });
+        router.delete('/guilds/:guildId/aliases', async (req, res) => {
+            try {
+                const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
+                const { invalidateAliasCache } = await Promise.resolve().then(() => __importStar(require('./utils/aliasCache')));
+                const result = await CommandAlias.deleteMany({ guildId: req.params.guildId });
+                invalidateAliasCache(req.params.guildId);
+                res.json({ success: true, deleted: result.deletedCount || 0 });
+            }
+            catch (error) {
+                logger.error('Failed to clear command aliases:', error);
+                res.status(500).json({ error: 'Failed to clear command aliases' });
+            }
+        });
         // ===== 📚 قاعدة المعرفة =====
         router.get('/guilds/:guildId/knowledge', async (req, res) => {
             try {

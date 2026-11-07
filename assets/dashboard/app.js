@@ -284,8 +284,8 @@ const NAV = [
   { title: 'الرئيسية', items: [['overview', '🏠', 'نظرة عامة']] },
   { title: 'الأمان', items: [['protection', '🛡️', 'الحماية'], ['investigator', '🕵️', 'المحقق الأمني'], ['verification', '✅', 'التحقق'], ['honeypot', '🍯', 'المصيدة']] },
   { title: 'المجتمع', items: [['members', '👥', 'الأعضاء'], ['levels', '📈', 'المستويات'], ['economy', '💰', 'الاقتصاد'], ['welcome', '👋', 'الترحيب والوداع'], ['giveaways', '🎁', 'السحوبات']] },
-  { title: 'الإدارة', items: [['tickets', '🎫', 'التذاكر'], ['announcements', '📢', 'الإعلانات'], ['commands', '🧩', 'أوامر ووسوم'], ['logs', '📜', 'السجلات'], ['knowledge', '📚', 'المعرفة']] },
-  { title: 'النظام', items: [['ai', '🤖', 'الذكاء الاصطناعي'], ['general', '⚙️', 'إعدادات عامة']] },
+  { title: 'الإدارة', items: [['tickets', '🎫', 'التذاكر'], ['announcements', '📢', 'الإعلانات'], ['commands', '🧩', 'أوامر ووسوم'], ['aliases', '⌨️', 'الأسماء المستعارة'], ['logs', '📜', 'السجلات'], ['knowledge', '📚', 'المعرفة']] },
+  { title: 'النظام', items: [['ai', '🤖', 'الذكاء الاصطناعي'], ['general', '⚙️', 'إعدادات عامة'], ['help', '❓', 'مساعدة']] },
 ];
 const ALL_PAGES = NAV.flatMap((g) => g.items.map((i) => i[0]));
 
@@ -377,6 +377,7 @@ async function onViewClick(e) {
   if (act.startsWith('inv-')) return investigatorAction(btn);
   if (act.startsWith('cc-')) return commandsAction(btn);
   if (act.startsWith('tag-')) return commandsAction(btn);
+  if (act.startsWith('alias-')) return aliasesAction(btn);
   if (act.startsWith('lr-')) return levelRewardAction(btn);
   if (act.startsWith('welcome-')) return welcomeAction(btn);
   if (act === 'logs-prev') { S.logsPage = Math.max(1, S.logsPage - 1); return render('logs'); }
@@ -504,6 +505,9 @@ const PAGES = {
     const msHint = (v) => (v ? `= ${Math.round(v / 1000)} ث` : '');
     return `
       <div class="banner info">🛡️ كل تعديل هنا يُطبَّق على البوت مباشرة (مزامنة خلال ثوانٍ).</div>
+      ${card('قنوات السجلات', `
+        ${chSel('protection.logChannel', 'قناة التنبيهات العامة للحماية (افتراضي)')}
+        <div class="dim">عند تحديد قناة هنا، ستُرسل معظم تنبيهات الحماية إليها ما لم تحدد قناة أدق لكل وحدة.</div>`, '📜')}
       <div class="grid-2">
         ${card('الرايد والانضمام', `
           ${sw('protection.antiRaid.enabled', 'مكافحة الرايد')}
@@ -521,6 +525,7 @@ const PAGES = {
           </div>
           ${sw('protection.antiRaid.beastMode.escalateVerification', 'رفع مستوى التحقق تلقائياً')}
           ${num('protection.antiRaid.beastMode.autoRecoverMinutes', 'مدة التعافي (دقائق)')}
+          ${chSel('protection.antiRaid.logChannel', 'قناة سجل الرايد')}
           <div class="sec-title">🚫 السبام</div>
           ${sw('protection.antiSpam.enabled', 'مكافحة السبام')}
           <div class="grid-3">
@@ -528,24 +533,29 @@ const PAGES = {
             ${num('protection.antiSpam.timeWindow', 'النافذة (مللي)')}
             ${sel('protection.antiSpam.action', 'الإجراء', actions)}
           </div>
-          ${num('protection.antiSpam.muteDuration', 'مدة الكتم (مللي)')} ${msHint(val('protection.antiSpam.muteDuration'))}`, '🚪')}
+          <div class="grid-2">${num('protection.antiSpam.muteDuration', 'مدة الكتم (مللي)')} ${chSel('protection.antiSpam.logChannel', 'قناة سجل السبام')}</div> ${msHint(val('protection.antiSpam.muteDuration'))}`, '🚪')}
         ${card('الروابط والدعوات', `
           ${sw('protection.antiLink.enabled', 'حظر الروابط')}
           ${sel('protection.antiLink.action', 'الإجراء', actions)}
           ${arrLines('protection.antiLink.whitelist', 'روابط مسموحة (سطر لكل رابط)')}
           ${chipList('protection.antiLink.ignoreRoles', 'رولات مستثناة', 'role')}
+          ${chSel('protection.antiLink.logChannel', 'قناة سجل الروابط')}
           <div class="sec-title">📨 دعوات السيرفرات</div>
           ${sw('protection.antiInvite.enabled', 'حظر الدعوات')}
-          ${chipList('protection.antiInvite.ignoreRoles', 'رولات مستثناة', 'role')}`, '🔗')}
+          ${chipList('protection.antiInvite.ignoreRoles', 'رولات مستثناة', 'role')}
+          ${chSel('protection.antiInvite.logChannel', 'قناة سجل الدعوات')}`, '🔗')}
         ${card('المنشن والتنسيق', `
           ${sw('protection.antiMention.enabled', 'حظر المنشن الجماعي')}
           <div class="grid-2">${num('protection.antiMention.max', 'أقصى عدد منشن')}${sel('protection.antiMention.action', 'الإجراء', actions)}</div>
+          ${chSel('protection.antiMention.logChannel', 'قناة سجل المنشن')}
           <div class="sec-title">🔠 الحروف الكبيرة</div>
           ${sw('protection.antiCaps.enabled', 'حظر الرسائل CAPS')}
           <div class="grid-3">${num('protection.antiCaps.percentage', 'النسبة %')}${num('protection.antiCaps.minLength', 'أقل طول')}${sel('protection.antiCaps.action', 'الإجراء', actions)}</div>
+          ${chSel('protection.antiCaps.logChannel', 'قناة سجل CAPS')}
           <div class="sec-title">😄 الإيموجي</div>
           ${sw('protection.antiEmoji.enabled', 'حظر الإفراط')}
-          <div class="grid-2">${num('protection.antiEmoji.max', 'الحد الأقصى')}${sel('protection.antiEmoji.action', 'الإجراء', actions)}</div>`, '📣')}
+          <div class="grid-2">${num('protection.antiEmoji.max', 'الحد الأقصى')}${sel('protection.antiEmoji.action', 'الإجراء', actions)}</div>
+          ${chSel('protection.antiEmoji.logChannel', 'قناة سجل الإيموجي')}`, '📣')}
         ${card('مكافحة التخريب (Anti-Nuke)', `
           ${sw('protection.antiNuke.enabled', 'حماية anti-nuke')}
           <div class="grid-3">
@@ -553,6 +563,7 @@ const PAGES = {
             ${sel('protection.antiNuke.action', 'الإجراء', actions)}
             ${num('protection.antiNuke.threshold', 'حد العمليات')}
           </div>
+          <div class="grid-2">${num('protection.antiNuke.timeWindow', 'النافذة الزمنية')}${chSel('protection.antiNuke.logChannel', 'قناة سجل التخريب')}</div>
           ${sw('protection.antiNuke.slowNukeGuard', 'الرصد البطيء')}
           <div class="grid-2">${num('protection.antiNuke.slowNukeMax', 'أقصى عمليات بطيئة')}${num('protection.antiNuke.slowNukeWindowMinutes', 'النافذة (دقائق)')}</div>
           ${sw('protection.antiNuke.autoRestore', 'استعادة القنوات والرولات')}
@@ -562,12 +573,17 @@ const PAGES = {
         ${card('الحسابات والبوتات', `
           ${sw('protection.antiAlt.enabled', 'كشف الحسابات الوهمية')}
           <div class="grid-3">${num('protection.antiAlt.checkCreationDays', 'أقل عمر (أيام)')}${num('protection.antiAlt.maxAccountsPerIP', 'أقصى حسابات/IP')}${sel('protection.antiAlt.action', 'الإجراء', actions)}</div>
+          <div class="grid-2">${roleSel('protection.antiAlt.quarantineRoleId', 'رول الحجر')}${chSel('protection.antiAlt.logChannel', 'قناة سجل الحسابات المشبوهة')}</div>
           <div class="sec-title">🤖 البوتات — القائمة البيضاء</div>
           ${sw('protection.antiBot.enabled', 'منع دخول البوتات غير المصرح لها')}
           ${chipList('protection.antiBot.whitelist', 'بوتات مسموحة', 'bot', 'استخدم زر الإضافة لاختيار أكثر من بوت دفعة واحدة')}
+          ${chSel('protection.antiBot.logChannel', 'قناة سجل البوتات')}
           <div class="sec-title">👑 الصلاحيات الخطيرة</div>
           ${sw('protection.antiAdmin.enabled', 'رصد منح Administrator')}
-          ${sel('protection.antiAdmin.action', 'الإجراء', actions)}`, '🤖')}
+          ${sel('protection.antiAdmin.action', 'الإجراء', actions)}
+          ${chSel('protection.antiAdmin.logChannel', 'قناة سجل الصلاحيات')}
+          <div class="sec-title">🤖 مكافحة الإساءة للبوت</div>
+          ${sw('protection.antiBotAbuse.enabled', 'تحذير ثم سحب الرولات القابلة للإزالة ثم الحظر')}`, '🤖')}
         ${card('الفلاتر والصيانة', `
           ${sw('protection.scamFilter.enabled', 'فلتر الاحتيال والنصب')}
           ${sw('protection.messageScanner.enabled', 'ماسح المرفقات والروابط')}
@@ -576,6 +592,7 @@ const PAGES = {
           ${sw('protection.messageScanner.scanAttachments', 'فحص المرفقات')}
           ${arrLines('protection.messageScanner.whitelistDomains', 'نطاقات مسموحة')}
           ${txt('protection.messageScanner.virusTotalApiKey', 'مفتاح VirusTotal (اختياري)')}
+          ${chSel('protection.messageScanner.logChannel', 'قناة سجل الماسح')}
           ${sw('protection.punishmentTracker.enabled', 'تتبع العقوبات المتكررة')}
           <div class="sec-title">💾 النسخ الاحتياطي والفحص</div>
           ${sw('protection.autoBackup.enabled', 'نسخ احتياطي تلقائي')}
@@ -587,12 +604,24 @@ const PAGES = {
           <div class="grid-3">${num('protection.inviteTracker.rewardInvites', 'مكافأة الدعوات')}${num('protection.inviteTracker.minInviteAgeHours', 'أقل عمر (ساعات)')}${num('protection.inviteTracker.maxUsesPerInvite', 'أقصى استخدامات')}</div>
           <div class="grid-2">${sw('protection.inviteTracker.trackJoins', 'تتبع الدخول')}${sw('protection.inviteTracker.trackLeaves', 'تتبع الخروج')}</div>
           ${sel('protection.inviteTracker.suspiciousInviteAction', 'إجراء الدعوة المشبوهة', [['warn', 'تحذير'], ['kick', 'طرد'], ['ban', 'حظر'], ['none', 'بدون']])}
+          ${chSel('protection.inviteTracker.logChannel', 'قناة سجل الدعوات والدعوات المشبوهة')}
+          ${roleSel('protection.inviteTracker.rewardRoleId', 'رول مكافأة الدعوات')}
           <div class="sec-title">⚪ القائمة البيضاء العامة</div>
           ${sw('protection.whitelist.enabled', 'تفعيل القائمة البيضاء')}
           ${chipList('protection.whitelist.userIds', 'أعضاء/بوتات مستثنون', 'member')}
+          ${chSel('protection.whitelist.logChannel', 'قناة سجل القائمة البيضاء')}
           <div class="sec-title">👑 موافقة المالك</div>
           ${sw('protection.ownerApproval', 'طلب موافقة المالك قبل إطفاء أي حماية', 'عند التعطيل يطلب البوت تأكيداً إضافياً')}
           <div class="status-item">${val('protection.lockdown') ? '🔴 وضع الطوارئ مفعّل حالياً' : '🟢 لا يوجد وضع طوارئ'} <em class="dim">(يُدار من زر الطوارئ في ديسكورد)</em></div>`, '🎟️')}
+        ${card('إشراف تلقائي — كلمات وحروف زالغو', `
+          ${sw('automod.enabled', 'تفعيل الإشراف التقليدي')}
+          ${arrLines('automod.badWords', 'كلمات ممنوعة (سطر لكل كلمة)')}
+          <div class="grid-2">${sel('automod.badWordsAction', 'إجراء الكلمات المحظورة', [['delete', 'حذف'], ['warn', 'تحذير'], ['mute', 'كتم'], ['kick', 'طرد'], ['ban', 'حظر']])}${num('automod.badWordsDuration', 'مدة الكتم (مللي)')}</div>
+          <div class="sec-title">ᐤ نصوص زالغو</div>
+          ${sw('automod.zalgoEnabled', 'حظر نصوص زالغو')}
+          ${sel('automod.zalgoAction', 'إجراء زالغو', [['delete', 'حذف'], ['warn', 'تحذير'], ['mute', 'كتم']])}
+          ${chipList('automod.ignoredRoles', 'رولات مستثناة', 'role')}
+          ${chipList('automod.ignoredChannels', 'قنوات مستثناة', 'channel')}`, '✍️')}
       </div>`;
   },
 
@@ -610,6 +639,7 @@ const PAGES = {
             ${sel('ai.responseLanguage', 'لغة الرد', [['ar', 'العربية'], ['en', 'English'], ['auto', 'تلقائي']])}
           </div>
           <div class="grid-3">
+            ${txt('ai.model', 'الموديل')}
             ${num('ai.temperature', 'الإبداع (0-2)', { step: 0.1 })}
             ${num('ai.maxTokens', 'أقصى توكنز')}
             ${num('ai.cooldown', 'الانتظار (ثواني)')}
@@ -632,7 +662,8 @@ const PAGES = {
           ${sw('protection.aiTranslator.showOriginal', 'إظهار النص الأصلي')}
           ${chipList('protection.aiTranslator.autoTranslateChannels', 'قنوات ترجمة تلقائية', 'channel')}
           ${chipList('protection.aiTranslator.ignoredChannels', 'قنوات مستثناة', 'channel')}
-          ${chipList('protection.aiTranslator.ignoredRoles', 'رولات مستثناة', 'role')}`, '🌐')}
+          ${chipList('protection.aiTranslator.ignoredRoles', 'رولات مستثناة', 'role')}
+          ${chSel('protection.aiTranslator.logChannel', 'قناة سجل الترجمة')}`, '🌐')}
         ${card('رقيب المحتوى AI', `
           ${sw('protection.aiAutoMod.enabled', 'تفعيل الرقيب')}
           <div class="grid-2">
@@ -643,6 +674,7 @@ const PAGES = {
           ${num('protection.aiAutoMod.maxWarningsBeforeEscalation', 'عدد التحذيرات قبل التصعيد')}
           ${chipList('protection.aiAutoMod.ignoredChannels', 'قنوات مستثناة', 'channel')}
           ${chipList('protection.aiAutoMod.ignoredRoles', 'رولات مستثناة', 'role')}
+          ${chSel('protection.aiAutoMod.logChannel', 'قناة سجل الرقيب')}
           <div class="sec-title">التصنيفات والإجراءات</div>
           ${Object.entries(catAr).map(([c, ar]) => `
             <div class="cat-row">
@@ -725,10 +757,13 @@ const PAGES = {
 
   // ---------------- Verification ----------------
   async verification() {
+    await ensureRoles().catch(() => {});
     return `
       <div class="grid-2">
         ${card('نظام التحقق', `
           ${sw('verification.enabled', 'تفعيل التحقق')}
+          ${chSel('verification.channelId', 'قناة التوثيق')}
+          ${roleSel('verification.roleId', 'رول العضو الموثق')}
           ${txt('verification.title', 'العنوان')}
           ${area('verification.description', 'الوصف')}
           <div class="grid-2">
@@ -737,7 +772,9 @@ const PAGES = {
           </div>
           ${sw('verification.captchaEnabled', 'كابتشا إضافية')}
           ${num('verification.minAccountAgeDays', 'أقل عمر حساب (أيام)')}
-          ${sw('verification.kickOnFail', 'طرد عند الفشل المتكرر')}`, '✅')}
+          ${sw('verification.kickOnFail', 'طرد عند الفشل المتكرر')}
+          ${roleSel('verification.quarantineRoleId', 'رول الحجر')}
+          ${chSel('verification.logChannelId', 'قناة سجل التوثيق')}`, '✅')}
         ${card('الحجر التلقائي للحسابات الجديدة', `
           ${sw('verification.autoQuarantine', 'تفعيل الحجر التلقائي')}
           ${sw('verification.autoQuarantineNewAccounts', 'حجر كل الحسابات الجديدة تلقائياً')}
@@ -753,10 +790,12 @@ const PAGES = {
       <div class="grid-2">
         ${card('المصيدة (Honeypot)', `
           ${sw('honeypot.enabled', 'تفعيل المصيدة')}
+          ${chSel('honeypot.channelId', 'قناة المصيدة')}
           ${sel('honeypot.action', 'الإجراء عند دخول المصيدة', [['ban', 'حظر'], ['kick', 'طرد'], ['mute', 'كتم'], ['timeout', 'توقيت'], ['warn', 'تحذير']])}
           ${num('honeypot.timeoutMinutes', 'مدة التوقيت (دقائق)')}
           ${sw('honeypot.deleteMessage', 'حذف الرسالة فوراً')}
-          ${sw('honeypot.ignoreAdmins', 'تجاهل الإداريين')}`, '🍯')}
+          ${sw('honeypot.ignoreAdmins', 'تجاهل الإداريين')}
+          ${chSel('honeypot.logChannelId', 'قناة سجل المصيدة')}`, '🍯')}
         ${card('التنبيهات', `
           ${chipList('honeypot.alertRoleIds', 'رولات يتم تنبيهها', 'role')}
           <div class="banner info">💡 المصيدة قناة فخ — أي عضو يكتب فيها يُعتبر مخترقاً ويُنفَّذ الإجراء فوراً.</div>`, '🔔')}
@@ -1028,6 +1067,44 @@ const PAGES = {
       </div>`;
   },
 
+  // ---------------- Command aliases ----------------
+  async aliases() {
+    const [aliasesData, commandsData] = await Promise.all([
+      api.get(`/api/guilds/${S.guildId}/aliases`).catch(() => ({ aliases: [] })),
+      api.get('/api/commands').catch(() => ({ commands: [] })),
+    ]);
+    const aliases = aliasesData.aliases || [];
+    const commands = commandsData.commands || [];
+    const grouped = new Map();
+    for (const a of aliases) {
+      if (!grouped.has(a.alias)) grouped.set(a.alias, []);
+      const target = `/${String(a.command || '').replace(':', ' ')}`;
+      if (!grouped.get(a.alias).includes(target)) grouped.get(a.alias).push(target);
+    }
+    const groupedRows = [...grouped.entries()].map(([alias, rows]) => {
+      return `<div class="sec-title"><code>${esc(alias)}</code></div>` + rows
+        .map((a) => `<div class="list-row"><span class="grow">← <code>${esc('/' + String(a.command || '').replace(':', ' '))}</code>${a.options && Object.keys(a.options).length ? ' <span class="dim">· خيارات افتراضية</span>' : ''}</span><button class="btn sm danger" data-act="alias-del" data-id="${esc(a._id)}" data-alias="${esc(alias)}">حذف هذا الارتباط</button></div>`)
+        .join('');
+    }).join('');
+
+    return `
+      <div class="grid-2">
+        ${card('إضافة اختصار', `
+          <div class="banner info">اختصر أي أمر موجود بسلسلة قصيرة. مثال: <code>اختار</code> ← <code>/choose</code></div>
+          <div class="field"><label>الاسم المستعار</label><input class="inp" id="al-shortcut" maxlength="30" placeholder="مثال: اختار"></div>
+          <div class="field"><label>الأمر المستهدف</label><select class="inp" id="al-command">
+            <option value="">— اختر أمراً —</option>
+            ${commands.map((c) => `<option value="${esc(c.name)}">${esc(c.name)} — ${esc(c.description || '')}</option>`).join('')}
+          </select></div>
+          <div class="field"><label>خيارات افتراضية (JSON — اختياري)</label><textarea class="inp" id="al-options" placeholder='{"key":"value"}'></textarea></div>
+          <button class="btn primary" data-act="alias-add">⌨️ إضافة الاختصار</button>
+          ${commands.length ? '' : '<div class="banner info mt">لم تُحمَّل قائمة الأوامر — تأكد أن البوت متصل ثم حدّث الصفحة.</div>'}`, '⌨️')}
+        ${card(`الاختصارات الحالية (${fmtNum(aliases.length)})`, `
+          <div class="stack">${groupedRows || '<div class="empty">لا اختصارات بعد</div>'}</div>
+          ${aliases.length ? `<button class="btn danger mt" data-act="alias-clear">🗑️ حذف كل الاختصارات</button>` : ''}`, '📋')}
+      </div>`;
+  },
+
   // ---------------- Logs ----------------
   async logs() {
     const TYPES = [['messages', 'الرسائل'], ['members', 'الأعضاء'], ['roles', 'الرولات'], ['channels', 'القنوات'], ['voice', 'الصوتي'], ['moderation', 'الإشراف'], ['tickets', 'التذاكر'], ['economy', 'الاقتصاد'], ['server', 'السيرفر'], ['ai', 'AI']];
@@ -1122,6 +1199,50 @@ const PAGES = {
           <div class="sec-title">🔍 سنايب</div>
           ${sw('snipe.enabled', 'استرجاع الرسائل المحذوفة /snipe')}`, '🚨')}
       </div>`;
+  },
+
+  // ---------------- Help ----------------
+  async help() {
+    const topic = (icon, page, what, how) => `
+      <div class="help-item">
+        <div class="help-head"><span class="help-icon">${icon}</span><b>${page}</b></div>
+        <p>${what}</p>
+        <p class="help-how">الاستخدام: ${how}</p>
+      </div>`;
+    return `
+      <div class="banner info">تشرح هذه الصفحة كل أبواب لوحة التحكم. كل تعديل يُحفظ تلقائياً في قاعدة بيانات البوت ويُطبّق خلال ثوانٍ من غير إعادة تشغيل.</div>
+      ${card('البداية والحفظ', `
+        ${topic('🏠', 'نظرة عامة', 'عدد الأعضاء وسرعة البوت ومدة التشغيل وملخص حالة أهم الأنظمة لكل سيرفر.', 'راجع النقاط الخضراء والحمراء لمعرفة المفعّل والمعطّل.')}
+        ${topic('🎛️', 'حفظ التغييرات', 'المفاتيح والحقول تحفظ عند تغييرها وتظهر رسالة نجاح. القوائم تُضاف فورياً عند الضغط على إضافة.', 'بعد تغيير إعداد مهم حدّث الصفحة للتأكد من ثباته.')}
+      `, '🚀')}
+      ${card('الأمان والحماية', `
+        ${topic('🛡️', 'الحماية', 'الرايد، السبام، الروابط، الدعوات، المنشن، المخالفين، والتخريب، مع الإجراءات والحدود وقنوات السجلات والقوائم الاستثنائية.', 'فعّل الوحدة، اختر الإجراء، ثم حدّد قناة السجل وأي رولات أو قنوات مستثناة.')}
+        ${topic('🕵️', 'المحقق الأمني', 'تحليل داخلي للمخاطر والنوايا والهجمات مع تقرير ونتائج مصنّفة بالخطورة.', 'شغّل الفحص اليدوي أو فعّل الفحص الدوري وحدّد قناة التنبيهات.')}
+        ${topic('✅', 'التحقق', 'زر توثيق وحجر تلقائي للحسابات الجديدة ورول العضو الموثق وحد أدنى لعمر الحساب.', 'حدّد قناة التوثيق والرول والسلوك عند فشل الشرط.')}
+        ${topic('🍯', 'المصيدة', 'قناة فخ؛ أي رسالة فيها تؤدي لإجراء الحماية المحدد مع إشعار رولات معينة.', 'استخدم قناة مخفية لا يراها الأعضاء وفعّلها بحذر.')}
+      `, '🛡️')}
+      ${card('الأعضاء والمجتمع', `
+        ${topic('👥', 'الأعضاء', 'بحث، سجل إجراءات، تحذير، توقيت، تحكم بالرولات، طرد وحظر.', 'استخدم البحث للتصفية واضغط السجل لعرض التحذيرات.')}
+        ${topic('📈', 'المستويات', 'خبرة بالرسائل والصوت، رسائل ترقية، ومكافآت رولات عند مستويات.', 'فعّل المستويات واضبط XP ثم أضف مكافأة الرول عند المستوى المطلوب.')}
+        ${topic('💰', 'الاقتصاد', 'عملة، أجر عمل، تسول، بنك، تحويلات، متجر، حقيبة ولوحة متصدرين.', 'فعّل الاقتصاد ثم اضبط المبالغ والمعدلات ومحتويات المتجر.')}
+        ${topic('👋', 'الترحيب والوداع', 'رسائل انضمام ومغادرة، ألوان وبطاقة صورة ورسالة خاصة.', 'فعّل الرسائل واختر قناة الإعلانات وقناة الوداع وتجربة رسالة الترحيب.')}
+        ${topic('🎁', 'السحوبات', 'إعدادات افتراضية ونتائج للسحوبات النشطة والمنتهية.', 'حدّد المدة والفائزين والشروط ثم أنشئ السحب من Discord.')}
+      `, '👥')}
+      ${card('الإدارة والأتمتة', `
+        ${topic('🎫', 'التذاكر', 'إعدادات عامة وإدارة مباشرة للتذاكر: رد، استلام، إغلاق، حذف.', 'اضبط الرولات والحد الأقصى والإغلاق التلقائي والترحيب ثم راقب الجدول.')}
+        ${topic('📢', 'الإعلانات', 'إرسال لقناة محددة أو لكل القنوات العامة أو رسائل خاصة، مع سجل الإعلانات.', 'اختر الهدف واكتب النص وراجع التأكيد قبل الإرسال.')}
+        ${topic('🧩', 'أوامر ووسوم', 'أوامر نصية مخصصة ووسوم بنصوص حرة، مع نطاق عام/إداري.', 'اكتب الاسم والمحتوى واختر النوع والصلاحية.')}
+        ${topic('⌨️', 'الأسماء المستعارة', 'اختصار سهل لأي أمر موجود، ويمكن ربطه بخيارات افتراضية.', 'اختر الأمر من القائمة واكتب الاختصار، ويمكنك إضافة اسم واحد لأكثر من أمر.')}
+        ${topic('📜', 'السجلات', 'تسجيل أحداث وأقسام مخصصة لكل نوع، مع فلتر وترقيم صفحات لعمليات الإشراف.', 'فعّل التسجيل واختر قناة رئيسية وقنوات لكل نوع مستقل.')}
+        ${topic('📚', 'المعرفة', 'قاعدة معرفة تستخدمها إجابات AI وخدمة التذاكر.', 'أضف عنواناً ومحتوى وتصنيفاً ووسوماً، ويمكنك حذف أي سجل.')}
+      `, '📋')}
+      ${card('الذكاء الاصطناعي والإعدادات العامة', `
+        ${topic('🤖', 'الذكاء الاصطناعي', 'ردود ذكية، ترجمة فورية، رقيب AI، مساعد تذاكر، تحليل المزاج، وتلخيص الروابط والفيديو.', 'فعّل الميزة المطلوبة بين مفاتيحها ثم اضبط النموذج والقنوات والرولات والإجراءات.')}
+        ${topic('⚙️', 'إعدادات عامة', 'الهوية والبادئة واللغة والمنطقة الزمنية والرول التلقائي والسجن والموسيقى وتحذيرات الرول.', 'عدّل كل بند ثم حدّث الصفحة للتأكد من الحفظ.')}
+      `, '🤖')}
+      ${card('استكشاف الأخطاء', `
+        <p>إذا لا تُحفظ التغييرات، حدّث الصفحة وأعد المحاولة. إذا لا تظهر قنوات أو رولات، حدّث عاماً أولاً. إذا فشل الإجراء، تحقق من صلاحيات البوت في ديسكورد. بعد إعادة تشغيل البوت قد تحتاج تسجيل دخول جديد للوحة.</p>
+      `, '🧭')}`;
   },
 };
 
@@ -1362,6 +1483,37 @@ async function commandsAction(btn) {
     list.splice(Number(btn.dataset.idx), 1);
     await save('tags', list);
     render('commands');
+  }
+}
+
+async function aliasesAction(btn) {
+  const act = btn.dataset.act;
+  if (act === 'alias-add') {
+    const alias = $('#al-shortcut').value.trim();
+    const command = $('#al-command').value.trim();
+    const options = $('#al-options').value.trim();
+    if (!alias || !command) { toast('اكتب الاسم المستعار واختر الأمر المستهدف', 'err'); return; }
+    try {
+      if (options) JSON.parse(options);
+    } catch {
+      toast('الخيارات ليست JSON صالحاً', 'err');
+      return;
+    }
+    await api.post(`/api/guilds/${S.guildId}/aliases`, { alias, command, options });
+    toast('تمت إضافة الاختصار ✓', 'ok');
+    render('aliases');
+  }
+  if (act === 'alias-del') {
+    if (!(await confirmModal('حذف الارتباط', `سيتم حذف الاختصار ${btn.dataset.alias} من هذا الأمر فقط. متأكد؟`))) return;
+    await api.del(`/api/guilds/${S.guildId}/aliases/${btn.dataset.id}`);
+    toast('تم الحذف ✓', 'ok');
+    render('aliases');
+  }
+  if (act === 'alias-clear') {
+    if (!(await confirmModal('حذف كل الاختصارات', 'سيتم حذف جميع الاختصارات من هذا السيرفر نهائياً. متأكد؟'))) return;
+    const res = await api.del(`/api/guilds/${S.guildId}/aliases`);
+    toast(`تم حذف ${res.deleted ?? 0} ارتباط ✓`, 'ok');
+    render('aliases');
   }
 }
 

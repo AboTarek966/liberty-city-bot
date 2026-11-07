@@ -242,6 +242,14 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 
 .radio { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 600; }
 .radio input { accent-color: var(--primary); width: 16px; height: 16px; }
 
+/* ===== Help ===== */
+.help-item { padding: 13px 14px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); margin-bottom: 10px; background: var(--bg-soft); }
+.help-item:hover { border-color: var(--line); }
+.help-head { display: flex; gap: 9px; align-items: center; margin-bottom: 5px; }
+.help-icon { font-size: 18px; }
+.help-item p { color: var(--text-2); font-size: 13.5px; line-height: 1.75; }
+.help-how { color: var(--primary) !important; font-size: 12.5px !important; margin-top: 4px; }
+
 /* ===== Spinner / transitions ===== */
 .spinner-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 70px 0; color: var(--text-3); font-size: 13px; }
 .spinner { width: 42px; height: 42px; border-radius: 50%; border: 3px solid rgba(34, 211, 238, .18); border-top-color: var(--primary); animation: spin .8s linear infinite; }
