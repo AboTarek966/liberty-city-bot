@@ -141,6 +141,12 @@ export class WebDashboard {
       }
       const state = createOAuthState(session.id);
       const clientId = process.env.DISCORD_CLIENT_ID || '';
+      const clientSecret = process.env.DISCORD_CLIENT_SECRET || '';
+      // ❌ الإعدادات غير مكتملة — إرشاد واضح بدل التبويب الفارغ
+      if (!clientId || !clientSecret) {
+        res.status(503).json({ error: 'OAuth غير مُعدّ بعد: ضع DISCORD_CLIENT_SECRET في البيئة وأضف Redirect URI في Discord Developer Portal' });
+        return;
+      }
       const url = new URL('https://discord.com/oauth2/authorize');
       url.searchParams.set('client_id', clientId);
       url.searchParams.set('response_type', 'code');

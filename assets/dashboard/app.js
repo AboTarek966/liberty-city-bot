@@ -1489,7 +1489,7 @@ async function knowledgeAction(btn) {
 async function sessionsAction(btn) {
   if (btn.dataset.act === 'sess-revoke') {
     if (!(await confirmModal('تسجيل خروج من جلسة', 'سيتم تسجيل الخروج من هذه الجلسة فوراً. متأكد؟'))) return;
-    const res = await api.del(`/api/dashboard/sessions/${encodeURIComponent(btn.dataset.id)}`);
+    const res = await api.del(`/dashboard/api/sessions/${encodeURIComponent(btn.dataset.id)}`);
     if (res.currentRevoked) {
       location.href = '/dashboard/auth/logout';
       return;
@@ -1499,7 +1499,7 @@ async function sessionsAction(btn) {
   }
   if (btn.dataset.act === 'sess-logout-all') {
     if (!(await confirmModal('خروج من كل الأجهزة', 'سيتم إنهاء كل الجلسات النشطة، بما فيها جلستك هذه. متأكد؟'))) return;
-    await api.delete('/api/dashboard/sessions/logout-all', {});
+    await api.post('/dashboard/api/sessions/logout-all', {});
     location.href = '/dashboard/auth/logout';
   }
 }
