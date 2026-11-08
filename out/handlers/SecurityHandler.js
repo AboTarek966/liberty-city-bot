@@ -613,7 +613,8 @@ class SecurityHandler {
     botWhitelist(settings) {
         const wl = this.trustedBotIds();
         const main = settings?.protection?.whitelist;
-        if (main?.enabled && Array.isArray(main.userIds)) {
+        // ⚠️ الإضافات رغماً تسمح بدون enabled=true (الافتراضي false) فكانت تُتجاهل — نقرأها دائماً
+        if (Array.isArray(main?.userIds)) {
             for (const id of main.userIds)
                 wl.add(String(id));
         }
@@ -1648,7 +1649,8 @@ class SecurityHandler {
             const cfg = settings.protection?.antiNuke;
             if (!cfg?.enabled)
                 return false;
-            if (this.trustedBotIds().has(message.author.id))
+            // 👑 بوت القائمة البيضاء: لا يُحظر لرسائله — يُراقب فقط للهجمات السريعة (فروع onAuditEntry)
+            if (this.isPreemptivelyWhitelisted(settings, message.author.id))
                 return false;
             const key = `${guild.id}:bot:${message.author.id}`;
             const now = Date.now();

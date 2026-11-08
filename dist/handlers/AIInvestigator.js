@@ -451,7 +451,7 @@ class AIInvestigator {
     authorizedBotIds(settings) {
         const ids = new Set(TRUSTED_BOT_IDS);
         const main = settings?.protection?.whitelist;
-        if (main?.enabled && Array.isArray(main.userIds)) {
+        if (Array.isArray(main?.userIds)) {
             for (const id of main.userIds)
                 ids.add(String(id));
         }
