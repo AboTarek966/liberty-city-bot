@@ -1248,7 +1248,12 @@ const PAGES = {
         </table></div>
       `, '🔒')}
       ${card('تفاصيل الأمان', `
-        <p class="help-how">الجلسات النشطة تُحفظ في ذاكرة البوت وتُسجّل للتحقيق في قاعدة البيانات بدون حفظ التوكن.</p>
+        <p class="help-how">وثّق الجلسة بـ Discord OAuth (طبقة تحقق إضافية مع كلمة المرور).</p>
+        <div class="btn-row mb">
+          <a class="btn primary" href="/dashboard/auth/oauth/start">✅ وثّق بـ Discord OAuth</a>
+          <span class="dim">يعتمد على DISCORD_CLIENT_SECRET وإعداد Redirect URI في Discord</span>
+        </div>
+        <p>الجلسات النشطة تُحفظ في ذاكرة البوت وتُسجّل للتحقيق في قاعدة البيانات بدون حفظ التوكن.</p>
         <p>إذا لاحظت جلسة غريبة، اضغط «تسجيل خروج» عليها فوراً، ثم «خروج من كل الأجهزة» للحصول على جلسة نظيفة.</p>
       `, '🛡️')}`;
   },
