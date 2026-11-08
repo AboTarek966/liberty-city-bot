@@ -1066,7 +1066,7 @@ export class OmniClient extends Client {
 
     this.user?.setPresence({
       activities: [activity],
-      status: 'online',
+      status: 'idle',
     });
   }
 

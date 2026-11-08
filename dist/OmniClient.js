@@ -1030,7 +1030,7 @@ class OmniClient extends discord_js_1.Client {
         const activity = activities[Math.floor(Math.random() * activities.length)];
         this.user?.setPresence({
             activities: [activity],
-            status: 'online',
+            status: 'idle',
         });
     }
     // --------------------------------------------
