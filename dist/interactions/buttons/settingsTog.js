@@ -67,6 +67,11 @@ const handler = {
                     prot.ownerApproval = !(prot.ownerApproval !== false);
                     break;
                 }
+                if (field === 'silentAlerts') {
+                    // 🤫 وضع الصمت الأمني — بوليان مستقل: الحماية تعمل بدون تنبيهات تخريب
+                    prot.silentSecurityAlerts = !(prot.silentSecurityAlerts === true);
+                    break;
+                }
                 if (!prot[field])
                     prot[field] = { enabled: false };
                 prot[field].enabled = !prot[field].enabled;

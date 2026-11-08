@@ -19,6 +19,7 @@ import { getGuildSettings, GuildSettings } from '../models';
 import { setLockdown } from '../utils/lockdown';
 import { globalThreat } from '../utils/threatScore';
 import { scoreJoin } from '../utils/raidScoring';
+import { securityAlertsSilent } from '../utils/securityAlerts';
 import {
   containsInvite,
   extractUrls,
@@ -151,27 +152,29 @@ export class ProtectionHandler {
     );
 
     // إرسال تنبيه لقروم الحماية
-    try {
-      const logChannelId = settings.protection?.logChannel;
-      if (logChannelId) {
-        const logChannel = await message.guild.channels.fetch(logChannelId).catch(() => null);
-        if (logChannel && 'send' in logChannel) {
-          const { EmbedBuilder } = await import('discord.js');
-          const embed = new EmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle('🚨 Webhook Spam — Death Note')
-            .addFields(
-              { name: 'القناة', value: (message.channel as any)?.name || 'unknown', inline: true },
-              { name: 'حذف الـ Webhook', value: webhookDeleted ? '✅ نعم' : '❌ لا', inline: true },
-              { name: 'المنفّذ', value: executor?.tag || 'غير معروف', inline: true },
-              { name: 'العقوبة', value: punished ? '✅ تم طرد المنفّذ' : '❌ لم يتم', inline: true },
-              { name: 'السبب', value: isMassMention ? '@everyone mass mention' : isInvite ? 'Invite link' : 'Scam link', inline: true },
-            )
-            .setTimestamp();
-          await (logChannel as any).send({ embeds: [embed] });
+    if (!securityAlertsSilent(settings)) {
+      try {
+        const logChannelId = settings.protection?.logChannel;
+        if (logChannelId) {
+          const logChannel = await message.guild.channels.fetch(logChannelId).catch(() => null);
+          if (logChannel && 'send' in logChannel) {
+            const { EmbedBuilder } = await import('discord.js');
+            const embed = new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle('🚨 Webhook Spam — Death Note')
+              .addFields(
+                { name: 'القناة', value: (message.channel as any)?.name || 'unknown', inline: true },
+                { name: 'حذف الـ Webhook', value: webhookDeleted ? '✅ نعم' : '❌ لا', inline: true },
+                { name: 'المنفّذ', value: executor?.tag || 'غير معروف', inline: true },
+                { name: 'العقوبة', value: punished ? '✅ تم طرد المنفّذ' : '❌ لم يتم', inline: true },
+                { name: 'السبب', value: isMassMention ? '@everyone mass mention' : isInvite ? 'Invite link' : 'Scam link', inline: true },
+              )
+              .setTimestamp();
+            await (logChannel as any).send({ embeds: [embed] });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     return true;
   }
@@ -501,6 +504,9 @@ export class ProtectionHandler {
   // Log Action
   // --------------------------------------------
   private async logAction(message: Message, action: ProtectionAction, settings: any): Promise<void> {
+    // 🤫 وضع الصمت الأمني — لا سجلات تنبيه أمنية
+    if (securityAlertsSilent(settings)) return;
+
     // Find log channel
     const logChannelId = settings.protection?.[this.getProtectionKey(action.reason)]?.logChannel 
       || settings.logging?.channelId;
@@ -667,7 +673,7 @@ export class ProtectionHandler {
 
         // تنبيه (مرة كل 10 دقائق)
         const lastAlert = this.threatAlertCooldown.get(guildId) || 0;
-        if (Date.now() - lastAlert > 10 * 60 * 1000) {
+        if (!securityAlertsSilent(settings) && Date.now() - lastAlert > 10 * 60 * 1000) {
           this.threatAlertCooldown.set(guildId, Date.now());
           const logChannelId = antiRaid.logChannel || settings?.protection?.logChannel;
           const ch = logChannelId ? guild.channels.cache.get(logChannelId) : null;
@@ -830,6 +836,7 @@ export class ProtectionHandler {
       );
       const content = response?.content?.trim();
       if (!content) return;
+      if (securityAlertsSilent(settings)) return;
 
       const logId = settings?.protection?.logChannel || settings?.logging?.channelId;
       const logChannel = logId ? guild.channels.cache.get(logId) : null;

@@ -8,6 +8,7 @@ exports.checkScamContent = checkScamContent;
 exports.handleScamFilter = handleScamFilter;
 const models_1 = require("../models");
 const helpers_1 = require("./helpers");
+const securityAlerts_1 = require("./securityAlerts");
 const logger = (0, helpers_1.createLogger)('ScamFilter');
 // نطاقات احتيالية شائعة (تُطابَق بنهاية النطاق)
 const SCAM_DOMAINS = [
@@ -88,7 +89,7 @@ async function handleScamFilter(message, client) {
         setTimeout(() => warning.delete().catch(() => { }), 8000);
     // تسجيل في قناة السجلات إن وُجدت
     const logChannelId = settings.logging?.channelId;
-    if (logChannelId) {
+    if (logChannelId && !(0, securityAlerts_1.securityAlertsSilent)(settings)) {
         const logChannel = message.guild.channels.cache.get(logChannelId);
         if (logChannel && 'send' in logChannel) {
             await logChannel

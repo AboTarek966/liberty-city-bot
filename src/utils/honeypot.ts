@@ -14,6 +14,7 @@ import {
 import { getGuildSettings } from '../models';
 import { createLogger } from './helpers';
 import { Colors } from './embeds';
+import { securityAlertsSilent } from './securityAlerts';
 
 const logger = createLogger('Honeypot');
 
@@ -164,18 +165,20 @@ export async function runHoneypot(message: Message): Promise<boolean> {
     if (channel && channel.isTextBased()) logChannel = channel as TextChannel;
   }
 
-  if (logChannel) {
-    await logChannel
-      .send({
-        content: alertMention || undefined,
-        embeds: [embed],
-      })
-      .catch(() => {});
-  } else {
-    // لا يوجد سجل → نحاول إبلاغ الرولات في نفس القناة
-    const fallback = message.channel as TextChannel;
-    if (alertMention && fallback.isTextBased()) {
-      await fallback.send({ content: alertMention, embeds: [embed] }).catch(() => {});
+  if (!securityAlertsSilent(settings)) {
+    if (logChannel) {
+      await logChannel
+        .send({
+          content: alertMention || undefined,
+          embeds: [embed],
+        })
+        .catch(() => {});
+    } else {
+      // لا يوجد سجل → نحاول إبلاغ الرولات في نفس القناة
+      const fallback = message.channel as TextChannel;
+      if (alertMention && fallback.isTextBased()) {
+        await fallback.send({ content: alertMention, embeds: [embed] }).catch(() => {});
+      }
     }
   }
 

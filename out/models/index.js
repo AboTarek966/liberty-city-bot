@@ -131,6 +131,8 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
     protection: {
         logChannel: { type: String },
+        // 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن بدون إشعارات تخريب
+        silentSecurityAlerts: { type: Boolean, default: false },
         // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
         ownerApproval: { type: Boolean, default: true },
         antiBotAbuse: {

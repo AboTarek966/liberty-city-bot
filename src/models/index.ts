@@ -27,6 +27,8 @@ export interface IGuildSettings extends Document {
   protection: {
     /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
     logChannel?: string;
+    /** 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن لا تُرسل تنبيهات تخريب/رايد/اختراق */
+    silentSecurityAlerts?: boolean;
     /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
     ownerApproval?: boolean;
     /** 🤖 مكافحة الإساءة للبوت: يحذر ثم يسحب كل الرولات القابلة للإزالة ثم يحظر */
@@ -893,6 +895,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   
   protection: {
     logChannel: { type: String },
+    // 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن بدون إشعارات تخريب
+    silentSecurityAlerts: { type: Boolean, default: false },
     // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
     ownerApproval: { type: Boolean, default: true },
     antiBotAbuse: {

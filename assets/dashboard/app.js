@@ -520,6 +520,9 @@ const PAGES = {
       ${card('قنوات السجلات', `
         ${chSel('protection.logChannel', 'قناة التنبيهات العامة للحماية (افتراضي)')}
         <div class="dim">عند تحديد قناة هنا، ستُرسل معظم تنبيهات الحماية إليها ما لم تحدد قناة أدق لكل وحدة.</div>`, '📜')}
+      ${card('وضع الصمت الأمني', `
+        ${sw('protection.silentSecurityAlerts', 'إيقاف إشعارات التخريب والاختراق (وضع صامت)', 'الحماية والعقوبات والاستعادة تستمر كاملة — لكن البوت لا يرسل تنبيهات أمنية في قنوات السجلات')}
+        <div class="banner info">${val('protection.silentSecurityAlerts') ? '🤫 الوضع الصامت مفعّل الآن — البوت يحمي السيرفر بهدوء بدون إزعاج.' : '🔔 الوضع الصامت معطّل — البوت يرسل تنبيهات أمنية فورية عند أي تخريب.'}</div>`, '🤫')}
       <div class="grid-2">
         ${card('الرايد والانضمام', `
           ${sw('protection.antiRaid.enabled', 'مكافحة الرايد')}
@@ -579,7 +582,7 @@ const PAGES = {
           ${sw('protection.antiNuke.slowNukeGuard', 'الرصد البطيء')}
           <div class="grid-2">${num('protection.antiNuke.slowNukeMax', 'أقصى عمليات بطيئة')}${num('protection.antiNuke.slowNukeWindowMinutes', 'النافذة (دقائق)')}</div>
           ${sw('protection.antiNuke.autoRestore', 'استعادة القنوات والرولات')}
-          ${sw('protection.antiNuke.autoDmRecovery', 'تنبيه المالك بالخاص')}
+          ${sw('protection.antiNuke.autoDmRecovery', 'إرسال دعوة رجوع للمطرودين بالخاص')}
           ${chipList('protection.antiNuke.whitelistedChannels', 'قنوات مستثناة', 'channel')}
           ${chipList('protection.antiNuke.whitelistedRoles', 'رولات مستثناة', 'role')}`, '💣')}
         ${card('الحسابات والبوتات', `

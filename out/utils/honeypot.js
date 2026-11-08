@@ -11,6 +11,7 @@ const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const helpers_1 = require("./helpers");
 const embeds_1 = require("./embeds");
+const securityAlerts_1 = require("./securityAlerts");
 const logger = (0, helpers_1.createLogger)('Honeypot');
 const ACTION_LABELS = {
     delete: 'حذف الرسالة فقط',
@@ -146,19 +147,21 @@ async function runHoneypot(message) {
         if (channel && channel.isTextBased())
             logChannel = channel;
     }
-    if (logChannel) {
-        await logChannel
-            .send({
-            content: alertMention || undefined,
-            embeds: [embed],
-        })
-            .catch(() => { });
-    }
-    else {
-        // لا يوجد سجل → نحاول إبلاغ الرولات في نفس القناة
-        const fallback = message.channel;
-        if (alertMention && fallback.isTextBased()) {
-            await fallback.send({ content: alertMention, embeds: [embed] }).catch(() => { });
+    if (!(0, securityAlerts_1.securityAlertsSilent)(settings)) {
+        if (logChannel) {
+            await logChannel
+                .send({
+                content: alertMention || undefined,
+                embeds: [embed],
+            })
+                .catch(() => { });
+        }
+        else {
+            // لا يوجد سجل → نحاول إبلاغ الرولات في نفس القناة
+            const fallback = message.channel;
+            if (alertMention && fallback.isTextBased()) {
+                await fallback.send({ content: alertMention, embeds: [embed] }).catch(() => { });
+            }
         }
     }
     logger.warn(`Honeypot triggered by ${message.author.tag} (${message.author.id}) in ${message.guild.name} — ${outcome}`);

@@ -24,6 +24,7 @@ import { getGuildSettings, BackupConfig, RogueBot } from '../models';
 import { Colors } from '../utils/embeds';
 import { globalThreat } from '../utils/threatScore';
 import { isMaliciousSecurityName } from '../utils/securityNames';
+import { securityAlertsSilent } from '../utils/securityAlerts';
 
 const logger = createLogger('SecurityHandler');
 
@@ -418,6 +419,9 @@ export class SecurityHandler {
 
   // قناة تنبيهات الأمن: مخصصة → حماية عامة → أنتينوك → سجلات → نظام → أول قناة قابلة للإرسال
   private async getAlertChannel(guild: Guild, settings: any, specific?: string): Promise<TextChannel | null> {
+    // 🤫 وضع الصمت الأمني — لا تنبيهات، لكن كل إجراءات الحماية تكمل بشكل طبيعي
+    if (securityAlertsSilent(settings)) return null;
+
     const candidates = [
       specific,
       settings?.protection?.logChannel,

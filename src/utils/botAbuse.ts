@@ -9,6 +9,7 @@ import { getGuildSettings } from '../models';
 import { BotAbuseStrike } from '../models/BotAbuseStrike';
 import { createLogger } from './helpers';
 import { OmniClient } from '../OmniClient';
+import { securityAlertsSilent } from './securityAlerts';
 
 const logger = createLogger('AntiBotAbuse');
 
@@ -107,6 +108,7 @@ export async function handleBotAbuse(
       || undefined;
     const logChannel = logId ? guild.channels.cache.get(logId) as TextChannel | undefined : undefined;
     const sendLog = async (action: string) => {
+      if (securityAlertsSilent(settings)) return;
       if (!logChannel || !logChannel.isTextBased()) return;
       const embed = new EmbedBuilder()
         .setTitle('🤖 مكافحة الإساءة للبوت')

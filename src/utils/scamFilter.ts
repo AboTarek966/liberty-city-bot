@@ -7,6 +7,7 @@ import { Message } from 'discord.js';
 import { OmniClient } from '../OmniClient';
 import { getGuildSettings } from '../models';
 import { createLogger } from './helpers';
+import { securityAlertsSilent } from './securityAlerts';
 
 const logger = createLogger('ScamFilter');
 
@@ -104,7 +105,7 @@ export async function handleScamFilter(message: Message, client: OmniClient): Pr
 
   // تسجيل في قناة السجلات إن وُجدت
   const logChannelId = settings.logging?.channelId;
-  if (logChannelId) {
+  if (logChannelId && !securityAlertsSilent(settings)) {
     const logChannel = message.guild.channels.cache.get(logChannelId);
     if (logChannel && 'send' in logChannel) {
       await (logChannel as any)

@@ -16,6 +16,7 @@ const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const threatScore_1 = require("../utils/threatScore");
 const securityNames_1 = require("../utils/securityNames");
+const securityAlerts_1 = require("../utils/securityAlerts");
 const logger = (0, helpers_1.createLogger)('SecurityHandler');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // أنواع القنوات القابلة لإعادة الإنشاء
@@ -335,6 +336,9 @@ class SecurityHandler {
     // --------------------------------------------
     // قناة تنبيهات الأمن: مخصصة → حماية عامة → أنتينوك → سجلات → نظام → أول قناة قابلة للإرسال
     async getAlertChannel(guild, settings, specific) {
+        // 🤫 وضع الصمت الأمني — لا تنبيهات، لكن كل إجراءات الحماية تكمل بشكل طبيعي
+        if ((0, securityAlerts_1.securityAlertsSilent)(settings))
+            return null;
         const candidates = [
             specific,
             settings?.protection?.logChannel,

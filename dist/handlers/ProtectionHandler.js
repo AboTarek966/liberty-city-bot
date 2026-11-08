@@ -43,6 +43,7 @@ const models_1 = require("../models");
 const lockdown_1 = require("../utils/lockdown");
 const threatScore_1 = require("../utils/threatScore");
 const raidScoring_1 = require("../utils/raidScoring");
+const securityAlerts_1 = require("../utils/securityAlerts");
 const helpers_2 = require("../utils/helpers");
 const logger = (0, helpers_1.createLogger)('ProtectionHandler');
 // --------------------------------------------
@@ -136,22 +137,24 @@ class ProtectionHandler {
             `punished=${punished}, executor=${executor?.tag || 'unknown'}, ` +
             `reason=${isMassMention ? '@everyone' : isInvite ? 'invite' : 'scam-link'}`);
         // إرسال تنبيه لقروم الحماية
-        try {
-            const logChannelId = settings.protection?.logChannel;
-            if (logChannelId) {
-                const logChannel = await message.guild.channels.fetch(logChannelId).catch(() => null);
-                if (logChannel && 'send' in logChannel) {
-                    const { EmbedBuilder } = await Promise.resolve().then(() => __importStar(require('discord.js')));
-                    const embed = new EmbedBuilder()
-                        .setColor(0xff0000)
-                        .setTitle('🚨 Webhook Spam — Death Note')
-                        .addFields({ name: 'القناة', value: message.channel?.name || 'unknown', inline: true }, { name: 'حذف الـ Webhook', value: webhookDeleted ? '✅ نعم' : '❌ لا', inline: true }, { name: 'المنفّذ', value: executor?.tag || 'غير معروف', inline: true }, { name: 'العقوبة', value: punished ? '✅ تم طرد المنفّذ' : '❌ لم يتم', inline: true }, { name: 'السبب', value: isMassMention ? '@everyone mass mention' : isInvite ? 'Invite link' : 'Scam link', inline: true })
-                        .setTimestamp();
-                    await logChannel.send({ embeds: [embed] });
+        if (!(0, securityAlerts_1.securityAlertsSilent)(settings)) {
+            try {
+                const logChannelId = settings.protection?.logChannel;
+                if (logChannelId) {
+                    const logChannel = await message.guild.channels.fetch(logChannelId).catch(() => null);
+                    if (logChannel && 'send' in logChannel) {
+                        const { EmbedBuilder } = await Promise.resolve().then(() => __importStar(require('discord.js')));
+                        const embed = new EmbedBuilder()
+                            .setColor(0xff0000)
+                            .setTitle('🚨 Webhook Spam — Death Note')
+                            .addFields({ name: 'القناة', value: message.channel?.name || 'unknown', inline: true }, { name: 'حذف الـ Webhook', value: webhookDeleted ? '✅ نعم' : '❌ لا', inline: true }, { name: 'المنفّذ', value: executor?.tag || 'غير معروف', inline: true }, { name: 'العقوبة', value: punished ? '✅ تم طرد المنفّذ' : '❌ لم يتم', inline: true }, { name: 'السبب', value: isMassMention ? '@everyone mass mention' : isInvite ? 'Invite link' : 'Scam link', inline: true })
+                            .setTimestamp();
+                        await logChannel.send({ embeds: [embed] });
+                    }
                 }
             }
+            catch { }
         }
-        catch { }
         return true;
     }
     // --------------------------------------------
@@ -435,6 +438,9 @@ class ProtectionHandler {
     // Log Action
     // --------------------------------------------
     async logAction(message, action, settings) {
+        // 🤫 وضع الصمت الأمني — لا سجلات تنبيه أمنية
+        if ((0, securityAlerts_1.securityAlertsSilent)(settings))
+            return;
         // Find log channel
         const logChannelId = settings.protection?.[this.getProtectionKey(action.reason)]?.logChannel
             || settings.logging?.channelId;
@@ -583,7 +589,7 @@ class ProtectionHandler {
                 }
                 // تنبيه (مرة كل 10 دقائق)
                 const lastAlert = this.threatAlertCooldown.get(guildId) || 0;
-                if (Date.now() - lastAlert > 10 * 60 * 1000) {
+                if (!(0, securityAlerts_1.securityAlertsSilent)(settings) && Date.now() - lastAlert > 10 * 60 * 1000) {
                     this.threatAlertCooldown.set(guildId, Date.now());
                     const logChannelId = antiRaid.logChannel || settings?.protection?.logChannel;
                     const ch = logChannelId ? guild.channels.cache.get(logChannelId) : null;
@@ -732,6 +738,8 @@ class ProtectionHandler {
             const response = await this.client.aiHandler?.generateResponse(`protection:raid:${guild.id}`, guild.id, settings?.protection?.logChannel || settings?.logging?.channelId || '', prompt, [], false, false, { fromCommand: true });
             const content = response?.content?.trim();
             if (!content)
+                return;
+            if ((0, securityAlerts_1.securityAlertsSilent)(settings))
                 return;
             const logId = settings?.protection?.logChannel || settings?.logging?.channelId;
             const logChannel = logId ? guild.channels.cache.get(logId) : null;

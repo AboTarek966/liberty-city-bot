@@ -10,6 +10,7 @@ const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const BotAbuseStrike_1 = require("../models/BotAbuseStrike");
 const helpers_1 = require("./helpers");
+const securityAlerts_1 = require("./securityAlerts");
 const logger = (0, helpers_1.createLogger)('AntiBotAbuse');
 // 🧠 قائمة أساسية للإساءة (عربية + إنجليزية) — تستهدف البوت حصراً
 const INSULT_WORDS = [
@@ -101,6 +102,8 @@ async function handleBotAbuse(message) {
             || undefined;
         const logChannel = logId ? guild.channels.cache.get(logId) : undefined;
         const sendLog = async (action) => {
+            if ((0, securityAlerts_1.securityAlertsSilent)(settings))
+                return;
             if (!logChannel || !logChannel.isTextBased())
                 return;
             const embed = new discord_js_1.EmbedBuilder()

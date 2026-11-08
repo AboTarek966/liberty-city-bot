@@ -447,6 +447,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.scamFilter?.enabled)} **فلتر الاحتيال** — يحذف روابط الصيد والمشاريع المزيفة\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.logChannel)} **📢 قناة تنبيهات الحماية** — ${p.logChannel ? `<#${p.logChannel}>` : 'غير محددة'} (كافتراضي للتنبيهات)\n` +
+    `> ${on(p.silentSecurityAlerts !== true)} **الإشعارات الأمنية** — ${p.silentSecurityAlerts ? 'صامتة 🤫 (الحماية تعمل بدون تنبيهات)' : 'مفعّلة 🔔'}\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${p.lockdown ? '🔒' : '🔓'} **وضع الطوارئ** — ${p.lockdown ? 'مفعّل (السيرفر مقفول!)' : 'معطّل'} — زر واحد يقفل كل القنوات\n` +
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n` +
@@ -462,6 +463,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled),
     toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled),
     toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled),
+    btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Primary, '🎁'),
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -489,9 +491,9 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
       !!p.lockdown
     ),
     toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false),
+    toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true),
     btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
     btn('settings_cat:honeypot', 'قناة الطعم', ButtonStyle.Secondary, '🍯'),
-    btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Primary, '🎁'),
   );
 
   // Row 5: Protection log channel selection
