@@ -65,6 +65,21 @@
     </main>
   </div>
 
+  <!-- ═══════ تحقق Discord OAuth قبل استخدام اللوحة ═══════ -->
+  <div id="oauth-guard" class="modal-wrap hidden">
+    <div class="modal">
+      <div class="modal-head"><h3>🛡️ تحقق إضافي بـ Discord OAuth</h3></div>
+      <div class="modal-body">
+        <p>دخلت بالفعل بكلمة المرور أو الكود، وخطوة التحقق الإضافية مطلوبة قبل فتح الإعدادات. أكمل تسجيل الدخول بـ Discord لتأكيد أنك مالك البوت على هذا الجهاز.</p>
+        <p class="dim mt-sm">لن تتغير إعداداتك أثناء التوثيق، وستُسجّل الجلسة فوراً بعد نجاح التحقق.</p>
+        <div class="btn-row mt">
+          <a class="btn primary" href="/dashboard/auth/oauth/start">✅ وثّق بـ Discord OAuth</a>
+          <button id="btn-oauth-logout" class="btn ghost">خروج</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════ مكونات مساعدة ═══════ -->
   <div id="toast" class="toast"></div>
 

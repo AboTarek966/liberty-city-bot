@@ -4,26 +4,70 @@
 // ============================================
 // جلسات داخل الذاكرة + كوكي موقّع + كود دخول يُرسل بالخاص لمالك البوت.
 // الهدف: تأمين منفذ Express العام المكشوف للإنترنت — لا وصول لأي API بدون جلسة.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CSRF_HEADER = exports.SESSION_COOKIE = void 0;
+exports.oauthFlows = exports.CSRF_HEADER = exports.SESSION_COOKIE = void 0;
 exports.safeEqual = safeEqual;
+exports.tokenHash = tokenHash;
+exports.clientIp = clientIp;
+exports.parseDevice = parseDevice;
+exports.getAllActiveSessions = getAllActiveSessions;
+exports.listPersistedSessions = listPersistedSessions;
+exports.markOAuthVerified = markOAuthVerified;
+exports.oauthRequired = oauthRequired;
+exports.oauthRedirect = oauthRedirect;
+exports.createOAuthState = createOAuthState;
+exports.consumeOAuthState = consumeOAuthState;
 exports.parseCookies = parseCookies;
 exports.getSession = getSession;
 exports.createSession = createSession;
 exports.destroySession = destroySession;
+exports.revokeActiveSession = revokeActiveSession;
 exports.setSessionCookie = setSessionCookie;
 exports.clearSessionCookie = clearSessionCookie;
 exports.rateLimit = rateLimit;
-exports.clientIp = clientIp;
 exports.issueLoginCode = issueLoginCode;
 exports.consumeLoginCode = consumeLoginCode;
 exports.passwordLoginEnabled = passwordLoginEnabled;
 exports.passwordMatches = passwordMatches;
 exports.apiGuard = apiGuard;
 exports.requireSession = requireSession;
+exports.requireVerifiedSession = requireVerifiedSession;
 exports.logAuth = logAuth;
 const crypto_1 = __importDefault(require("crypto"));
 const helpers_1 = require("./helpers");
@@ -59,6 +103,156 @@ function safeEqual(a, b) {
 }
 function sign(sessionId) {
     return crypto_1.default.createHmac('sha256', COOKIE_SECRET).update(sessionId).digest('hex');
+}
+function tokenHash(sessionId) {
+    return crypto_1.default.createHash('sha256').update(sessionId).digest('hex');
+}
+function clientIp(req) {
+    const fwd = req.headers['x-forwarded-for'];
+    if (typeof fwd === 'string' && fwd.length)
+        return fwd.split(',')[0].trim();
+    return req.socket?.remoteAddress || 'unknown';
+}
+const COUNTRY_NAMES = {
+    AE: 'الإمارات', SA: 'السعودية', EG: 'مصر', KW: 'الكويت', QA: 'قطر',
+    BH: 'Bahrain', OM: 'عُمان', IQ: 'العراق', JO: 'الأردن', LB: 'لبنان',
+};
+function parseDevice(ua = '') {
+    const normalized = String(ua || '').toLowerCase();
+    const isTablet = /ipad|tablet|kindle/.test(normalized);
+    const isMobile = !isTablet && /iphone|android.*mobile|mobile/.test(normalized);
+    const deviceType = isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop';
+    const browserName = /edg\//.test(normalized) ? 'Edge' : /chrome\//.test(normalized) ? 'Chrome' : /firefox\//.test(normalized) ? 'Firefox' : /safari\//.test(normalized) ? 'Safari' : /opera\//.test(normalized) ? 'Opera' : 'المتصفح';
+    const osName = /windows/.test(normalized) ? 'Windows' : /mac os x|macintosh/.test(normalized) ? 'macOS' : /android/.test(normalized) ? 'Android' : /iphone|ipad|ipod/.test(normalized) ? 'iOS' : /linux/.test(normalized) ? 'Linux' : 'نظام غير معروف';
+    const deviceName = isMobile ? 'جوال' : isTablet ? 'تابلت' : 'جهاز';
+    return { deviceName, deviceType, browserName, osName };
+}
+function countryFromRequest(req) {
+    const code = String(req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || req.headers['x-country'] || '').trim().toUpperCase();
+    if (!code || code === 'XX' || code === 'XX-')
+        return {};
+    return { countryCode: code, countryName: COUNTRY_NAMES[code] || code };
+}
+async function storeAudit(session, req, authMethod = 'password') {
+    try {
+        const { DashboardSession } = await Promise.resolve().then(() => __importStar(require('../models/DashboardSession')));
+        const device = req ? parseDevice(String(req.headers['user-agent'] || '')) : { deviceName: 'جهاز', deviceType: 'desktop', browserName: 'المتصفح', osName: 'نظام غير معروف' };
+        const country = req ? countryFromRequest(req) : {};
+        await DashboardSession.findOneAndUpdate({ tokenHash: tokenHash(session.id) }, {
+            $setOnInsert: {
+                tokenHash: tokenHash(session.id),
+                userId: session.userId,
+                username: session.username,
+                authMethod,
+                ip: req ? clientIp(req) : 'unknown',
+                userAgent: String(req?.headers['user-agent'] || '').slice(0, 512),
+                createdAt: new Date(session.createdAt),
+            },
+            $set: {
+                ...country,
+                ...device,
+                oauthVerified: Boolean(session.oauthVerified),
+                lastPath: req?.path,
+                requestCount: session.requestCount || 0,
+                lastSeenAt: new Date(session.lastSeen),
+                revokedAt: undefined,
+            },
+        }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    }
+    catch { /* تسجيل نشاط الجلسة اختياري */ }
+}
+async function touchAudit(session, path) {
+    try {
+        const { DashboardSession } = await Promise.resolve().then(() => __importStar(require('../models/DashboardSession')));
+        await DashboardSession.updateOne({ tokenHash: tokenHash(session.id), revokedAt: { $exists: false } }, {
+            $set: { lastSeenAt: new Date(session.lastSeen), lastPath: path || session.lastPath, requestCount: session.requestCount || 0 },
+            $inc: { requestCount: 0 },
+        });
+    }
+    catch { /* تجاهل */ }
+}
+async function revokeAudit(sessionId) {
+    try {
+        const { DashboardSession } = await Promise.resolve().then(() => __importStar(require('../models/DashboardSession')));
+        await DashboardSession.updateOne({ tokenHash: tokenHash(sessionId) }, { $set: { revokedAt: new Date() } });
+    }
+    catch { /* تجاهل */ }
+}
+async function markAuditVerified(sessionId, userId, username, authMethod = 'password+oauth') {
+    try {
+        const { DashboardSession } = await Promise.resolve().then(() => __importStar(require('../models/DashboardSession')));
+        await DashboardSession.updateOne({ tokenHash: tokenHash(sessionId) }, {
+            $set: { oauthVerified: true, userId, username, authMethod, lastSeenAt: new Date() },
+        });
+    }
+    catch { /* تجاهل */ }
+}
+function getAllActiveSessions() {
+    return Array.from(sessions.values())
+        .filter((s) => Date.now() - s.lastSeen <= SESSION_TTL_MS)
+        .map((s) => ({
+        sessionId: s.id,
+        userId: s.userId,
+        username: s.username,
+        authMethod: s.authMethod,
+        oauthVerified: s.oauthVerified,
+        requestCount: s.requestCount || 0,
+        lastPath: s.lastPath || null,
+        lastSeenAt: s.lastSeen,
+        createdAt: s.createdAt,
+    }))
+        .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+}
+async function listPersistedSessions() {
+    try {
+        const { DashboardSession } = await Promise.resolve().then(() => __importStar(require('../models/DashboardSession')));
+        const docs = await DashboardSession.find({}).sort({ lastSeenAt: -1 }).limit(200).lean();
+        return docs.map((d) => ({ ...d, id: d._id?.toString?.() || d.id }));
+    }
+    catch {
+        return [];
+    }
+}
+function markOAuthVerified(sessionId, userId, username) {
+    const session = sessions.get(sessionId);
+    if (!session || Date.now() - session.lastSeen > SESSION_TTL_MS)
+        return null;
+    session.userId = userId;
+    session.username = username;
+    session.oauthVerified = true;
+    session.authMethod = session.authMethod === 'code' ? 'code+oauth' : 'password+oauth';
+    session.lastSeen = Date.now();
+    void markAuditVerified(sessionId, userId, username, session.authMethod);
+    return session;
+}
+function oauthRequired() {
+    const v = String(process.env.DASHBOARD_REQUIRE_OAUTH || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+}
+function oauthRedirect(req) {
+    const forced = String(process.env.DISCORD_REDIRECT_URI || process.env.DISCORD_OAUTH_REDIRECT_URI || '');
+    if (forced)
+        return forced;
+    const host = String(req.get('host') || '').trim();
+    if (!host)
+        return '';
+    const proto = req.protocol || 'http';
+    return `${proto}://${host}/dashboard/auth/oauth/callback`;
+}
+exports.oauthFlows = new Map();
+function createOAuthState(sessionId) {
+    const state = crypto_1.default.randomBytes(32).toString('hex');
+    exports.oauthFlows.set(state, { sessionId, expiresAt: Date.now() + 10 * 60 * 1000 });
+    return state;
+}
+function consumeOAuthState(state) {
+    const flow = exports.oauthFlows.get(state);
+    exports.oauthFlows.delete(state);
+    if (!flow)
+        return null;
+    if (Date.now() > flow.expiresAt)
+        return null;
+    return flow;
 }
 function parseCookies(header) {
     const out = {};
@@ -102,6 +296,12 @@ function getSession(req) {
         return null;
     }
     session.lastSeen = Date.now();
+    session.requestCount = (session.requestCount || 0) + 1;
+    session.lastPath = req.path || session.lastPath;
+    if (!session.lastActivityPersistedAt || Date.now() - session.lastActivityPersistedAt > 60_000) {
+        session.lastActivityPersistedAt = Date.now();
+        void touchAudit(session, req.path);
+    }
     return session;
 }
 function createSession(init = {}) {
@@ -111,10 +311,16 @@ function createSession(init = {}) {
         mode: 'owner',
         userId: init.userId,
         username: init.username,
+        authMethod: init.authMethod || 'password',
+        oauthVerified: Boolean(init.oauthVerified),
         createdAt: Date.now(),
         lastSeen: Date.now(),
+        lastPath: init.req?.path,
+        requestCount: 0,
     };
     sessions.set(id, session);
+    if (init.req)
+        void storeAudit(session, init.req, session.authMethod);
     return { token: `${id}.${sign(id)}`, session };
 }
 function destroySession(req) {
@@ -122,8 +328,17 @@ function destroySession(req) {
     if (!token)
         return;
     const [id] = token.split('.');
-    if (id)
-        sessions.delete(id);
+    if (!id)
+        return;
+    sessions.delete(id);
+    void revokeAudit(id);
+}
+function revokeActiveSession(sessionId) {
+    if (!sessions.has(sessionId))
+        return false;
+    sessions.delete(sessionId);
+    void revokeAudit(sessionId);
+    return true;
 }
 function setSessionCookie(res, token) {
     res.setHeader('Set-Cookie', `${exports.SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`);
@@ -156,12 +371,6 @@ function rateLimit(key, max, windowMs) {
     times.push(now);
     buckets.set(key, times);
     return true;
-}
-function clientIp(req) {
-    const fwd = req.headers['x-forwarded-for'];
-    if (typeof fwd === 'string' && fwd.length)
-        return fwd.split(',')[0].trim();
-    return req.socket?.remoteAddress || 'unknown';
 }
 let pendingCode = null;
 function issueLoginCode() {
@@ -238,6 +447,10 @@ function apiGuard(client) {
             userId: session.userId,
             username: session.username,
         };
+        if (oauthRequired() && !session.oauthVerified) {
+            res.status(403).json({ error: 'oauth_required', message: 'وثّق تسجيل دخولك بـ Discord قبل استخدام اللوحة' });
+            return;
+        }
         next();
     };
 }
@@ -248,6 +461,19 @@ function requireSession(req, res, next) {
     const session = getSession(req);
     if (!session) {
         res.status(401).json({ error: 'unauthorized' });
+        return;
+    }
+    req.webSession = session;
+    next();
+}
+function requireVerifiedSession(req, res, next) {
+    const session = getSession(req);
+    if (!session) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+    }
+    if (oauthRequired() && !session.oauthVerified) {
+        res.status(403).json({ error: 'oauth_required', message: 'وثّق تسجيل دخولك بـ Discord قبل استخدام اللوحة' });
         return;
     }
     req.webSession = session;

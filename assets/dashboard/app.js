@@ -44,6 +44,9 @@ const api = {
     }
     let data = null;
     try { data = await res.json(); } catch { data = {}; }
+    if (res.status === 403 && data?.error === 'oauth_required') {
+      showOAuthGuard();
+    }
     if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
     return data;
   },
@@ -208,6 +211,7 @@ const FIELD = { title: 'الفصل', body: '', icon: '' };
 // ===== Screen switching =====
 function showLogin(login = {}) {
   $('#app').classList.add('hidden');
+  $('#oauth-guard').classList.add('hidden');
   $('#login').classList.remove('hidden');
   const codeBlock = $('#login-code-block');
   const passBlock = $('#login-pass-block');
@@ -219,6 +223,13 @@ function showLogin(login = {}) {
   codeBlock.classList.toggle('hidden', !codeOn);
   passBlock.classList.toggle('hidden', !passOn);
   noneBlock.classList.toggle('hidden', codeOn || passOn);
+}
+
+function showOAuthGuard() {
+  $('#login').classList.add('hidden');
+  $('#app').classList.add('hidden');
+  $('#oauth-guard').classList.remove('hidden');
+  $('#oauth-guard').classList.add('open');
 }
 
 async function startApp() {
@@ -285,7 +296,7 @@ const NAV = [
   { title: 'الأمان', items: [['protection', '🛡️', 'الحماية'], ['investigator', '🕵️', 'المحقق الأمني'], ['verification', '✅', 'التحقق'], ['honeypot', '🍯', 'المصيدة']] },
   { title: 'المجتمع', items: [['members', '👥', 'الأعضاء'], ['levels', '📈', 'المستويات'], ['economy', '💰', 'الاقتصاد'], ['welcome', '👋', 'الترحيب والوداع'], ['giveaways', '🎁', 'السحوبات']] },
   { title: 'الإدارة', items: [['tickets', '🎫', 'التذاكر'], ['announcements', '📢', 'الإعلانات'], ['commands', '🧩', 'أوامر ووسوم'], ['aliases', '⌨️', 'الأسماء المستعارة'], ['logs', '📜', 'السجلات'], ['knowledge', '📚', 'المعرفة']] },
-  { title: 'النظام', items: [['ai', '🤖', 'الذكاء الاصطناعي'], ['general', '⚙️', 'إعدادات عامة'], ['help', '❓', 'مساعدة']] },
+  { title: 'النظام', items: [['ai', '🤖', 'الذكاء الاصطناعي'], ['general', '⚙️', 'إعدادات عامة'], ['sessions', '🔒', 'الجلسات والأجهزة'], ['help', '❓', 'مساعدة']] },
 ];
 const ALL_PAGES = NAV.flatMap((g) => g.items.map((i) => i[0]));
 
@@ -378,6 +389,7 @@ async function onViewClick(e) {
   if (act.startsWith('cc-')) return commandsAction(btn);
   if (act.startsWith('tag-')) return commandsAction(btn);
   if (act.startsWith('alias-')) return aliasesAction(btn);
+  if (act.startsWith('sess-')) return sessionsAction(btn);
   if (act.startsWith('lr-')) return levelRewardAction(btn);
   if (act.startsWith('welcome-')) return welcomeAction(btn);
   if (act === 'logs-prev') { S.logsPage = Math.max(1, S.logsPage - 1); return render('logs'); }
@@ -1201,6 +1213,46 @@ const PAGES = {
       </div>`;
   },
 
+  // ---------------- Sessions ----------------
+  async sessions() {
+    const data = await api.get('/dashboard/api/sessions').catch(() => ({ sessions: [], currentSessionId: null }));
+    const sessions = data.sessions || [];
+    const currentId = data.currentSessionId;
+    const rows = sessions.map((s) => {
+      const status = s.status === 'active' ? '<span class="chip green">نشطة</span>' : s.status === 'revoked' ? '<span class="chip red">ملغاة</span>' : '<span class="chip">منتهية</span>';
+      const method = s.authMethod || '—';
+      const device = `${esc(s.deviceName || 'جهاز')} · ${esc(s.browserName || 'المتصفح')} · ${esc(s.osName || 'نظام غير معروف')}`;
+      const location = `${esc(s.countryName || 'غير محدد')}${s.ip ? `<br><code>${esc(s.ip)}</code>` : ''}`;
+      return `<tr data-name="${esc(((s.username || '') + ' ' + (s.userId || '') + ' ' + (s.deviceName || '') + ' ' + (s.ip || '')).toLowerCase())}">
+        <td>${esc(s.username || 'المالك')}<br><code>${esc(s.userId || s.sessionId || '')}</code></td>
+        <td>${status}<br><span class="dim">${esc(method)}</span></td>
+        <td>${device}<br><span class="dim">${esc(s.deviceType || '')}</span></td>
+        <td>${location}</td>
+        <td>${fmtDate(s.lastSeenAt)}<br><span class="dim">طلبات: ${esc(s.requestCount ?? 0)}</span></td>
+        <td>${esc(s.lastPath || '—')}</td>
+        <td class="actions">
+          ${s.status === 'active' ? `<button class="btn sm danger" data-act="sess-revoke" data-id="${esc(s.sessionId || '')}">${s.isCurrent ? 'تسجيل خروج هذه الجلسة' : 'تسجيل خروج'}</button>` : '<span class="dim">—</span>'}
+        </td>
+      </tr>`;
+    }).join('');
+    return `
+      ${card('الجلسات والأجهزة', `
+        <div class="btn-row mb">
+          <span class="chip cyan">النشطة الآن: ${fmtNum(sessions.filter((s) => s.status === 'active').length)}</span>
+          <span class="chip">الأرشيف: ${fmtNum(sessions.filter((s) => s.status !== 'active').length)}</span>
+          <button class="btn danger" data-act="sess-logout-all">🚪 خروج من كل الأجهزة</button>
+        </div>
+        <div class="tbl-wrap"><table class="tbl" id="sessions-table">
+          <thead><tr><th>المستخدم</th><th>الحالة وطريقة الدخول</th><th>الجهاز والمتصفح</th><th>الموقع والعنوان</th><th>آخر نشاط</th><th>آخر صفحة</th><th>إجراء</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7"><div class="empty">لا توجد جلسات بعد</div></td></tr>'}</tbody>
+        </table></div>
+      `, '🔒')}
+      ${card('تفاصيل الأمان', `
+        <p class="help-how">الجلسات النشطة تُحفظ في ذاكرة البوت وتُسجّل للتحقيق في قاعدة البيانات بدون حفظ التوكن.</p>
+        <p>إذا لاحظت جلسة غريبة، اضغط «تسجيل خروج» عليها فوراً، ثم «خروج من كل الأجهزة» للحصول على جلسة نظيفة.</p>
+      `, '🛡️')}`;
+  },
+
   // ---------------- Help ----------------
   async help() {
     const topic = (icon, page, what, how) => `
@@ -1350,6 +1402,24 @@ async function knowledgeAction(btn) {
     await api.del(`/api/guilds/${S.guildId}/knowledge/${btn.dataset.id}`);
     toast('تم الحذف', 'ok');
     render('knowledge');
+  }
+}
+
+async function sessionsAction(btn) {
+  if (btn.dataset.act === 'sess-revoke') {
+    if (!(await confirmModal('تسجيل خروج من جلسة', 'سيتم تسجيل الخروج من هذه الجلسة فوراً. متأكد؟'))) return;
+    const res = await api.del(`/api/dashboard/sessions/${encodeURIComponent(btn.dataset.id)}`);
+    if (res.currentRevoked) {
+      location.href = '/dashboard/auth/logout';
+      return;
+    }
+    toast('تم تسجيل الخروج من الجلسة ✓', 'ok');
+    render('sessions');
+  }
+  if (btn.dataset.act === 'sess-logout-all') {
+    if (!(await confirmModal('خروج من كل الأجهزة', 'سيتم إنهاء كل الجلسات النشطة، بما فيها جلستك هذه. متأكد؟'))) return;
+    await api.delete('/api/dashboard/sessions/logout-all', {});
+    location.href = '/dashboard/auth/logout';
   }
 }
 
@@ -1568,16 +1638,25 @@ $('#btn-request-code').onclick = async () => {
     toast('تم إرسال الكود على الخاص ✓', 'ok');
   } catch (e) { loginError(e.message); }
 };
+async function enterAfterLogin() {
+  const st = await api.get('/dashboard/auth/status');
+  if (st.oauthRequired && st.user && !st.user.oauthVerified) {
+    showOAuthGuard();
+    return;
+  }
+  await startApp();
+}
+
 $('#btn-verify-code').onclick = async () => {
   try {
     await api.post('/dashboard/auth/code/verify', { code: $('#code-input').value.trim() });
-    await startApp();
+    await enterAfterLogin();
   } catch (e) { loginError(e.message); }
 };
 $('#btn-login-pass').onclick = async () => {
   try {
     await api.post('/dashboard/auth/password', { password: $('#pass-input').value });
-    await startApp();
+    await enterAfterLogin();
   } catch (e) { loginError(e.message); }
 };
 $('#btn-logout').onclick = async () => {
@@ -1585,6 +1664,10 @@ $('#btn-logout').onclick = async () => {
   location.reload();
 };
 $('#btn-refresh').onclick = async () => { await selectGuild(S.guildId, S.page); };
+$('#btn-oauth-logout')?.addEventListener('click', async () => {
+  try { await api.post('/dashboard/auth/logout', {}); } catch { /* تجاهل */ }
+  location.href = '/dashboard';
+});
 
 // modal wiring
 $('#modal-x').onclick = closeModal;
@@ -1602,7 +1685,8 @@ $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') 
 (async function boot() {
   try {
     const st = await api.get('/dashboard/auth/status');
-    if (st.authenticated) await startApp();
+    if (st.oauthRequired && st.user && !st.user.oauthVerified) showOAuthGuard();
+    else if (st.authenticated) await startApp();
     else showLogin(st.login);
   } catch (e) {
     showLogin({ password: false, code: false });

@@ -168,6 +168,7 @@ input[type="number"].inp, textarea.inp { font-variant-numeric: tabular-nums; }
 .btn.ghost { background: transparent; }
 .btn.block { width: 100%; }
 .btn.sm { padding: 5px 11px; font-size: 12px; border-radius: 9px; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(15,22,39,.74); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 750; color: var(--text-2); backdrop-filter: blur(8px); }

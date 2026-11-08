@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.MemberReturnRecord = exports.KnowledgeEntry = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.MemberReturnRecord = exports.KnowledgeEntry = exports.DashboardSession = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
@@ -770,6 +770,8 @@ var Giveaway_1 = require("./Giveaway");
 Object.defineProperty(exports, "Giveaway", { enumerable: true, get: function () { return Giveaway_1.Giveaway; } });
 var BotAbuseStrike_1 = require("./BotAbuseStrike");
 Object.defineProperty(exports, "BotAbuseStrike", { enumerable: true, get: function () { return BotAbuseStrike_1.BotAbuseStrike; } });
+var DashboardSession_1 = require("./DashboardSession");
+Object.defineProperty(exports, "DashboardSession", { enumerable: true, get: function () { return DashboardSession_1.DashboardSession; } });
 var KnowledgeEntry_1 = require("./KnowledgeEntry");
 Object.defineProperty(exports, "KnowledgeEntry", { enumerable: true, get: function () { return KnowledgeEntry_1.KnowledgeEntry; } });
 var MemberReturnRecord_1 = require("./MemberReturnRecord");
