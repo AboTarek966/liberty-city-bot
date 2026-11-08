@@ -7,6 +7,7 @@ exports.LoggingHandler = exports.LOG_EVENTS = void 0;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
+const securityAlerts_1 = require("../utils/securityAlerts");
 const logger = (0, helpers_1.createLogger)('LoggingHandler');
 // All supported log event types
 exports.LOG_EVENTS = [
@@ -50,6 +51,14 @@ exports.LOG_EVENTS = [
     'ticketAddUser',
     'ticketRemoveUser',
 ];
+// 🛡️ أحداث التخريب البنيوي — تُكتم في وضع الصمت الأمني حتى لا يغرق السيرفر بالسجلات أثناء الهجوم
+const SILENT_SECURITY_EVENTS = new Set([
+    'roleCreate', 'roleDelete', 'roleUpdate',
+    'channelCreate', 'channelDelete', 'channelUpdate',
+    'memberBan', 'memberTimeout', 'webhookUpdate',
+    'threadDelete', 'emojiDelete', 'stickerDelete',
+    'messageDeleteBulk', 'auditLogEntryCreate',
+]);
 // --------------------------------------------
 // Event → Category Color System
 // --------------------------------------------
@@ -193,6 +202,12 @@ class LoggingHandler {
                 (eventType === 'memberTimeout' && config.types.has('memberUpdate'));
             if (!allowedByTypes)
                 return;
+            // 🤫 وضع الصمت الأمني — لا سجلات لأحداث التخريب البنيوي
+            if (SILENT_SECURITY_EVENTS.has(eventType)) {
+                const settings = await (0, models_1.getGuildSettings)(guild.id);
+                if ((0, securityAlerts_1.securityAlertsSilent)(settings))
+                    return;
+            }
             const targetId = config.splits[eventType] || config.channelId;
             if (!targetId)
                 return;
