@@ -177,7 +177,8 @@ export class OmniClient extends Client {
     router.get('/guilds/:guildId/settings', async (req: Request, res: Response) => {
       try {
         const guildId = req.params.guildId;
-        const settings = await this.getGuildSettings(guildId);
+        // fresh=1: قراءة مباشرة من قاعدة البيانات — تستخدمها اللوحة للمزامنة مع ديسكورد
+        const settings = await this.getGuildSettings(guildId, String(req.query.fresh) === '1');
         res.json(settings);
       } catch (error) {
         logger.error('Failed to get guild settings:', error);
@@ -848,9 +849,9 @@ export class OmniClient extends Client {
     this.expressApp.use('/api', router);
   }
 
-  private async getGuildSettings(guildId: string): Promise<any> {
-    const { getGuildSettings } = await import('./models');
-    const settings = await getGuildSettings(guildId);
+  private async getGuildSettings(guildId: string, fresh = false): Promise<any> {
+    const { getGuildSettings, getGuildSettingsFresh } = await import('./models');
+    const settings = fresh ? await getGuildSettingsFresh(guildId) : await getGuildSettings(guildId);
     return settings.toObject();
   }
 

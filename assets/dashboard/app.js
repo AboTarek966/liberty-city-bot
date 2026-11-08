@@ -115,17 +115,81 @@ function setDeep(obj, path, value) {
   n[parts[parts.length - 1]] = value;
 }
 let saveChain = Promise.resolve();
+let pendingLocalSaves = 0;
+let lastLocalSaveAt = 0;
 function save(path, value) {
+  pendingLocalSaves++;
   const doSave = async () => {
-    const patch = {};
-    setDeep(patch, path, value);
-    await api.patch(`/api/guilds/${S.guildId}/settings`, patch);
-    setDeep(S.settings, path, value);
-    toast('تم الحفظ ✓', 'ok');
+    try {
+      const patch = {};
+      setDeep(patch, path, value);
+      await api.patch(`/api/guilds/${S.guildId}/settings`, patch);
+      setDeep(S.settings, path, value);
+      lastLocalSaveAt = Date.now();
+      toast('تم الحفظ ✓', 'ok');
+    } finally {
+      pendingLocalSaves--;
+    }
   };
   const next = saveChain.catch(() => {}).then(doSave);
   saveChain = next.catch(() => {});
   return next;
+}
+
+// ===== Live settings sync (Discord → dashboard) =====
+// الصفحات التي تُعيد بناء واجهتها من S.settings — نحدّثها لحظياً عند تغيير الإعدادات من ديسكورد
+const LIVE_SETTINGS_PAGES = new Set([
+  'overview', 'protection', 'ai', 'investigator', 'verification', 'honeypot',
+  'tickets', 'economy', 'welcome', 'levels', 'announcements', 'general',
+]);
+let settingsSyncBusy = false;
+let settingsSyncTimer = null;
+
+function settingsFingerprint(value) {
+  if (Array.isArray(value)) return '[' + value.map(settingsFingerprint).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value)
+      .filter((k) => k !== '__v')
+      .sort()
+      .map((k) => JSON.stringify(k) + ':' + settingsFingerprint(value[k]))
+      .join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
+async function syncSettingsFromServer() {
+  if (!S.ready || !S.guildId || !S.settings || document.hidden || settingsSyncBusy) return;
+  if (pendingLocalSaves > 0 || Date.now() - lastLocalSaveAt < 2000) return;
+  settingsSyncBusy = true;
+  const guildId = S.guildId;
+  const pageAtStart = S.page;
+  try {
+    const next = await api.get(`/api/guilds/${guildId}/settings?fresh=1`);
+    if (!next || guildId !== S.guildId || !S.settings) return;
+    if (settingsFingerprint(next) === settingsFingerprint(S.settings)) return;
+    // لا نقاطع المستخدم أثناء الكتابة أو وجود نافذة مفتوحة — نعيد المحاولة في الدورة التالية
+    if ($('#modal').classList.contains('open')) return;
+    const active = document.activeElement;
+    if (active && active.matches && active.matches('input, textarea, select') && active.closest('#view')) return;
+    S.settings = next;
+    if (LIVE_SETTINGS_PAGES.has(S.page) && S.page === pageAtStart) {
+      const y = window.scrollY;
+      await render(S.page);
+      window.scrollTo(0, y);
+    }
+    toast('تم تحديث الإعدادات من ديسكورد ✓', 'ok');
+  } catch { /* انقطاع مؤقت — نحاول في الدورة التالية */ }
+  finally {
+    settingsSyncBusy = false;
+  }
+}
+
+function ensureSettingsSync() {
+  if (settingsSyncTimer) return;
+  settingsSyncTimer = setInterval(syncSettingsFromServer, 3000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncSettingsFromServer();
+  });
 }
 
 // ===== Caches =====
@@ -251,6 +315,7 @@ async function startApp() {
   S.ready = true;
   renderNav();
   await selectGuild(initial, page);
+  ensureSettingsSync();
   setInterval(async () => {
     try {
       const st = await api.get('/dashboard/auth/status');
@@ -275,7 +340,7 @@ async function selectGuild(id, page) {
   $('#view').innerHTML = '<div class="empty">…جارٍ التحميل</div>';
   try {
     const [settings, chans] = await Promise.all([
-      api.get(`/api/guilds/${id}/settings`),
+      api.get(`/api/guilds/${id}/settings?fresh=1`),
       api.get(`/api/guilds/${id}/channels`).catch(() => ({ channels: [] })),
     ]);
     S.settings = settings || {};

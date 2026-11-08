@@ -169,7 +169,8 @@ class OmniClient extends discord_js_1.Client {
         router.get('/guilds/:guildId/settings', async (req, res) => {
             try {
                 const guildId = req.params.guildId;
-                const settings = await this.getGuildSettings(guildId);
+                // fresh=1: قراءة مباشرة من قاعدة البيانات — تستخدمها اللوحة للمزامنة مع ديسكورد
+                const settings = await this.getGuildSettings(guildId, String(req.query.fresh) === '1');
                 res.json(settings);
             }
             catch (error) {
@@ -829,9 +830,9 @@ class OmniClient extends discord_js_1.Client {
         this.expressApp.use('/api', this.webDashboard.apiGuard());
         this.expressApp.use('/api', router);
     }
-    async getGuildSettings(guildId) {
-        const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
-        const settings = await getGuildSettings(guildId);
+    async getGuildSettings(guildId, fresh = false) {
+        const { getGuildSettings, getGuildSettingsFresh } = await Promise.resolve().then(() => __importStar(require('./models')));
+        const settings = fresh ? await getGuildSettingsFresh(guildId) : await getGuildSettings(guildId);
         return settings.toObject();
     }
     /**

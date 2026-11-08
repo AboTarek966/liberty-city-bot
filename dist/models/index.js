@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.MemberReturnRecord = exports.KnowledgeEntry = exports.DashboardSession = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
+exports.getGuildSettingsFresh = getGuildSettingsFresh;
 exports.getOrCreateUserProfile = getOrCreateUserProfile;
 exports.getNextCaseId = getNextCaseId;
 const mongoose_1 = __importStar(require("mongoose"));
@@ -847,6 +848,16 @@ async function getGuildSettings(guildId) {
 /** إجبار إعادة الجلب من قاعدة البيانات (بعد تعديل خارجي مباشر) */
 function invalidateGuildSettings(guildId) {
     settingsCache.delete(guildId);
+}
+/**
+ * قراءة حديثة ومباشرة من قاعدة البيانات — بدون كاش.
+ * تستخدمها لوحة التحكم للمزامنة اللحظية مع تعديلات ديسكورد.
+ */
+async function getGuildSettingsFresh(guildId) {
+    const existing = await exports.GuildSettings.findOne({ guildId });
+    if (existing)
+        return existing;
+    return loadGuildSettings(guildId);
 }
 async function getOrCreateUserProfile(userId, guildId) {
     try {

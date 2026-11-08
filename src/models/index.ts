@@ -1664,6 +1664,16 @@ export function invalidateGuildSettings(guildId: string): void {
   settingsCache.delete(guildId);
 }
 
+/**
+ * قراءة حديثة ومباشرة من قاعدة البيانات — بدون كاش.
+ * تستخدمها لوحة التحكم للمزامنة اللحظية مع تعديلات ديسكورد.
+ */
+export async function getGuildSettingsFresh(guildId: string): Promise<IGuildSettings> {
+  const existing = await GuildSettings.findOne({ guildId });
+  if (existing) return existing;
+  return loadGuildSettings(guildId);
+}
+
 export async function getOrCreateUserProfile(userId: string, guildId: string): Promise<IUserProfile> {
   try {
     const profile = await UserProfile.findOneAndUpdate(

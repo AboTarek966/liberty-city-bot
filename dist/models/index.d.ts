@@ -801,6 +801,11 @@ export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig,
 export declare function getGuildSettings(guildId: string): Promise<IGuildSettings>;
 /** إجبار إعادة الجلب من قاعدة البيانات (بعد تعديل خارجي مباشر) */
 export declare function invalidateGuildSettings(guildId: string): void;
+/**
+ * قراءة حديثة ومباشرة من قاعدة البيانات — بدون كاش.
+ * تستخدمها لوحة التحكم للمزامنة اللحظية مع تعديلات ديسكورد.
+ */
+export declare function getGuildSettingsFresh(guildId: string): Promise<IGuildSettings>;
 export declare function getOrCreateUserProfile(userId: string, guildId: string): Promise<IUserProfile>;
 export declare function getNextCaseId(guildId: string): Promise<number>;
 declare const _default: {
