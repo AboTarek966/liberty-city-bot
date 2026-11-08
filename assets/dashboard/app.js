@@ -355,6 +355,14 @@ document.addEventListener('change', async (e) => {
   try {
     await save(el.dataset.set, v);
     el.style.borderColor = '#22c55e';
+    if (el.dataset.set === 'protection.silentSecurityAlerts') {
+      const box = $('#silent-alert-status');
+      if (box) {
+        box.textContent = v
+          ? '🤫 الوضع الصامت مفعّل الآن — البوت يحمي السيرفر بهدوء بدون إزعاج.'
+          : '🔔 الوضع الصامت معطّل — البوت يرسل تنبيهات أمنية فورية عند أي تخريب.';
+      }
+    }
   } catch (err) {
     el.style.borderColor = '#f43f5e';
     toast(err.message, 'err');
@@ -522,7 +530,7 @@ const PAGES = {
         <div class="dim">عند تحديد قناة هنا، ستُرسل معظم تنبيهات الحماية إليها ما لم تحدد قناة أدق لكل وحدة.</div>`, '📜')}
       ${card('وضع الصمت الأمني', `
         ${sw('protection.silentSecurityAlerts', 'إيقاف إشعارات التخريب والاختراق (وضع صامت)', 'الحماية والعقوبات والاستعادة تستمر كاملة — لكن البوت لا يرسل تنبيهات أمنية في قنوات السجلات')}
-        <div class="banner info">${val('protection.silentSecurityAlerts') ? '🤫 الوضع الصامت مفعّل الآن — البوت يحمي السيرفر بهدوء بدون إزعاج.' : '🔔 الوضع الصامت معطّل — البوت يرسل تنبيهات أمنية فورية عند أي تخريب.'}</div>`, '🤫')}
+        <div class="banner info" id="silent-alert-status">${val('protection.silentSecurityAlerts') ? '🤫 الوضع الصامت مفعّل الآن — البوت يحمي السيرفر بهدوء بدون إزعاج.' : '🔔 الوضع الصامت معطّل — البوت يرسل تنبيهات أمنية فورية عند أي تخريب.'}</div>`, '🤫')}
       <div class="grid-2">
         ${card('الرايد والانضمام', `
           ${sw('protection.antiRaid.enabled', 'مكافحة الرايد')}
