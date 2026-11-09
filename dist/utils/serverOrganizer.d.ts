@@ -2,12 +2,21 @@ export interface OrganizeRoleDef {
     name: string;
     color?: number;
     hoist?: boolean;
+    /** رولات الإدارة/الإشراف — تُمنح للرومات المقفلة */
+    staff?: boolean;
 }
 export interface OrganizeChannelDef {
     name: string;
     type: 'text' | 'voice' | 'category';
     topic?: string;
     position?: number;
+    /**
+     * public   = كل الأعضاء يقرأون ويكتبون
+     * readonly = الجميع يقرأ فقط (للإعلانات والمنتجات) + الإدارة تكتب
+     * staff    = الإدارة فقط (غير مرئية للجميع) + الإدارة تكتب
+     * lock     = كما staff لكن للإدارات ذات الحساسية العليا
+     */
+    perms?: 'public' | 'readonly' | 'staff';
 }
 export interface OrganizePreset {
     id: string;
@@ -42,7 +51,15 @@ export interface OrganizeResult {
         channelsNew: number;
         channelsExisting: number;
     };
+    deleted: {
+        roles: number;
+        channels: number;
+    };
+    permErrors: string[];
     note: string;
 }
-export declare function organizePreset(guild: any, presetId: string): Promise<OrganizeResult>;
+export declare function organizePreset(guild: any, presetId: string, opts?: {
+    deleteOlds?: boolean;
+    cleanRoles?: boolean;
+}): Promise<OrganizeResult>;
 //# sourceMappingURL=serverOrganizer.d.ts.map

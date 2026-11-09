@@ -107,7 +107,10 @@ export class DashboardCommandWorker {
     switch (command) {
       // ------------- التنظيم -------------
       case 'organize': {
-        const result = await organizePreset(guild, String(payload.presetId || 'community'));
+        const result = await organizePreset(guild, String(payload.presetId || 'community'), {
+          deleteOlds: payload.deleteOlds === true || payload.deleteOlds === 'true',
+          cleanRoles: payload.cleanRoles === true || payload.cleanRoles === 'true',
+        });
         return result;
       }
 

@@ -53,8 +53,54 @@ exports.ORGANIZE_PRESETS = [
             { name: '📋 سجل-الأوامر', type: 'text', topic: 'سجل أوامر الإدارة', position: 42 },
         ],
     },
+    {
+        id: 'store',
+        name: '🛒 متجر البوتات والأدوات — مزخرف بالنجوم',
+        roles: [
+            { name: '♛ المالك', color: PALETTE.gold, hoist: true, staff: true },
+            { name: '⚜ الإدارة', color: PALETTE.red, hoist: true, staff: true },
+            { name: '🛡️ فريق الإشراف', color: PALETTE.orange, hoist: true, staff: true },
+            { name: '💎 المشترين', color: PALETTE.violet },
+            { name: '⭐ VIP', color: PALETTE.pink },
+            { name: '🎁 الزبائن', color: PALETTE.teal },
+            { name: '🔇 مكتوم', color: PALETTE.gray },
+            { name: '✦ عضو', color: PALETTE.blue },
+        ],
+        categories: [
+            { name: '✦ معلومات ✦', type: 'category', position: 0, perms: 'public' },
+            { name: '⌁ عن-المتجر', type: 'text', topic: 'من نحن؟', position: 1, perms: 'readonly' },
+            { name: '⌁ القواعد', type: 'text', topic: 'اقرأ القواعد قبل المشاركة', position: 2, perms: 'readonly' },
+            { name: '⌁ الإعلانات', type: 'text', topic: 'أخبار المتجر والعروض', position: 3, perms: 'readonly' },
+            { name: '⌁ طريقة-الشراء', type: 'text', topic: 'خطوات الشراء خطوة بخطوة', position: 4, perms: 'readonly' },
+            { name: '⌁ تواصلوا-معنا', type: 'text', topic: 'روابط التواصل الرسمية', position: 5, perms: 'readonly' },
+            { name: '✦ المتجر ✦', type: 'category', position: 10, perms: 'public' },
+            { name: '⌁ منتجات-مدفوعة', type: 'text', topic: 'البوتات والأدوات المدفوعة', position: 11, perms: 'readonly' },
+            { name: '⌁ منتجات-مجانية', type: 'text', topic: 'مجانيات للناس', position: 12, perms: 'readonly' },
+            { name: '⌁ الباقات', type: 'text', topic: 'باقات وعروض خاصة', position: 13, perms: 'readonly' },
+            { name: '⌁ طلب-شراء', type: 'text', topic: 'اطلب منتجك من هنا', position: 14, perms: 'public' },
+            { name: '⌁ التقييمات', type: 'text', topic: 'رأيك يهمنا', position: 15, perms: 'public' },
+            { name: '⌁ إثباتات-البيع', type: 'text', topic: 'إثباتات عمليات البيع', position: 16, perms: 'readonly' },
+            { name: '✦ الأقسام ✦', type: 'category', position: 20, perms: 'readonly' },
+            { name: '⌁ بوتات', type: 'text', topic: 'كل البوتات', position: 21, perms: 'readonly' },
+            { name: '⌁ أدوات', type: 'text', topic: 'أدوات وبرامج مساعدة', position: 22, perms: 'readonly' },
+            { name: '⌁ تحديثات', type: 'text', topic: 'آخر تحديثات المنتجات', position: 23, perms: 'readonly' },
+            { name: '⌁ جرب-النسخة', type: 'text', topic: 'نسخ تجريبية للجميع', position: 24, perms: 'public' },
+            { name: '✦ الدعم ✦', type: 'category', position: 30, perms: 'public' },
+            { name: '⌁ طلب-دعم', type: 'text', topic: 'اطلب مساعدة الإدارة', position: 31, perms: 'public' },
+            { name: '⌁ الأسئلة-الشائعة', type: 'text', topic: 'أجوبة على الأسئلة المتكررة', position: 32, perms: 'readonly' },
+            { name: '⌁ بلاغ', type: 'text', topic: 'الإبلاغ عن مخالفات', position: 33, perms: 'public' },
+            { name: '✦ الصوتيات ✦', type: 'category', position: 40, perms: 'public' },
+            { name: '⌁ صوت-عام', type: 'voice', topic: 'تحدث واستمع', position: 41, perms: 'public' },
+            { name: '⌁ صوت-تجربة', type: 'voice', topic: 'جرب المنتجات صوتياً', position: 42, perms: 'public' },
+            { name: '⌁ اجتماع-الزبائن', type: 'voice', topic: 'للزبائن والمشترين', position: 43, perms: 'public' },
+            { name: '✦ الإدارة ✦', type: 'category', position: 50, perms: 'staff' },
+            { name: '⌁ إدارة-داخلية', type: 'text', topic: 'للإدارة فقط', position: 51, perms: 'staff' },
+            { name: '⌁ سجل-المبيعات', type: 'text', topic: 'سجل عمليات البيع', position: 52, perms: 'staff' },
+            { name: '⌁ سجل-الأوامر', type: 'text', topic: 'سجل أوامر الإدارة', position: 53, perms: 'staff' },
+        ],
+    },
 ];
-async function organizePreset(guild, presetId) {
+async function organizePreset(guild, presetId, opts = {}) {
     const preset = exports.ORGANIZE_PRESETS.find((p) => p.id === presetId) || exports.ORGANIZE_PRESETS[0];
     const me = guild.members.me;
     if (!me)
@@ -136,6 +182,107 @@ async function organizePreset(guild, presetId) {
             await createChan(def, currentParentId);
         }
     }
+    // —— الصلاحيات: apply overwrites per channel ——
+    const permErrors = [];
+    const everyoneId = guild.id;
+    const staffIds = preset.roles.filter((r) => r.staff).map((r) => createdRoles.find((c) => c.name === r.name)?.id).filter(Boolean);
+    const mutedId = createdRoles.find((c) => c.name.includes('مكتوم') || /muted/i.test(c.name))?.id;
+    const applyOverwrite = async (ch, targetId, allow, deny) => {
+        try {
+            await ch.permissionOverwrites.edit(targetId, { ...(allow ? { allow } : {}), ...(deny ? { deny } : {}) }, 'تصليح الصلاحيات — Omni Organizer');
+        }
+        catch (e) {
+            permErrors.push(`${ch.name}: ${e.message}`);
+        }
+    };
+    const applyPerms = async (def, ch) => {
+        if (!ch)
+            return;
+        const kind = def.perms || 'public';
+        if (kind === 'staff') {
+            // غير مرئية للجميع
+            await applyOverwrite(ch, everyoneId, null, [discord_js_1.PermissionFlagsBits.ViewChannel]);
+            for (const sid of staffIds) {
+                await applyOverwrite(ch, sid, [discord_js_1.PermissionFlagsBits.ViewChannel, discord_js_1.PermissionFlagsBits.SendMessages, discord_js_1.PermissionFlagsBits.Connect], null);
+            }
+        }
+        else if (kind === 'readonly') {
+            // الجميع يقرأ فقط، الإدارة تكتب
+            await applyOverwrite(ch, everyoneId, null, [discord_js_1.PermissionFlagsBits.SendMessages]);
+            for (const sid of staffIds) {
+                await applyOverwrite(ch, sid, [discord_js_1.PermissionFlagsBits.SendMessages], null);
+            }
+        }
+        // حجر المكتوم عن الكتابة في كل الرومات المفتوحة
+        if (mutedId) {
+            await applyOverwrite(ch, mutedId, null, [discord_js_1.PermissionFlagsBits.SendMessages, discord_js_1.PermissionFlagsBits.Speak]);
+        }
+    };
+    for (const def of sorted) {
+        const ch = chanByName.get(def.name);
+        if (ch)
+            await applyPerms(def, ch);
+    }
+    // —— تنظيف اختياري: حذف رومات ورولات النمط القديم ——
+    let deleted = { roles: 0, channels: 0 };
+    if (opts?.deleteOlds) {
+        const other = exports.ORGANIZE_PRESETS.find((p) => p.id !== presetId);
+        if (other) {
+            for (const def of other.roles) {
+                const r = guild.roles.cache.find((x) => x.name === def.name);
+                if (r && r.id !== guild.id) {
+                    try {
+                        await r.delete('تنظيف الهيكل القديم — Omni Organizer');
+                        deleted.roles++;
+                    }
+                    catch { }
+                }
+            }
+            for (const def of other.categories) {
+                const ch = chanByName.get(def.name);
+                if (ch) {
+                    try {
+                        await ch.delete('تنظيف الهيكل القديم — Omni Organizer');
+                        deleted.channels++;
+                    }
+                    catch { }
+                }
+            }
+            // أزل ما تبقى من القنوات القديمة الأخرى التي تحمل اسم القنوات القديمة
+            for (const ch of [...(guild.channels.cache.values())]) {
+                const match = other.categories.some((c) => c.name === ch.name);
+                if (match) {
+                    try {
+                        await ch.delete('تنظيف الهيكل القديم — Omni Organizer');
+                        deleted.channels++;
+                    }
+                    catch { }
+                }
+            }
+        }
+    }
+    // —— التنظيف الكلي للرتب: كل الرتب ما عدا @everyone والرتب الجديدة + Member + رتب البوتات المدارة ——
+    if (opts?.cleanRoles) {
+        const keepNames = new Set([...preset.roles.map((r) => r.name), 'Member', 'member']);
+        for (const r of [...(guild.roles.cache.values())]) {
+            if (r.id === guild.id)
+                continue; // @everyone
+            if (r.managed)
+                continue; // رتب البوتات المُدارة
+            if (r.name === 'Omni' || r.managed)
+                continue;
+            if (keepNames.has(r.name))
+                continue;
+            // رتبة البوت Omni نفسها لا تُحذف أبداً
+            if (r.id === me.id)
+                continue;
+            try {
+                await r.delete('تنظيف الرتب — Omni Organizer');
+                deleted.roles++;
+            }
+            catch { }
+        }
+    }
     // —— ملاحظة توزيع الرولات على الأعضاء ——
     const assignmentNote = 'ملاحظة: الرولات أُنشئت بدون أعضاء — وزّعها بنفسك من إعدادات السيرفر ← الأعضاء (السحب والإفلات)، أو أخبرني بمن يأخذ كل رول وأعطيه أنا.';
     return {
@@ -144,6 +291,8 @@ async function organizePreset(guild, presetId) {
         created: { roles: createdRoles, channels: channelResults, categories },
         counts: { rolesNew, rolesExisting, channelsNew, channelsExisting },
         note: assignmentNote,
+        deleted,
+        permErrors,
     };
 }
 //# sourceMappingURL=serverOrganizer.js.map
