@@ -77,51 +77,59 @@ export async function runHoneypot(message: Message): Promise<boolean> {
   // --------------------------------------------
   let outcome = 'تم تسجيل المخالفة';
   if (member) {
-    try {
-      if (action === 'timeout') {
-        if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-          outcome = '⚠️ لا أملك صلاحية كتم الأعضاء';
-        } else if (
-          message.guild.members.me &&
-          member.roles.highest.position >= message.guild.members.me.roles.highest.position
-        ) {
-          outcome = '⚠️ رتبة العضو أعلى من رتبة البوت — لم أستطع كتمه';
+    // 🛡️ الجدار الوقائي: الطرد/الحظر لا يكونان عند المخالفة الأولى — تحذير وتسجيل فقط
+    const honeyPotFirstStrike =
+      (action === 'kick' || action === 'ban') &&
+      (message.client as any)?.securityHandler?.takeStrike?.(message.guild.id, member.id) === 'first';
+    if (honeyPotFirstStrike) {
+      outcome = '🛡️ الطبقة الوقائية: مخالفة أولى — تم حذف الرسالة والتسجيل فقط، بدون طرد/حظر';
+    } else {
+      try {
+        if (action === 'timeout') {
+          if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+            outcome = '⚠️ لا أملك صلاحية كتم الأعضاء';
+          } else if (
+            message.guild.members.me &&
+            member.roles.highest.position >= message.guild.members.me.roles.highest.position
+          ) {
+            outcome = '⚠️ رتبة العضو أعلى من رتبة البوت — لم أستطع كتمه';
+          } else {
+            await member.timeout(timeoutMinutes * 60_000, 'Honeypot: كتابة في قناة الطعم');
+            outcome = `🔇 تم كتمه لمدة ${timeoutMinutes} دقيقة`;
+          }
+        } else if (action === 'kick') {
+          if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.KickMembers)) {
+            outcome = '⚠️ لا أملك صلاحية الطرد';
+          } else if (
+            message.guild.members.me &&
+            member.roles.highest.position >= message.guild.members.me.roles.highest.position
+          ) {
+            outcome = '⚠️ رتبة العضو أعلى من رتبة البوت — لم أستطع طرده';
+          } else {
+            await member.kick('Honeypot: كتابة في قناة الطعم');
+            outcome = '👢 تم طرده';
+          }
+        } else if (action === 'ban') {
+          if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.BanMembers)) {
+            outcome = '⚠️ لا أملك صلاحية الحظر';
+          } else if (
+            message.guild.members.me &&
+            member.roles.highest.position >= message.guild.members.me.roles.highest.position
+          ) {
+            outcome = '⚠️ رتبة العضو أعلى من رتبة البوت — لم أستطع حظره';
+          } else {
+            await member.ban({
+              reason: 'Honeypot: كتابة في قناة الطعم',
+              deleteMessageSeconds: 3600,
+            });
+            outcome = '🔨 تم حظره';
+          }
         } else {
-          await member.timeout(timeoutMinutes * 60_000, 'Honeypot: كتابة في قناة الطعم');
-          outcome = `🔇 تم كتمه لمدة ${timeoutMinutes} دقيقة`;
+          outcome = '🗑️ تم حذف الرسالة فقط';
         }
-      } else if (action === 'kick') {
-        if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.KickMembers)) {
-          outcome = '⚠️ لا أملك صلاحية الطرد';
-        } else if (
-          message.guild.members.me &&
-          member.roles.highest.position >= message.guild.members.me.roles.highest.position
-        ) {
-          outcome = '⚠️ رتبة العضو أعلى من رتبة البوت — لم أستطع طرده';
-        } else {
-          await member.kick('Honeypot: كتابة في قناة الطعم');
-          outcome = '👢 تم طرده';
-        }
-      } else if (action === 'ban') {
-        if (!message.guild.members.me?.permissions.has(PermissionFlagsBits.BanMembers)) {
-          outcome = '⚠️ لا أملك صلاحية الحظر';
-        } else if (
-          message.guild.members.me &&
-          member.roles.highest.position >= message.guild.members.me.roles.highest.position
-        ) {
-          outcome = '⚠️ رتبة العضو أعلى من رتبة البوت — لم أستطع حظره';
-        } else {
-          await member.ban({
-            reason: 'Honeypot: كتابة في قناة الطعم',
-            deleteMessageSeconds: 3600,
-          });
-          outcome = '🔨 تم حظره';
-        }
-      } else {
-        outcome = '🗑️ تم حذف الرسالة فقط';
+      } catch (error: any) {
+        outcome = `⚠️ فشل تنفيذ العقوبة: ${error.message}`;
       }
-    } catch (error: any) {
-      outcome = `⚠️ فشل تنفيذ العقوبة: ${error.message}`;
     }
   } else {
     outcome = '⚠️ لم أتمكن من جلب عضويتهم';

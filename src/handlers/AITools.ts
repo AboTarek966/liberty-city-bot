@@ -68,13 +68,18 @@ registerTool('ban_user', {
     reason: { type: 'string', description: 'سبب الحظر', required: true },
     deleteMessageSeconds: { type: 'number', description: 'ثواني رسائل تحذف (0-604800)', required: false },
   },
-  async func({ guild, executor }, { userId, reason, deleteMessageSeconds = 0 }) {
+  async func({ guild, executor, client }, { userId, reason, deleteMessageSeconds = 0 }) {
     const target = await guild.members.fetch(userId).catch(() => null);
     if (!target) return { success: false, message: '❌ العضو غير موجود في السيرفر' };
-    
+
     if (!target.bannable) return { success: false, message: '❌ لا أستطيع حظر هذا العضو (رتبته أعلى مني أو لديه صلاحيات)' };
     if (target.id === executor.id) return { success: false, message: '❌ لا تستطيع حظر نفسك' };
     if (target.id === guild.ownerId) return { success: false, message: '❌ لا تستطيع حظر مالك السيرفر' };
+
+    // 🛡️ الجدار الوقائي: أدوات الـ AI أيضاً لا تحظر عند المخالفة الأولى
+    if ((client as any)?.securityHandler?.takeStrike?.(guild.id, target.id) === 'first') {
+      return { success: false, message: '🛡️ الطبقة الوقائية: مخالفة أولى — لا حظر الآن (تحذير/عزل فقط). حاول مجدداً عند التأكد.' };
+    }
 
     try {
       await target.ban({ reason: `${executor.user.tag}: ${reason}`, deleteMessageSeconds });
@@ -94,12 +99,17 @@ registerTool('kick_user', {
     userId: { type: 'string', description: 'آيدي العضو المراد طرده', required: true },
     reason: { type: 'string', description: 'سبب الطرد', required: true },
   },
-  async func({ guild, executor }, { userId, reason }) {
+  async func({ guild, executor, client }, { userId, reason }) {
     const target = await guild.members.fetch(userId).catch(() => null);
     if (!target) return { success: false, message: '❌ العضو غير موجود في السيرفر' };
     if (!target.kickable) return { success: false, message: '❌ لا أستطيع طرد هذا العضو' };
     if (target.id === executor.id) return { success: false, message: '❌ لا تستطيع طرد نفسك' };
     if (target.id === guild.ownerId) return { success: false, message: '❌ لا تستطيع طرد مالك السيرفر' };
+
+    // 🛡️ الجدار الوقائي: أدوات الـ AI أيضاً لا تطرد عند المخالفة الأولى
+    if ((client as any)?.securityHandler?.takeStrike?.(guild.id, target.id) === 'first') {
+      return { success: false, message: '🛡️ الطبقة الوقائية: مخالفة أولى — لا طرد الآن (تحذير/عزل فقط). حاول مجدداً عند التأكد.' };
+    }
 
     try {
       await target.kick(`${executor.user.tag}: ${reason}`);

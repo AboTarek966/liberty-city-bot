@@ -301,6 +301,11 @@ export async function executeTicketAction(
         if (!guild.members.me?.permissions.has(PermissionFlagsBits.BanMembers)) {
           return { ok: false, message: '❌ لا أملك صلاحية الحظر' };
         }
+        // 🛡️ الجدار الوقائي: المخالفة الأولى من الـ AI = تحذير وسحب صلاحيات فقط (بدون حظر)
+        if ((guild.client as any)?.securityHandler?.takeStrike?.(guild.id, member.id) === 'first') {
+          await member.roles.set([], 'AI Ticket: تحييد وقائي — تنبيه أول بدون حظر').catch(() => null);
+          return { ok: false, message: `🛡️ الطبقة الوقائية: مخالفة أولى — تم التحذير والتحييد فقط، بدون حظر` };
+        }
         const deleteSeconds = Math.min(
           604_800,
           Math.max(0, Number(action.params?.deleteMessageSeconds || 0))
