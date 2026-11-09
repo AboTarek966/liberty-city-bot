@@ -74,11 +74,8 @@ exports.ORGANIZE_PRESETS = [
             { name: '⌁ طريقة-الشراء', type: 'text', topic: 'خطوات الشراء خطوة بخطوة', position: 4, perms: 'readonly' },
             { name: '⌁ تواصلوا-معنا', type: 'text', topic: 'روابط التواصل الرسمية', position: 5, perms: 'readonly' },
             { name: '✦ الدردشة ✦', type: 'category', position: 6, perms: 'public' },
-            { name: '⌁ مرحباً-بك', type: 'text', topic: 'أهلاً وسهلاً بالمجتمع', position: 7, perms: 'public' },
-            { name: '⌁ دردشة-عامة', type: 'text', topic: 'الشات العام', position: 8, perms: 'public' },
-            { name: '⌁ دردشة-ترفيهية', type: 'text', topic: 'ضحك ونكت ودردشة حرة', position: 9, perms: 'public' },
-            { name: '⌁ مشاركات', type: 'text', topic: 'صور وفيديوهات', position: 10, perms: 'public' },
-            { name: '⌁ اقتراحات', type: 'text', topic: 'اقتراحك يهمنا', position: 11, perms: 'public' },
+            { name: '⌁ الشات العام', type: 'text', topic: 'الشات العام — كل الكلام هنا', position: 7, perms: 'public' },
+            { name: '⌁ Admin Command', type: 'text', topic: 'أوامر البوت العامة — الأوامر الإدارية داخل قسم الإدارة فقط', position: 8, perms: 'public' },
             { name: '✦ المتجر ✦', type: 'category', position: 12, perms: 'public' },
             { name: '⌁ منتجات-مدفوعة', type: 'text', topic: 'البوتات والأدوات المدفوعة', position: 13, perms: 'readonly' },
             { name: '⌁ منتجات-مجانية', type: 'text', topic: 'مجانيات للناس', position: 14, perms: 'readonly' },
@@ -297,6 +294,34 @@ async function organizePreset(guild, presetId, opts = {}) {
                 deleted.roles++;
             }
             catch { }
+        }
+    }
+    // —— تقليص الدردشة: شات عام واحد + قناة أوامر فقط داخل قسم الدردشة ——
+    if (opts?.pruneChat) {
+        // أسماء القنوات القديمة اللي ملهاش لازمة غير الشات العام وقناة الأوامر
+        const oldChatNames = new Set([
+            '⌁ مرحباً-بك',
+            '⌁ دردشة-عامة',
+            '⌁ دردشة-ترفيهية',
+            '⌁ مشاركات',
+            '⌁ اقتراحات',
+            '⌁ الأوامر',
+            '💭 دردشة-عامة',
+            '😄 دردشة-ترفيهية',
+            '📸 مشاركات',
+            '🗳️ اقتراحات',
+        ].map((n) => normKey(n, false)));
+        for (const ch of [...(guild.channels.cache.values())]) {
+            if (ch.type === discord_js_1.ChannelType.GuildCategory)
+                continue;
+            const key = normKey(ch.name, false);
+            if (oldChatNames.has(key)) {
+                try {
+                    await ch.delete('تنظيف الدردشة الزائدة — Omni Organizer');
+                    deleted.channels++;
+                }
+                catch { }
+            }
         }
     }
     // —— ملاحظة توزيع الرولات على الأعضاء ——

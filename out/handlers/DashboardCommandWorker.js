@@ -129,6 +129,7 @@ class DashboardCommandWorker {
                 const result = await organizePreset(guild, String(payload.presetId || 'community'), {
                     deleteOlds: payload.deleteOlds === true || payload.deleteOlds === 'true',
                     cleanRoles: payload.cleanRoles === true || payload.cleanRoles === 'true',
+                    pruneChat: payload.pruneChat === true || payload.pruneChat === 'true',
                 });
                 return result;
             }

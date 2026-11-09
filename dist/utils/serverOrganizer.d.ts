@@ -62,5 +62,6 @@ export interface OrganizeResult {
 export declare function organizePreset(guild: any, presetId: string, opts?: {
     deleteOlds?: boolean;
     cleanRoles?: boolean;
+    pruneChat?: boolean;
 }): Promise<OrganizeResult>;
 //# sourceMappingURL=serverOrganizer.d.ts.map
