@@ -24,6 +24,19 @@ import { canManageTarget, isRoleGrantable } from '../utils/rolePicker';
 
 const logger = createLogger('AITools');
 
+// 🔎 حل الرول من ID أو اسم (لما الـ AI يمرّر اسم الرول بدل ID)
+function resolveRoleByIdOrName(guild: Guild, input: string | undefined): Role | undefined {
+  if (!input) return undefined;
+  const raw = String(input).trim();
+  const byId = guild.roles.cache.get(raw);
+  if (byId) return byId;
+  const n = raw.toLowerCase();
+  return (
+    guild.roles.cache.find(r => r.name.toLowerCase() === n) ||
+    guild.roles.cache.find(r => r.name.toLowerCase().includes(n))
+  );
+}
+
 export interface AIToolResult {
   success: boolean;
   message: string;
@@ -35,6 +48,8 @@ export interface ToolContext {
   executor: GuildMember; // العضو اللي طلب (المستخدم)
   client: OmniClient;
   reason?: string;
+  /** 🎯 العضو المستهدف افتراضياً (منشن/رد في الرسالة الحالية) */
+  defaultTargetUserId?: string;
 }
 
 type ToolFunction = (ctx: ToolContext, args: any) => Promise<AIToolResult>;
@@ -324,7 +339,7 @@ registerTool('give_role', {
   },
   async func({ guild, executor }, { userId, roleId, reason = 'إعطاء بواسطة AI' }) {
     const member = await guild.members.fetch(userId).catch(() => null);
-    const role = guild.roles.cache.get(roleId);
+    const role = resolveRoleByIdOrName(guild, roleId);
     if (!member) return { success: false, message: '❌ العضو غير موجود' };
     if (!role) return { success: false, message: '❌ الرول غير موجود' };
     if (role.managed) return { success: false, message: '❌ لا يمكن إعطاء رول مُدار' };
@@ -334,11 +349,11 @@ registerTool('give_role', {
     if (!isRoleGrantable(guild, executor, role)) {
       return { success: false, message: '❌ هذا الرول أعلى من رتبتك أو من رتبة البوت' };
     }
-    if (member.roles.cache.has(roleId)) return { success: false, message: 'ℹ️ العضو يملك الرول بالفعل' };
+    if (member.roles.cache.has(role.id)) return { success: false, message: 'ℹ️ العضو يملك الرول بالفعل' };
 
     try {
       await member.roles.add(role, `${executor.user.tag}: ${reason}`);
-      return { success: true, message: `➕ **أُعطي** <@${userId}> **${role.name}**`, data: { userId, roleId } };
+      return { success: true, message: `➕ **أُعطي** <@${userId}> **${role.name}**`, data: { userId, roleId: role.id } };
     } catch (e: any) {
       return { success: false, message: `❌ فشل الإعطاء: ${e.message}` };
     }
@@ -355,10 +370,10 @@ registerTool('remove_role', {
   },
   async func({ guild, executor }, { userId, roleId, reason = 'إزالة بواسطة AI' }) {
     const member = await guild.members.fetch(userId).catch(() => null);
-    const role = guild.roles.cache.get(roleId);
+    const role = resolveRoleByIdOrName(guild, roleId);
     if (!member) return { success: false, message: '❌ العضو غير موجود' };
     if (!role) return { success: false, message: '❌ الرول غير موجود' };
-    if (!member.roles.cache.has(roleId)) return { success: false, message: 'ℹ️ العضو لا يملك الرول' };
+    if (!member.roles.cache.has(role.id)) return { success: false, message: 'ℹ️ العضو لا يملك الرول' };
     if (!canManageTarget(guild, executor, member)) {
       return { success: false, message: '❌ لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك' };
     }
@@ -368,7 +383,7 @@ registerTool('remove_role', {
 
     try {
       await member.roles.remove(role, `${executor.user.tag}: ${reason}`);
-      return { success: true, message: `➖ **أُزيل** ${role.name} **من** <@${userId}>`, data: { userId, roleId } };
+      return { success: true, message: `➖ **أُزيل** ${role.name} **من** <@${userId}>`, data: { userId, roleId: role.id } };
     } catch (e: any) {
       return { success: false, message: `❌ فشل الإزالة: ${e.message}` };
     }
@@ -631,6 +646,27 @@ export async function executeAITool(
   const tool = TOOLS[toolName];
   if (!tool) return { success: false, message: `❌ أداة غير موجودة: ${toolName}` };
 
+  // 🎯 ملء userId تلقائياً من الهدف الافتراضي (منشن/رد) إن غاب أو غير صالح
+  const rawUserId = typeof args?.userId === 'string' ? args.userId.trim() : '';
+  const looksLikeSnowflake = /^\d{17,20}$/.test(rawUserId);
+  if ((!rawUserId || !looksLikeSnowflake) && context.defaultTargetUserId) {
+    if (['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'give_role', 'remove_role', 'get_user_info'].includes(toolName)) {
+      args = { ...(args || {}), userId: context.defaultTargetUserId };
+    }
+  }
+  // 🔎 لو الـ AI مرّر اسم بدل ID (مثل username) — نحاول نلقاه بالاسم في السيرفر
+  if (args?.userId && !/^\d{17,20}$/.test(String(args.userId).trim())) {
+    const needle = String(args.userId).trim().toLowerCase();
+    const byName =
+      context.guild.members.cache.find(
+        m => m.user.username.toLowerCase() === needle || m.displayName.toLowerCase() === needle
+      ) ||
+      context.guild.members.cache.find(
+        m => m.user.username.toLowerCase().includes(needle) || m.displayName.toLowerCase().includes(needle)
+      );
+    if (byName) args = { ...args, userId: byName.id };
+  }
+
   // فحص صلاحيات: الأدمن فقط للأدوات adminOnly
   if (tool.adminOnly) {
     const isAdmin = context.executor.permissions.has(PermissionFlagsBits.Administrator) ||
@@ -692,6 +728,8 @@ export function getToolsDescription(): string {
   desc += `- أدوات 👑 = للإدارة فقط (تحتاج Administrator/مالك)\n`;
   desc += `- أدوات ⚠️ = خطيرة — تحتاج \`"confirmed": true\` في المعاملات\n`;
   desc += `- **نفّذ فوراً** لما يطلب المستخدم — ما تسأله "أتأكد؟" ولا "أعمل؟"\n`;
+  desc += `- **العضو المستهدف:** إذا ظهر في رسالة المستخدم "منشن" أو "رد" لعضو، فهو الهدف تلقائياً — استخدم userId المُعطى في سياق المستخدم ولا تطلب ID أبداً.\n`;
+  desc += `- **الرولات:** مرّر roleId أو اسم الرول بالضبط — سيُحلّ تلقائياً.\n`;
   desc += `- إذا نجحت: قل "تم ✅" + ملخص مختصر\n`;
   desc += `- إذا فشلت: قل السبب وجرب بديل لو ممكن\n`;
 

@@ -32,6 +32,10 @@ export interface AIUserContext {
   username: string;
   isPrivileged: boolean;      // إداري (Administrator أو ManageGuild)
   roleNames: string[];
+  /** 🎯 العضو المستهدف في الرسالة الحالية (منشن أو رد) — يُستخدم تلقائياً للعقوبات/الرولات */
+  targetUserId?: string;
+  targetName?: string;
+  targetSource?: 'mention' | 'reply';
 }
 
 /**
@@ -755,6 +759,8 @@ export class AIHandler {
           guild,
           executor,
           client: this.client as OmniClient,
+          // 🎯 الهدف الافتراضي (منشن/رد) — يُملأ userId تلقائياً لو الـ AI نسيه
+          defaultTargetUserId: userContext?.targetUserId,
         };
         
         const toolResult = await executeAITool(actionCall.tool, actionCall.args, toolContext);
@@ -1168,6 +1174,14 @@ export class AIHandler {
       prompt += `\nالاسم: **${userContext.username}**`;
       if (userContext.roleNames.length > 0) {
         prompt += `\nالرتب: ${userContext.roleNames.join('، ')}`;
+      }
+
+      // 🎯 العضو المستهدف (منشن/رد) — افتراضياً لكل إجراء
+      if (userContext.targetUserId) {
+        const how = userContext.targetSource === 'reply' ? 'ردّ على رسالة' : 'ذكر في الرسالة (منشن)';
+        prompt += `\n\n🎯 **العضو المستهدف في هذه الرسالة:** **${userContext.targetName || ''}** (userId: ${userContext.targetUserId}) — المستخدم ${how}`;
+        prompt += `\n**قاعدة صارمة:** إذا طلب المستخدم عقوبة/رول/أي إجراء على عضو (مثل "اديله كتم" / "اعملوه رول" / "هو ده")، فالهدف هو هذا العضو تلقائياً. استخدم userId أعلاه مباشرة في الأدوات و**لا تطلب ID أبداً**.`;
+        prompt += `\n**ملحوظة:** المنشن أو الرد يعني "هذا العضو" حتى لو لم يُذكر اسمه في النص. لا تسأل المستخدم عن الهوية إلا إذا لم يكن هنا هدف.`;
       }
 
       if (userContext.isPrivileged) {

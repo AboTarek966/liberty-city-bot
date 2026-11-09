@@ -1641,12 +1641,48 @@ async function handleAIResponse(message: Message, client: OmniClient): Promise<v
   const memberRoles = message.member?.roles.cache.map(r => r.id) || [];
   const guildId = message.guild?.id;
 
+  // تعريف الهدف (mention/reply) — أنت تُرسل الرسالة الحالية للدعم، المستهدف مذكور أو مُرد عليه
+  // الأفضلية للذكر في النص (المنشن) ثم النص المُرد عليه (reply)
+  let targetUserId: string | undefined;
+  let targetName: string | undefined;
+  let targetSource: 'mention' | 'reply' | undefined;
+  const mentionedTarget = [...message.mentions.users.values()].find(u => u.id !== botId);
+  if (mentionedTarget) {
+    targetUserId = mentionedTarget.id;
+    targetName = mentionedTarget.username;
+    targetSource = 'mention';
+    if (message.guild) {
+      const tm = message.guild.members.cache.get(mentionedTarget.id);
+      if (tm) targetName = tm.displayName || mentionedTarget.username;
+    }
+  } else if (message.reference?.messageId && message.guild) {
+    try {
+      const cached = message.channel.messages.cache.get(message.reference.messageId);
+      const ref = cached || (await message.channel.messages.fetch(message.reference.messageId).catch(() => null));
+      if (ref && ref.author.id !== botId && !ref.author.bot && ref.author.id !== message.author.id) {
+        targetUserId = ref.author.id;
+        targetName = ref.author.username;
+        targetSource = 'reply';
+        const rm = message.guild.members.cache.get(ref.author.id);
+        if (rm) targetName = rm.displayName || ref.author.username;
+      }
+    } catch {}
+  }
+
   // سياق المستخدم: هل هو إداري؟ (يحدد ما يمكن للـ AI إظهاره)
   let isPrivileged = false;
-  const userContext = {
+  const userContext: {
+    username: string;
+    isPrivileged: boolean;
+    roleNames: string[];
+    targetUserId?: string;
+    targetName?: string;
+    targetSource?: 'mention' | 'reply';
+  } = {
     username: message.member?.displayName || message.author.username,
     isPrivileged: false,
     roleNames: [] as string[],
+    ...(targetUserId ? { targetUserId, targetName, targetSource } : {}),
   };
 
   if (message.member) {

@@ -9,6 +9,10 @@ export interface AIUserContext {
     username: string;
     isPrivileged: boolean;
     roleNames: string[];
+    /** 🎯 العضو المستهدف في الرسالة الحالية (منشن أو رد) — يُستخدم تلقائياً للعقوبات/الرولات */
+    targetUserId?: string;
+    targetName?: string;
+    targetSource?: 'mention' | 'reply';
 }
 /**
  * معالجات البث المباشر — تُستدعى أثناء توليد الرد

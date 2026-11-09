@@ -10,6 +10,8 @@ export interface ToolContext {
     executor: GuildMember;
     client: OmniClient;
     reason?: string;
+    /** 🎯 العضو المستهدف افتراضياً (منشن/رد في الرسالة الحالية) */
+    defaultTargetUserId?: string;
 }
 export declare function executeAITool(toolName: string, args: any, context: ToolContext): Promise<AIToolResult>;
 export declare function getToolsDescription(): string;

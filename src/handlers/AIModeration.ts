@@ -172,10 +172,8 @@ async function resolveTarget(
 ): Promise<{ user: User; member?: GuildMember } | null> {
   const guild = message.guild!;
 
-  // 1) منشن مباشر (مع تجاهل منشن البوت نفسه)
-  const mentioned =
-    message.mentions.users.find(u => u.id !== client.user?.id) ||
-    message.mentions.users.first();
+  // 1) منشن مباشر (مع تجاهل منشن البوت نفسه — لو البوت فقط، نكمل للرد بعده)
+  const mentioned = message.mentions.users.find(u => u.id !== client.user?.id);
   if (mentioned) {
     const member =
       guild.members.cache.get(mentioned.id) ||
