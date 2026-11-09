@@ -3,6 +3,7 @@
 // لوحة التحكم (المستضافة على سحابة أو محلياً) تكتب أمراً في مجموعة
 // dashboard_commands، وهذا العامل يقرأ الأوامر المعلقة كل ثوانٍ ليتنفيذها.
 // --------------------------------------------
+import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import {
   DashboardCommand,
   ModerationCase,
@@ -128,6 +129,38 @@ export class DashboardCommandWorker {
             roles: p.roles.map((r) => r.name),
           })),
         };
+      }
+
+      // ------------- إنشاء قناة منفردة (لا ترجع أي قناة محذوفة) -------------
+      case 'channel_create': {
+        if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+          throw new Error('البوت لا يملك صلاحية إدارة القنوات');
+        }
+        const name = String(payload.name || '').trim();
+        if (!name) throw new Error('اسم القناة مطلوب');
+        const parentId = payload.parentId ? String(payload.parentId) : undefined;
+        const parent = parentId ? guild.channels.cache.get(parentId) : undefined;
+        const normKey = (n: string) => n.trim().replace(/\s+/g, '-');
+        const existing = [...guild.channels.cache.values()].find(
+          (c: any) => c.type === ChannelType.GuildText && normKey(c.name) === normKey(name)
+        );
+        if (existing) {
+          return { success: true, existing: true, id: (existing as any).id, name: (existing as any).name };
+        }
+        const channel: any = await guild.channels.create({
+          name,
+          type: ChannelType.GuildText,
+          topic: payload.topic ? String(payload.topic) : undefined,
+          parent: parent?.id,
+          reason: 'إضافة قناة — Omni (بطلب المالك)',
+        });
+        // صلاحيات عامة صريحة: الجميع يقرأ ويكتب
+        try {
+          await channel.permissionOverwrites.edit(guild.id, {
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+          }, 'تصليح الصلاحيات — Omni');
+        } catch { /* حقول افتراضية مقبولة */ }
+        return { success: true, existing: false, id: channel.id, name: channel.name };
       }
 
       // ------------- الأعضاء -------------

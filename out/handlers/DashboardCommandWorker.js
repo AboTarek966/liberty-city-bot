@@ -39,6 +39,7 @@ exports.DashboardCommandWorker = void 0;
 // لوحة التحكم (المستضافة على سحابة أو محلياً) تكتب أمراً في مجموعة
 // dashboard_commands، وهذا العامل يقرأ الأوامر المعلقة كل ثوانٍ ليتنفيذها.
 // --------------------------------------------
+const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 class DashboardCommandWorker {
     client;
@@ -146,6 +147,37 @@ class DashboardCommandWorker {
                         roles: p.roles.map((r) => r.name),
                     })),
                 };
+            }
+            // ------------- إنشاء قناة منفردة (لا ترجع أي قناة محذوفة) -------------
+            case 'channel_create': {
+                if (!guild.members.me?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+                    throw new Error('البوت لا يملك صلاحية إدارة القنوات');
+                }
+                const name = String(payload.name || '').trim();
+                if (!name)
+                    throw new Error('اسم القناة مطلوب');
+                const parentId = payload.parentId ? String(payload.parentId) : undefined;
+                const parent = parentId ? guild.channels.cache.get(parentId) : undefined;
+                const normKey = (n) => n.trim().replace(/\s+/g, '-');
+                const existing = [...guild.channels.cache.values()].find((c) => c.type === discord_js_1.ChannelType.GuildText && normKey(c.name) === normKey(name));
+                if (existing) {
+                    return { success: true, existing: true, id: existing.id, name: existing.name };
+                }
+                const channel = await guild.channels.create({
+                    name,
+                    type: discord_js_1.ChannelType.GuildText,
+                    topic: payload.topic ? String(payload.topic) : undefined,
+                    parent: parent?.id,
+                    reason: 'إضافة قناة — Omni (بطلب المالك)',
+                });
+                // صلاحيات عامة صريحة: الجميع يقرأ ويكتب
+                try {
+                    await channel.permissionOverwrites.edit(guild.id, {
+                        allow: [discord_js_1.PermissionFlagsBits.ViewChannel, discord_js_1.PermissionFlagsBits.SendMessages],
+                    }, 'تصليح الصلاحيات — Omni');
+                }
+                catch { /* حقول افتراضية مقبولة */ }
+                return { success: true, existing: false, id: channel.id, name: channel.name };
             }
             // ------------- الأعضاء -------------
             case 'members_list': {
