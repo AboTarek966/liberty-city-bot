@@ -139,6 +139,7 @@ export interface OrganizeResult {
   counts: { rolesNew: number; rolesExisting: number; channelsNew: number; channelsExisting: number };
   deleted: { roles: number; channels: number };
   permErrors: string[];
+  creationErrors?: string[];
   note: string;
 }
 
@@ -151,6 +152,9 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
   if (!canManageRoles || !canManageChannels) {
     throw new Error('البوت يحتاج صلاحيتي «إدارة الرولات» و«إدارة القنوات»');
   }
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const creationErrors: string[] = [];
 
   // —— الرولات ——
   const roleNameSet = new Map<string, any>(
@@ -173,18 +177,22 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
         hoist: def.hoist ?? false,
         reason: 'أمى الهيكل الجاهز — Omni Organizer',
       });
+      await sleep(400);
       roleNameSet.set(role.name, role);
       createdRoles.push({ name: def.name, id: role.id, created: true });
       rolesNew++;
     } catch (e: any) {
+      creationErrors.push(`رول «${def.name}»: ${e?.message || e}`);
       createdRoles.push({ name: def.name, id: '', created: false });
       rolesExisting++;
     }
   }
 
   // —— القنوات ——
+  // ديسكورد يحوّل المسافات إلى شرطات في أسماء قنوات النص/الصوت — نقارن بشكل مُطبَّع
+  const normKey = (n: string, isCat: boolean) => (isCat ? n.trim() : n.trim().replace(/\s+/g, '-'));
   const chanByName = new Map<string, any>(
-    [...(guild.channels.cache.values())].map((c: any) => [c.name, c])
+    [...(guild.channels.cache.values())].map((c: any) => [normKey(c.name, c.type === ChannelType.GuildCategory), c])
   );
   let channelsNew = 0;
   let channelsExisting = 0;
@@ -192,7 +200,9 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
   const categories: { name: string; id: string; created: boolean }[] = [];
 
   const createChan = async (def: OrganizeChannelDef, parentId?: string) => {
-    const existing = chanByName.get(def.name);
+    const isCat = def.type === 'category';
+    const key = normKey(def.name, isCat);
+    const existing = chanByName.get(key);
     const expectedType = def.type === 'voice' ? ChannelType.GuildVoice : def.type === 'category' ? ChannelType.GuildCategory : ChannelType.GuildText;
     if (existing && existing.type === expectedType) {
       (def.type === 'category' ? categories : channelResults).push({ name: def.name, id: existing.id, created: false });
@@ -203,15 +213,17 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
       const ch = await guild.channels.create({
         name: def.name,
         type: expectedType,
-        topic: def.topic,
+        ...(def.type === 'text' ? { topic: def.topic } : {}),
         parent: parentId,
         reason: 'أمى الهيكل الجاهز — Omni Organizer',
       });
-      chanByName.set(ch.name, ch);
+      await sleep(400);
+      chanByName.set(normKey(ch.name, ch.type === ChannelType.GuildCategory), ch);
       (def.type === 'category' ? categories : channelResults).push({ name: def.name, id: ch.id, created: true });
       channelsNew++;
       return ch;
     } catch (e: any) {
+      creationErrors.push(`قناة «${def.name}»: ${e?.message || e}`);
       (def.type === 'category' ? categories : channelResults).push({ name: def.name, id: '', created: false });
       channelsExisting++;
       return null;
@@ -282,15 +294,15 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
         }
       }
       for (const def of other.categories) {
-        const ch = chanByName.get(def.name);
+        const ch = chanByName.get(normKey(def.name, def.type === 'category'));
         if (ch) {
           try { await ch.delete('تنظيف الهيكل القديم — Omni Organizer'); deleted.channels++; } catch {}
         }
       }
-      // أزل ما تبقى من القنوات القديمة الأخرى التي تحمل اسم القنوات القديمة
+      // أزل ما تبقى من القنوات القديمة الأخرى التي تحمل اسم القنوات القديمة (بالأسماء المطبّعة)
+      const otherKeys = new Set(other.categories.map((c) => normKey(c.name, c.type === 'category')));
       for (const ch of [...(guild.channels.cache.values())]) {
-        const match = other.categories.some((c) => c.name === ch.name);
-        if (match) {
+        if (otherKeys.has(normKey(ch.name, ch.type === ChannelType.GuildCategory))) {
           try { await ch.delete('تنظيف الهيكل القديم — Omni Organizer'); deleted.channels++; } catch {}
         }
       }
@@ -323,5 +335,6 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
     note: assignmentNote,
     deleted,
     permErrors,
+    creationErrors,
   };
 }

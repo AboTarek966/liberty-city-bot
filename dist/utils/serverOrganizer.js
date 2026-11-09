@@ -110,6 +110,8 @@ async function organizePreset(guild, presetId, opts = {}) {
     if (!canManageRoles || !canManageChannels) {
         throw new Error('البوت يحتاج صلاحيتي «إدارة الرولات» و«إدارة القنوات»');
     }
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const creationErrors = [];
     // —— الرولات ——
     const roleNameSet = new Map([...(guild.roles.cache.values())].map((r) => [r.name, r]));
     const createdRoles = [];
@@ -129,23 +131,29 @@ async function organizePreset(guild, presetId, opts = {}) {
                 hoist: def.hoist ?? false,
                 reason: 'أمى الهيكل الجاهز — Omni Organizer',
             });
+            await sleep(400);
             roleNameSet.set(role.name, role);
             createdRoles.push({ name: def.name, id: role.id, created: true });
             rolesNew++;
         }
         catch (e) {
+            creationErrors.push(`رول «${def.name}»: ${e?.message || e}`);
             createdRoles.push({ name: def.name, id: '', created: false });
             rolesExisting++;
         }
     }
     // —— القنوات ——
-    const chanByName = new Map([...(guild.channels.cache.values())].map((c) => [c.name, c]));
+    // ديسكورد يحوّل المسافات إلى شرطات في أسماء قنوات النص/الصوت — نقارن بشكل مُطبَّع
+    const normKey = (n, isCat) => (isCat ? n.trim() : n.trim().replace(/\s+/g, '-'));
+    const chanByName = new Map([...(guild.channels.cache.values())].map((c) => [normKey(c.name, c.type === discord_js_1.ChannelType.GuildCategory), c]));
     let channelsNew = 0;
     let channelsExisting = 0;
     const channelResults = [];
     const categories = [];
     const createChan = async (def, parentId) => {
-        const existing = chanByName.get(def.name);
+        const isCat = def.type === 'category';
+        const key = normKey(def.name, isCat);
+        const existing = chanByName.get(key);
         const expectedType = def.type === 'voice' ? discord_js_1.ChannelType.GuildVoice : def.type === 'category' ? discord_js_1.ChannelType.GuildCategory : discord_js_1.ChannelType.GuildText;
         if (existing && existing.type === expectedType) {
             (def.type === 'category' ? categories : channelResults).push({ name: def.name, id: existing.id, created: false });
@@ -156,16 +164,18 @@ async function organizePreset(guild, presetId, opts = {}) {
             const ch = await guild.channels.create({
                 name: def.name,
                 type: expectedType,
-                topic: def.topic,
+                ...(def.type === 'text' ? { topic: def.topic } : {}),
                 parent: parentId,
                 reason: 'أمى الهيكل الجاهز — Omni Organizer',
             });
-            chanByName.set(ch.name, ch);
+            await sleep(400);
+            chanByName.set(normKey(ch.name, ch.type === discord_js_1.ChannelType.GuildCategory), ch);
             (def.type === 'category' ? categories : channelResults).push({ name: def.name, id: ch.id, created: true });
             channelsNew++;
             return ch;
         }
         catch (e) {
+            creationErrors.push(`قناة «${def.name}»: ${e?.message || e}`);
             (def.type === 'category' ? categories : channelResults).push({ name: def.name, id: '', created: false });
             channelsExisting++;
             return null;
@@ -239,7 +249,7 @@ async function organizePreset(guild, presetId, opts = {}) {
                 }
             }
             for (const def of other.categories) {
-                const ch = chanByName.get(def.name);
+                const ch = chanByName.get(normKey(def.name, def.type === 'category'));
                 if (ch) {
                     try {
                         await ch.delete('تنظيف الهيكل القديم — Omni Organizer');
@@ -248,10 +258,10 @@ async function organizePreset(guild, presetId, opts = {}) {
                     catch { }
                 }
             }
-            // أزل ما تبقى من القنوات القديمة الأخرى التي تحمل اسم القنوات القديمة
+            // أزل ما تبقى من القنوات القديمة الأخرى التي تحمل اسم القنوات القديمة (بالأسماء المطبّعة)
+            const otherKeys = new Set(other.categories.map((c) => normKey(c.name, c.type === 'category')));
             for (const ch of [...(guild.channels.cache.values())]) {
-                const match = other.categories.some((c) => c.name === ch.name);
-                if (match) {
+                if (otherKeys.has(normKey(ch.name, ch.type === discord_js_1.ChannelType.GuildCategory))) {
                     try {
                         await ch.delete('تنظيف الهيكل القديم — Omni Organizer');
                         deleted.channels++;
@@ -293,6 +303,7 @@ async function organizePreset(guild, presetId, opts = {}) {
         note: assignmentNote,
         deleted,
         permErrors,
+        creationErrors,
     };
 }
 //# sourceMappingURL=serverOrganizer.js.map

@@ -56,6 +56,7 @@ export interface OrganizeResult {
         channels: number;
     };
     permErrors: string[];
+    creationErrors?: string[];
     note: string;
 }
 export declare function organizePreset(guild: any, presetId: string, opts?: {
