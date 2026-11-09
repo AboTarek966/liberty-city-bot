@@ -51,6 +51,7 @@ const discord_js_1 = require("discord.js");
 const crypto_1 = require("crypto");
 const models_1 = require("../models");
 const helpers_1 = require("../utils/helpers");
+const securityAlerts_1 = require("../utils/securityAlerts");
 const knowledge_1 = require("../utils/knowledge");
 const embeds_1 = require("../utils/embeds");
 const aiTicketActions_1 = require("../utils/aiTicketActions");
@@ -468,13 +469,8 @@ ${this.personaBlock(aiConfig)}
             .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
             .setTimestamp();
         const loggedAnalysis = await this.sendToTicketLog(channel, initialEmbed, aiConfig);
-        if (loggedAnalysis) {
-            await channel
-                .send({
-                content: `🤖 **AI:** تم تحليل التذكرة — ${String(analysis.summary || 'جارٍ المراجعة').slice(0, 180)}${analysis.summary && analysis.summary.length > 180 ? '…' : ''}\n> التفاصيل/السجل في قناة لوق التذاكر.`,
-            })
-                .catch(() => { });
-        }
+        // 🤫 التحليل كاملاً في اللوق فقط — لا رسائل تشويش داخل التذكرة
+        await this.sendToTicketLog(channel, initialEmbed, aiConfig);
         const context = {
             ticketUserId: (0, aiTicketActions_1.normalizeId)(ticket.userId),
             ticketChannelId: channel.id,
@@ -518,13 +514,8 @@ ${this.personaBlock(aiConfig)}
                 .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
                 .setTimestamp();
             const loggedResults = await this.sendToTicketLog(channel, resultsEmbed, aiConfig);
-            if (loggedResults) {
-                await channel
-                    .send({
-                    content: `⚙️ **AI:** تم تنفيذ ${Math.max(0, autoResults.length - failedAuto)} إجراء${failedAuto > 0 ? ` (فشل ${failedAuto})` : ''} — التفاصيل في لوق التذاكر.`,
-                })
-                    .catch(() => { });
-            }
+            // 🤫 نشرة الإجراءات في اللوق فقط — لا تشويش داخل التذكرة
+            await this.sendToTicketLog(channel, resultsEmbed, aiConfig);
         }
         // 4️⃣ طلبات الموافقة
         if (approvalActions.length > 0) {
@@ -709,6 +700,7 @@ ${this.personaBlock(aiConfig)}
     // --------------------------------------------
     async sendToTicketLog(channel, embed, aiConfig) {
         try {
+            // أولوية أولى: قناة لوق التذاكر المخصصة لإعدادات AI Ticket
             const logId = aiConfig?.logChannel;
             if (logId && logId !== channel.id) {
                 const logChannel = channel.guild.channels.cache.get(logId);
@@ -717,11 +709,22 @@ ${this.personaBlock(aiConfig)}
                     return true;
                 }
             }
+            // احتياط: قناة لوق الحماية (الأمن) — فقط إن لم يوجد لوق تذاكر، وبشرط عدم كتم التنبيهات الأمنية
+            const settings = await (0, models_1.getGuildSettings)(channel.guild.id).catch(() => null);
+            const plogId = settings?.protection?.logChannel;
+            if (plogId && plogId !== channel.id && !(0, securityAlerts_1.securityAlertsSilent)(settings || {})) {
+                const logChannel = channel.guild.channels.cache.get(plogId);
+                if (logChannel && logChannel.isTextBased()) {
+                    await logChannel.send({ embeds: [embed] }).catch(() => { });
+                    return true;
+                }
+            }
+            logger.warn(`AI Ticket: لا توجد قناة لوق صالحة في ${channel.guild.name} — الرسالة لم تُرسل لأي قناة عامة`);
         }
         catch {
             /* ignore */
         }
-        await channel.send({ embeds: [embed] }).catch(() => { });
+        // ⛔ ممنوع إرسال التحليل في قناة التذكرة لقاعدة المستخدم: التحليل يذهب للوق فقط
         return false;
     }
     // --------------------------------------------
