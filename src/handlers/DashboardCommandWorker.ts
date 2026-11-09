@@ -102,7 +102,30 @@ export class DashboardCommandWorker {
     const guild = this.client.guilds.cache.get(guildId);
     if (!guild) throw new Error('البوت غير موجود في هذا السيرفر');
 
+    const { organizePreset, ORGANIZE_PRESETS } = await import('../utils/serverOrganizer');
+
     switch (command) {
+      // ------------- التنظيم -------------
+      case 'organize': {
+        const result = await organizePreset(guild, String(payload.presetId || 'community'));
+        return result;
+      }
+
+      case 'organize_preview': {
+        return {
+          success: true,
+          presets: ORGANIZE_PRESETS.map((p) => ({
+            id: p.id,
+            name: p.name,
+            rolesCount: p.roles.length,
+            channelsCount: p.categories.length,
+            categories: p.categories.filter((c) => c.type === 'category').map((c) => c.name),
+            channels: p.categories.filter((c) => c.type !== 'category').map((c) => c.name),
+            roles: p.roles.map((r) => r.name),
+          })),
+        };
+      }
+
       // ------------- الأعضاء -------------
       case 'members_list': {
         const members = await guild.members.fetch();

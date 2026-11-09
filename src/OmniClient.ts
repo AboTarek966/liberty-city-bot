@@ -819,6 +819,7 @@ export class OmniClient extends Client {
 
     // ===== 🎛️ جسر أوامر اللوحة (تنفيذ فوري داخل نفس العملية) =====
     const DASHBOARD_ALLOWED_COMMANDS = new Set([
+        'organize', 'organize_preview',
       'members_list', 'roles_list', 'member_get', 'member_warn', 'member_kick',
       'member_ban', 'member_timeout', 'member_addrole', 'member_removerole',
       'ticket_claim', 'ticket_unclaim', 'ticket_close', 'ticket_delete', 'ticket_reply',
