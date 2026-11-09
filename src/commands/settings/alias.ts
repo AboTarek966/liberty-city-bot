@@ -208,14 +208,7 @@ const command: Command = {
               { name: '🔀 خلط القائمة', value: 'music:shuffle' },
               { name: '🗑️ إزالة أغنية', value: 'music:remove' },
               { name: '🛡️ حماية', value: 'protection' },
-              { name: '🛑 لوكداون', value: 'lockdown' },
-              { name: '🔒 قفل الروم', value: 'lock' },
-              { name: '🔓 فتح الروم', value: 'unlock' },
-              { name: '🔒 سجن', value: 'jail' },
-              { name: '🔓 إفراج', value: 'unjail' },
               { name: '🏰 سيرفر إنفو', value: 'serverinfo' },
-              { name: '👤 يوزر إنفو', value: 'userinfo' },
-              { name: '🏆 توب', value: 'top' },
               { name: '📈 نشاط', value: 'activity' }
             )
         )
@@ -225,20 +218,13 @@ const command: Command = {
             .setDescription('🛠️ أدوات + تذاكر + AI')
             .setRequired(false)
             .addChoices(
-              { name: '🏓 بينج', value: 'ping' },
-              { name: '💬 say', value: 'say' },
-              { name: '🖼️ أفاتار', value: 'avatar' },
-              { name: '📝 إمبد', value: 'embed' },
               { name: '🕵️ سنايب', value: 'snipe' },
               { name: '💾 باك أب', value: 'backup' },
               { name: '🎫 تذاكر', value: 'ticket' },
               { name: '🏆 توب التفاعل', value: 'leaderboard' },
               { name: '🤖 AI', value: 'ai' },
               { name: '🎮 ألعاب', value: 'games' },
-              { name: '🎮 لعبة', value: 'game' },
-              { name: '🗣️ السماح بالكلام', value: 'speak' },
-              { name: '🔒 قفل الروم', value: 'lock' },
-              { name: '🔓 فتح الروم', value: 'unlock' }
+              { name: '🎮 لعبة', value: 'game' }
             )
         )
         .addStringOption(o =>
@@ -248,28 +234,14 @@ const command: Command = {
             .setRequired(false)
             .addChoices(
               { name: '⚙️ إعدادات', value: 'settings' },
-              { name: '🛡️ حماية', value: 'protection' },
-              { name: '🕵️ سنايب', value: 'snipe' },
-              { name: '💾 باك أب', value: 'backup' },
               { name: '⌨️ علياس', value: 'alias' },
               { name: '🎭 رول منيو', value: 'rolemenu' },
               { name: '➕ أوتو رول', value: 'autorole' },
               { name: '➕ رول أدد', value: 'roleadd' },
               { name: '➖ رول ريموف', value: 'roleremove' },
-              { name: '🔓 إلغاء تايم', value: 'untimeout' },
-              { name: '🔓 إلغاء حظر', value: 'unban' },
-              { name: '✅ إزالة تحذير', value: 'unwarn' },
-              { name: '⬆️ ترقية', value: 'promote' },
-              { name: '🚨 لوكداون', value: 'lockdown' },
-              { name: '🔒 قفل الروم', value: 'lock' },
-              { name: '🔓 فتح الروم', value: 'unlock' },
-              { name: '🔒 سجن', value: 'jail' },
-              { name: '🔓 إفراج', value: 'unjail' },
               { name: '📊 توب تذاكر', value: 'ticket_top' },
               { name: '📊 تذكرة ستات', value: 'ticket_mystats' },
-              { name: '💤 AFK', value: 'afk' },
-              { name: '🎫 تذاكر', value: 'ticket' },
-              { name: '🤖 AI', value: 'ai' }
+              { name: '💤 AFK', value: 'afk' }
             )
         )
     )
