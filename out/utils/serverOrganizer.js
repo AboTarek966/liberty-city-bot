@@ -301,6 +301,7 @@ async function organizePreset(guild, presetId, opts = {}) {
         // أسماء القنوات القديمة اللي ملهاش لازمة غير الشات العام وقناة الأوامر
         const oldChatNames = new Set([
             '⌁ مرحباً-بك',
+            '⌁ شات',
             '⌁ دردشة-عامة',
             '⌁ دردشة-ترفيهية',
             '⌁ مشاركات',

@@ -332,6 +332,7 @@ export async function organizePreset(guild: any, presetId: string, opts: { delet
     const oldChatNames = new Set(
       [
         '⌁ مرحباً-بك',
+        '⌁ شات',
         '⌁ دردشة-عامة',
         '⌁ دردشة-ترفيهية',
         '⌁ مشاركات',
