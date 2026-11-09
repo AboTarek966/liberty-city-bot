@@ -1,0 +1,1 @@
+{"version":3,"file":"lockdown.d.ts","sourceRoot":"","sources":["../../src/utils/lockdown.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,KAAK,EAAe,MAAM,YAAY,CAAC;AAKhD,MAAM,WAAW,cAAc;IAC7B,YAAY,EAAE,MAAM,CAAC;IACrB,aAAa,EAAE,MAAM,CAAC;CACvB;AAED;;;;GAIG;AACH,wBAAsB,WAAW,CAAC,KAAK,EAAE,KAAK,EAAE,OAAO,EAAE,OAAO,GAAG,OAAO,CAAC,cAAc,CAAC,CAyCzF"}

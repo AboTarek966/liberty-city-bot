@@ -1,0 +1,1 @@
+{"version":3,"file":"securityAlerts.js","sourceRoot":"","sources":["../../src/utils/securityAlerts.ts"],"names":[],"mappings":";AAAA,+CAA+C;AAC/C,mCAAmC;AACnC,+CAA+C;AAC/C,oEAAoE;AACpE,2DAA2D;;AAE3D,oDAEC;AAFD,SAAgB,oBAAoB,CAAC,QAAa;IAChD,OAAO,QAAQ,EAAE,UAAU,EAAE,oBAAoB,KAAK,IAAI,CAAC;AAC7D,CAAC"}

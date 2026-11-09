@@ -1,0 +1,1 @@
+{"version":3,"file":"BotAbuseStrike.d.ts","sourceRoot":"","sources":["../../src/models/BotAbuseStrike.ts"],"names":[],"mappings":"AAKA,OAAO,QAAQ,EAAE,EAAE,QAAQ,EAAU,MAAM,UAAU,CAAC;AAEtD,MAAM,WAAW,eAAgB,SAAQ,QAAQ;IAC/C,OAAO,EAAE,MAAM,CAAC;IAChB,MAAM,EAAE,MAAM,CAAC;IACf,KAAK,EAAE,MAAM,CAAC;IACd,YAAY,EAAE,IAAI,CAAC;CACpB;AAWD,eAAO,MAAM,cAAc,2CAE8C,CAAC"}
