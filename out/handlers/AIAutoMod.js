@@ -266,6 +266,11 @@ ${context}
     async banUser(guild, member, reason) {
         if (!member.bannable)
             return;
+        // 🛡️ الجدار الوقائي: الحظر الآلي لا يُنفَّذ إلا بعد المخالفة الثانية المؤكّدة
+        if (this.client?.securityHandler?.takeStrike?.(guild.id, member.id) === 'first') {
+            logger.info(`🛡️ Shield: AI Auto-Mod first offense for ${member.user.tag} — quarantine/warn only`);
+            return;
+        }
         await member.ban({ reason: `AI Auto-Mod: ${reason}`, deleteMessageSeconds: 0 });
         logger.info(`AI Auto-Mod banned ${member.user.tag}: ${reason}`);
     }

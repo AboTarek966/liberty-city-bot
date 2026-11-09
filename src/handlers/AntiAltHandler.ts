@@ -45,6 +45,17 @@ export class AntiAltHandler {
       const result = await this.checkForAlts(member, cfg);
       
       if (result.isAlt) {
+        // 🛡️ الجدار الوقائي: الاشتباه الأولى = حجر/تنبيه فقط، بدون طرد/حظر — العقوبة عند التكرار
+        const first = this.client.securityHandler?.takeStrike?.(member.guild.id, member.id) === 'first';
+        if (first) {
+          const act = cfg.action as string;
+          if ((act === 'kick' || act === 'ban') && cfg.quarantineRoleId) {
+            await this.executeAction(member, { ...result, action: 'quarantine' }, cfg);
+          } else {
+            await this.executeAction(member, { ...result, action: 'log' }, cfg);
+          }
+          return;
+        }
         await this.executeAction(member, result, cfg);
       }
     } catch (error: any) {
@@ -141,6 +152,12 @@ export class AntiAltHandler {
   private async executeAction(member: GuildMember, result: AltCheckResult, cfg: any): Promise<void> {
     const guild = member.guild;
     const { action, reason, matchedAccounts } = result;
+
+    // 🛡️ الجدار الوقائي: المخالفة الأولى = حجر/سجل فقط (لا طرد/حظر) — العقوبة عند التكرار
+    if ((action === 'kick' || action === 'ban') && this.client.securityHandler?.takeStrike?.(guild.id, member.id) === 'first') {
+      const fallback = cfg.quarantineRoleId ? 'quarantine' : 'log';
+      return this.executeAction(member, { ...result, action: fallback as any }, cfg);
+    }
 
     try {
       switch (action) {

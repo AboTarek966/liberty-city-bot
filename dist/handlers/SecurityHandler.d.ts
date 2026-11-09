@@ -59,6 +59,15 @@ export declare class SecurityHandler {
     private rogueBotsLoaded;
     private recentBans;
     private recentKicks;
+    private strikeRegistry;
+    private readonly STRIKE_WINDOW_MS;
+    /**
+     * 🛡️ كل مخسقة — يسجّل ضربة جديدة على الفاعل خلال نافذة 5 دقائق.
+     * @returns 'first' للمخالفة الأولى (اكتفِ بالتنبيه والتحييد فقط) أو 'proven' عند تكرارها (عقوبة)
+     */
+    takeStrike(guildId: string, actorId: string): 'first' | 'proven';
+    /** قراءة العدد الحالي بدون تسجيل */
+    strikesOf(guildId: string, actorId: string): number;
     constructor(client: Client);
     clearGuild(guildId: string): void;
     cleanup(fullCleanup?: boolean): void;

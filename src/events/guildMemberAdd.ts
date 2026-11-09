@@ -30,6 +30,16 @@ const event: Event = {
         } else {
           logger.warn(`Raid detected in ${member.guild.name}!`);
 
+          // 🛡️ الجدار الوقائي: الاشتباه الأولى = تنبيه + تصعيد (بدون طرد/حظر)؛ العقوبة عند التكرار
+          const raidStrike = client.securityHandler?.takeStrike?.(member.guild.id, member.id);
+          const firstRaid = raidStrike === 'first';
+          if (firstRaid) {
+            logger.info(`🛡️ Shield: raid first offense for ${member.user.tag} — alert-only, no kick/ban`);
+            await logRaid(member, `${raidResult.action.reason} (تحذير وقائي أول — بدون عقوبة)`);
+            // تحقق: لا نُكمل بقية الحماية الانضمامية لهذا الظالم؟ نكمل للمعالجة العادية التالية فقط إن لم تُقفل
+            return;
+          }
+
           // Execute raid action
           if (raidResult.action.type === 'kick' || raidResult.action.type === 'ban') {
             if (raidResult.action.type === 'ban') {

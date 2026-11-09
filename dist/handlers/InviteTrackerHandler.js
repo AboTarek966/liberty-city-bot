@@ -199,39 +199,47 @@ class InviteTrackerHandler {
     async handleSuspicious(member, invite, reason, cfg) {
         const guild = member.guild;
         const client = member.client;
-        try {
-            switch (cfg.suspiciousInviteAction) {
-                case 'ban':
-                    await member.ban({ reason: `Invite Tracker: ${reason}`, deleteMessageSeconds: 0 });
-                    break;
-                case 'kick':
-                    await member.kick(`Invite Tracker: ${reason}`);
-                    break;
-                case 'warn':
-                    await client.moderationHandler?.warn({ guild, moderator: guild.members.me, target: member, reason });
-                    break;
-                case 'delete':
-                default:
-                    // تسجيل فقط
-                    break;
-            }
-            // لاوج
-            if (cfg.logChannel) {
-                const logChannel = guild.channels.cache.get(cfg.logChannel);
-                if (logChannel) {
-                    await logChannel.send({
-                        content: `📨 **Invite Tracker — دعوة مشبوهة**\n` +
-                            `👤 **العضو:** ${member.user.tag} (\`${member.id}\`)\n` +
-                            `⚠️ **السبب:** ${reason}\n` +
-                            `🔗 **كود الدعوة:** \`${invite.code}\`\n` +
-                            `👑 **الداعي:** <@${invite.inviterId}>`,
-                    }).catch(() => { });
-                }
-            }
-            logger.warn(`Suspicious invite in ${guild.name}: ${member.user.tag} — ${reason}`);
+        // 🛡️ الجدار الوقائي: المخالفة الأولى من دعوة مشبوهة = تسجيل/تحذير فقط (بدون طرد/حظر)
+        if ((cfg.suspiciousInviteAction === 'ban' || cfg.suspiciousInviteAction === 'kick') &&
+            client.securityHandler?.takeStrike?.(guild.id, member.id) === 'first') {
+            logger.info(`🛡️ Shield: Invite Tracker first offense for ${member.user.tag} — log/warn only`);
+            // سجّل فقط (لا تنفيذ)
         }
-        catch (error) {
-            logger.error(`InviteTracker handleSuspicious error: ${error.message}`);
+        else {
+            try {
+                switch (cfg.suspiciousInviteAction) {
+                    case 'ban':
+                        await member.ban({ reason: `Invite Tracker: ${reason}`, deleteMessageSeconds: 0 });
+                        break;
+                    case 'kick':
+                        await member.kick(`Invite Tracker: ${reason}`);
+                        break;
+                    case 'warn':
+                        await client.moderationHandler?.warn({ guild, moderator: guild.members.me, target: member, reason });
+                        break;
+                    case 'delete':
+                    default:
+                        // تسجيل فقط
+                        break;
+                }
+                // لاوج
+                if (cfg.logChannel) {
+                    const logChannel = guild.channels.cache.get(cfg.logChannel);
+                    if (logChannel) {
+                        await logChannel.send({
+                            content: `📨 **Invite Tracker — دعوة مشبوهة**\n` +
+                                `👤 **العضو:** ${member.user.tag} (\`${member.id}\`)\n` +
+                                `⚠️ **السبب:** ${reason}\n` +
+                                `🔗 **كود الدعوة:** \`${invite.code}\`\n` +
+                                `👑 **الداعي:** <@${invite.inviterId}>`,
+                        }).catch(() => { });
+                    }
+                }
+                logger.warn(`Suspicious invite in ${guild.name}: ${member.user.tag} — ${reason}`);
+            }
+            catch (error) {
+                logger.error(`InviteTracker handleSuspicious error: ${error.message}`);
+            }
         }
     }
     // --------------------------------------------

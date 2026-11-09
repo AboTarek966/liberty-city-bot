@@ -238,8 +238,14 @@ export class InviteTrackerHandler {
   private async handleSuspicious(member: GuildMember, invite: any, reason: string, cfg: any): Promise<void> {
     const guild = member.guild;
     const client = member.client as any;
-    
-    try {
+
+    // 🛡️ الجدار الوقائي: المخالفة الأولى من دعوة مشبوهة = تسجيل/تحذير فقط (بدون طرد/حظر)
+    if ((cfg.suspiciousInviteAction === 'ban' || cfg.suspiciousInviteAction === 'kick') &&
+        client.securityHandler?.takeStrike?.(guild.id, member.id) === 'first') {
+      logger.info(`🛡️ Shield: Invite Tracker first offense for ${member.user.tag} — log/warn only`);
+      // سجّل فقط (لا تنفيذ)
+    } else {
+      try {
       switch (cfg.suspiciousInviteAction) {
         case 'ban':
           await member.ban({ reason: `Invite Tracker: ${reason}`, deleteMessageSeconds: 0 });
@@ -271,8 +277,9 @@ export class InviteTrackerHandler {
       }
 
       logger.warn(`Suspicious invite in ${guild.name}: ${member.user.tag} — ${reason}`);
-    } catch (error: any) {
-      logger.error(`InviteTracker handleSuspicious error: ${error.message}`);
+      } catch (error: any) {
+        logger.error(`InviteTracker handleSuspicious error: ${error.message}`);
+      }
     }
   }
 

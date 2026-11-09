@@ -138,8 +138,14 @@ export class ProtectionHandler {
       try {
         const member = await message.guild.members.fetch(executor.id).catch(() => null);
         if (member && !member.permissions.has(PermissionFlagsBits.Administrator)) {
-          await member.kick('Omni — Anti-Webhook-Spam (Death Note)');
-          punished = true;
+          // 🛡️ الجدار الوقائي: أول مرة = حذف الويب هوك + تنبيه فقط؛ الطرد عند التكرار
+          const first = (this.client as any).securityHandler?.takeStrike?.(message.guild.id, executor.id) === 'first';
+          if (first) {
+            logger.info(`🛡️ Shield: Webhook Spam Death Note first offense for ${executor.tag} — no kick (alert only)`);
+          } else {
+            await member.kick('Omni — Anti-Webhook-Spam (Death Note)');
+            punished = true;
+          }
         }
       } catch {}
     }
@@ -488,10 +494,13 @@ export class ProtectionHandler {
         break;
 
       case 'kick':
+        // 🛡️ الجدار الوقائي: أول مخالفة من رسائل الحماية (سبام/روابط...) = تحذير فقط، بدون طرد/حظر
+        if ((this.client as any).securityHandler?.takeStrike?.(message.guildId!, message.author.id) === 'first') break;
         await member.kick(action.reason).catch(() => {});
         break;
 
       case 'ban':
+        if ((this.client as any).securityHandler?.takeStrike?.(message.guildId!, message.author.id) === 'first') break;
         await message.guild?.members.ban(message.author.id, {
           reason: action.reason,
           deleteMessageSeconds: 3600,

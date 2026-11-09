@@ -237,6 +237,16 @@ export class MessageScannerHandler {
     if (!guild) return;
 
     try {
+      // 🛡️ الجدار الوقائي: المخالفة الأولى من ماسح الرسائل = حذف + تنبيه فقط (بدون طرد/حظر)
+      const isBanKick = cfg.action === 'ban' || cfg.action === 'kick';
+      const first = isBanKick &&
+        (message.client as any)?.securityHandler?.takeStrike?.(guild.id, message.author.id) === 'first';
+      if (first) {
+        logger.info(`🛡️ Shield: Message Scanner first offense for ${message.author.tag} — alert-only`);
+        // 🛡️ الدرع يحذف الرسالة الضارة فوراً حتى في التحذير الأول
+        await message.delete().catch(() => {});
+        return;
+      }
       // تنفيذ الإجراء
       switch (cfg.action) {
         case 'ban':

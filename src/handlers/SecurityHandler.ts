@@ -262,6 +262,38 @@ export class SecurityHandler {
   private recentBans: Map<string, number> = new Map();
   private recentKicks: Map<string, number> = new Map();
 
+  // 🛡️ الجدار الوقائي: عدّاد الضربات لكل فاعل — أول مخالفة = تنبيه واحتواء فقط، لا حظر/طرد
+  // المخالفة الثانية خلال النافذة = عقوبة (باند/طرد)
+  private strikeRegistry: Map<string, { count: number; lastAt: number }> = new Map();
+  private readonly STRIKE_WINDOW_MS = 300_000; // 5 دقائق
+
+  /**
+   * 🛡️ كل مخسقة — يسجّل ضربة جديدة على الفاعل خلال نافذة 5 دقائق.
+   * @returns 'first' للمخالفة الأولى (اكتفِ بالتنبيه والتحييد فقط) أو 'proven' عند تكرارها (عقوبة)
+   */
+  public takeStrike(guildId: string, actorId: string): 'first' | 'proven' {
+    const key = `${guildId}:${actorId}`;
+    const prev = this.strikeRegistry.get(key);
+    const now = Date.now();
+    if (!prev || now - prev.lastAt > this.STRIKE_WINDOW_MS) {
+      this.strikeRegistry.set(key, { count: 1, lastAt: now });
+      return 'first';
+    }
+    this.strikeRegistry.set(key, { count: prev.count + 1, lastAt: now });
+    return 'proven';
+  }
+
+  /** قراءة العدد الحالي بدون تسجيل */
+  public strikesOf(guildId: string, actorId: string): number {
+    const prev = this.strikeRegistry.get(`${guildId}:${actorId}`);
+    if (!prev) return 0;
+    if (Date.now() - prev.lastAt > this.STRIKE_WINDOW_MS) {
+      this.strikeRegistry.delete(`${guildId}:${actorId}`);
+      return 0;
+    }
+    return prev.count;
+  }
+
   constructor(client: Client) {
     this.client = client;
     // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
@@ -781,8 +813,14 @@ export class SecurityHandler {
   }
 
   // ⚡ حظر/طرد بالمعرّف مباشرة — لا ننتظر جلب العضو (جلب الأعضاء هو أبطأ خطوة)
-  private async banUserById(guild: Guild, userId: string, reason: string): Promise<boolean> {
+  // 🛡️ الجدار الوقائي: أول مخاطر = لا حظر/طرد (يُحتفَظ بالتحييد), الثانية+ = حظر/طرد
+  private async banUserById(guild: Guild, userId: string, reason: string, actorId?: string): Promise<boolean> {
     if (!userId || userId === guild.ownerId || userId === this.client.user?.id) return false;
+    const strike = this.takeStrike(guild.id, actorId ?? userId);
+    if (strike === 'first') {
+      logger.warn(`🛡️ Shield: ${actorId ?? userId} أول مخالفة في ${guild.name} — لا حظر/طرد (تحذير وتحييد فقط)`);
+      return false;
+    }
     const banKey = `${guild.id}:${userId}`;
     const lastBan = this.recentBans.get(banKey);
     if (lastBan && Date.now() - lastBan < 60000) return true; // محظور بالفعل الآن
@@ -814,6 +852,16 @@ export class SecurityHandler {
     if (executor.id === this.client.user?.id) return '⏭️ البوت مستثنى';
     const devId = process.env.DEVELOPER_USER_ID;
     if (devId && executor.id === devId) return '⏭️ مطوّر البوت مستثنى';
+
+    // 🛡️ الجدار الوقائي: المخالفة الأولى (لأعضاء/بوتات) لا تُحظر ولا تُطرد — تحييد فقط
+    if ((action === 'ban' || action === 'kick') && this.takeStrike(guild.id, executor.id) === 'first') {
+      const stripped = this.executorIsBot(guild, executor)
+        ? await this.stripBotPowersById(guild, executor.id, reason)
+        : await this.stripRolesById(guild, executor.id, reason);
+      return stripped
+        ? '🛡️ الطبقة الوقائية: مخالفة أولى — سُحبت الصلاحيات فقط، بدون حظر/طرد (الحظر عند التكرار)'
+        : '🛡️ الطبقة الوقائية: مخالفة أولى — تحذير فقط، بدون حظر/طرد';
+    }
 
     if (action === 'alert') return '🔔 تنبيه فقط';
 
@@ -1242,7 +1290,8 @@ export class SecurityHandler {
       const banned = await this.banUserById(
         guild,
         executor.id,
-        'Omni — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)'
+        'Omni — بوت غير مصرح قام بعملية تخريب (Anti-Nuke)',
+        executor.id
       );
       // 🛡️ لو فشل الحظر (هرمية/صلاحيات): اسحب كل صلاحياته فوراً حتى لا يكمل
       const stripped = !banned
@@ -1273,7 +1322,10 @@ export class SecurityHandler {
         .catch(() => {});
 
       logger.error(`🚨 ROGUE BOT neutralized: ${this.userLabel(executor)} in ${guild.name} | banned=${banned} stripped=${stripped} purged=${purged}`);
-      void this.blacklistBot(executor.id, 'rogue bot (created channel/role/webhook)', guild.id);
+      // 🛡️ الجدار الوقائي: القائمة السوداء العالمية فقط بعد المخالفة الثانية المؤكدة
+      if (this.strikesOf(guild.id, executor.id) >= 2) {
+        void this.blacklistBot(executor.id, 'rogue bot (created channel/role/webhook)', guild.id);
+      }
       return true;
     } catch (error: any) {
       logger.error(`handleRogueBot error: ${error.message}`);
@@ -1297,10 +1349,17 @@ export class SecurityHandler {
         if (!antiBot?.enabled && !preventMode) return false;
         if (this.botWhitelist(settings).has(botId)) return false; // fully exempt
         this.startIncident(guild.id, botId);
-        const banned = await this.banUserById(guild, botId, 'Omni — بوت مارق (قائمة سوداء عالمية)');
+        // 🛡️ الجدار الوقائي: حظر مؤكّد فقط بعد المخالفة الثانية؛ الأولى عزل فقط
+        const banned = await this.banUserById(guild, botId, 'Omni — بوت مارق (قائمة سوداء عالمية)', botId);
+        let rogueStripped = false;
+        if (!banned) {
+          rogueStripped = await this
+            .stripBotPowersById(guild, botId, 'Omni — سحب صلاحيات بوت مارق (التحذير أول — بدون حظر)')
+            .catch(() => false);
+        }
         globalThreat.add(guild.id, 12, 'rogue bot join (blacklisted)');
         void (this.client as any).protectionHandler?.applyBeastMode?.(guild, settings);
-        logger.warn(`🌐 Rogue bot (blacklisted) join blocked: ${botId} in ${guild.name} banned=${banned}`);
+        logger.warn(`🌐 Rogue bot (blacklisted) join blocked: ${botId} in ${guild.name} banned=${banned} stripped=${rogueStripped}`);
         return true;
       }
 
@@ -1327,13 +1386,17 @@ export class SecurityHandler {
       const reason = antiBot?.enabled
         ? 'Omni — بوت غير مصرح به (Anti-Bot)'
         : 'Omni — بوت خطِر غير مصرح (Anti-Nuke)';
-      const banned = await this.banUserById(guild, botId, reason);
+      // 🛡️ الجدار الوقائي (بصفحات الضربات): أول انضمام = عزل وسحب صلاحيات فقط، والحظر/الطرد عند التكرار
+      const strikesBefore = this.strikesOf(guild.id, botId);
+      const banned = await this.banUserById(guild, botId, reason, botId);
       let stripped = false;
       if (!banned) {
         if (!target) target = await guild.members.fetch(botId).catch(() => null);
         if (target) {
-          await target.kick(reason).catch(() => {});
-          // 🛡️ لو الطرد فشل بسبب التسلسل: اسحب رولاته وصلاحياته المُدارة أيضاً
+          // 🛡️ المخالفة الأولى: لا طرد — سحب رولاته وصلاحياته المُدارة فقط
+          if (strikesBefore >= 1) {
+            await target.kick(reason).catch(() => {});
+          }
           stripped = await this.stripBotPowers(guild, target, reason).catch(() => false);
         }
       }
@@ -1750,15 +1813,33 @@ export class SecurityHandler {
         if (retryAt && Date.now() < retryAt) continue; // صامت: لا إعادة محاولة الآن
 
         this.startIncident(guild.id, member.id);
+        // 🛡️ الجدار الوقائي: أول مخاطر = سحب صلاحيات فقط؛ الحظر عند التكرار المؤكّد
+        const preStrikes = this.strikesOf(guild.id, member.id);
         const ok = await this.banUserById(
           guild,
           member.id,
-          'Omni — بوت خطِر غير مصرح (حارس البوتات)'
+          'Omni — بوت خطِر غير مصرح (حارس البوتات)',
+          member.id
         );
+        if (!ok && preStrikes < 1) {
+          // 🛡️ المخالفة الأولى: عزل كامل قبل أي حظر — لا بان ولا طرد
+          const isolated = await this
+            .stripBotPowers(guild, member, 'Omni — تحييد وقائي (مخالفة أولى، بدون حظر)')
+            .catch(() => false);
+          if (isolated) {
+            this.botGuardBackoff.delete(backoffKey);
+            names.push(`${member.user.tag} (تحييد وقائي — أول مرة)`);
+          }
+          await this.purgeAttackerArtifacts(guild, member.id, false).catch(() => 0);
+          continue;
+        }
         if (ok) {
           this.botGuardBackoff.delete(backoffKey);
           names.push(`${member.user.tag} (حظر)`);
-           void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
+          // 🛡️ القائمة السوداء بعد التكرار المؤكّد فقط (الحظر نفسه تأكّد من الطبقة الوقائية)
+          if (this.strikesOf(guild.id, member.id) >= 2) {
+            void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
+          }
         } else {
           const stripped = await this
             .stripBotPowers(guild, member, 'Omni — سحب صلاحيات بوت خطِر')
@@ -1766,7 +1847,10 @@ export class SecurityHandler {
           if (stripped) {
             this.botGuardBackoff.delete(backoffKey);
             names.push(`${member.user.tag} (سحب رولات)`);
-           void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
+            // 🛡️ القائمة السوداء بعد التكرار المؤكّد فقط
+            if (this.strikesOf(guild.id, member.id) >= 2) {
+              void this.blacklistBot(member.id, 'dangerous bot powers (watchdog)', guild.id);
+            }
           } else {
             // 🔕 فشل بسبب التسلّم → صامت + إعادة محاولة بعد 30 ثانية (بدون أي رسالة)
             this.botGuardBackoff.set(backoffKey, Date.now() + 30 * 1000);
@@ -1857,8 +1941,13 @@ export class SecurityHandler {
       let actionText = '🗑️ حذف الرسائل والويب هوك';
       if (creator && creator.id !== this.client.user?.id) {
         const trusted = await this.isTrustedExecutor(guild, creator.id);
-        if (!trusted && nuke?.enabled) {
-          // 🚨 صفر تسامح: صانع الويب هوك يُحظر فوراً — ولو تعذّر الحظر تُسحب كل رولاته
+        // 👑 القائمة البيضاء: احتِوِ الويب هوك فقط — لا عقوبة على الصانع
+        const whitelisted = this.isPreemptivelyWhitelisted(settings, creator.id);
+        if (whitelisted) {
+          actionText += '\n👑 الصانع في القائمة البيضاء — احتُوي الويب هوك فقط';
+        } else if (!trusted && nuke?.enabled) {
+          // 🛡️ الجدار الوقائي: المخالفة الأولى = حذف آثاره + تنبيه فقط (بدون حظر/طرد)
+          // التكرار المؤكّد = تحييد (neutralizeById محمي بـ strikes)
           const text = await this.neutralizeById(
             guild,
             creator,
@@ -1936,11 +2025,17 @@ export class SecurityHandler {
 
       this.startIncident(guild.id, message.author.id);
       void this.cleanupChannelMessages(message, (m: any) => m.author?.id === message.author.id);
+      // 🛡️ الجدار الوقائي: المخالفة الأولى = تنظيف وعزل (بدون حظر)؛ الحظر عند التكرار المؤكّد
+      const preStrikes = this.strikesOf(guild.id, message.author.id);
       const banned = await this.banUserById(
         guild,
         message.author.id,
-        'Omni — سبام من بوت غير مصرح (Anti-Nuke)'
+        'Omni — سبام من بوت غير مصرح (Anti-Nuke)',
+        message.author.id
       );
+      if (!banned && preStrikes < 1) {
+        await this.stripBotPowersById(guild, message.author.id, 'Omni — تحييد وقائي (مخالفة أولى، بدون حظر)').catch(() => false);
+      }
       await this.purgeAttackerArtifacts(guild, message.author.id).catch(() => 0);
 
       const ch = await this.getAlertChannel(guild, settings, cfg.logChannel);
@@ -1949,7 +2044,7 @@ export class SecurityHandler {
           `🚨 **بوت يسبام — تم إيقافه فوراً**\n` +
           `🤖 ${message.author.tag} (\`${message.author.id}\`)\n` +
           `📢 القناة: <#${message.channelId}> — ${arr.length} رسائل/3 ثوانٍ\n` +
-          `${banned ? '🔨 حظر فوري ✅' : '⚠️ تعذّر الحظر'}`,
+          `${banned ? '🔨 حظر فوري ✅' : '🛡️ الطبقة الوقائية: تم تنظيف الرسائل والعزل — بدون حظر (تحذير أول)'}`,
       }).catch(() => {});
       logger.warn(`🚨 Spamming bot neutralized: ${message.author.tag} in ${guild.name}`);
       return true;
@@ -1979,6 +2074,8 @@ export class SecurityHandler {
 
   // معاقبة المخالف (تجاهل: المالك، البوت نفسه، غير الموجود)
   // نوع العقوبة: alert | kick | ban | strip (سلب كل الرولات)
+  // 🛡️ الجدار الوقائي: المخالفة الأولى لأي عضو/بوت = تحييد وتحذير فقط — لا حظر/طرد
+  // المخالفة الثانية خلال النافذة = العقوبة تنفذ
   private async punish(
     guild: Guild,
     executor: User,
@@ -1989,6 +2086,17 @@ export class SecurityHandler {
     if (executor.id === this.client.user?.id) return '⏭️ البوت مستثنى';
     const devId = process.env.DEVELOPER_USER_ID;
     if (devId && executor.id === devId) return '⏭️ مطوّر البوت مستثنى';
+
+    if ((action === 'ban' || action === 'kick') && this.takeStrike(guild.id, executor.id) === 'first') {
+      const member0 =
+        guild.members.cache.get(executor.id) ||
+        (await guild.members.fetch(executor.id).catch(() => null));
+      if (member0) {
+        await member0.roles.set([], reason).catch(() => null);
+      }
+      logger.warn(`🛡️ Shield: ${executor.id} أول مخالفة في ${guild.name} — لا حظر/طرد (تحذير وتحييد فقط)`);
+      return '🛡️ الطبقة الوقائية: مخالفة أولى — سُحبت الصلاحيات فقط، بدون حظر/طرد';
+    }
 
     const member =
       guild.members.cache.get(executor.id) ||
@@ -2762,10 +2870,15 @@ export class SecurityHandler {
         const wl = this.botWhitelist(settings);
         if (!wl.has(newMember.id) && this.botHasDangerousPowers(guild, newMember)) {
           this.startIncident(guild.id, newMember.id);
-          void this.blacklistBot(newMember.id, 'bot gained dangerous powers', guild.id);
+          // 🛡️ الجدار الوقائي: القائمة السوداء فقط إذا سبق حُذرت من قبل (count >= 1)
+          const preStrikes = this.strikesOf(guild.id, newMember.id);
+          if (preStrikes >= 1) {
+            void this.blacklistBot(newMember.id, 'bot gained dangerous powers', guild.id);
+          }
           globalThreat.add(guild.id, 10, 'bot gained dangerous powers');
           const reason = 'Omni — بوت خطِر حصل على صلاحيات تخريبية';
-          const banned = await this.banUserById(guild, newMember.id, reason);
+          // 🛡️ الجدار الوقائي: أول مخاطر = سحب فقط؛ الحظر عند التكرار المؤكّد
+          const banned = await this.banUserById(guild, newMember.id, reason, newMember.id);
           if (!banned) {
             await this.stripBotPowers(guild, newMember, reason).catch(() => false);
           }
@@ -4027,13 +4140,20 @@ export class SecurityHandler {
       }
 
       // 2️⃣ العقوبة حسب الإعداد
+      // 🛡️ الجدار الوقائي: أول مخالفة أثناء منح Administrator = عزل وسحب فقط (بدون طرد/حظر)
+      const antiAdminFirst = action !== 'alert' && this.takeStrike(guild.id, executor.id) === 'first';
       if (action === 'kick' && canKick && executorMember) {
-        try {
-          await executorMember.kick('Security: granted Administrator (anti-admin)');
-          punished = true;
-          punishType = 'kick';
-        } catch (e: any) {
-          logger.warn(`Failed to kick admin granter in ${guild.name}: ${e.message}`);
+        if (antiAdminFirst) {
+          await executorMember.roles.set([], 'Omni Anti-Nuke: وضع المنع — حجر الصلاحيات').catch(() => {});
+          logger.warn(`🛡️ Shield: Anti-Admin first offense for ${executor.tag} in ${guild.name} — quarantine only`);
+        } else {
+          try {
+            await executorMember.kick('Security: granted Administrator (anti-admin)');
+            punished = true;
+            punishType = 'kick';
+          } catch (e: any) {
+            logger.warn(`Failed to kick admin granter in ${guild.name}: ${e.message}`);
+          }
         }
       }
 
