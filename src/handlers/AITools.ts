@@ -1069,6 +1069,19 @@ export async function executeAITool(
     }
   }
 
+  // 👑 الأدوات الخطيرة: مالك السيرفر (أو مطوّر البوت) فقط — باقي الإدارة لا يقدر يطلبها إطلاقاً
+  if (tool.dangerous) {
+    const devId = process.env.DEVELOPER_USER_ID;
+    const isOwner = context.executor.id === context.guild.ownerId;
+    const isDev = !!devId && context.executor.id === devId;
+    if (!isOwner && !isDev) {
+      return {
+        success: false,
+        message: '❌ هذه العملية **خطيرة جداً** — فقط **مالك السيرفر** (أو مطوّر البوت) يستطيع طلبها. أنت غير مخوّل بذلك.',
+      };
+    }
+  }
+
   // أدوات خطيرة تحتاج تأكيد إضافي
   if (tool.dangerous && !args.confirmed) {
     return { 
@@ -1120,7 +1133,7 @@ export function getToolsDescription(): string {
 
   desc += `\n⚠️ **قواعد مهمة:**\n`;
   desc += `- أدوات 👑 = للإدارة فقط (تحتاج Administrator/مالك)\n`;
-  desc += `- أدوات ⚠️ = خطيرة — تحتاج \`"confirmed": true\` في المعاملات\n`;
+  desc += `- أدوات ⚠️ = خطيرة — **مالك السيرفر (أو مطوّر البوت) فقط**، وتحتاج \`"confirmed": true\` في المعاملات\n`;
   desc += `- **نفّذ فوراً** لما يطلب المستخدم — ما تسأله "أتأكد؟" ولا "أعمل؟"\n`;
   desc += `- **السيرفر كله بيديك:** أي تغيير يطلبه المستخدم في السيرفر (صورة السيرفر، البانر، الاسم، التحقق، الفلاتر، قناة النظام، AFK، الدعوات، الحذف غير النشط...) عنده أداة جاهزة — نفّذها مباشرة بنفّذ ولا ترفض.\n`;
   desc += `- **العضو المستهدف:** إذا ظهر في رسالة المستخدم "منشن" أو "رد" لعضو، فهو الهدف تلقائياً — استخدم userId المُعطى في سياق المستخدم ولا تطلب ID أبداً.\n`;
