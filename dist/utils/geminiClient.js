@@ -111,7 +111,7 @@ async function geminiGenerate(opts) {
             try {
                 const res = await axios_1.default.post(`${BASE}/models/${model}:generateContent`, body, {
                     headers: { 'x-goog-api-key': opts.apiKey, 'Content-Type': 'application/json' },
-                    timeout: 60_000,
+                    timeout: 20000,
                 });
                 const content = extractText(res.data);
                 if (!content) {

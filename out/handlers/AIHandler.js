@@ -80,6 +80,8 @@ class AIHandler {
                         'HTTP-Referer': 'https://github.com/liberty-city-bot',
                         'X-Title': 'Omni Bot',
                     },
+                    timeout: 20000,
+                    maxRetries: 2,
                 });
                 logger.info(`OpenRouter provider initialized (model: ${config_1.config.ai.openrouter.model})`);
             }
@@ -92,7 +94,7 @@ class AIHandler {
         if (groqKey && groqKey.startsWith('gsk_')) {
             try {
                 const { OpenAI } = require('openai');
-                this.groq = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' });
+                this.groq = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1', timeout: 20000, maxRetries: 2 });
                 logger.info(`Groq provider initialized (model: ${config_1.config.ai.groq.model})`);
             }
             catch (error) {
@@ -128,23 +130,16 @@ class AIHandler {
         }
     }
     loadFallbackResponses() {
-        // Arabic fallback responses
+        // ردود صادقة عند فشل مزود الذكاء الاصطناعي — لا تسلّم للبوت شخصية جديدة تخون السياق
         this.fallbackResponses.set('ar', [
-            'أهلاً! أنا بوت Omni، كيف يمكنني مساعدتك؟ 🤖',
-            'مرحباً بك! أنا هنا للمساعدة. هل لديك سؤال معين؟',
-            'أنا بوت ذكي مصمم لمساعدتك. تفضل بطرح سؤالك!',
-            'أهلاً! كيف يمكنني خدمتك اليوم؟',
-            'مرحباً! أنا Omni، مساعدك الذكي. اسألني أي شيء! 😊',
-            'أهلاً بك! هل تريد معرفة أوامر البوت؟ اكتب /help',
-            'أنا هنا للمساعدة! هل هناك شيء معين تريد معرفته؟',
+            'معلش يا صاحبي، حصل خطأ فني مؤقت ومش قادر أجاوب دلوقتي — سؤالك وصلني بس الجهاز مش مستجيب. جرّب مرة تانية كمان شوية. 🙏',
+            'أعتذر! حصل خطأ فني عندي الآن — مش إنسًى؛ بس معالجي مشغول/فيه ضغط. جرّب تسأل مرة تانية حالاً.',
+            'عفواً، في مشكلة فنية مؤقتة (ضغط على السيرفر الذكي) — ما بقدر كمان أحلل ردك. عاود المحاولة بعد ثوانٍ.',
         ]);
         // English fallback responses
         this.fallbackResponses.set('en', [
-            'Hello! I\'m Omni bot. How can I help you? 🤖',
-            'Welcome! I\'m here to assist you. Do you have a question?',
-            'Hi there! I\'m an AI assistant. Feel free to ask me anything!',
-            'Hey! How can I help you today?',
-            'Hello! I\'m Omni, your smart assistant. Ask me anything! 😊',
+            'Sorry, a temporary technical issue occurred and I can\'t answer right now. Your message was received — please try again in a moment.',
+            'Apologies! There\'s a temporary AI/server issue. It\'s not that I forgot — the engine is overloaded. Please try again shortly.',
         ]);
         // Programming/Technical responses
         this.fallbackResponses.set('tech_ar', [
@@ -498,55 +493,15 @@ class AIHandler {
     // Web Search Detection (كشف الحاجة للبحث) — محسّن وذكي
     // --------------------------------------------
     needsWebSearch(message) {
-        const searchTriggers = {
-            // ترندات وميمز وثقافة إنترنت
-            trends: ['ترند', 'ترندات', 'ميمي', 'ميمز', 'موضة', 'فيرال', 'viral', 'trend', 'meme', 'تيك توك', 'tiktok', 'ريلز', 'reels', 'هاشتاق', 'hashtag'],
-            // أخبار وأحداث حالية
-            news: ['أخبار', 'خبر', 'اليوم', 'الآن', 'حاليا', 'جديد', 'محدث', 'news', 'breaking', 'عاجل', 'تطور', 'مستجد', 'تصريح'],
-            // أسعار وتغييرات مالية
-            prices: ['سعر', 'أسعار', 'كم سعر', 'بكم', 'price', 'كم صار', 'تغير', 'صعود', 'هبوط', 'دولار', 'بيتكوين', 'بتكوين', 'عملة', 'سهم', 'بورصة', 'ذهب', 'نفط'],
-            // رياضة ونتائج
-            sports: ['من فاز', 'نتيجة', 'مباراة', 'كأس', 'دوري', 'بطولة', 'هدف', 'بطاقة', 'تشكيلة', 'ترتيب', 'دوريات', 'كأس العالم', 'أولمبياد'],
-            // تقنيات وإصدارات وبرمجيات
-            tech: ['جديد', 'إصدار', 'تحديث', 'version', 'update', 'release', 'إطلاق', 'ميزات', 'مميزات', 'ai', 'ذكاء اصطناعي', 'نموذج', 'gpt', 'claude', 'gemini', 'llm'],
-            // يوتيوب وفيديوهات
-            youtube: ['يوتيوب', 'youtube', 'فيديو', 'مقطع', 'شغل', 'ابحث', 'video', 'قناة', 'مشاهدة', 'أكثر مشاهدة'],
-            // استفسارات وقتية
-            temporal: ['الآن', 'حاليا', 'هذه الأيام', 'هذا الأسبوع', 'هذا الشهر', 'هذا العام', '2024', '2025', 'الأسبوع الماضي', 'الشهر الماضي'],
-            // علوم وصحة
-            science: ['دراسة', 'بحث', 'اكتشف', 'علماء', 'ناسا', 'ناسا', 'فضاء', 'طب', 'دواء', 'علاج', 'مرض', 'فيروس', 'لقاح', 'صحة'],
-            // جغرافيا وسياسة
-            geo: ['دولة', 'عاصمة', 'رئيس', 'وزير', 'حكومة', 'برلمان', 'انتخابات', 'حدود', 'سكان', 'مساحة', 'قارة'],
-        };
-        const lower = message.toLowerCase();
-        // حساب درجة الحاجة للبحث (أكثر دقة)
-        let score = 0;
-        const matchedCategories = [];
-        for (const [category, triggers] of Object.entries(searchTriggers)) {
-            const matches = triggers.filter(t => lower.includes(t)).length;
-            if (matches > 0) {
-                score += matches * (category === 'temporal' ? 0.5 : 1); // التوقيتات أقل وزناً
-                matchedCategories.push(category);
-            }
-        }
-        // التحقق من نمط السؤال
-        const isQuestion = /[؟?]/.test(message) || /^(كيف|ما|من|متى|أين|لماذا|شنو|شو|واين|امتى|ليه|كم|هل)/i.test(message.trim());
-        // سؤال يبدأ بفعل استفهام
-        const startsWithQuestionWord = /^(ما|ما هي|ما هو|من|متى|أين|لماذا|كيف|كم|هل|شو|شنو|واين|امتى|ليه)\s/.test(message.trim());
-        // تجنب البحث لأسئلة بسيطة عن البوت نفسه
-        const isBotQuestion = /بوت|أمر|إعداد|الحماية|الترحيب|التذاكر|الرول|العملات|المتجر|المستويات|الإكس بي|الخبرة/i.test(message);
-        // تجنب البحث للتحيات البسيطة
-        const isGreeting = /^(أهل|مرحب|سلام|هاي|هلا|صباح|مساء|هاي بوت|يا بوت|يا ليبرتي)/i.test(message.trim());
-        // تجنب أوامر البوت
-        const isCommand = /^[\/!]/i.test(message.trim());
-        // قرار ذكي: يحتاج بحث إذا كان هناك محفزات + سؤال حقيقي + ليس بوت/تحية/أمر
-        const needsSearch = score >= 2 && (isQuestion || startsWithQuestionWord) && !isBotQuestion && !isGreeting && !isCommand;
-        // Log للتشخيص
-        if (needsSearch) {
-            const logger = require('../utils/helpers').createLogger('AIHandler');
-            logger.debug(`Web search triggered: score=${score}, categories=[${matchedCategories.join(', ')}], question="${message.substring(0, 50)}..."`);
-        }
-        return needsSearch;
+        // 🎯 كلمات/أنماط بحث صريحة فقط — بدونها كان أي سؤال عادي يطلق بحث ويب (1-4 ثواني تأخير إضافي)
+        const explicit = /(ابحث|بحث\s*عن|دوّر\s*لي|دورلي|آخر\s*(أخبار|إصدار|تحديث|خبر)|أحدث|أخبار|عاجل|خبر\s*عاجل|ترند|ترندات|اليوم\b|هذه\s*الأيام|الآن|حالياً|حاليا|الان|سعر|كم\s+سعر|أسعار|نتيجة\s*المباراة|مين\s*فاز|من\s*فاز|كم\s+صار|إصدار|تحديث|release|latest|update|news|price|bitcoin|youtube|يوتيوب|فيديو|مقاطع|2025|2026|النزلي|vs\s*$|مباراة|الدوري|الخسارة|النتيجة|اليوم\s*الأخير)/i;
+        if (explicit.test(message) && message.trim().length <= 500)
+            return true;
+        // سؤال يبدأ بفعل استفهام + كلمة زمنية صريحة
+        const hasQuestion = /[؟?]/.test(message) || /^(كيف|ما|من|متى|أين|لماذا|شو|شنو|واين|امتى|ليه|كم|هل)\s/.test(message.trim());
+        const strongTemporal = /(اليوم|الآن|الان|عاجل|هذا\s*الأسبوع|هذا\s*الشهر|حالياً)/.test(message);
+        const isBotOrGreeting = /بوت|إعداد|مرحب|تحية|ليش|هاي/i.test(message);
+        return hasQuestion && strongTemporal && !isBotOrGreeting;
     }
     // --------------------------------------------
     // Generate AI Response
@@ -774,18 +729,18 @@ class AIHandler {
             if (!session?.messages?.length)
                 return [];
             //7أيام (كانت30دقيقة — هذا سبب "نسيان" البوت للمحادثة القصيرة)
+            // ⚡ 4K حرف حد أقصى (بدلنا عن 8000) — تحميل أقل = رد أسرع (ولسه بتذكر المحادثة)
             const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
             const msgs = session.messages
                 .filter((m) => m.role !== 'system' && new Date(m.timestamp).getTime() >= cutoff)
                 .slice(-40) // آخر40 رسالة كحد أقصى للعدّ
                 .map((m) => ({ role: m.role, content: String(m.content).slice(0, 1500) }));
-            // ⚖️ قصّ بالحجم: حدود Groq المجانية ≈ 8000 توكن للطلب الواحد —
-            // نبقي ≤ 8000 حرف من التاريخ حتى لا نتجاوز مع system + الرسالة الحالية
             const trimmed = [];
             let chars = 0;
+            const MAX_HISTORY_CHARS = 4000;
             for (let i = msgs.length - 1; i >= 0; i--) {
                 const len = msgs[i].content.length + 8;
-                if (chars + len > 8000)
+                if (chars + len > MAX_HISTORY_CHARS)
                     break;
                 chars += len;
                 trimmed.unshift(msgs[i]);
