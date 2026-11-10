@@ -183,7 +183,10 @@ function buildGiveawayPayload(giveaway, state = {}, guildName) {
         .setCustomId(`giveaway:entry:${giveaway.shortId}`)
         .setLabel(ended ? 'انتهى السحب' : '🎉 شارك / انسحب')
         .setStyle(ended ? discord_js_1.ButtonStyle.Secondary : discord_js_1.ButtonStyle.Success)
-        .setDisabled(ended));
+        .setDisabled(ended), new discord_js_1.ButtonBuilder()
+        .setCustomId(`giveaway:list:${giveaway.shortId}`)
+        .setLabel(`👥 المشاركين (${participantCount})`)
+        .setStyle(discord_js_1.ButtonStyle.Primary));
     return { embeds: [embed], components: [row] };
 }
 async function refreshGiveawayMessage(client, giveaway) {

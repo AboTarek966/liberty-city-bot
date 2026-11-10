@@ -226,7 +226,11 @@ export function buildGiveawayPayload(
       .setCustomId(`giveaway:entry:${giveaway.shortId}`)
       .setLabel(ended ? 'انتهى السحب' : '🎉 شارك / انسحب')
       .setStyle(ended ? ButtonStyle.Secondary : ButtonStyle.Success)
-      .setDisabled(ended)
+      .setDisabled(ended),
+    new ButtonBuilder()
+      .setCustomId(`giveaway:list:${giveaway.shortId}`)
+      .setLabel(`👥 المشاركين (${participantCount})`)
+      .setStyle(ButtonStyle.Primary)
   );
 
   return { embeds: [embed], components: [row] };
