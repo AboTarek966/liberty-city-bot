@@ -121,6 +121,8 @@ export declare class SecurityHandler {
     /** هل المنفّذ مستثنى من الحماية الوقائية (وليس من عقوبة الهجوم السريع)؟ */
     isPreemptivelyWhitelisted(settings: any, userId: string): boolean;
     /** نسخة تعتمد على إعدادات السيرفر — للاستخدام من الأحداث */
+    /** ☢️ هل مسموح حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...)؟ الافتراضي: نعم */
+    private maliciousNameCleanupAllowed;
     isPreemptivelyWhitelistedInGuild(guildId: string, userId: string): Promise<boolean>;
     /** 🔥 تحميل الإعدادات في الذاكرة + القائمة السوداء — لتسريع الحارس */
     prewarmGuild(guild: Guild): Promise<void>;

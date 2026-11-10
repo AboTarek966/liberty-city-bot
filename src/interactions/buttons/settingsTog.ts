@@ -82,6 +82,25 @@ const handler: ButtonHandler = {
           prot.silentSecurityAlerts = !(prot.silentSecurityAlerts === true);
           break;
         }
+        if (field === 'blocknames') {
+          // ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — بوليان مستقل
+          // إطفاءه يحتاج موافقة المالك — تفعيله حر
+          if (prot.blockMaliciousNames !== false) {
+            const gateMsg = await gateProtectionOff({
+              settings,
+              guild: interaction.guild!,
+              user: interaction.user,
+              channel: interaction.channel,
+              field: 'blocknames',
+            });
+            if (gateMsg) {
+              await interaction.followUp({ content: gateMsg, ephemeral: true });
+              return;
+            }
+          }
+          prot.blockMaliciousNames = !(prot.blockMaliciousNames !== false);
+          break;
+        }
         if (!prot[field]) prot[field] = { enabled: false };
         prot[field].enabled = !prot[field].enabled;
         break;

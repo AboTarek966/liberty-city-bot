@@ -54,6 +54,9 @@ const handler = {
             if (field === 'ownerApproval') {
                 prot.ownerApproval = false; // خيار الموافقة نفسه — بوليان مستقل
             }
+            else if (field === 'blocknames') {
+                prot.blockMaliciousNames = false; // بوليان مستقل
+            }
             else {
                 if (!prot[field])
                     prot[field] = { enabled: false };

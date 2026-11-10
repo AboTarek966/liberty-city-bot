@@ -35,6 +35,8 @@ export interface IGuildSettings extends Document {
     antiBotAbuse?: {
       enabled: boolean;
     };
+    /** ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — مفعّل افتراضياً */
+    blockMaliciousNames?: boolean;
     antiRaid: {
       enabled: boolean;
       threshold: number;
@@ -904,6 +906,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     antiBotAbuse: {
       enabled: { type: Boolean, default: false },
     },
+    // ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — مفعّل افتراضياً
+    blockMaliciousNames: { type: Boolean, default: true },
     antiRaid: {
       enabled: { type: Boolean, default: true },
       threshold: { type: Number, default: 5 },

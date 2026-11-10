@@ -41,6 +41,7 @@ exports.PROTECTION_LABELS = {
     punishmentTracker: 'تتبع العقوبات 🔄',
     aiAutoMod: 'الأوتو مود الذكي 🤖',
     lockdown: 'وضع الطوارئ 🔒',
+    blocknames: 'مسح الاسم المشبوه ☢️',
 };
 /** الطلبات المعلّقة — في الذاكرة (إعادة التشغيل تلغيها = الحماية تبقى مفعّلة = آمن) */
 const PENDING = new Map();

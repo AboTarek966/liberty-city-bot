@@ -766,6 +766,10 @@ class SecurityHandler {
         return this.botWhitelist(settings).has(String(userId));
     }
     /** نسخة تعتمد على إعدادات السيرفر — للاستخدام من الأحداث */
+    /** ☢️ هل مسموح حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...)؟ الافتراضي: نعم */
+    maliciousNameCleanupAllowed(settings) {
+        return settings?.protection?.blockMaliciousNames !== false;
+    }
     async isPreemptivelyWhitelistedInGuild(guildId, userId) {
         const settings = await (0, models_1.getGuildSettings)(guildId);
         return this.isPreemptivelyWhitelisted(settings, userId);
@@ -2093,7 +2097,8 @@ class SecurityHandler {
                 return;
             const whitelistedTarget = Array.isArray(cfg.whitelistedChannels) && cfg.whitelistedChannels.includes(channel.id);
             const selfCreated = this.isSelfCreatedTarget(guild.id, 'channel', channel.id, channel.name);
-            const maliciousName = !selfCreated && !whitelistedTarget && (0, securityNames_1.isMaliciousSecurityName)(channel.name);
+            const maliciousName = !selfCreated && !whitelistedTarget && (0, securityNames_1.isMaliciousSecurityName)(channel.name) &&
+                this.maliciousNameCleanupAllowed(settings);
             // ⚡ حذف فوري قبل انتظار سجل التدقيق — الاسم التخريبي نفسه دليل كافٍ
             let deletedEarly = false;
             if (maliciousName) {
@@ -2234,7 +2239,8 @@ class SecurityHandler {
                 return;
             const whitelistedTarget = Array.isArray(cfg.whitelistedRoles) && cfg.whitelistedRoles.includes(role.id);
             const selfCreated = this.isSelfCreatedTarget(guild.id, 'role', role.id, role.name);
-            const maliciousName = !selfCreated && !whitelistedTarget && (0, securityNames_1.isMaliciousSecurityName)(role.name);
+            const maliciousName = !selfCreated && !whitelistedTarget && (0, securityNames_1.isMaliciousSecurityName)(role.name) &&
+                this.maliciousNameCleanupAllowed(settings);
             // ⚡ حذف فوري قبل انتظار سجل التدقيق — اسم الرول التخريبي دليل كافٍ
             let deletedEarly = false;
             if (maliciousName) {
@@ -2402,7 +2408,7 @@ class SecurityHandler {
             const isBot = this.executorIsBot(guild, entry.executor);
             const preWhitelisted = this.isPreemptivelyWhitelisted(settings, entry.executor.id);
             const count = this.trackRename(guild.id, entry.executor.id, 5000);
-            const maliciousRename = (0, securityNames_1.isMaliciousSecurityName)(newChannel.name);
+            const maliciousRename = (0, securityNames_1.isMaliciousSecurityName)(newChannel.name) && this.maliciousNameCleanupAllowed(settings);
             const nameChange = (entry.changes || []).find((c) => c.key === 'name');
             const oldName = nameChange?.old ? String(nameChange.old) : oldChannel.name;
             // 1️⃣ إرجاع الاسم فوراً — حتى لو لم نعاقب (تغيير واحد قد يكون طبيعياً)
@@ -2473,6 +2479,9 @@ class SecurityHandler {
     async cleanupSuspicious(guild) {
         let deleted = 0;
         const settings = await (0, models_1.getGuildSettings)(guild.id);
+        // ☢️ الزر مطفأ → التنظيف التلقائي بالاسم معطّل تماماً (يرجع النتيجة 0)
+        if (!this.maliciousNameCleanupAllowed(settings))
+            return 0;
         const cfg = settings.protection?.antiNuke;
         const whitelistedChannels = new Set((cfg?.whitelistedChannels || []).map(String));
         const whitelistedRoles = new Set((cfg?.whitelistedRoles || []).map(String));
@@ -3542,7 +3551,8 @@ class SecurityHandler {
             // 🏷️ رول سُمّي باسم تخريبي — تأمين فوري: حذف إن كان حديث الإنشاء، وإلا إرجاع الاسم
             const maliciousRename = !!nukeCfg?.enabled &&
                 (0, securityNames_1.isMaliciousSecurityName)(newRole.name) &&
-                !(0, securityNames_1.isMaliciousSecurityName)(oldRole.name);
+                !(0, securityNames_1.isMaliciousSecurityName)(oldRole.name) &&
+                this.maliciousNameCleanupAllowed(settings);
             if (maliciousRename) {
                 const executor = await this.findExecutor(guild, discord_js_1.AuditLogEvent.RoleUpdate, newRole.id, 900, 10000);
                 const trusted = executor ? await this.isTrustedExecutor(guild, executor.id) : false;
@@ -3822,6 +3832,9 @@ class SecurityHandler {
                 return;
             const whitelistedChannels = new Set((cfg.whitelistedChannels || []).map(String));
             const whitelistedRoles = new Set((cfg.whitelistedRoles || []).map(String));
+            // ☢️ الزر مطفأ → حارس الاسم المشبوه لا يمسح لا قنوات ولا رولات
+            if (!this.maliciousNameCleanupAllowed(settings))
+                return;
             const deletedChannels = [];
             const deletedRoles = [];
             const failed = [];

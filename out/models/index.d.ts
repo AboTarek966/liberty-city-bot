@@ -16,6 +16,8 @@ export interface IGuildSettings extends Document {
         antiBotAbuse?: {
             enabled: boolean;
         };
+        /** ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — مفعّل افتراضياً */
+        blockMaliciousNames?: boolean;
         antiRaid: {
             enabled: boolean;
             threshold: number;

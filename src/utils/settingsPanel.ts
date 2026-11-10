@@ -439,7 +439,8 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.antiEmoji.enabled)} **مكافحة الإيموجي** — يمنع الإيموجي المتكرر\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiNuke?.enabled)} **مضاد النيوك** — استجابة فورية من أول حذف/طرد/حظر ويعاقب المخالف\n` +
-    `> 🧹 **حارس الحذف السريع** — يمسح أي قناة/رول باسم هاكر أو تخريب كل **20 ثانية** (يعمل داخل مضاد النيوك)\n` +
+    `> ${on(p.blockMaliciousNames !== false)} ☢️ **مسح الاسم المشبوه** — حذف/إرجاع أي روم/رول اسمه nuke/nuker/هاكر... (${p.blockMaliciousNames !== false ? 'مفعّل' : 'مطفأ ✋'})\n` +
+    `> 🧹 **حارس الحذف السريع** — يمسح أي قناة/رول باسم هاكر أو تخريب كل **20 ثانية** (يعمل داخل مضاد النيوك — يتطلب الزر ☢️ مفعّل)\n` +
     `> ${on(p.antiBot?.enabled)} **مضاد البوتات** — يطرد البوتات غير المصرح بها\n` +
     `> ${on(p.antiAdmin?.enabled)} **مراقبة الصلاحيات** — تنبيه فوري عند منح أدمن\n` +
     `> ${on(p.autoBackup?.enabled)} **نسخ احتياطي تلقائي** — يحفظ بنية السيرفر ويستعيدها\n` +
@@ -493,7 +494,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false),
     toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true),
     btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
-    btn('settings_cat:honeypot', 'قناة الطعم', ButtonStyle.Secondary, '🍯'),
+    toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false),
   );
 
   // Row 5: Protection log channel selection

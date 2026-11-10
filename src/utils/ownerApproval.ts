@@ -35,6 +35,7 @@ export const PROTECTION_LABELS: Record<string, string> = {
   punishmentTracker: 'تتبع العقوبات 🔄',
   aiAutoMod: 'الأوتو مود الذكي 🤖',
   lockdown: 'وضع الطوارئ 🔒',
+  blocknames: 'مسح الاسم المشبوه ☢️',
 };
 
 interface PendingApproval {

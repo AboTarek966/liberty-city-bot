@@ -139,6 +139,8 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         antiBotAbuse: {
             enabled: { type: Boolean, default: false },
         },
+        // ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — مفعّل افتراضياً
+        blockMaliciousNames: { type: Boolean, default: true },
         antiRaid: {
             enabled: { type: Boolean, default: true },
             threshold: { type: Number, default: 5 },
