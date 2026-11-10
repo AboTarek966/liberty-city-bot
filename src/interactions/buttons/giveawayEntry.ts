@@ -6,6 +6,7 @@ import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings } from '../../models';
 import { toggleGiveawayEntry } from '../../utils/giveaway';
+import { claimInteractionOnce } from '../../utils/interactionLocks';
 
 const handler: ButtonHandler = {
   id: 'giveaway:entry',
@@ -22,6 +23,13 @@ const handler: ButtonHandler = {
     }
 
     await interaction.deferReply({ ephemeral: true });
+
+    // 🔒 حجز الضغطة — نفس الضغط لا يُعالج مرتين مهما تعددت نسخ البوت الشغالة
+    const claimed = await claimInteractionOnce(interaction.id);
+    if (!claimed) {
+      await interaction.editReply({ content: '✅ تمت معالجة ضغطتك هذه — المشاركة مسجلة بالفعل.' });
+      return;
+    }
 
     const settings = await getGuildSettings(interaction.guild.id).catch(() => null);
     if (settings?.giveaways && settings.giveaways.enabled === false) {

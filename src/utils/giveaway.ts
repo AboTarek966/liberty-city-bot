@@ -334,12 +334,32 @@ export async function findGiveaway(guildId: string, ref: string): Promise<IGivea
 // --------------------------------------------
 // Join / leave (toggle)
 // --------------------------------------------
+// ⏳ منع الضغط المتكرر من نفس العضو على نفس السحب خلال 1.5 ثانية (ضغطة مزدوجة بالخطأ)
+const toggleDebounce = new Map<string, number>();
+const TOGGLE_DEBOUNCE_MS = 1_500;
+
 export async function toggleGiveawayEntry(
   client: Client,
   guildId: string,
   ref: string,
   member: GuildMember
 ): Promise<GiveawayResult> {
+  const debounceKey = `${guildId}:${ref}:${member.id}`;
+  const nowTs = Date.now();
+  const lastAt = toggleDebounce.get(debounceKey);
+  if (lastAt && nowTs - lastAt < TOGGLE_DEBOUNCE_MS) {
+    // الضغطة المزدوجة لا تقلب العضو داخل/خارج السحب — تبقى مشاركته كما هي
+    const giveaway = await findGiveaway(guildId, ref);
+    if (giveaway) {
+      return { ok: true, left: !giveaway.entries.includes(member.id), giveaway };
+    }
+    return { ok: false, reason: 'لم أجد هذا السحب' };
+  }
+  toggleDebounce.set(debounceKey, nowTs);
+  if (toggleDebounce.size > 2000) {
+    for (const [k, ts] of toggleDebounce) if (nowTs - ts > TOGGLE_DEBOUNCE_MS) toggleDebounce.delete(k);
+  }
+
   const giveaway = await findGiveaway(guildId, ref);
   if (!giveaway) return { ok: false, reason: 'لم أجد هذا السحب' };
   if (giveaway.ended) return { ok: false, reason: 'هذا السحب انتهى بالفعل' };

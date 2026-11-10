@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const models_1 = require("../../models");
 const giveaway_1 = require("../../utils/giveaway");
+const interactionLocks_1 = require("../../utils/interactionLocks");
 const handler = {
     id: 'giveaway:entry',
     async execute(interaction) {
@@ -18,6 +19,12 @@ const handler = {
             return;
         }
         await interaction.deferReply({ ephemeral: true });
+        // 🔒 حجز الضغطة — نفس الضغط لا يُعالج مرتين مهما تعددت نسخ البوت الشغالة
+        const claimed = await (0, interactionLocks_1.claimInteractionOnce)(interaction.id);
+        if (!claimed) {
+            await interaction.editReply({ content: '✅ تمت معالجة ضغطتك هذه — المشاركة مسجلة بالفعل.' });
+            return;
+        }
         const settings = await (0, models_1.getGuildSettings)(interaction.guild.id).catch(() => null);
         if (settings?.giveaways && settings.giveaways.enabled === false) {
             await interaction.editReply({ content: '⚠️ نظام السحوبات معطّل حالياً في هذا السيرفر' });
