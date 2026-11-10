@@ -20,6 +20,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  PermissionFlagsBits,
 } from 'discord.js';
 import { randomUUID } from 'crypto';
 import { OmniClient } from '../OmniClient';
@@ -195,11 +196,61 @@ export class AITicketAssistant {
   // --------------------------------------------
   // 💬 متابعة محادثة التذكرة — يرد على رسائل صاحب التذكرة
   // --------------------------------------------
+  // --------------------------------------------
+  // 🔒 كشف طلب إغلاق/قفل التذكرة من رسالة صاحب التذكرة/الإدارة
+  //    مثال: "قفل تكت" / "أقفّل التذكرة" / "أغلق التكت شكراً"
+  //    التنفيذ يكون على القناة الحالية — ولا حاجة لأي ID
+  // --------------------------------------------
+  private isCloseIntent(content: string): boolean {
+    const text = content.toLowerCase().trim();
+    // نفي ("لا تُقفل" / "متقفلش") → نترك للـ AI العادي
+    if (/(لا\s*(ت?تقفل|ت?ت?غلق|ت?نها|ت?تنهي)|متقفلش|ماتقفلش|don'?t\s+close)/i.test(text)) return false;
+    const hasCloseWord = /(اق?فل|قف?ل|اق?فلها?|ا?غلق|ا?غلقها?|انهي|انهِ?ي|ا?نهها?|انهاء|إنهاء)/i.test(text);
+    const hasTicketWord = /(تكت|تذكرة|تذكره|ticket|تذكر)/i.test(text);
+    return hasCloseWord && hasTicketWord;
+  }
+
   async onTicketMessage(ticket: any, channel: TextChannel, message: Message): Promise<void> {
     try {
       if (!message.content.trim() && message.attachments.size === 0) return;
-      if (message.author.id !== String(ticket.userId)) return;
       if (['closed', 'deleted'].includes(String(ticket.status))) return;
+
+      // 🔒 طلب قفل/إغلاق التذكرة من داخل التذكرة نفسها — أي مسؤول/صاحب التذكرة يقدر يطلبها (بدون ID)
+      if (this.isCloseIntent(message.content || '')) {
+        const member = message.member;
+        const guild = channel.guild;
+        const settings = await getGuildSettings(guild.id).catch(() => null);
+        const isSupport = !!settings?.tickets?.supportRoleIds?.some((r: string) => member?.roles.cache.has(r));
+        const isAdminRole = !!settings?.tickets?.adminRoleIds?.some((r: string) => member?.roles.cache.has(r));
+        const isCreator = String(ticket.userId) === message.author.id;
+        const canClose =
+          isCreator ||
+          isSupport ||
+          isAdminRole ||
+          member?.permissions.has(PermissionFlagsBits.ManageChannels) ||
+          member?.permissions.has(PermissionFlagsBits.Administrator);
+
+        if (!canClose) {
+          await message.reply({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة — يملكها فريق الدعم أو صاحب التذكرة فقط.' }).catch(() => {});
+          return;
+        }
+
+        try {
+          await message.reply({ content: '🔒 **جارٍ إغلاق التذكرة والقناة الحالية...**' }).catch(() => {});
+          await (this.client as any).ticketHandler.closeTicket(
+            channel.id,
+            member,
+            'إغلاق عبر طلب العضو/الإدارة من داخل التذكرة'
+          );
+        } catch (error: any) {
+          logger.warn(`AI close ticket failed: ${error?.message || error}`);
+          await (channel as any).send({ content: `❌ تعذّر إغلاق التذكرة: ${error?.message || 'خطأ غير معروف'}` }).catch(() => {});
+        }
+        return;
+      }
+
+      // الـ AI يرد على صاحب التذكرة فقط — مش على الإداريين أو فريق الدعم
+      if (message.author.id !== String(ticket.userId)) return;
 
       const aiConfig = await this.getConfig(channel.guild.id);
       if (!aiConfig?.enabled) return;

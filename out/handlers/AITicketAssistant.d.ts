@@ -35,6 +35,7 @@ export declare class AITicketAssistant {
     private getConfig;
     private personaBlock;
     onTicketCreated(ticket: any, channel: TextChannel): Promise<void>;
+    private isCloseIntent;
     onTicketMessage(ticket: any, channel: TextChannel, message: Message): Promise<void>;
     private claimTicket;
     private sendAutoResponse;

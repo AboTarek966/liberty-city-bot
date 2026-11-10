@@ -1403,6 +1403,24 @@ async function handleTicketAIMessage(message, client) {
     });
     if (!ticket)
         return false;
+    // 🔒 الإدارة/فريق الدعم يقدرون يطلبوا "قفل تكت" من الداخل — يدخلوا حتى لو مش صاحب التذكرة
+    const rawText = (message.content || '').toLowerCase();
+    const closeIntent = /(اق?فل|قف?ل|ا?غلق|انهي|انه|إنهاء|انهاء)[\s\S]{0,40}(تكت|تذكرة|ticket)|(تكت|تذكرة|ticket)[\s\S]{0,40}(اق?فل|قف?ل|ا?غلق|انهي|انه|انهاء)/i.test(rawText);
+    const isNegation = /(لا\s*(ت?تقفل|ت?غلق|ت?نها|ت?تنهي)|متقفلش|ماتقفلش|don'?t\s+close)/i.test(rawText);
+    if (closeIntent && !isNegation && String(ticket.userId) !== message.author.id) {
+        const member = message.member;
+        const isStaff = !!settings.tickets?.supportRoleIds?.some((r) => member?.roles.cache.has(r)) ||
+            !!settings.tickets?.adminRoleIds?.some((r) => member?.roles.cache.has(r)) ||
+            !!member?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+            !!member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+        if (isStaff) {
+            // داخل التذكرة — الـ AI/المساعد ينفذ الإغلاق على القناة الحالية
+            await client.aiTicketAssistant.onTicketMessage(ticket, message.channel, message);
+            return true;
+        }
+        // غير مخوّل — نمرّر `false` حتى يرد عليه شخصياً
+        return false;
+    }
     // الـ AI يرد على صاحب التذكرة فقط — مش على الإداريين أو فريق الدعم
     if (String(ticket.userId) !== message.author.id)
         return false;
