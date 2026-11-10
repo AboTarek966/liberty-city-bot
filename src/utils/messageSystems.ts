@@ -3,12 +3,116 @@
 // الأوامر المخصصة + نشاط التذاكر + الرصيد العشوائي
 // ============================================
 
-import { Message, PermissionFlagsBits } from 'discord.js';
+import { Message, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { getGuildSettings, Ticket, UserProfile } from '../models';
 import { createLogger } from './helpers';
 import { normalizeEmojiForMatch, resolveEmojiShortcodes } from './emoji';
+import { Colors } from './embeds';
 
 const logger = createLogger('MessageSystems');
+
+// --------------------------------------------
+// 📝 التقديم على الإدارة — كشف صيغ "أريد التقديم" ويرسل نموذج التقديم داخل التذكرة المفتوحة فقط
+// الأعضاء العاديون: لازم يفتحوا تذكرة أولاً؛ داخلها البوت يرسل نموذج التقديم + رسالة انتظار القبول/الرفض
+// يعمل مع "أريد/عايز/أبغى أقدم على الإدارة" مهما كانت الصياغة، ومنها "تقديم اداره" نفسها
+// --------------------------------------------
+const APPLY_SUBMIT = /(?:أقدم|اقدم|التقدم|تقديم|تقدّم|ترشيح|أرشح|ارشح|أنضم|انضم|التحق|ابقدم|اقدم)/i;
+const APPLY_TARGET = /(?:إدار|ادار|ادارة|اداره|إدا|أدم|ادم|أدمن|ادمن|مشرف|مشرفي|support|admin|moderator|فريق الإدارة|فريق الاداره)/i;
+
+/** هل هذه رسالة طلب تقديم على الإدارة؟ */
+export function isApplicationIntent(content: string): boolean {
+  if (!content) return false;
+  const text = normalizeEmojiForMatch(content).slice(0, 300);
+  return APPLY_SUBMIT.test(text) && APPLY_TARGET.test(text);
+}
+
+/** يجد أمر التقديم على الإدارة في الأوامر المخصصة (إن وُجد) */
+function findApplicationCommand(commands: any[]): any | null {
+  if (!Array.isArray(commands) || !commands.length) return null;
+  const isApp = (n: string) =>
+    /(تقديم|تقدم|ترشيح|ارشح|أقدم|اقدم)/i.test(n) &&
+    /(إدار|ادار|ادارة|اداره|إدا|أدم|ادم|أدمن|ادمن|مشرف)/i.test(n);
+  // الأفضل مطابقة الاسم الأقرب "تقديم اداره" أولاً
+  const preferred = commands.find(c => /تقديم/.test(normalizeEmojiForMatch(String(c.name || ''))) && /(اداره|إدارة|ادارة)/i.test(String(c.name || '')));
+  if (preferred) return preferred;
+  return commands.find(c => isApp(normalizeEmojiForMatch(String(c.name || '')))) || null;
+}
+
+export async function handleApplicationIntent(message: Message): Promise<boolean> {
+  if (!message.guild || !message.member || message.author.bot) return false;
+  if (!isApplicationIntent(message.content || '')) return false;
+
+  const settings = await getGuildSettings(message.guild.id);
+  const appCmd = findApplicationCommand((settings as any).customCommands || []);
+  // لا يوجد أمر تقديم معرّف → لا نتدخل (رسائل التقديم العادية تمر للذكاء الاصطناعي)
+  if (!appCmd) return false;
+
+  // هل الرسالة داخل تذكرة مفتوحة يمتلكها العضو؟
+  const ticketInChannel = await Ticket.findOne({
+    guildId: message.guild.id,
+    channelId: message.channel.id,
+    status: { $in: ['open', 'claimed', 'waiting'] },
+  }).lean().catch(() => null);
+
+  if (ticketInChannel && String(ticketInChannel.userId) === message.author.id) {
+    // داخل تذكرة العضو → أرسل نموذج التقديم + رسالة الانتظار
+    const form = String(appCmd.content || '')
+      .replace(/\{user\}/g, `<@${message.author.id}>`)
+      .replace(/\{server\}/g, message.guild.name);
+
+    appCmd.uses = (appCmd.uses || 0) + 1;
+    await (settings as any).save?.().catch(() => {});
+
+    const adminRoles: string[] =
+      (settings as any).tickets?.adminRoleIds?.length
+        ? (settings as any).tickets.adminRoleIds
+        : (settings as any).tickets?.supportRoleIds || [];
+    const mention = adminRoles.map((r: string) => `<@&${r}>`).join(' ');
+
+    const embed = new EmbedBuilder()
+      .setTitle('📝 نموذج التقديم على الإدارة')
+      .setColor(Colors.primary)
+      .setDescription(
+        `${resolveEmojiShortcodes(form.substring(0, 3800), message.guild)}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `⏳ **انتظر الإدارة** — هيتم مراجعة طلبك والرد عليك داخل هذه التذكرة **بالقبول أو الرفض**.\n` +
+        `📌 ما ترسلش الطلب أكثر من مرة، وأي استفسار اكتبه هنا وهيتشاف.`
+      )
+      .setFooter({ text: `${message.guild.name} • طلب تقديم إدارة` })
+      .setTimestamp();
+
+    await message
+      .reply({
+        content: mention ? `${mention} — وصل طلب تقديم جديد 📥` : undefined,
+        embeds: [embed],
+        allowedMentions: { roles: adminRoles },
+      })
+      .catch(() => {});
+    logger.info(`📝 طلب تقديم إدارة من ${message.author.tag} — أُرسل النموذج داخل التذكرة`);
+    return true;
+  }
+
+  // خارج تذكرة → لازم يفتح تذكرة أولاً
+  const openTicket = await Ticket.findOne({
+    guildId: message.guild.id,
+    userId: message.author.id,
+    status: { $in: ['open', 'claimed', 'waiting'] },
+  }).lean().catch(() => null);
+
+  const openHint = openTicket?.channelId
+    ? `🎫 عندك تذكرة مفتوحة: <#${openTicket.channelId}> — افتحها واكتب «أريد التقديم على الإدارة» وهنبعتلك النموذج هناك.`
+    : '🎫 لازم تفتح **تذكرة أولاً** (زر فتح تذكرة / أمر التذاكر)، وبعدين اكتب «أريد التقديم على الإدارة» داخلها — وإحنا هنبعتلك نموذج التقديم وننتظر قبول أو رفض الإدارة.';
+
+  await message
+    .reply({
+      content:
+        `<@${message.author.id}>\n` +
+        `📝 **التقديم على الإدارة يكون داخل تذكرة فقط**\n` +
+        openHint,
+    })
+    .catch(() => {});
+  return true;
+}
 
 // --------------------------------------------
 // الأوامر المخصصة (ردود تلقائية لكلمات محددة)

@@ -27,7 +27,7 @@ import { buildTicketTopPage } from '../utils/ticketTop';
 import { getAliasesForShortcut, getAllGuildAliases } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
-import { handleCustomCommand, touchTicketActivity, earnCreditsRandom } from '../utils/messageSystems';
+import { handleCustomCommand, touchTicketActivity, earnCreditsRandom, handleApplicationIntent } from '../utils/messageSystems';
 import { resolveEmojiShortcodes } from '../utils/emoji';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
 import { detectImagePrompt, generateImageWithRetry, translateForImage } from '../utils/imageGen';
@@ -248,6 +248,14 @@ const event: Event = {
         if (topHandled) return;
       } catch (error) {
         logger.error('Error in top command:', error);
+      }
+
+      // 📝 طلب التقديم على الإدارة — يكتشف صيغ "أريد التقديم" ويرد برسالة التقديم (يعمل داخل التذكرة المفتوحة فقط)
+      try {
+        const appHandled = await handleApplicationIntent(message);
+        if (appHandled) return;
+      } catch (error) {
+        logger.error('Error in application intent:', error);
       }
 
       // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)

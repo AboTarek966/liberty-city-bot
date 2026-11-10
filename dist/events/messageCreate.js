@@ -247,6 +247,15 @@ const event = {
             catch (error) {
                 logger.error('Error in top command:', error);
             }
+            // 📝 طلب التقديم على الإدارة — يكتشف صيغ "أريد التقديم" ويرد برسالة التقديم (يعمل داخل التذكرة المفتوحة فقط)
+            try {
+                const appHandled = await (0, messageSystems_1.handleApplicationIntent)(message);
+                if (appHandled)
+                    return;
+            }
+            catch (error) {
+                logger.error('Error in application intent:', error);
+            }
             // الأوامر المخصصة (ردود تلقائية لكلمات محددة من الإعدادات)
             try {
                 const customHandled = await (0, messageSystems_1.handleCustomCommand)(message);
