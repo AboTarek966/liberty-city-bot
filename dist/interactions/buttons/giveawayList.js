@@ -14,7 +14,7 @@ const handler = {
             await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
             return;
         }
-        const shortId = interaction.customId.split(':')[3];
+        const shortId = interaction.customId.split(':')[2];
         if (!shortId) {
             await interaction.reply({ content: '❌ زر سحب غير صالح', ephemeral: true });
             return;
