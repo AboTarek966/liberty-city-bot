@@ -37,6 +37,8 @@ export async function claimInteractionOnce(interactionId: string): Promise<boole
     );
     return res.upsertedCount === 1;
   } catch (error: any) {
+    // E11000 = duplicate key → التفاعل محجوز سلفاً لهذه اللحظة — لا تعالجها مرة ثانية
+    if (error?.code === 11000 || error?.code === 11001) return false;
     logger.warn(`claimInteractionOnce(${interactionId}) failed: ${error?.message || error}`);
     return true;
   }
