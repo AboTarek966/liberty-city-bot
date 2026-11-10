@@ -199,16 +199,25 @@ class AITicketAssistant {
                 }
                 return;
             }
-            // الـ AI يرد على صاحب التذكرة فقط — مش على الإداريين أو فريق الدعم
-            if (message.author.id !== String(ticket.userId))
+            // من يتحدث الآن؟ صاحب التذكرة؟ الإدارة/المدّعي؟
+            const settings = await (0, models_1.getGuildSettings)(channel.guild.id).catch(() => null);
+            const member = message.member;
+            const isOwner = String(ticket.userId) === message.author.id;
+            const isClaimer = !!ticket.claimedBy && String(ticket.claimedBy) === message.author.id;
+            const isStaff = !!settings?.tickets?.supportRoleIds?.some((r) => member?.roles.cache.has(r)) ||
+                !!settings?.tickets?.adminRoleIds?.some((r) => member?.roles.cache.has(r)) ||
+                !!member?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+                !!member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+            // الـ AI يرد على صاحب التذكرة + الإدارة/المدّعي (طرد الناس اللي مش ذات صلة)
+            if (!isOwner && !isClaimer && !isStaff)
+                return;
+            // لو إداري بشري استلم التذكرة → الـ AI يسكت أمام صاحب التذكرة فقط (يستلمها بشرياً)
+            if (isOwner && ticket.claimedBy && ticket.claimedBy !== this.client.user?.id)
                 return;
             const aiConfig = await this.getConfig(channel.guild.id);
             if (!aiConfig?.enabled)
                 return;
             if (aiConfig.replyToMessages === false)
-                return;
-            // لو إداري بشري استلم التذكرة → الـ AI يتركها له
-            if (ticket.claimedBy && ticket.claimedBy !== this.client.user?.id)
                 return;
             // لو لسه في فترة الرد الأولي/التحليل → ما نكررش الرد
             const autoUntil = this.ticketAutoCooldown.get(channel.id) || 0;
@@ -228,7 +237,9 @@ class AITicketAssistant {
                         ? 'المساعد'
                         : m.author.bot
                             ? 'بوت'
-                            : 'العضو';
+                            : m.author.id === String(ticket.userId)
+                                ? 'صاحب التذكرة'
+                                : 'الإدارة';
                     return `${who}: ${m.content.replace(/\s+/g, ' ').slice(0, 700)}`;
                 })
                     .slice(-14)
@@ -237,21 +248,32 @@ class AITicketAssistant {
                     .map(a => a.name)
                     .filter(Boolean)
                     .join(', ');
+                const speakerRole = isOwner ? 'صاحب التذكرة' : isClaimer ? 'الإدارة (مستلم التذكرة)' : 'الإدارة/فريق الدعم';
                 const prompt = `أنت مساعد الدعم الذكي داخل تذكرة Discord في سيرفر "${channel.guild.name}".
 هذه محادثة التذكرة (الأحدث في الأسفل):
 ${transcript || 'لا توجد رسائل سابقة'}
 
-رسالة صاحب التذكرة الجديدة:
+رسالة المتحدث (${speakerRole}) الجديدة:
 "${message.content || '(مرفق بدون نص)'}"
 ${attachments ? `المرفقات: ${attachments}` : ''}
 
-اكتب رداً عربياً طبيعياً ومختصراً:
-- جاوب على سؤاله أو استفساره مباشرة.
+${isOwner
+                    ? `أنت تتكلم مع صاحب التذكرة:
+- جاوب على سؤاله/استفساره مباشرة بخطوات عملية.
 - لو المشكلة تحتاج صلاحية أو إجراء إداري، قل له إنه سيتم تحويلها للإدارة.
-- إذا أساء العضو (شتم/إهانة)، اطلب منه التوقف بأسلوب محترم وحذّره من الإجراءات (كتم/حظر) بعد موافقة الإدارة.
+- إذا أساء العضو (شتم/إهانة)، اطلب منه التوقف بأسلوب محترم وحذّره من الإجراءات بعد موافقة الإدارة.
 - لا تخترع معلومات ولا تكرر الترحيب إذا كانت المحادثة مستمرة.
 - لا تذكر أنك نموذج ذكاء اصطناعي إلا لو سألك.
-- كن مختصراً (1-3 جمل).
+- كن مختصراً (1-6 جمل).`
+                    : `أنت تتكلم مع الإدارة/المدّعي داخل تذكرتهم — مهمتك مساعدته كاملاً في مهام التذكرة:
+- لخّصله المشكلة (Categorization) أو جواب جاهز على العضو لو طلب ذلك.
+- اكتب رد للعضو فوراً لو قال "رد ده على العضو" أو "اكتب له...".
+- أعطه كل التفاصيل: سبب المشكلة + الحل المقترح + الخطوات.
+- أعطه معلومات التذكرة (الرقم/النوع/المواضيع) لو سأل.
+- قل له إن يعرف أمر «قفل تكت» داخل التذكرة لو أراد إغلاقها من جهته مباشرة.
+- لا تذكر أبداً أنك لا تستطيع إغلاق/نقل/تروس التذكرة — لو سأل عن فعل تستطيع إخباره بالأوامر المتاحة: "قفل تكت" للإغلاق.
+- كن مختصراً وعملياً — 1-6 جمل. لا تخترع معلومات خارج سياق التذكرة.
+- لا تذكر أنك نموذج ذكاء اصطناعي إلا لو سألك.`}
 ${this.personaBlock(aiConfig)}
 
 ردك:`;
