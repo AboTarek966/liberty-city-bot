@@ -43,6 +43,9 @@ export declare class SecurityHandler {
     private kickedQueue;
     private kickedTimers;
     private topWatchdogs;
+    private rapidBanKickTracker;
+    private readonly RAPID_BAN_KICK_WINDOW_MS;
+    private rapidBanKickLocks;
     private nukeTracker;
     private auditStream;
     private attackerArtifacts;
@@ -68,6 +71,10 @@ export declare class SecurityHandler {
     takeStrike(guildId: string, actorId: string): 'first' | 'proven';
     /** قراءة العدد الحالي بدون تسجيل */
     strikesOf(guildId: string, actorId: string): number;
+    /** ⚡ تتبع بان/كيك سريع للفاعل — يعيد العدد داخل نافذة 3 ثوانٍ (موحّد kick+ban) */
+    private trackRapidBanKick;
+    /** ⚡ باند فوري للفاعل عند إفلاته الثاني خلال 3 ثوانٍ (حتى للإداريين غير الموثوقين) */
+    private banRapidBanKickActor;
     constructor(client: Client);
     clearGuild(guildId: string): void;
     cleanup(fullCleanup?: boolean): void;

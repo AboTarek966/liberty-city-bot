@@ -212,6 +212,12 @@ export class SecurityHandler {
   // Pro Max: sticky role watchdog timers
   private topWatchdogs: Map<string, NodeJS.Timeout> = new Map();
 
+  // ⚡⚡ قاعدة الإفلات السريع: بان/كيك مرتين خلال 3 ثوانٍ = باند فوري للفاعل (حتى لو كان إداري)
+  //    النظام الموحّد (kick+ban) مع نافذة 3 ثوانٍ — المخالفة الثانية تكفي
+  private rapidBanKickTracker: Map<string, number[]> = new Map();
+  private readonly RAPID_BAN_KICK_WINDOW_MS = 3000;
+  private rapidBanKickLocks: Map<string, boolean> = new Map();
+
   // 💣 Nuke detection tracker
   private nukeTracker: Map<string, { channels: number; roles: number; webhooks: number; lastAction: number }> = new Map();
 
@@ -294,6 +300,99 @@ export class SecurityHandler {
     return prev.count;
   }
 
+  /** ⚡ تتبع بان/كيك سريع للفاعل — يعيد العدد داخل نافذة 3 ثوانٍ (موحّد kick+ban) */
+  private trackRapidBanKick(guildId: string, executorId: string, kind: 'ban' | 'kick', targetId: string | undefined): number {
+    const now = Date.now();
+    const key = `${guildId}:${executorId}`;
+    // dedupe per target (audit spam)
+    if (targetId) {
+      const dedupeKey = `${guildId}:rapid-ban-kick:${kind}:${targetId}`;
+      const seen = this.handledTargets.get(dedupeKey);
+      if (seen && now - seen < 30000) {
+        const arr = (this.rapidBanKickTracker.get(key) || []).filter(t => now - t <= this.RAPID_BAN_KICK_WINDOW_MS);
+        this.rapidBanKickTracker.set(key, arr);
+        return arr.length;
+      }
+      this.handledTargets.set(dedupeKey, now);
+    }
+    const arr = (this.rapidBanKickTracker.get(key) || []).filter(t => now - t <= this.RAPID_BAN_KICK_WINDOW_MS);
+    arr.push(now);
+    this.rapidBanKickTracker.set(key, arr);
+    return arr.length;
+  }
+
+  /** ⚡ باند فوري للفاعل عند إفلاته الثاني خلال 3 ثوانٍ (حتى للإداريين غير الموثوقين) */
+  private async banRapidBanKickActor(
+    guild: Guild,
+    executor: User,
+    settings: any,
+    cfg: any,
+    label: string,
+    badCount: number
+  ): Promise<void> {
+    const reason = `Omni — إفلات سريع: ${label} (${badCount} خلال 3 ثوانٍ)`;
+    globalThreat.add(guild.id, 6, `rapid-ban-kick: ${label}`);
+    void (this.client as any).protectionHandler?.applyBeastMode?.(guild, settings);
+
+    // منع تكرار الباند لنفس الفاعل (تقارب أحداث التدقيق)
+    const lockKey = `${guild.id}:${executor.id}`;
+    if (this.rapidBanKickLocks.get(lockKey)) return;
+    this.rapidBanKickLocks.set(lockKey, true);
+    setTimeout(() => this.rapidBanKickLocks.delete(lockKey), 60_000).unref();
+
+    let banned = false;
+    let banError = '';
+    if (executor.id !== guild.ownerId && executor.id !== this.client.user?.id) {
+      const devId = process.env.DEVELOPER_USER_ID;
+      if (!devId || executor.id !== devId) {
+        try {
+          await guild.bans.create(executor.id, { reason });
+          banned = true;
+        } catch (e: any) {
+          banError = e?.message || String(e);
+          logger.warn(`Rapid ban/kick actor ban failed in ${guild.name} (${executor.id}): ${banError}`);
+        }
+      }
+    }
+
+    // احتياطي: تجريد الصلاحيات لو تعذّر الباند (هرمية/صلاحيات)
+    if (!banned) {
+      if (this.executorIsBot(guild, executor)) {
+        await this.stripBotPowersById(guild, executor.id, reason).catch(() => null);
+      } else {
+        await this.stripRolesById(guild, executor.id, reason).catch(() => null);
+      }
+    }
+
+    // إلغاء حظر الضحايا الذين حظّرهم الفاعل (يحاول استرجاعهم)
+    try {
+      const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MemberBanAdd, user: executor.id, limit: 10 }).catch(() => null);
+      if (logs?.entries?.size) {
+        for (const [, entry] of logs.entries) {
+          const victim = (entry as any).targetId as string | undefined;
+          if (!victim) continue;
+          await guild.members.unban(victim, 'Omni: إلغاء حظر الضحية — الفاعل أُوقف (إفلات سريع)').catch(() => null);
+        }
+      }
+    } catch { /* ignore */ }
+
+    const alertKey = `${guild.id}:rapid-ban-kick-alert:${executor.id}`;
+    if (this.markHandled(alertKey)) {
+      const ch = await this.getAlertChannel(guild, settings, cfg?.logChannel);
+      ch?.send({
+        content:
+          `🚨 **باند فوري — إفلات سريع**\n` +
+          `👤 الفاعل: ${executor} (\`${this.userLabel(executor)}\`)\n` +
+          `⚡ **${badCount}** عمليات بان/طرد خلال **3 ثوانٍ**\n` +
+          (banned ? '🔨 **تم حظر الفاعل فوراً**' : `⚠️ تعذّر الحظر (${banError || 'الهرمية'}) — تم سحب صلاحياته`),
+      }).catch(() => {});
+    }
+
+    logger.warn(
+      `🚨 Rapid ban/kick guard: ${label} in ${guild.name} | executor=${this.userLabel(executor)} | count=${badCount} | banned=${banned}`
+    );
+  }
+
   constructor(client: Client) {
     this.client = client;
     // تنظيف دوري كل 5 دقائق لمنع تسرب الذاكرة
@@ -350,6 +449,10 @@ export class SecurityHandler {
     for (const key of this.recentKicks.keys()) if (key.startsWith(`${guildId}:`)) this.recentKicks.delete(key);
     for (const key of this.botGuardBackoff.keys()) if (key.startsWith(`${guildId}:`)) this.botGuardBackoff.delete(key);
     for (const key of this.slowActionTracker.keys()) if (key.startsWith(`${guildId}:`)) this.slowActionTracker.delete(key);
+    for (const key of this.rapidBanKickTracker.keys()) if (key.startsWith(`${guildId}:`)) this.rapidBanKickTracker.delete(key);
+    for (const key of this.rapidBanKickLocks.keys()) if (key.startsWith(`${guildId}:`)) this.rapidBanKickLocks.delete(key);
+    for (const key of this.actionTracker.keys()) if (key.startsWith(`${guildId}:`)) this.actionTracker.delete(key);
+    for (const key of this.strikeRegistry.keys()) if (key.startsWith(`${guildId}:`)) this.strikeRegistry.delete(key);
     logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
   }
 
@@ -413,6 +516,11 @@ export class SecurityHandler {
       const fresh = arr.filter(t => now - t <= 60000);
       if (fresh.length) this.actionTracker.set(key, fresh);
       else this.actionTracker.delete(key);
+    }
+    for (const [key, arr] of this.rapidBanKickTracker) {
+      const fresh = arr.filter(t => now - t <= 10000);
+      if (fresh.length) this.rapidBanKickTracker.set(key, fresh);
+      else this.rapidBanKickTracker.delete(key);
     }
     for (const [key, at] of this.handledTargets) {
       if (now - at > 30000) this.handledTargets.delete(key);
@@ -1628,6 +1736,28 @@ export class SecurityHandler {
           { forceBan: isBot || cfg.mode !== 'react' }
         );
         return;
+      }
+
+      // ⚡⚡ قاعدة الإفلات السريع: بان/كيك مرتين خلال 3 ثوانٍ = باند فوري للفاعل (حتى للإداريين)
+      //     (المالك ومطوّر البوت مستثنيان دوماً؛ القائمة البيضاء والجدار الوقائي لا تُضعف هذه القاعدة)
+      if (action === AuditLogEvent.MemberBanAdd || action === AuditLogEvent.MemberKick) {
+        // المالك ومطوّر البوت مستثنيان — لا يمسهما أي عقوبة
+        if (executor.id !== guild.ownerId) {
+          const devId = process.env.DEVELOPER_USER_ID;
+          const rapidKind: 'ban' | 'kick' = action === AuditLogEvent.MemberBanAdd ? 'ban' : 'kick';
+          const rapidCount = this.trackRapidBanKick(guild.id, executor.id, rapidKind, entry.targetId);
+          if (devId !== executor.id && rapidCount >= 2) {
+            await this.banRapidBanKickActor(
+              guild,
+              executor,
+              settings,
+              cfg,
+              rapidKind === 'ban' ? 'حظر متكرر' : 'طرد متكرر',
+              rapidCount
+            );
+            return;
+          }
+        }
       }
 
       // 🔨 حظر/طرد جماعي (عملية واحدة مسموحة، والثانية خلال النافذة = هجوم)
