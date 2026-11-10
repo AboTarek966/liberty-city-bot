@@ -12,6 +12,12 @@ export interface ToolContext {
     reason?: string;
     /** 🎯 العضو المستهدف افتراضياً (منشن/رد في الرسالة الحالية) */
     defaultTargetUserId?: string;
+    /** 📎 وسائط الرسالة الأصلية — يستخدمها set_server_icon لو الصورة مرفقة بالطلب */
+    attachments?: Array<{
+        url: string;
+        contentType?: string | null;
+        name?: string | null;
+    }>;
 }
 export declare function executeAITool(toolName: string, args: any, context: ToolContext): Promise<AIToolResult>;
 export declare function getToolsDescription(): string;

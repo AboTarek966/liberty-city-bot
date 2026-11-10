@@ -16,6 +16,9 @@ import {
   PermissionFlagsBits,
   EmbedBuilder,
   Colors,
+  GuildVerificationLevel,
+  GuildExplicitContentFilter,
+  GuildDefaultMessageNotifications,
 } from 'discord.js';
 import { OmniClient } from './../OmniClient';
 import { getGuildSettings, ModerationCase } from '../models';
@@ -50,6 +53,8 @@ export interface ToolContext {
   reason?: string;
   /** 🎯 العضو المستهدف افتراضياً (منشن/رد في الرسالة الحالية) */
   defaultTargetUserId?: string;
+  /** 📎 وسائط الرسالة الأصلية — يستخدمها set_server_icon لو الصورة مرفقة بالطلب */
+  attachments?: Array<{ url: string; contentType?: string | null; name?: string | null }>;
 }
 
 type ToolFunction = (ctx: ToolContext, args: any) => Promise<AIToolResult>;
@@ -636,6 +641,394 @@ registerTool('send_announcement', {
 });
 
 // --------------------------------------------
+// 🖼️ إعدادات السيرفر — تغيير أي شيء يطلبه الأدمن
+// --------------------------------------------
+
+function needManageGuild(guild: Guild): AIToolResult | null {
+  const me = guild.members.me;
+  if (!me?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    return { success: false, message: '❌ البوت يحتاج صلاحية **تعديل السيرفر (Manage Guild)** — امنحه إياها من إعدادات السيرفر ثم أعد المحاولة' };
+  }
+  return null;
+}
+
+async function fetchImageBuffer(url: string): Promise<Buffer> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { signal: controller.signal as any });
+    if (!res.ok) throw new Error(`فشل تحميل الصورة (HTTP ${res.status})`);
+    const ctype = res.headers.get('content-type') || '';
+    if (!ctype.startsWith('image/') && !url.match(/\.(png|jpe?g|gif|webp)(\?|$)/i)) {
+      throw new Error(`الملف ليس صورة (النوع: ${ctype || 'غير معروف'})`);
+    }
+    const ab = await res.arrayBuffer();
+    return Buffer.from(ab);
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function resolveChannelByIdOrName(guild: Guild, input: string | undefined): TextChannel | VoiceChannel | CategoryChannel | null {
+  if (!input) return null;
+  const raw = String(input).trim();
+  const byId = guild.channels.cache.get(raw);
+  if (byId) return byId as any;
+  const n = raw.toLowerCase().replace(/^#+/, '');
+  return (guild.channels.cache.find(c => c.name.toLowerCase() === n) ||
+          guild.channels.cache.find(c => c.name.toLowerCase().includes(n)) ||
+          null) as any;
+}
+
+registerTool('set_server_icon', {
+  description: 'تغيير صورة السيرفر — من رابط أو من الصورة المرفقة مع الطلب',
+  adminOnly: true,
+  params: {
+    url: { type: 'string', description: 'رابط الصورة (اختياري — لو الصورة مرفقة بالرسالة لا تكتبه)', required: false },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor, attachments }, { url, reason = 'تغيير الصورة بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    const attachmentImage = attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url || attachments?.[0]?.url;
+    const src = url || attachmentImage;
+    if (!src) return { success: false, message: '❌ مرّر رابط الصورة أو أرفق صورة مع طلبك' };
+    try {
+      const buffer = await fetchImageBuffer(src);
+      await guild.setIcon(buffer, `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تم تغيير صورة السيرفر**`, data: { url: src } };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل تغيير الصورة: ${e.message}` };
+    }
+  },
+});
+
+registerTool('remove_server_icon', {
+  description: 'إزالة صورة السيرفر نهائياً',
+  adminOnly: true,
+  params: { reason: { type: 'string', description: 'السبب', required: false } },
+  async func({ guild, executor }, { reason = 'إزالة الصورة بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    try {
+      await guild.setIcon(null, `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تمت إزالة صورة السيرفر**` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل إزالة الصورة: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_server_banner', {
+  description: 'تغيير البانر (غلاف) السيرفر — يتطلب تعزيز السيرفر',
+  adminOnly: true,
+  params: {
+    url: { type: 'string', description: 'رابط صورة البانر (اختياري — يرفض إن لم يعزّز السيرفر)', required: false },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor, attachments }, { url, reason = 'تغيير البانر بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    const attachmentImage = attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url;
+    const src = url || attachmentImage;
+    if (!src) return { success: false, message: '❌ مرّر رابط البانر أو أرفق صورة مع طلبك' };
+    try {
+      const buffer = await fetchImageBuffer(src);
+      await guild.setBanner(buffer, `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تم تغيير بانر السيرفر**`, data: { url: src } };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل تغيير البانر: ${e.message} (الغلاف يحتاج تعزيز السيرفر)` };
+    }
+  },
+});
+
+registerTool('remove_server_banner', {
+  description: 'إزالة بانر السيرفر',
+  adminOnly: true,
+  params: { reason: { type: 'string', description: 'السبب', required: false } },
+  async func({ guild, executor }, { reason = 'إزالة البانر بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    try {
+      await guild.setBanner(null, `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تمت إزالة بانر السيرفر**` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل إزالة البانر: ${e.message}` };
+    }
+  },
+});
+
+registerTool('rename_server', {
+  description: 'تغيير اسم السيرفر',
+  adminOnly: true,
+  params: {
+    name: { type: 'string', description: 'الاسم الجديد للسيرفر', required: true },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { name, reason = 'تغيير الاسم بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    const old = guild.name;
+    try {
+      await guild.setName(String(name).slice(0, 100), `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تم تغيير اسم السيرفر** من \`${old}\` إلى \`${String(name).slice(0, 100)}\`` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل تغيير الاسم: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_verification_level', {
+  description: 'ضبط مستوى التحقق للأعضاء الجدد (0 لا شيء، 1 منخفض، 2 متوسط، 3 مرتفع، 4 الأعلى)',
+  adminOnly: true,
+  params: { level: { type: 'number', description: '0-4', required: true } },
+  async func({ guild, executor }, { level }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    const n = Math.trunc(Number(level));
+    if (![0, 1, 2, 3, 4].includes(n)) return { success: false, message: '❌ القيمة بين 0 و 4 فقط' };
+    const map: Record<number, GuildVerificationLevel> = { 0: 0 as any, 1: 1 as any, 2: 2 as any, 3: 3 as any, 4: 4 as any };
+    try {
+      await guild.setVerificationLevel(map[n], `${executor.user.tag}: ضبط مستوى التحقق`);
+      return { success: true, message: `✅ **مستوى التحقق الآن:** \`${n}\`` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_explicit_content_filter', {
+  description: 'ضبط فلتر المحتوى الفاحش (0 معطل، 1 للأعضاء بدون رول، 2 للجميع)',
+  adminOnly: true,
+  params: { filter: { type: 'number', description: '0-2', required: true } },
+  async func({ guild, executor }, { filter }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    const n = Math.trunc(Number(filter));
+    if (![0, 1, 2].includes(n)) return { success: false, message: '❌ القيمة بين 0 و 2 فقط' };
+    const map: Record<number, GuildExplicitContentFilter> = { 0: 0 as any, 1: 1 as any, 2: 2 as any };
+    try {
+      await guild.setExplicitContentFilter(map[n], `${executor.user.tag}: ضبط فلتر المحتوى`);
+      return { success: true, message: `✅ **فلتر المحتوى الآن:** \`${n}\`` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_default_notifications', {
+  description: 'ضبط الإشعارات الافتراضية (0 كل الرسائل، 1 الإشارات فقط)',
+  adminOnly: true,
+  params: { mode: { type: 'number', description: '0 أو 1', required: true } },
+  async func({ guild, executor }, { mode }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    const n = Math.trunc(Number(mode));
+    if (![0, 1].includes(n)) return { success: false, message: '❌ القيمة 0 أو 1 فقط' };
+    const map: Record<number, GuildDefaultMessageNotifications> = { 0: 0 as any, 1: 1 as any };
+    try {
+      await guild.setDefaultMessageNotifications(map[n], `${executor.user.tag}: ضبط الإشعارات`);
+      return { success: true, message: `✅ **الإشعارات الافتراضية الآن:** \`${n}\`` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_system_channel', {
+  description: 'تحديد قناة رسائل النظام (الترحيب) — مرر channelId أو اسم القناة، أو null للإزالة',
+  adminOnly: true,
+  params: {
+    channel: { type: 'string', description: 'آيدي/اسم القناة أو null للإزالة', required: true },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { channel, reason = 'ضبط قناة النظام بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    if (String(channel).toLowerCase() === 'null') {
+      try {
+        await guild.setSystemChannel(null, `${executor.user.tag}: ${reason}`);
+        return { success: true, message: '✅ **أُزيلت قناة النظام**' };
+      } catch (e: any) {
+        return { success: false, message: `❌ فشل الإزالة: ${e.message}` };
+      }
+    }
+    const ch = resolveChannelByIdOrName(guild, channel);
+    if (!ch || ch.type !== ChannelType.GuildText) return { success: false, message: '❌ قناة نصية غير صالحة' };
+    try {
+      await guild.setSystemChannel(ch.id, `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **قناة النظام الآن:** ${ch}` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل التحديد: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_afk_channel', {
+  description: 'تحديد قناة AFK والمدة (بالدقائق: 1 أو 5 أو 15 أو 30 أو 60)، أو null للإزالة',
+  adminOnly: true,
+  params: {
+    channel: { type: 'string', description: 'آيدي/اسم القناة الصوتية أو null للإزالة', required: true },
+    timeout: { type: 'number', description: 'المدة بالدقائق: 1/5/15/30/60 (اختياري)', required: false },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { channel, timeout, reason = 'ضبط AFK بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    if (String(channel).toLowerCase() === 'null') {
+      try {
+        await guild.setAFKChannel(null, `${executor.user.tag}: ${reason}`);
+        return { success: true, message: '✅ **أُزيلت قناة AFK**' };
+      } catch (e: any) {
+        return { success: false, message: `❌ فشل الإزالة: ${e.message}` };
+      }
+    }
+    const ch = resolveChannelByIdOrName(guild, channel);
+    if (!ch || ch.type !== ChannelType.GuildVoice) return { success: false, message: '❌ قناة صوتية غير صالحة' };
+    try {
+      await guild.setAFKChannel(ch.id, `${executor.user.tag}: ${reason}`);
+      if (timeout) {
+        const valid = [1, 5, 15, 30, 60].find(v => v === Math.trunc(Number(timeout))) ?? 5;
+        await guild.setAFKTimeout(valid, `${executor.user.tag}: ${reason}`);
+      }
+      return { success: true, message: `✅ **قناة AFK الآن:** ${ch}${timeout ? ` — المدة: \`${timeout}\` دقيقة` : ''}` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل التحديد: ${e.message}` };
+    }
+  },
+});
+
+registerTool('rename_channel', {
+  description: 'تغيير اسم قناة أو فئة',
+  adminOnly: true,
+  params: {
+    channelId: { type: 'string', description: 'آيدي/اسم القناة', required: true },
+    name: { type: 'string', description: 'الاسم الجديد', required: true },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { channelId, name, reason = 'تعديل القناة بواسطة AI' }) {
+    const ch = resolveChannelByIdOrName(guild, channelId);
+    if (!ch) return { success: false, message: '❌ القناة غير موجودة' };
+    try {
+      await ch.setName(String(name).slice(0, 100), `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تم تغيير اسم القناة إلى** \`${String(name).slice(0, 100)}\`` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل تغيير الاسم: ${e.message}` };
+    }
+  },
+});
+
+registerTool('set_channel_topic', {
+  description: 'تغيير وصف/موضوع قناة نصية',
+  adminOnly: true,
+  params: {
+    channelId: { type: 'string', description: 'آيدي/اسم القناة النصية', required: true },
+    topic: { type: 'string', description: 'الموضوع الجديد (فارغ للمسح)', required: true },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { channelId, topic, reason = 'تعديل الموضوع بواسطة AI' }) {
+    const ch = resolveChannelByIdOrName(guild, channelId);
+    if (!ch || ch.type !== ChannelType.GuildText) return { success: false, message: '❌ قناة نصية غير صالحة' };
+    try {
+      await (ch as TextChannel).setTopic(String(topic).slice(0, 1024), `${executor.user.tag}: ${reason}`);
+      return { success: true, message: `✅ **تم تحديث الموضوع**` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل تحديث الموضوع: ${e.message}` };
+    }
+  },
+});
+
+registerTool('rename_role', {
+  description: 'تغيير اسم رول',
+  adminOnly: true,
+  params: {
+    roleId: { type: 'string', description: 'آيدي الرول أو اسمه', required: true },
+    name: { type: 'string', description: 'الاسم الجديد', required: true },
+    color: { type: 'string', description: 'اللون هكس (اختياري #ff0000)', required: false },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { roleId, name, color, reason = 'تعديل الرول بواسطة AI' }) {
+    const role = resolveRoleByIdOrName(guild, roleId);
+    if (!role) return { success: false, message: '❌ الرول غير موجود' };
+    if (role.managed) return { success: false, message: '❌ لا يمكن تعديل رول مُدار (بوت/دمج)' };
+    if (role.id === guild.id) return { success: false, message: '❌ لا يمكن تعديل @everyone' };
+    try {
+      await role.setName(String(name).slice(0, 100), `${executor.user.tag}: ${reason}`);
+      if (color && /^#?[0-9a-fA-F]{6}$/.test(String(color).trim())) {
+        await role.setColor((String(color).startsWith('#') ? String(color) : `#${color}`) as any, `${executor.user.tag}: ${reason}`);
+      }
+      return { success: true, message: `✅ **تم تعديل الرول** ${role}` };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل تعديل الرول: ${e.message}` };
+    }
+  },
+});
+
+registerTool('create_invite', {
+  description: 'إنشاء رابط دعوة جديد في قناة',
+  adminOnly: true,
+  params: {
+    channelId: { type: 'string', description: 'آيدي/اسم القناة', required: true },
+    maxAge: { type: 'number', description: 'المدة بالثواني (0 = لا تنتهي) — مثال 86400', required: false },
+    maxUses: { type: 'number', description: 'عدد الاستخدامات (0 = بلا حد)', required: false },
+    temporary: { type: 'boolean', description: 'دعوة مؤقتة؟', required: false },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { channelId, maxAge = 0, maxUses = 0, temporary = false, reason = 'دعوة بواسطة AI' }) {
+    const ch = resolveChannelByIdOrName(guild, channelId);
+    if (!ch) return { success: false, message: '❌ القناة غير موجودة' };
+    const me = guild.members.me;
+    if (!me?.permissions.has(PermissionFlagsBits.CreateInstantInvite)) {
+      return { success: false, message: '❌ البوت يحتاج صلاحية **إنشاء دعوات (Create Instant Invite)** للقناة' };
+    }
+    try {
+      const invite = await (ch as TextChannel).createInvite({ maxAge: Math.max(0, Math.trunc(maxAge)), maxUses: Math.max(0, Math.trunc(maxUses)), temporary, reason: `${executor.user.tag}: ${reason}` });
+      return { success: true, message: `✅ **تم إنشاء الدعوة:** ${invite.url}`, data: { url: invite.url } };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل إنشاء الدعوة: ${e.message}` };
+    }
+  },
+});
+
+registerTool('delete_all_invites', {
+  description: 'حذف كل دعوات السيرفر',
+  adminOnly: true,
+  dangerous: true,
+  params: { reason: { type: 'string', description: 'السبب', required: false } },
+  async func({ guild, executor }, { reason = 'تنظيف الدعوات بواسطة AI' }) {
+    const perm = needManageGuild(guild); if (perm) return perm;
+    try {
+      const invites = await guild.invites.fetch();
+      const list = invites.map(i => i);
+      for (const invite of list) {
+        await invite.delete(`${executor.user.tag}: ${reason}`).catch(() => null);
+      }
+      return { success: true, message: `🧹 **تم حذف ${list.length} دعوة**`, data: { count: list.length } };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل حذف الدعوات: ${e.message}` };
+    }
+  },
+});
+
+registerTool('prune_members', {
+  description: 'حذف الأعضاء غير النشطين (لا يملكون رول وبدون نشاط خلال X يوم)',
+  adminOnly: true,
+  dangerous: true,
+  params: {
+    days: { type: 'number', description: 'أيام عدم النشاط (1-30)', required: true },
+    computeCount: { type: 'boolean', description: 'احسب فقط بدون حذف (true = تجربة)', required: false },
+    reason: { type: 'string', description: 'السبب', required: false },
+  },
+  async func({ guild, executor }, { days, computeCount = false, reason = 'حذف غير النشط بواسطة AI' }) {
+    const n = Math.min(30, Math.max(1, Math.trunc(Number(days))));
+    const me = guild.members.me;
+    if (!me?.permissions.has(PermissionFlagsBits.KickMembers)) {
+      return { success: false, message: '❌ البوت يحتاج صلاحية **طرد الأعضاء (Kick Members)**' };
+    }
+    try {
+      // dry: true = احسب فقط بدون حذف — يرجّع عدد الأعضاء المطابقين
+      const result: any = await (guild.members as any).prune(
+        computeCount ? { days: n, dry: true, reason: `${executor.user.tag}: ${reason}` } : { days: n, reason: `${executor.user.tag}: ${reason}` }
+      );
+      const count = typeof result === 'number' ? result : (result?.pruned ?? result?.count ?? 0);
+      return { success: true, message: computeCount ? `📊 **سيُحذف ${count} عضو غير نشط**` : `🧹 **تم حذف ${count} عضو غير نشط**`, data: { count } };
+    } catch (e: any) {
+      return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+    }
+  },
+});
+
+// --------------------------------------------
 // تنفيذ أداة من قبل الـ AI
 // --------------------------------------------
 export async function executeAITool(
@@ -708,7 +1101,8 @@ export function getToolsDescription(): string {
 
   const categories: Record<string, string[]> = {
     '🛡️ إدارة/حماية': ['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user'],
-    '📝 قنوات/رولات': ['create_channel', 'delete_channel', 'create_role', 'delete_role', 'give_role', 'remove_role'],
+    '📝 قنوات/رولات': ['create_channel', 'delete_channel', 'create_role', 'delete_role', 'give_role', 'remove_role', 'rename_channel', 'set_channel_topic', 'rename_role'],
+    '🖼️ إعدادات السيرفر': ['set_server_icon', 'remove_server_icon', 'set_server_banner', 'remove_server_banner', 'rename_server', 'set_verification_level', 'set_explicit_content_filter', 'set_default_notifications', 'set_system_channel', 'set_afk_channel', 'create_invite', 'delete_all_invites', 'prune_members'],
     '📊 معلومات': ['get_server_info', 'get_user_info', 'check_security_status'],
     '⚙️ إعدادات': ['toggle_protection', 'create_backup', 'restore_backup', 'run_security_scan'],
     '🗑️ تنظيف': ['purge_messages'],
@@ -728,8 +1122,10 @@ export function getToolsDescription(): string {
   desc += `- أدوات 👑 = للإدارة فقط (تحتاج Administrator/مالك)\n`;
   desc += `- أدوات ⚠️ = خطيرة — تحتاج \`"confirmed": true\` في المعاملات\n`;
   desc += `- **نفّذ فوراً** لما يطلب المستخدم — ما تسأله "أتأكد؟" ولا "أعمل؟"\n`;
+  desc += `- **السيرفر كله بيديك:** أي تغيير يطلبه المستخدم في السيرفر (صورة السيرفر، البانر، الاسم، التحقق، الفلاتر، قناة النظام، AFK، الدعوات، الحذف غير النشط...) عنده أداة جاهزة — نفّذها مباشرة بنفّذ ولا ترفض.\n`;
   desc += `- **العضو المستهدف:** إذا ظهر في رسالة المستخدم "منشن" أو "رد" لعضو، فهو الهدف تلقائياً — استخدم userId المُعطى في سياق المستخدم ولا تطلب ID أبداً.\n`;
-  desc += `- **الرولات:** مرّر roleId أو اسم الرول بالضبط — سيُحلّ تلقائياً.\n`;
+  desc += `- **الرولات/القنوات/الأعضاء:** مرّر roleId/channelId أو الاسم بالضبط — تُحلّ تلقائياً.\n`;
+  desc += `- ![مرفق صورة مع الطلب]: لو المستخدم أرفق صورة وقال "حطها صورة للسيرفر" — استخدم \`set_server_icon\` بدون url (الصورة المرفقة تُلتقط تلقائياً).\n`;
   desc += `- إذا نجحت: قل "تم ✅" + ملخص مختصر\n`;
   desc += `- إذا فشلت: قل السبب وجرب بديل لو ممكن\n`;
 

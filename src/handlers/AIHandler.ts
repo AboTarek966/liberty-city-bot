@@ -394,7 +394,7 @@ export class AIHandler {
       }
 
       // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle);
+      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle, attachments);
       this.cooldowns.set(cooldownKey, now);
 
       // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
@@ -653,7 +653,8 @@ export class AIHandler {
     searchContext: string = '',
     media?: { context: string; images: Array<{ data: string; mimeType: string }> },
     brief: boolean = false,
-    independentFeature: boolean = false
+    independentFeature: boolean = false,
+    attachments?: Array<{ url: string; contentType?: string | null; name?: string | null }>
   ): Promise<AIResponse> {
     // Check for role-specific personality
     // 🔌 الميزات المستقلة (مثل مساعد التذاكر) لا ترث شخصية الذكاء العام — لكل ميزة شخصيتها الخاصة
@@ -761,6 +762,8 @@ export class AIHandler {
           client: this.client as OmniClient,
           // 🎯 الهدف الافتراضي (منشن/رد) — يُملأ userId تلقائياً لو الـ AI نسيه
           defaultTargetUserId: userContext?.targetUserId,
+          // 📎 الوسائط المرفقة بالرسالة — يستخدمها AI لصورة السيرفر لو أرفقها المستخدم
+          attachments,
         };
         
         const toolResult = await executeAITool(actionCall.tool, actionCall.args, toolContext);

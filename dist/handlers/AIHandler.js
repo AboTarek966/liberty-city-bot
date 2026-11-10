@@ -341,7 +341,7 @@ class AIHandler {
                 }
             }
             // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle);
+            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle, attachments);
             this.cooldowns.set(cooldownKey, now);
             // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
             //   تتم قبل الحفظ — حتى تتذكّر الذاكرة الرد الفعلي الذي رآه المستخدم
@@ -551,7 +551,7 @@ class AIHandler {
     // --------------------------------------------
     // Generate AI Response
     // --------------------------------------------
-    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media, brief = false, independentFeature = false) {
+    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media, brief = false, independentFeature = false, attachments) {
         // Check for role-specific personality
         // 🔌 الميزات المستقلة (مثل مساعد التذاكر) لا ترث شخصية الذكاء العام — لكل ميزة شخصيتها الخاصة
         let personality = independentFeature ? '' : aiConfig.customPersonality;
@@ -657,6 +657,8 @@ class AIHandler {
                     client: this.client,
                     // 🎯 الهدف الافتراضي (منشن/رد) — يُملأ userId تلقائياً لو الـ AI نسيه
                     defaultTargetUserId: userContext?.targetUserId,
+                    // 📎 الوسائط المرفقة بالرسالة — يستخدمها AI لصورة السيرفر لو أرفقها المستخدم
+                    attachments,
                 };
                 const toolResult = await (0, AITools_1.executeAITool)(actionCall.tool, actionCall.args, toolContext);
                 // نضيف النتيجة للسياق ونعيد التوليد
