@@ -512,7 +512,7 @@ function buildGiveawaysPanel(guild, s) {
         ? [g.logChannelId]
         : []));
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('giveaways', 'enabled', 'السحوبات', '🎁', enabled), btn('settings_btn:giveaways:duration', 'المدة الافتراضية', discord_js_1.ButtonStyle.Primary, '⏱️'), btn('settings_btn:giveaways:winners', 'عدد الفائزين', discord_js_1.ButtonStyle.Primary, '🏆'), btn('settings_btn:giveaways:requirements', 'الشروط', discord_js_1.ButtonStyle.Secondary, '📋'));
-    const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('giveaways', 'dmwinners', 'رسالة خاصة', '📩', g.dmWinners !== false), toggleBtn('giveaways', 'pingwinners', 'منشن الفائز', '🔔', g.pingWinners !== false), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('giveaways', 'dmwinners', 'رسالة خاصة', '📩', g.dmWinners !== false), toggleBtn('giveaways', 'pingwinners', 'منشن الفائز', '🔔', g.pingWinners !== false), toggleBtn('giveaways', 'manualwinners', 'الفائز يدوي', '✋', g.manualWinners !== false), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     return {
         embeds: [embed],
         components: [channelSelect, roleSelect, logSelect, row1, row2],

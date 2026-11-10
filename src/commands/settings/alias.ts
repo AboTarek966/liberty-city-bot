@@ -239,6 +239,7 @@ const command: Command = {
               { name: '➕ أوتو رول', value: 'autorole' },
               { name: '➕ رول أدد', value: 'roleadd' },
               { name: '➖ رول ريموف', value: 'roleremove' },
+              { name: '🏆 الفائز (إعلان يدوي)', value: 'winner' },
               { name: '📊 توب تذاكر', value: 'ticket_top' },
               { name: '📊 تذكرة ستات', value: 'ticket_mystats' },
               { name: '💤 AFK', value: 'afk' }

@@ -43,7 +43,7 @@ const handler = {
         await interaction.editReply({
             content: `🎉 **تم تسجيل مشاركتك!**\n` +
                 `> 🎁 الجائزة: **${result.giveaway?.prize}**\n` +
-                `> 👥 عدد المشاركين الآن: \`${result.giveaway?.entries.length ?? 0}\`\n\n` +
+                `> 👥 عدد المشاركين الآن: \`${result.giveaway ? new Set(result.giveaway.entries.map(String)).size : 0}\`\n\n` +
                 `حظاً موفقاً! 🍀`,
         });
     },

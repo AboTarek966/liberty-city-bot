@@ -484,6 +484,8 @@ export interface IGuildSettings extends Document {
         dmWinners: boolean;
         /** منشن الفائزين في قناة السحب */
         pingWinners: boolean;
+        /** ✋ الفائز يُعلن يدوياً من الإدارة (البوت لا يسحب عشوائياً) — الافتراضي: مفعّل */
+        manualWinners?: boolean;
         /** قناة سجل نتائج السحوبات */
         logChannelId?: string;
     };

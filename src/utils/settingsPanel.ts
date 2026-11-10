@@ -695,6 +695,7 @@ export function buildGiveawaysPanel(guild: Guild, s: any): BuiltPanel {
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('giveaways', 'dmwinners', 'رسالة خاصة', '📩', g.dmWinners !== false),
     toggleBtn('giveaways', 'pingwinners', 'منشن الفائز', '🔔', g.pingWinners !== false),
+    toggleBtn('giveaways', 'manualwinners', 'الفائز يدوي', '✋', g.manualWinners !== false),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 

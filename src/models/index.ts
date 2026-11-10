@@ -537,6 +537,8 @@ export interface IGuildSettings extends Document {
     dmWinners: boolean;
     /** منشن الفائزين في قناة السحب */
     pingWinners: boolean;
+    /** ✋ الفائز يُعلن يدوياً من الإدارة (البوت لا يسحب عشوائياً) — الافتراضي: مفعّل */
+    manualWinners?: boolean;
     /** قناة سجل نتائج السحوبات */
     logChannelId?: string;
   };
@@ -1359,6 +1361,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     defaultMinInvites: { type: Number, default: 0, min: 0, max: 10000 },
     dmWinners: { type: Boolean, default: true },
     pingWinners: { type: Boolean, default: true },
+    manualWinners: { type: Boolean, default: true },
     logChannelId: { type: String },
   },
 

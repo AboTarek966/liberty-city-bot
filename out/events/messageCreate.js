@@ -50,6 +50,7 @@ const aliasCache_1 = require("../utils/aliasCache");
 const afk_1 = require("../utils/afk");
 const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
+const giveaway_1 = require("../utils/giveaway");
 const emoji_1 = require("../utils/emoji");
 const pendingUploads_1 = require("../utils/pendingUploads");
 const imageGen_1 = require("../utils/imageGen");
@@ -823,6 +824,21 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
         return;
     }
     switch (commandName) {
+        // ---------- GIVEAWAY WINNER ----------
+        case 'winner': {
+            const ids = (0, giveaway_1.parseUserMentions)(args.join(' '));
+            if (!ids.length)
+                return usage('<@المستخدم> [معرّف السحب] • مثال: الفائز @opencode');
+            // آخر كلمة ليست منشن/آيدي قد تكون معرّف السحب القصير (مثال: الفائز @opencode ABC123)
+            const nonMention = args.filter(a => !/^<@!?\d{17,20}>$/.test(a) && !/^\d{17,20}$/.test(a));
+            const refCandidate = nonMention.find(a => /^[A-Za-z0-9]{4,8}$/.test(a));
+            const result = await (0, giveaway_1.addGiveawayWinners)(client, guild.id, refCandidate, ids);
+            if (!result.ok)
+                return respond(message, result.reason || '❌ تعذّر إعلان الفائز');
+            return respond(message, `🏆 **تم إعلان الفائز** في سحب \`${result.giveaway?.shortId}\` (${result.giveaway?.prize})\n` +
+                `الفائزون: ${result.winners.map(id => `<@${id}>`).join('، ')}` +
+                (result.finishedNow ? '\n> ✅ أُنهي السحب الآن لأن وقتّه كان خلص أو لسه شغال.' : ''));
+        }
         // ---------- MODERATION ----------
         case 'ban': {
             const userId = parseUserId(args[0]);

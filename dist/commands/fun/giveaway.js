@@ -84,7 +84,7 @@ const command = {
                 g.prize.toLowerCase().includes(needle));
         })
             .map(g => ({
-            name: `#${g.shortId} — ${g.prize} (${g.entries.length} مشارك)`,
+            name: `#${g.shortId} — ${g.prize} (${new Set((g.entries || []).map(String)).size} مشارك)`,
             value: g.shortId,
         }));
         await interaction.respond(choices.slice(0, 25));
@@ -248,7 +248,7 @@ async function handleList(interaction) {
         embed.addFields({
             name: `⏳ نشطة (${active.length})`,
             value: active
-                .map(g => `> \`#${g.shortId}\` **${g.prize}** — ${g.entries.length} مشارك — ينتهي <t:${Math.floor(g.endsAt.getTime() / 1000)}:R>`)
+                .map(g => `> \`#${g.shortId}\` **${g.prize}** — ${(0, giveaway_1.uniqueEntryCount)(g)} مشارك — ينتهي <t:${Math.floor(g.endsAt.getTime() / 1000)}:R>`)
                 .join('\n'),
             inline: false,
         });

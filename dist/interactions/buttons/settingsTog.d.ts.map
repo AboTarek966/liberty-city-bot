@@ -1,1 +1,1 @@
-{"version":3,"file":"settingsTog.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/settingsTog.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAOlE,QAAA,MAAM,OAAO,EAAE,aA+Ud,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"settingsTog.d.ts","sourceRoot":"","sources":["../../../src/interactions/buttons/settingsTog.ts"],"names":[],"mappings":"AAKA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAC;AAOlE,QAAA,MAAM,OAAO,EAAE,aAgVd,CAAC;AAEF,eAAe,OAAO,CAAC"}

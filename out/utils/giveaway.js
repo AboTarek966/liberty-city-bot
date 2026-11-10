@@ -7,6 +7,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateShortId = generateShortId;
 exports.formatRemaining = formatRemaining;
+exports.uniqueEntryCount = uniqueEntryCount;
+exports.dedupeGiveawayEntries = dedupeGiveawayEntries;
 exports.requirementLines = requirementLines;
 exports.invalidateInviteCache = invalidateInviteCache;
 exports.checkGiveawayRequirements = checkGiveawayRequirements;
@@ -16,6 +18,9 @@ exports.createGiveaway = createGiveaway;
 exports.findGiveaway = findGiveaway;
 exports.toggleGiveawayEntry = toggleGiveawayEntry;
 exports.endGiveaway = endGiveaway;
+exports.findDefaultGiveawayForWinner = findDefaultGiveawayForWinner;
+exports.addGiveawayWinners = addGiveawayWinners;
+exports.parseUserMentions = parseUserMentions;
 exports.rerollGiveaway = rerollGiveaway;
 exports.clearGiveawayTimer = clearGiveawayTimer;
 exports.scheduleGiveaway = scheduleGiveaway;
@@ -43,6 +48,19 @@ function formatRemaining(ms) {
     if (ms <= 0)
         return 'انتهى';
     return (0, helpers_1.formatDuration)(ms, { compact: true });
+}
+// 🧹 عدد المشاركين الفريد: دائماً فريد (حتى لا يتذبذب العداد بسبب بيانات قديمة مكررة)
+function uniqueEntryCount(giveaway) {
+    return new Set((giveaway.entries || []).map(String)).size;
+}
+// 🧹 إزالة أي تكرارات قديمة في المشاركات (من قبل إصلاح العداد) — تُستدعى قبل أي قراءة/عرض
+function dedupeGiveawayEntries(giveaway) {
+    const unique = Array.from(new Set(giveaway.entries || []));
+    if (unique.length !== (giveaway.entries || []).length) {
+        giveaway.entries = unique;
+        return true;
+    }
+    return false;
 }
 function toRequirementObject(input) {
     return {
@@ -141,12 +159,13 @@ function buildGiveawayPayload(giveaway, state = {}, guildName) {
         .setColor(ended ? embeds_1.Colors.Grey : embeds_1.Colors.primary)
         .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guildName || 'Omni'}` })
         .setTimestamp();
+    const participantCount = uniqueEntryCount(giveaway);
     const lines = [];
     if (giveaway.description)
         lines.push(giveaway.description, '');
     lines.push(ended
         ? `> 🏁 **انتهى السحب** ${giveaway.endedAt ? `<t:${Math.floor(new Date(giveaway.endedAt).getTime() / 1000)}:R>` : ''}`
-        : `> ⏳ **ينتهي:** <t:${Math.floor(endsAt / 1000)}:R> (<t:${Math.floor(endsAt / 1000)}:f>)`, `> 👥 **المشاركون:** \`${giveaway.entries.length}\``, `> 🏆 **عدد الفائزين:** \`${giveaway.winnersCount}\``, `> 🎩 **صاحب السحب:** <@${giveaway.hostId}>`);
+        : `> ⏳ **ينتهي:** <t:${Math.floor(endsAt / 1000)}:R> (<t:${Math.floor(endsAt / 1000)}:f>)`, `> 👥 **المشاركون:** \`${participantCount}\``, `> 🏆 **عدد الفائزين:** \`${giveaway.winnersCount}\``, `> 🎩 **صاحب السحب:** <@${giveaway.hostId}>`);
     const reqLines = requirementLines(giveaway.requirements);
     if (reqLines.length) {
         lines.push('', '**📋 شروط المشاركة:**', ...reqLines);
@@ -154,7 +173,9 @@ function buildGiveawayPayload(giveaway, state = {}, guildName) {
     if (ended) {
         lines.push('', winners.length
             ? `**🏆 الفائزون:** ${winners.map(id => `<@${id}>`).join('، ')}`
-            : '**🏆 الفائزون:** لا يوجد — لم يشارك أحد');
+            : state.awaitingWinner
+                ? '**🏆 الفائزون:** ⏳ بانتظار الإدارة تعلن الفائز (`الفائز @العضو`)'
+                : '**🏆 الفائزون:** لا يوجد — لم يشارك أحد');
     }
     else if (remaining > 0) {
         lines.push('', `> ⌛ **الوقت المتبقي:** \`${formatRemaining(remaining)}\``);
@@ -171,13 +192,19 @@ async function refreshGiveawayMessage(client, giveaway) {
     try {
         if (!giveaway.messageId)
             return;
+        // 🧹 إزالة التكرارات القديمة قبل العرض — يُحفظ إن تغيّر شيء
+        if (dedupeGiveawayEntries(giveaway)) {
+            await giveaway.save().catch(() => { });
+        }
         const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
         if (!channel || !channel.isTextBased())
             return;
         const message = await channel.messages.fetch(giveaway.messageId).catch(() => null);
         if (!message)
             return;
-        const payload = buildGiveawayPayload(giveaway, {}, client.guilds.cache.get(giveaway.guildId)?.name);
+        const options = await getGiveawayOptions(giveaway.guildId);
+        const awaitingWinner = !!giveaway.ended && !giveaway.winnerIds?.length && options.manualWinners;
+        const payload = buildGiveawayPayload(giveaway, { awaitingWinner }, client.guilds.cache.get(giveaway.guildId)?.name);
         await message.edit({ embeds: payload.embeds, components: payload.components }).catch(() => { });
     }
     catch (error) {
@@ -190,6 +217,7 @@ async function getGiveawayOptions(guildId) {
     return {
         dmWinners: cfg?.dmWinners !== false,
         pingWinners: cfg?.pingWinners !== false,
+        manualWinners: cfg?.manualWinners !== false,
         logChannelId: cfg?.logChannelId,
     };
 }
@@ -251,11 +279,21 @@ async function toggleGiveawayEntry(client, guildId, ref, member) {
         return { ok: false, reason: 'لم أجد هذا السحب' };
     if (giveaway.ended)
         return { ok: false, reason: 'هذا السحب انتهى بالفعل' };
-    const alreadyIn = giveaway.entries.includes(member.id);
-    if (alreadyIn) {
-        giveaway.entries = giveaway.entries.filter(id => id !== member.id);
-        await giveaway.save();
-        await refreshGiveawayMessage(client, giveaway);
+    // 🧹 إزالة أي تكرارات قديمة قبل الفحص
+    if (dedupeGiveawayEntries(giveaway))
+        await giveaway.save().catch(() => { });
+    // ⚡ المزامنة الذرية ($pull/$addToSet) — تمنع ضياع المشاركات/العداد الملتوي عند Press متزامن
+    const armed = giveaway.entries.includes(member.id);
+    if (armed) {
+        // المغادرة ذرية
+        const pull = await models_1.Giveaway.updateOne({ _id: giveaway._id, entries: member.id }, { $pull: { entries: member.id } });
+        const fresh = await models_1.Giveaway.findById(giveaway._id);
+        if (fresh) {
+            dedupeGiveawayEntries(fresh);
+            await fresh.save().catch(() => { });
+            await refreshGiveawayMessage(client, fresh);
+            return { ok: true, left: true, giveaway: fresh };
+        }
         return { ok: true, left: true, giveaway };
     }
     const inviteCounts = (giveaway.requirements?.minInvites || 0) > 0
@@ -265,9 +303,15 @@ async function toggleGiveawayEntry(client, guildId, ref, member) {
     if (missing.length) {
         return { ok: false, reason: `لا تستوفي الشروط:\n> • ${missing.join('\n> • ')}` };
     }
-    giveaway.entries.push(member.id);
-    await giveaway.save();
-    await refreshGiveawayMessage(client, giveaway);
+    // الإضافة ذرية — تُتجاهل بصمت إن كان العضو انضم للتو في ضغطة متزامنة
+    await models_1.Giveaway.updateOne({ _id: giveaway._id, entries: { $ne: member.id } }, { $addToSet: { entries: member.id } });
+    const fresh = await models_1.Giveaway.findById(giveaway._id);
+    if (fresh) {
+        dedupeGiveawayEntries(fresh);
+        await fresh.save().catch(() => { });
+        await refreshGiveawayMessage(client, fresh);
+        return { ok: true, left: false, giveaway: fresh };
+    }
     return { ok: true, left: false, giveaway };
 }
 // --------------------------------------------
@@ -338,7 +382,12 @@ async function finishGiveaway(client, giveaway) {
         return { ok: true, winners: [], giveaway };
     }
     const eligible = await eligibleEntries(guild, giveaway.entries, giveaway.requirements);
-    const winners = pickRandom(eligible, giveaway.winnersCount).map(m => m.id);
+    let winners = pickRandom(eligible, giveaway.winnersCount).map(m => m.id);
+    const optionsEarly = await getGiveawayOptions(giveaway.guildId);
+    // ✋ الوضع اليدوي: لا يسحب البوت فائزاً — الإدارة تعلن الفائز بنفسها
+    if (optionsEarly.manualWinners) {
+        winners = [];
+    }
     giveaway.ended = true;
     giveaway.endedAt = new Date();
     giveaway.winnerIds = winners;
@@ -352,11 +401,13 @@ async function finishGiveaway(client, giveaway) {
             .setTitle('🎉 نتيجة السحب')
             .setColor(winners.length ? embeds_1.Colors.success : embeds_1.Colors.warning)
             .setDescription(`**الجائزة:** ${giveaway.prize}\n` +
-            `**المشاركون:** \`${giveaway.entries.length}\`\n\n` +
+            `**المشاركون:** \`${uniqueEntryCount(giveaway)}\`\n\n` +
             (winners.length
                 ? `🏆 **الفائزون:** ${winners.map(id => `<@${id}>`).join('، ')}\n\n` +
                     `> 📩 سيتم التواصل معكم لاستلام الجائزة. مبروك!`
-                : `😔 **لا يوجد فائز** — لم يستوفِ أحد الشروط أو لم يشارك أحد.`))
+                : optionsEarly.manualWinners
+                    ? `✋ **انتهى وقت السحب** — بانتظار الإدارة تعلن الفائز يدوياً (\`الفائز @العضو\`)`
+                    : `😔 **لا يوجد فائز** — لم يستوفِ أحد الشروط أو لم يشارك أحد.`))
             .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guild.name}` })
             .setTimestamp();
         await channel.send({
@@ -380,13 +431,109 @@ async function finishGiveaway(client, giveaway) {
         .setColor(winners.length ? embeds_1.Colors.success : embeds_1.Colors.warning)
         .setDescription(`> 🎁 **الجائزة:** ${giveaway.prize}\n` +
         `> 🆔 **المعرّف:** \`${giveaway.shortId}\`\n` +
-        `> 👥 **المشاركون:** \`${giveaway.entries.length}\`\n` +
+        `> 👥 **المشاركون:** \`${uniqueEntryCount(giveaway)}\`\n` +
         `> 🎩 **صاحب السحب:** <@${giveaway.hostId}>\n` +
         `> 🏆 **الفائزون:** ${winners.length ? winners.map(id => `<@${id}>`).join('، ') : 'لا يوجد'}`)
         .setFooter({ text: guild.name })
         .setTimestamp());
     logger.info(`Giveaway ${giveaway.shortId} ended — winners: ${winners.join(', ') || 'none'}`);
     return { ok: true, winners, giveaway };
+}
+// --------------------------------------------
+// ✋ الإعلان اليدوي عن الفائزين — الإدارة تحدد الفائز بدل السحب العشوائي
+// --------------------------------------------
+async function findDefaultGiveawayForWinner(guildId) {
+    // 1) آخر سحب منتهٍ بدون فائز معلن
+    const pending = await models_1.Giveaway.findOne({ guildId, ended: true, winnerIds: { $size: 0 } })
+        .sort({ endedAt: -1, createdAt: -1 })
+        .catch(() => null);
+    if (pending)
+        return pending;
+    // 2) آخر سحب أُنشئ (حتى لو شغال — يحذّر لاحقاً)
+    const latest = await models_1.Giveaway.findOne({ guildId })
+        .sort({ createdAt: -1 })
+        .catch(() => null);
+    return latest;
+}
+/**
+ * يعلن الفائزين يدوياً لسحب معيّن (أو الافتراضي).
+ * - ينهي السحب إن لم ينتهِ بعد.
+ * - يدمج الفائزين مع القائمة الحالية (بدون تكرار).
+ */
+async function addGiveawayWinners(client, guildId, ref, winnerIds) {
+    const ids = Array.from(new Set(winnerIds.filter(id => /^\d{17,20}$/.test(String(id))))).slice(0, 20);
+    if (!ids.length)
+        return { ok: false, reason: '❌ منشن عضو واحد على الأقل (مثال: `الفائز @العضو`)' };
+    let giveaway = null;
+    if (ref && ref.trim()) {
+        giveaway = await findGiveaway(guildId, ref);
+        if (!giveaway)
+            return { ok: false, reason: '❌ لم أجد هذا السحب' };
+    }
+    else {
+        giveaway = await findDefaultGiveawayForWinner(guildId);
+        if (!giveaway)
+            return { ok: false, reason: '❌ لا يوجد أي سحب في هذا السيرفر — أنشئ سحباً أولاً' };
+    }
+    const wasEnded = !!giveaway.ended;
+    if (!giveaway.ended) {
+        giveaway.ended = true;
+        giveaway.endedAt = new Date();
+        clearGiveawayTimer(giveaway._id.toString());
+    }
+    dedupeGiveawayEntries(giveaway);
+    giveaway.winnerIds = Array.from(new Set([...(giveaway.winnerIds || []), ...ids]));
+    await giveaway.save();
+    await refreshGiveawayMessage(client, giveaway);
+    const guild = client.guilds.cache.get(guildId);
+    const options = await getGiveawayOptions(guildId);
+    const channel = guild ? await client.channels.fetch(giveaway.channelId).catch(() => null) : null;
+    if (channel && channel.isTextBased()) {
+        const embed = new discord_js_1.EmbedBuilder()
+            .setTitle('🏆 نتيجة السحب')
+            .setColor(embeds_1.Colors.success)
+            .setDescription(`**الجائزة:** ${giveaway.prize}\n` +
+            `**المشاركون:** \`${uniqueEntryCount(giveaway)}\`\n\n` +
+            `🎉 **الفائزون:** ${giveaway.winnerIds.map(id => `<@${id}>`).join('، ')}\n\n` +
+            `> 📩 سيتم التواصل معكم لاستلام الجائزة. مبروك!`)
+            .setFooter({ text: `Giveaway ID: ${giveaway.shortId} • ${guild?.name || 'Omni'}` })
+            .setTimestamp();
+        await channel.send({
+            content: options.pingWinners ? giveaway.winnerIds.map(id => `<@${id}>`).join(' ') : undefined,
+            embeds: [embed],
+        }).catch(() => { });
+    }
+    // الرسائل الخاصة للفائزين الجدد فقط
+    if (options.dmWinners && guild) {
+        for (const winnerId of ids) {
+            const member = guild.members.cache.get(winnerId);
+            if (member) {
+                await member.send(`🎉 مبروك! لقد فزت في سحب **${giveaway.prize}** في سيرفر **${guild.name}**.\n` +
+                    `تواصل مع الإدارة لاستلام جائزتك.`).catch(() => { });
+            }
+        }
+    }
+    await sendGiveawayLog(client, giveaway, options.logChannelId, new discord_js_1.EmbedBuilder()
+        .setTitle('🏆 سجل سحب — الفائز أُعلن يدوياً')
+        .setColor(embeds_1.Colors.success)
+        .setDescription(`> 🎁 **الجائزة:** ${giveaway.prize}\n` +
+        `> 🆔 **المعرّف:** \`${giveaway.shortId}\`\n` +
+        `> 👥 **المشاركون:** \`${uniqueEntryCount(giveaway)}\`\n` +
+        `> 🎩 **صاحب السحب:** <@${giveaway.hostId}>\n` +
+        `> 🏆 **الفائزون:** ${giveaway.winnerIds.map(id => `<@${id}>`).join('، ')}${wasEnded ? '' : ' — أُنهي السحب الآن'}`)
+        .setFooter({ text: guild?.name || 'Omni' })
+        .setTimestamp());
+    logger.info(`Giveaway ${giveaway.shortId} manual winners set: ${giveaway.winnerIds.join(', ')}`);
+    return { ok: true, winners: giveaway.winnerIds, giveaway, finishedNow: !wasEnded };
+}
+/** استخراج معرّفات المنشن من نص رسالة — <@!id> أو <@id> أو آيدي خام */
+function parseUserMentions(text) {
+    const ids = new Set();
+    for (const m of String(text || '').matchAll(/<@!?(\d{17,20})>/g))
+        ids.add(m[1]);
+    for (const m of String(text || '').matchAll(/\b(\d{17,20})\b/g))
+        ids.add(m[1]);
+    return [...ids];
 }
 // --------------------------------------------
 // Reroll
@@ -491,8 +638,12 @@ async function restoreGiveaways(client) {
     try {
         const active = await models_1.Giveaway.find({ ended: false }).limit(500);
         logger.info(`Restoring ${active.length} active giveaway(s)`);
-        for (const giveaway of active)
+        // 🧹 تنظيف التكرارات القديمة في المشاركات مرة واحدة عند الإقلاع
+        for (const giveaway of active) {
+            if (dedupeGiveawayEntries(giveaway))
+                await giveaway.save().catch(() => { });
             scheduleGiveaway(client, giveaway);
+        }
     }
     catch (error) {
         logger.error(`Could not restore giveaways: ${error.message}`);

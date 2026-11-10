@@ -25,6 +25,7 @@ import {
   rerollGiveaway,
   buildGiveawayPayload,
   scheduleGiveaway,
+  uniqueEntryCount,
 } from '../../utils/giveaway';
 
 const command: Command = {
@@ -134,7 +135,7 @@ const command: Command = {
         );
       })
       .map(g => ({
-        name: `#${g.shortId} — ${g.prize} (${g.entries.length} مشارك)`,
+        name: `#${g.shortId} — ${g.prize} (${new Set((g.entries || []).map(String)).size} مشارك)`,
         value: g.shortId,
       }));
 
@@ -332,7 +333,7 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
       value: active
         .map(
           g =>
-            `> \`#${g.shortId}\` **${g.prize}** — ${g.entries.length} مشارك — ينتهي <t:${Math.floor(
+            `> \`#${g.shortId}\` **${g.prize}** — ${uniqueEntryCount(g as any)} مشارك — ينتهي <t:${Math.floor(
               g.endsAt.getTime() / 1000
             )}:R>`
         )

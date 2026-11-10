@@ -577,6 +577,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         defaultMinInvites: { type: Number, default: 0, min: 0, max: 10000 },
         dmWinners: { type: Boolean, default: true },
         pingWinners: { type: Boolean, default: true },
+        manualWinners: { type: Boolean, default: true },
         logChannelId: { type: String },
     },
     shop: {

@@ -28,6 +28,7 @@ import { getAliasesForShortcut, getAllGuildAliases } from '../utils/aliasCache';
 import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom, handleApplicationIntent } from '../utils/messageSystems';
+import { addGiveawayWinners, findDefaultGiveawayForWinner, parseUserMentions } from '../utils/giveaway';
 import { resolveEmojiShortcodes } from '../utils/emoji';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
 import { detectImagePrompt, generateImageWithRetry, translateForImage } from '../utils/imageGen';
@@ -927,6 +928,23 @@ async function runAliasCommand(
   }
 
   switch (commandName) {
+    // ---------- GIVEAWAY WINNER ----------
+    case 'winner': {
+      const ids = parseUserMentions(args.join(' '));
+      if (!ids.length) return usage('<@المستخدم> [معرّف السحب] • مثال: الفائز @opencode');
+      // آخر كلمة ليست منشن/آيدي قد تكون معرّف السحب القصير (مثال: الفائز @opencode ABC123)
+      const nonMention = args.filter(a => !/^<@!?\d{17,20}>$/.test(a) && !/^\d{17,20}$/.test(a));
+      const refCandidate = nonMention.find(a => /^[A-Za-z0-9]{4,8}$/.test(a));
+      const result = await addGiveawayWinners(client, guild.id, refCandidate, ids);
+      if (!result.ok) return respond(message, result.reason || '❌ تعذّر إعلان الفائز');
+      return respond(
+        message,
+        `🏆 **تم إعلان الفائز** في سحب \`${result.giveaway?.shortId}\` (${result.giveaway?.prize})\n` +
+          `الفائزون: ${result.winners!.map(id => `<@${id}>`).join('، ')}` +
+          (result.finishedNow ? '\n> ✅ أُنهي السحب الآن لأن وقتّه كان خلص أو لسه شغال.' : '')
+      );
+    }
+
     // ---------- MODERATION ----------
     case 'ban': {
       const userId = parseUserId(args[0]);

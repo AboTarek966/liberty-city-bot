@@ -102,6 +102,7 @@ const handler: ButtonHandler = {
         const g: any = settings.giveaways;
         if (field === 'dmwinners') g.dmWinners = !(g.dmWinners !== false);
         else if (field === 'pingwinners') g.pingWinners = !(g.pingWinners !== false);
+        else if (field === 'manualwinners') g.manualWinners = !(g.manualWinners !== false);
         else g.enabled = !(g.enabled !== false);
         break;
       }
