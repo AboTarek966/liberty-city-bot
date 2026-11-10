@@ -729,15 +729,15 @@ class AIHandler {
             if (!session?.messages?.length)
                 return [];
             //7أيام (كانت30دقيقة — هذا سبب "نسيان" البوت للمحادثة القصيرة)
-            // ⚡ 4K حرف حد أقصى (بدلنا عن 8000) — تحميل أقل = رد أسرع (ولسه بتذكر المحادثة)
+            // 🔥 ذاكرة ضخمة (20K حرف) — سياق طويل جداً لكن Gemini Flash يخدمها بسرعة ومع ذاكرة كبيرة جداً
             const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
             const msgs = session.messages
                 .filter((m) => m.role !== 'system' && new Date(m.timestamp).getTime() >= cutoff)
-                .slice(-40) // آخر40 رسالة كحد أقصى للعدّ
-                .map((m) => ({ role: m.role, content: String(m.content).slice(0, 1500) }));
+                .slice(-200) // آخر200 رسالة كحد أقصى — ذاكرة ضخمة جداً (الحصص: 20K حرف أحدثها)
+                .map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
             const trimmed = [];
             let chars = 0;
-            const MAX_HISTORY_CHARS = 4000;
+            const MAX_HISTORY_CHARS = 20000; // ~5K token — ذاكرة كبيرة جداً ومضغوطة نسبياً
             for (let i = msgs.length - 1; i >= 0; i--) {
                 const len = msgs[i].content.length + 8;
                 if (chars + len > MAX_HISTORY_CHARS)
@@ -763,7 +763,8 @@ class AIHandler {
                             { role: 'user', content: userMessage.slice(0, 2000), timestamp: now },
                             { role: 'assistant', content: botResponse.slice(0, 3000), timestamp: now },
                         ],
-                        $slice: -300, // نحتفظ بآخر300 رسالة كذاكرة طويلة المدى (زيادة من 200)
+                        // ذاكرة طويلة المدى ضخمة — بتقدر تتذكر سنين من المحادثات
+                        $slice: -1000,
                     },
                 },
                 $set: { lastActivity: now },
