@@ -153,7 +153,6 @@ function buildGiveawayPayload(giveaway, state = {}, guildName) {
     const ended = state.ended ?? giveaway.ended;
     const winners = state.winners ?? giveaway.winnerIds ?? [];
     const endsAt = new Date(giveaway.endsAt).getTime();
-    const remaining = ended ? 0 : endsAt - Date.now();
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(ended ? `🏁 انتهى السحب — ${giveaway.prize}` : `🎉 ${giveaway.prize}`)
         .setColor(ended ? embeds_1.Colors.Grey : embeds_1.Colors.primary)
@@ -177,9 +176,8 @@ function buildGiveawayPayload(giveaway, state = {}, guildName) {
                 ? '**🏆 الفائزون:** ⏳ بانتظار الإدارة تعلن الفائز (`الفائز @العضو`)'
                 : '**🏆 الفائزون:** لا يوجد — لم يشارك أحد');
     }
-    else if (remaining > 0) {
-        lines.push('', `> ⌛ **الوقت المتبقي:** \`${formatRemaining(remaining)}\``);
-    }
+    // ملاحظة: لا نكتب "الوقت المتبقي" كنص ثابت — الرقم كان بيقف عند قراءته.
+    // ديسكورد يعرض <t:…:R> (ينتهي بعد …) بشكل حي بدون أي تحديث من البوت.
     embed.setDescription(lines.join('\n'));
     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
         .setCustomId(`giveaway:entry:${giveaway.shortId}`)
@@ -192,10 +190,9 @@ async function refreshGiveawayMessage(client, giveaway) {
     try {
         if (!giveaway.messageId)
             return;
-        // 🧹 إزالة التكرارات القديمة قبل العرض — يُحفظ إن تغيّر شيء
-        if (dedupeGiveawayEntries(giveaway)) {
-            await giveaway.save().catch(() => { });
-        }
+        // 🧹 تنظيف التكرارات في الذاكرة فقط — لا نحفظ الوثيقة هنا حتى لا نمسخ
+        // مشاركات ذرّية جرت بين القراءة والحفظ (الضغطات المتزامنة كانت هي سبب تذبذب العداد).
+        dedupeGiveawayEntries(giveaway);
         const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
         if (!channel || !channel.isTextBased())
             return;
@@ -279,10 +276,7 @@ async function toggleGiveawayEntry(client, guildId, ref, member) {
         return { ok: false, reason: 'لم أجد هذا السحب' };
     if (giveaway.ended)
         return { ok: false, reason: 'هذا السحب انتهى بالفعل' };
-    // 🧹 إزالة أي تكرارات قديمة قبل الفحص
-    if (dedupeGiveawayEntries(giveaway))
-        await giveaway.save().catch(() => { });
-    // ⚡ المزامنة الذرية ($pull/$addToSet) — تمنع ضياع المشاركات/العداد الملتوي عند Press متزامن
+    // ⚙️ لا نحفظ الوثيقة كما هي — نعدل فقط بشكل ذري ($pull/$addToSet) حتى لا نرجع العداد للخلف
     const armed = giveaway.entries.includes(member.id);
     if (armed) {
         // المغادرة ذرية
@@ -290,7 +284,6 @@ async function toggleGiveawayEntry(client, guildId, ref, member) {
         const fresh = await models_1.Giveaway.findById(giveaway._id);
         if (fresh) {
             dedupeGiveawayEntries(fresh);
-            await fresh.save().catch(() => { });
             await refreshGiveawayMessage(client, fresh);
             return { ok: true, left: true, giveaway: fresh };
         }
@@ -308,7 +301,6 @@ async function toggleGiveawayEntry(client, guildId, ref, member) {
     const fresh = await models_1.Giveaway.findById(giveaway._id);
     if (fresh) {
         dedupeGiveawayEntries(fresh);
-        await fresh.save().catch(() => { });
         await refreshGiveawayMessage(client, fresh);
         return { ok: true, left: false, giveaway: fresh };
     }
