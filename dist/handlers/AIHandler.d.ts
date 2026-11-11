@@ -112,7 +112,7 @@ export declare class AIHandler {
     /** موديلات الرؤية على Groq (تدعم الصور) — تُستخدم فقط عند إرفاق صور */
     private groqVisionCandidates;
     private generateGemini;
-    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة والموثوقية */
+    /** موديلات OpenRouter للرؤية — المجرّبة فعلياً أولاً (Gemini المباشر قد يكون مفتاحه معطلاً) */
     private openrouterVisionCandidates;
     /** موديلات OpenRouter النصية — الأسرع/الأرخص/الأثبت أولاً (بلا نماذج استدلالية تُستهلك في التفكير) */
     private openrouterTextCandidates;

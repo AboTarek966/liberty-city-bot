@@ -1391,13 +1391,14 @@ class AIHandler {
     // --------------------------------------------
     // OpenRouter — بديل مجاني يدعم الرؤية (موديلات :free)
     // --------------------------------------------
-    /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة والموثوقية */
+    /** موديلات OpenRouter للرؤية — المجرّبة فعلياً أولاً (Gemini المباشر قد يكون مفتاحه معطلاً) */
     openrouterVisionCandidates() {
         const preferred = config_1.config.ai.openrouter?.visionModel;
         const list = [
-            preferred, // gemma-31b: ~7ث عندما لا تكون حصة Google مشغولة
-            'dots-studio/dots-3-note-preview:free', // موثوق ~12ث (بلا ازدحام Google)
-            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', // موثوق، يدعم صور+فيديو+صوت
+            'google/gemini-2.5-flash', // 💎 موثوق وسريع ورخيص — يدعم الصور بدقة
+            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', // مجاني موثوق (صور+فيديو+صوت)
+            preferred,
+            'dots-studio/dots-3-note-preview:free',
             'google/gemma-4-26b-a4b-it:free', // احتياطي أخير
         ].filter(Boolean);
         // لا نستخدم openrouter/free هنا لأنه قد يختار موديل "سلامة محتوى"
