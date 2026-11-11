@@ -749,6 +749,10 @@ export interface IAISession extends Document {
   guildId?: string;
   channelId?: string;
   messages: IAISessionMessage[];
+  /** 🧠 ملخص ذكي متجدد من المحادثات القديمة — يحمل ذاكرة البوت الطويلة مضغوطة */
+  summary?: string;
+  /** عدد الرسائل عند آخر تلخيص — يمنع إعادة التلخيص قبل تراكم جديد */
+  summaryCount?: number;
   lastActivity: Date;
   tokenCount: number;
 }
@@ -1486,6 +1490,9 @@ const AISessionSchema = new Schema<IAISession>({
   guildId: { type: String, index: true },
   channelId: { type: String },
   messages: [AIMessageSchema],
+  /** 🧠 ملخص ذكي متجدد من الرسائل القديمة — يمنع bloat في كل طلب */
+  summary: { type: String, default: '' },
+  summaryCount: { type: Number, default: 0 },
   lastActivity: { type: Date, default: Date.now },
   tokenCount: { type: Number, default: 0 },
 });

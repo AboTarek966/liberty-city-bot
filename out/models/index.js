@@ -687,6 +687,9 @@ const AISessionSchema = new mongoose_1.Schema({
     guildId: { type: String, index: true },
     channelId: { type: String },
     messages: [AIMessageSchema],
+    /** 🧠 ملخص ذكي متجدد من الرسائل القديمة — يمنع bloat في كل طلب */
+    summary: { type: String, default: '' },
+    summaryCount: { type: Number, default: 0 },
     lastActivity: { type: Date, default: Date.now },
     tokenCount: { type: Number, default: 0 },
 });

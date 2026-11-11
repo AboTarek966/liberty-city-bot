@@ -32,6 +32,8 @@ export declare class AIHandler {
     /** OpenRouter — بديل مجاني يدعم الرؤية عبر موديلات :free */
     private openrouter;
     private cooldowns;
+    /** ⏳ تهدئة المزوّدين — المزوّد الذي فشل (مفتاح ميت/حصة/ازدحام) نتخطاه مؤقتاً بدل إهدار ثوانٍ كل رسالة */
+    private providerCooldowns;
     private fallbackResponses;
     constructor(client: Client);
     private initializeProviders;
@@ -88,9 +90,14 @@ export declare class AIHandler {
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     private runResearchTool;
     private loadHistory;
+    private maybeUpdateSummary;
     private saveHistory;
     /** بناء رسائل الـ API: system + ذاكرة المحادثة + سؤال المستخدم (مع صور إن وُجدت) */
     private buildMessages;
+    /** ⏳ هل المزوّد في فترة تهدئة؟ */
+    private isProviderCooling;
+    /** 🧊 تهدئة مزوّد فشل — نتخطاه حتى انتهاء المدة */
+    private coolProvider;
     /**
      * Resolve the order in which AI providers should be tried.
      * Uses aiConfig.provider if set, otherwise AI_PROVIDER from .env (default: auto).
@@ -107,11 +114,14 @@ export declare class AIHandler {
     private generateGemini;
     /** موديلات OpenRouter المجانية للرؤية — مُختبرة فعلياً ومرتّبة حسب السرعة والموثوقية */
     private openrouterVisionCandidates;
+    /** موديلات OpenRouter النصية — الأسرع/الأرخص/الأثبت أولاً (بلا نماذج استدلالية تُستهلك في التفكير) */
+    private openrouterTextCandidates;
     private generateOpenRouter;
     /** بث رد Groq مباشرة أثناء التوليد */
     private streamGroq;
     private generateAnthropic;
     private containsSensitiveContent;
+    private emergencyResponse;
     private getFallbackResponse;
     handleAICommand(interaction: any, prompt: string, options?: {
         model?: string;

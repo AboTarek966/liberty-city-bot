@@ -55,6 +55,8 @@ class AIHandler {
     /** OpenRouter — بديل مجاني يدعم الرؤية عبر موديلات :free */
     openrouter = null;
     cooldowns = new Map();
+    /** ⏳ تهدئة المزوّدين — المزوّد الذي فشل (مفتاح ميت/حصة/ازدحام) نتخطاه مؤقتاً بدل إهدار ثوانٍ كل رسالة */
+    providerCooldowns = new Map();
     fallbackResponses = new Map();
     constructor(client) {
         this.client = client;
@@ -555,6 +557,9 @@ class AIHandler {
                 ];
             }
             for (const provider of providerOrder) {
+                // ⏳ تخطّي المزوّد الذي فشل مؤخراً (مفتاح ميت/حصة منتهية/ازدحام) — لا نضيّع ثواني كل رسالة
+                if (this.isProviderCooling(provider))
+                    continue;
                 try {
                     if (provider === 'gemini')
                         return await this.generateGemini(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
@@ -579,7 +584,17 @@ class AIHandler {
                 }
                 catch (error) {
                     const errMsg = String(error?.message || error);
-                    logger.warn(`AI provider "${provider}" failed: ${errMsg}`);
+                    const status = Number(error?.status ?? error?.response?.status ?? 0);
+                    logger.warn(`AI provider "${provider}" failed (${status || '?'}): ${errMsg}`);
+                    // 🧊 تهدئة ذكية: مفتاح ميت → 10 دقائق | حصة/حد معدل → 45 ثانية | رصيد → دقيقة
+                    if (status === 401 || status === 403)
+                        this.coolProvider(provider, 10 * 60_000, 'مفتاح غير صالح/محذوف');
+                    else if (status === 429)
+                        this.coolProvider(provider, 45_000, 'حد معدل أو حصة مؤقتة');
+                    else if (status === 402)
+                        this.coolProvider(provider, 60_000, 'حد رصيد/توكنز');
+                    else if (status === 503)
+                        this.coolProvider(provider, 30_000, 'ازدحام مؤقت');
                     // 🔧 413 = الطلب أكبر من الحد (تاريخ محادثة طويل) → نعيد المحاولة بدون تاريخ
                     if (errMsg.includes('413') || errMsg.toLowerCase().includes('too large')) {
                         try {
@@ -683,8 +698,9 @@ class AIHandler {
                 fallback: false,
             };
         }
-        // Fallback
-        const finalResponse = response || this.getFallbackResponse(aiConfig.language || 'ar');
+        // Fallback — 🆘 محاولة إنقاذ بمزوّد سريع وبرومبت مختصر قبل رسالة الفشل
+        const rescued = response ? null : await this.emergencyResponse(effectiveMessage, aiConfig);
+        const finalResponse = response || rescued || this.getFallbackResponse(aiConfig.language || 'ar');
         // 🔒 تنظيف أخير — لا تصل أي علامة أداة إلى المستخدم أبداً
         const leaked = (finalResponse.content || '').match(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i);
         if (leaked) {
@@ -807,30 +823,101 @@ class AIHandler {
         try {
             const { AISession } = require('../models');
             const session = await AISession.findOne({ userId, guildId: key });
-            if (!session?.messages?.length)
+            if (!session?.messages?.length && !session?.summary)
                 return [];
-            //7أيام (كانت30دقيقة — هذا سبب "نسيان" البوت للمحادثة القصيرة)
-            // 🔥 ذاكرة ضخمة (20K حرف) — سياق طويل جداً لكن Gemini Flash يخدمها بسرعة ومع ذاكرة كبيرة جداً
             const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-            const msgs = session.messages
+            // ⚡ آخر 10 رسائل خام كحد أقصى — الباقي محفوظ في الملخص (ضغط ذكي)
+            const msgs = (session.messages || [])
                 .filter((m) => m.role !== 'system' && new Date(m.timestamp).getTime() >= cutoff)
-                .slice(-200) // آخر200 رسالة كحد أقصى — ذاكرة ضخمة جداً (الحصص: 20K حرف أحدثها)
-                .map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
-            const trimmed = [];
-            let chars = 0;
-            const MAX_HISTORY_CHARS = 20000; // ~5K token — ذاكرة كبيرة جداً ومضغوطة نسبياً
-            for (let i = msgs.length - 1; i >= 0; i--) {
-                const len = msgs[i].content.length + 8;
-                if (chars + len > MAX_HISTORY_CHARS)
-                    break;
-                chars += len;
-                trimmed.unshift(msgs[i]);
+                .slice(-10)
+                .map((m) => ({ role: m.role, content: String(m.content).slice(0, 1500) }));
+            const composed = [];
+            // 🧠 الملخص الذكي — يحمل كل المحادثات القديمة مضغوطة
+            if (session.summary && String(session.summary).trim()) {
+                composed.push({ role: 'user', content: `[🧠 الذاكرة طويلة المدى من المحادثات السابقة]\n${session.summary}` });
+                composed.push({ role: 'assistant', content: 'فهمت — سأراعي هذا السياق في كل رد أقدمه ولا أكرره إلا عند طلبك.' });
             }
-            return trimmed;
+            composed.push(...msgs);
+            return composed;
         }
         catch (error) {
             logger.warn('Failed to load AI history:', error);
             return [];
+        }
+    }
+    // --------------------------------------------
+    // 🧠 تلخيص ذكي للمحادثات القديمة — ذاكرة ضخمة بدون ضغط الطلب
+    // --------------------------------------------
+    async maybeUpdateSummary(userId, guildId) {
+        try {
+            const { AISession } = require('../models');
+            const session = await AISession.findOne({ userId, guildId });
+            if (!session)
+                return;
+            const total = (session.messages?.length || 0);
+            const summarized = typeof session.summaryCount === 'number' ? session.summaryCount : 0;
+            // لا نلخص قبل تراكم 15 رسالة جديدة على آخر تلخيص
+            if (total - summarized < 15)
+                return;
+            // لا نريد تلخيصاً قبل أن يكون لدينا شيء لنلخصه
+            if (total < 12)
+                return;
+            const chunk = (session.messages || []).slice(-30).map((m) => {
+                const who = m.role === 'user' ? 'المستخدم' : m.role === 'assistant' ? 'المساعد' : m.role;
+                return `${who}: ${String(m.content).slice(0, 280)}`;
+            }).join('\n');
+            const prior = session.summary ? `ملخص سابق (ارفض القديم إن تعارض مع الجديد):\n${session.summary}\n\n` : '';
+            const prompt = `${prior}هذه المحادثات الإضافية الأخيرة:\n${chunk}\n\n` +
+                `اكتب ملخصاً محدّثاً وموحداً للمحادثات مع هذا المستخدم (<= 220 كلمة عربية) يحتفظ بأهم الحقائق والقرارات:\n` +
+                `- شخصية المستخدم وتفضيلاته وأسلوب كلامه\n` +
+                `- الطلبات الجارية والقرارات المتخذة\n` +
+                `- معلومات مهمة ذكرها المستخدم (السيرفرات، الأرقام، المنتجات، المشاكل)\n` +
+                `- أي وعود أو اقتراحات من مساعده\n\n` +
+                `اكتب الملخص فقط بدون مقدمات أو عنوان — نصاً عربياً مفصلاً يصلح لإعادة استخدامه لاحقاً.`;
+            const sumSystem = 'أنت محرر استخلاص الذاكرة طويلة المدى للمستخدم. اكتب بالعربية الفصحى بدون مقدمات، واحتفظ بكل الحقائق المهمة.';
+            let clean = '';
+            // 1) OpenRouter — الأثبت حالياً (مفتاح Gemini القديم قد يكون معطلاً)
+            if (this.openrouter) {
+                try {
+                    const c = await this.openrouter.chat.completions.create({
+                        model: 'google/gemini-2.5-flash-lite',
+                        messages: [{ role: 'system', content: sumSystem }, { role: 'user', content: prompt }],
+                        temperature: 0.3,
+                        max_tokens: 700,
+                    });
+                    clean = String(c?.choices?.[0]?.message?.content || '').trim();
+                }
+                catch (e) {
+                    logger.debug(`AI summary (OpenRouter) skipped: ${e?.message || e}`);
+                }
+            }
+            // 2) Gemini المباشر — احتياطي عندما يكون المفتاح سليماً
+            if (!clean && this.geminiReady && !this.isProviderCooling('gemini')) {
+                try {
+                    const { geminiGenerate } = await Promise.resolve().then(() => __importStar(require('../utils/geminiClient')));
+                    const result = await geminiGenerate({
+                        apiKey: config_1.config.ai.gemini.apiKey,
+                        systemPrompt: sumSystem,
+                        history: [],
+                        message: prompt,
+                        temperature: 0.3,
+                        maxTokens: 600,
+                        preferredModel: config_1.config.ai.gemini.model,
+                    });
+                    clean = String(result?.content || '').trim();
+                }
+                catch (e) {
+                    logger.debug(`AI summary (Gemini) skipped: ${e?.message || e}`);
+                }
+            }
+            clean = clean.slice(0, 3000);
+            if (clean.length > 40) {
+                await AISession.updateOne({ userId, guildId }, { $set: { summary: clean, summaryCount: total } });
+                logger.info(`🧠 AI memory summary updated for ${userId} (${guildId || 'dm'}) size=${clean.length}`);
+            }
+        }
+        catch (error) {
+            logger.debug(`AI summary skipped: ${error?.message || error}`);
         }
     }
     async saveHistory(userId, guildId, userMessage, botResponse) {
@@ -851,6 +938,8 @@ class AIHandler {
                 $set: { lastActivity: now },
                 $inc: { tokenCount: Math.ceil((userMessage.length + botResponse.length) / 4) },
             }, { upsert: true });
+            // 🧠 حدّث الملخص الذكي بشكل دوري حتى تبقى الذاكرة كبيرة دون تضخم الطلبات
+            void this.maybeUpdateSummary(userId, guildId).catch(() => { });
         }
         catch (error) {
             logger.warn('Failed to save AI history:', error);
@@ -879,6 +968,16 @@ class AIHandler {
             ...history,
             { role: 'user', content },
         ];
+    }
+    /** ⏳ هل المزوّد في فترة تهدئة؟ */
+    isProviderCooling(provider) {
+        const until = this.providerCooldowns.get(provider) || 0;
+        return Date.now() < until;
+    }
+    /** 🧊 تهدئة مزوّد فشل — نتخطاه حتى انتهاء المدة */
+    coolProvider(provider, ms, why) {
+        this.providerCooldowns.set(provider, Date.now() + ms);
+        logger.warn(`🧊 Provider "${provider}" cooling for ${Math.round(ms / 1000)}s (${why})`);
     }
     /**
      * Resolve the order in which AI providers should be tried.
@@ -916,9 +1015,9 @@ class AIHandler {
                 preferred = ['groq'];
                 break;
             case 'both':
-                preferred = ['gemini', 'openrouter', 'anthropic', 'openai'];
+                preferred = ['openrouter', 'gemini', 'anthropic', 'openai'];
                 break;
-            default: preferred = ['groq', 'gemini', 'openrouter', 'anthropic', 'openai']; // auto: الأسرع أولاً
+            default: preferred = ['openrouter', 'groq', 'gemini', 'anthropic', 'openai']; // auto: الأكثر ثباتاً أولاً
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));
@@ -1191,8 +1290,8 @@ class AIHandler {
     }
     /** موديلات Groq بالترتيب: المُهيّأ أولاً ثم بدائل معروفة بالحساب */
     groqModelCandidates() {
-        const primary = config_1.config.ai.groq.model || 'openai/gpt-oss-120b';
-        const backups = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+        const primary = config_1.config.ai.groq.model || 'qwen/qwen3.8-27b';
+        const backups = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
         return [primary, ...backups.filter((m) => m !== primary)];
     }
     async generateGroq(message, systemPrompt, aiConfig, history = [], stream, images) {
@@ -1206,13 +1305,21 @@ class AIHandler {
             try {
                 // 📡 بث مباشر — أول كلمات تظهر فوراً (رد يبدو أسرع) — لا يُستخدم مع الرؤية
                 if (stream?.onFirstChunk && !images?.length) {
-                    return await this.streamGroq(model, messages, temperature, maxTokens, stream);
+                    try {
+                        return await this.streamGroq(model, messages, temperature, maxTokens, stream);
+                    }
+                    catch (streamErr) {
+                        logger.warn(`Groq stream "${model}" failed, retrying non-stream: ${streamErr?.message || streamErr}`);
+                    }
                 }
+                const reasoning = model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {};
                 const completion = await this.groq.chat.completions.create({
                     model,
                     messages,
                     temperature,
-                    max_tokens: maxTokens,
+                    // 🧠 نماذج التفكير تحتاج هامشاً إضافياً وإلا يعود النص فارغاً
+                    max_tokens: Math.max(maxTokens, model.includes('gpt-oss') ? 1200 : maxTokens),
+                    ...reasoning,
                 });
                 const content = completion.choices[0]?.message?.content?.trim();
                 if (!content)
@@ -1296,6 +1403,18 @@ class AIHandler {
         // لا نستخدم openrouter/free هنا لأنه قد يختار موديل "سلامة محتوى"
         return [...new Set(list)].filter((m) => m !== 'openrouter/free');
     }
+    /** موديلات OpenRouter النصية — الأسرع/الأرخص/الأثبت أولاً (بلا نماذج استدلالية تُستهلك في التفكير) */
+    openrouterTextCandidates() {
+        const preferred = config_1.config.ai.openrouter?.model;
+        const list = [
+            preferred,
+            'google/gemini-3.1-flash-lite',
+            'google/gemini-2.5-flash-lite',
+            'google/gemini-3.5-flash-lite',
+            'google/gemini-2.5-flash',
+        ].filter(Boolean);
+        return [...new Set(list)];
+    }
     async generateOpenRouter(message, systemPrompt, aiConfig, history = [], stream, images) {
         if (!this.openrouter)
             throw new Error('OpenRouter not configured');
@@ -1306,7 +1425,7 @@ class AIHandler {
         const messages = this.buildMessages(systemPrompt, history, message, imageList.length ? imageList : undefined);
         const candidates = imageList.length
             ? this.openrouterVisionCandidates()
-            : [config_1.config.ai.openrouter?.model || 'google/gemma-4-26b-a4b-it:free'];
+            : this.openrouterTextCandidates();
         // 🔭 الرؤية تحتاج توكنز أكبر — الموديلات الاستدلالية تستهلكها في "التفكير" قبل الإجابة
         const effMaxTokens = imageList.length ? Math.max(maxTokens, 1800) : maxTokens;
         let lastError = null;
@@ -1317,7 +1436,7 @@ class AIHandler {
                 try {
                     // 📡 بث مباشر — لا يُستخدم مع الصور
                     if (stream?.onFirstChunk && !imageList.length) {
-                        const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: effMaxTokens, stream: true }, { responseType: 'stream' });
+                        const completion = await this.openrouter.chat.completions.create({ model, messages, temperature, max_tokens: Math.max(effMaxTokens, 900), stream: true }, { responseType: 'stream' });
                         let full = '';
                         let started = false;
                         for await (const chunk of completion) {
@@ -1332,17 +1451,19 @@ class AIHandler {
                             else if (stream.onUpdate)
                                 await stream.onUpdate(full);
                         }
-                        if (!full)
-                            throw new Error('Empty streamed response from OpenRouter');
-                        if (stream.onUpdate)
-                            await stream.onUpdate(full);
-                        return { content: full, tokensUsed: 0, model: 'openrouter-' + model, fallback: false };
+                        if (full) {
+                            if (stream.onUpdate)
+                                await stream.onUpdate(full);
+                            return { content: full, tokensUsed: 0, model: 'openrouter-' + model, fallback: false };
+                        }
+                        // ⚠️ لا نص (الموديل صرف كل التوكنز على التفكير) → نكمل بدون بث بتوكنز أكبر
+                        logger.warn(`OpenRouter stream "${model}" produced no text — retrying non-stream with more tokens`);
                     }
                     const completion = await this.openrouter.chat.completions.create({
                         model,
                         messages,
                         temperature,
-                        max_tokens: effMaxTokens,
+                        max_tokens: Math.max(effMaxTokens, imageList.length ? 1800 : 1200),
                     });
                     const msg = completion?.choices?.[0]?.message;
                     const content = msg?.content?.trim();
@@ -1365,9 +1486,9 @@ class AIHandler {
                         await new Promise((r) => setTimeout(r, 2000));
                         continue;
                     }
-                    // موديل غير متاح/لا يدعم الرؤية → انتقل للموديل التالي
-                    const retryable = status === 400 || status === 404 || status === 429 || status === 503 ||
-                        /image|vision|modalit/i.test(msg);
+                    // موديل غير متاح/لا يدعم الرؤية/حد توكنز → انتقل للموديل التالي
+                    const retryable = status === 400 || status === 402 || status === 404 || status === 429 || status === 503 ||
+                        /image|vision|modalit|prompt tokens limit/i.test(msg);
                     if (!retryable)
                         throw error; // خطأ غير قابل للإصلاح (مفتاح/خادم) → لا فائدة من بقية الموديلات
                     logger.warn(`OpenRouter model "${model}" failed (${status}): ${msg.slice(0, 140)}`);
@@ -1383,8 +1504,9 @@ class AIHandler {
             model,
             messages,
             temperature,
-            max_tokens: maxTokens,
+            max_tokens: Math.max(maxTokens, model.includes('gpt-oss') ? 1000 : maxTokens),
             stream: true,
+            ...(model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
         });
         let acc = '';
         let firstSent = false;
@@ -1469,6 +1591,78 @@ class AIHandler {
     // --------------------------------------------
     // Fallback Responses
     // --------------------------------------------
+    // --------------------------------------------
+    // 🆘 رد إنقاذي — لو كل المزوّدين فشلوا، نحاول مزوّداً سريعاً برومبت مختصر بدل رسالة "مضغوط"
+    // --------------------------------------------
+    async emergencyResponse(message, aiConfig) {
+        const systemPrompt = 'أنت مساعد ودود في سيرفر ديسكورد، تجيب بالعربية بإيجاز ووضوح. ' +
+            'لا تدّعي أنك نفّذت أي إجراء في السيرفر — إن طلب المستخدم إجراءً فقل إنك لم تنفذه الآن وسيعاد المحاولة.';
+        const userMsg = String(message || '').slice(0, 4000);
+        const models = ['google/gemini-2.5-flash-lite', 'google/gemini-3.1-flash-lite'];
+        if (this.openrouter) {
+            for (const model of models) {
+                try {
+                    const c = await this.openrouter.chat.completions.create({
+                        model,
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+                        temperature: typeof aiConfig?.temperature === 'number' ? aiConfig.temperature : 0.7,
+                        max_tokens: 600,
+                    });
+                    const content = c?.choices?.[0]?.message?.content?.trim();
+                    if (content) {
+                        logger.info(`🆘 Emergency AI reply via OpenRouter/${model}`);
+                        return { content, tokensUsed: c?.usage?.total_tokens || 0, model: 'openrouter-emergency-' + model, fallback: false };
+                    }
+                }
+                catch (e) {
+                    logger.warn(`Emergency OpenRouter/${model} failed: ${e?.message || e}`);
+                }
+            }
+        }
+        if (this.groq) {
+            for (const model of ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b']) {
+                try {
+                    const c = await this.groq.chat.completions.create({
+                        model,
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+                        temperature: 0.7,
+                        max_tokens: 700,
+                        ...(model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
+                    });
+                    const content = c?.choices?.[0]?.message?.content?.trim();
+                    if (content) {
+                        logger.info(`🆘 Emergency AI reply via Groq/${model}`);
+                        return { content, tokensUsed: c?.usage?.total_tokens || 0, model: 'groq-emergency-' + model, fallback: false };
+                    }
+                }
+                catch (e) {
+                    logger.warn(`Emergency Groq/${model} failed: ${e?.message || e}`);
+                }
+            }
+        }
+        if (this.geminiReady && !this.isProviderCooling('gemini')) {
+            try {
+                const { geminiGenerate } = await Promise.resolve().then(() => __importStar(require('../utils/geminiClient')));
+                const r = await geminiGenerate({
+                    apiKey: config_1.config.ai.gemini.apiKey,
+                    systemPrompt,
+                    history: [],
+                    message: userMsg,
+                    temperature: 0.7,
+                    maxTokens: 600,
+                    preferredModel: 'gemini-3.1-flash-lite',
+                });
+                if (r?.content?.trim()) {
+                    logger.info(`🆘 Emergency AI reply via Gemini/${r.model}`);
+                    return { content: r.content.trim(), tokensUsed: r.tokens, model: 'gemini-emergency-' + r.model, fallback: false };
+                }
+            }
+            catch (e) {
+                logger.warn(`Emergency Gemini failed: ${e?.message || e}`);
+            }
+        }
+        return null;
+    }
     getFallbackResponse(language) {
         const responses = this.fallbackResponses.get(language) || this.fallbackResponses.get('ar');
         const randomResponse = responses[Math.floor(Math.random() * responses.length)];
@@ -1488,7 +1682,7 @@ class AIHandler {
         const channelId = interaction.channelId;
         await interaction.deferReply({ ephemeral: options.ephemeral });
         // Check if AI is available
-        if (!this.openai && !this.anthropic && !this.groq) {
+        if (!this.openai && !this.anthropic && !this.groq && !this.openrouter && !this.geminiReady) {
             await interaction.editReply({
                 content: '❌ ميزة الذكاء الاصطناعي غير مفعلة. يرجى إضافة `OPENAI_API_KEY` أو `ANTHROPIC_API_KEY` في ملف `.env` وتفعيل البوت.',
             });

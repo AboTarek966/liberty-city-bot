@@ -674,6 +674,10 @@ export interface IAISession extends Document {
     guildId?: string;
     channelId?: string;
     messages: IAISessionMessage[];
+    /** 🧠 ملخص ذكي متجدد من المحادثات القديمة — يحمل ذاكرة البوت الطويلة مضغوطة */
+    summary?: string;
+    /** عدد الرسائل عند آخر تلخيص — يمنع إعادة التلخيص قبل تراكم جديد */
+    summaryCount?: number;
     lastActivity: Date;
     tokenCount: number;
 }

@@ -119,7 +119,7 @@ exports.config = {
         // احصل على مفتاح مجاني: https://openrouter.ai/keys
         openrouter: {
             apiKey: process.env.OPENROUTER_API_KEY || '',
-            model: getEnv('OPENROUTER_MODEL', 'google/gemini-2.5-pro'), // أقوى نموذج
+            model: getEnv('OPENROUTER_MODEL', 'google/gemini-3.1-flash-lite'), // سريع/رخيص/ثابت — بلا تفكير يستهلك التوكنز
             visionModel: getEnv('OPENROUTER_VISION_MODEL', 'google/gemini-2.5-flash'),
             maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 4000),
             temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.8')),
