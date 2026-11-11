@@ -1263,19 +1263,40 @@ registerTool('send_dm', {
   description: 'إرسال رسالة خاصة (DM) لعضو',
   adminOnly: true,
   params: {
-    userId: { type: 'string', description: 'آيدي/منشن العضو (لو مفيش — الهدف في الرسالة)', required: false },
+    userId: { type: 'string', description: 'آيدي/منشن/اسم العضو (لو مفيش — الهدف في الرسالة)', required: false },
     message: { type: 'string', description: 'نص الرسالة', required: true },
   },
-  async func({ guild, executor, defaultTargetUserId }, { userId, message }) {
-    const targetId = userId || defaultTargetUserId;
+  async func({ guild, executor, defaultTargetUserId, client }, { userId, message }) {
+    const targetId = (typeof userId === 'string' && /\d{17,20}/.test(userId))
+      ? (userId.match(/\d{17,20}/)?.[0] as string)
+      : (defaultTargetUserId || '');
     if (!targetId) return { success: false, message: '❌ حدد العضو أو منشنِه في الرسالة' };
-    const member = await guild.members.fetch(String(targetId)).catch(() => null);
-    if (!member) return { success: false, message: '❌ العضو غير موجود' };
+
+    // نلقى العضو من كاش السيرفر أولاً ثم من Discord مباشرة (للي مش في كاش السيرفر)
+    let target: any = guild.members.cache.get(targetId) || null;
+    if (!target) target = await guild.members.fetch(targetId).catch(() => null);
+    if (!target) target = await client.users.fetch(targetId).catch(() => null);
+    if (!target) return { success: false, message: '❌ العضو غير موجود — تأكد من الآيدي/الاسم' };
+
+    // من DM bot — يتطلب أن يكون للعضو قناة DM مفتوحة أو مشتركة على سيرفر
+    const mention = target.user?.tag ?? target.tag ?? target.username ?? targetId;
     try {
-      await member.send(String(message).slice(0, 1900));
-      return { success: true, message: `📩 **تم الإرسال إلى** ${member.user.tag}` };
-    } catch {
-      return { success: false, message: '❌ تعذّر الإرسال الخاص (ربما أغلق الفياضي)' };
+      await target.send(String(message).slice(0, 1900));
+      return { success: true, message: `📩 **تم الإرسال إلى** ${mention}`, data: { deliveredTo: targetId } };
+    } catch (e: any) {
+      const raw = String(e?.message ?? e ?? '');
+      const code = Number(e?.code ?? 0);
+      // 50007 = Cannot send messages to this user — غالباً العضو قافل الخاص أو سيرفر المهمة
+      if (code === 50007 || /cannot send messages to this user/i.test(raw)) {
+        return {
+          success: false,
+          message: `❌ لا يمكن إرسال خاص لـ **${mention}** — غالباً مفعّل خاصية «لا تسمح برسائل الخاصة لأعضاء السيرفر»، أو لم تتشارك سيرفر معه.\n> الحل: العضو لازم يسمح بالخاص من «خصوصية» حسابه، أو اطلب منه ترسل رسالة أولاً.`,
+        };
+      }
+      if (/missing access|missing permissions/i.test(raw)) {
+        return { success: false, message: '❌ البوت لا يملك صلاحية الرسائل الخاصة — حاول ترسل رسالة عادية.' };
+      }
+      return { success: false, message: `❌ تعذّر الإرسال الخاص إلى ${mention}: ${raw.slice(0, 160)}` };
     }
   },
 });
@@ -3213,24 +3234,47 @@ export async function executeAITool(
   const tool = TOOLS[toolName];
   if (!tool) return { success: false, message: `❌ أداة غير موجودة: ${toolName}` };
 
+  // 🎯 لو الـ AI مرّر منشن «<@123>» أو «<@!123>» مكان الآيدي — نستخرج الرقم
+  if (typeof args?.userId === 'string') {
+    const snow = String(args.userId).match(/\d{17,20}/);
+    if (snow && snow[0] !== String(args.userId).trim()) {
+      args = { ...(args || {}), userId: snow[0] };
+    }
+  }
+  if (typeof args?.channelId === 'string') {
+    const snow = String(args.channelId).match(/\d{17,20}/);
+    if (snow && snow[0] !== String(args.channelId).trim()) {
+      args = { ...(args || {}), channelId: snow[0] };
+    }
+  }
+
   // 🎯 ملء userId تلقائياً من الهدف الافتراضي (منشن/رد) إن غاب أو غير صالح
   const rawUserId = typeof args?.userId === 'string' ? args.userId.trim() : '';
   const looksLikeSnowflake = /^\d{17,20}$/.test(rawUserId);
   if ((!rawUserId || !looksLikeSnowflake) && context.defaultTargetUserId) {
-    if (['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'give_role', 'remove_role', 'get_user_info', 'voice_mute', 'voice_deafen', 'disconnect_voice', 'set_member_roles'].includes(toolName)) {
+    if (['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'give_role', 'remove_role', 'get_user_info', 'voice_mute', 'voice_deafen', 'disconnect_voice', 'set_member_roles', 'send_dm', 'giveaway_set_winner'].includes(toolName)) {
       args = { ...(args || {}), userId: context.defaultTargetUserId };
     }
   }
   // 🔎 لو الـ AI مرّر اسم بدل ID (مثل username) — نحاول نلقاه بالاسم في السيرفر
   if (args?.userId && !/^\d{17,20}$/.test(String(args.userId).trim())) {
     const needle = String(args.userId).trim().toLowerCase();
-    const byName =
+    let byName =
       context.guild.members.cache.find(
         m => m.user.username.toLowerCase() === needle || m.displayName.toLowerCase() === needle
       ) ||
       context.guild.members.cache.find(
         m => m.user.username.toLowerCase().includes(needle) || m.displayName.toLowerCase().includes(needle)
       );
+    // الكاش غير مكتمل في السيرفرات الكبيرة — نجرب البحث الفعلي
+    if (!byName) {
+      try {
+        const search = await context.guild.members.search({ query: String(args.userId).trim(), limit: 3 });
+        byName =
+          search.find(m => m.user.username.toLowerCase() === needle || m.user.globalName?.toLowerCase() === needle) ||
+          search.first();
+      } catch { /* تجاهل */ }
+    }
     if (byName) args = { ...args, userId: byName.id };
   }
 
