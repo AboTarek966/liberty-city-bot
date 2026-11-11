@@ -102,6 +102,8 @@ export declare class AIHandler {
     /** تحويل كائن JSON إلى نداء أداة صالح — يرفض أي اسم غير مسجّل في السجل */
     private parseActionValue;
     private parseActionCallJson;
+    /** 🧹 أزل أي استدعاءات أدوات معروضة عارية أو داخل سطور من النص (حتى لو في منتصف الجملة) */
+    private stripToolJsons;
     /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
     private looksLikeActionRequest;
     /** سؤال عن قدرات البوت/الأدوات → يكفي ضمّ [ACTIONS] القصيرة بدل إلغائها */

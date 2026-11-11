@@ -836,7 +836,7 @@ class AIHandler {
         }
         // Fallback — 🆘 محاولة إنقاذ بمزوّد سريع وبرومبت مختصر قبل رسالة الفشل
         const rescued = response ? null : await this.emergencyResponse(effectiveMessage, aiConfig);
-        const finalResponse = response || rescued || this.getFallbackResponse(aiConfig.language || 'ar');
+        let finalResponse = response || rescued || this.getFallbackResponse(aiConfig.language || 'ar');
         // 🔒 تنظيف أخير — لا تصل أي علامة أداة إلى المستخدم أبداً
         const leaked = (finalResponse.content || '').match(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i);
         if (leaked) {
@@ -849,18 +849,29 @@ class AIHandler {
             if (cleaned)
                 finalResponse.content = cleaned;
         }
-        // 🔒 الموديل كتب استدعاء الأداة عارياً (بلات أسوار codeblock) — لا يظهر لينتشر كالنص
-        //    لو محتوى الرد كله تقريباً استدعاء → نحوله لنتيجة حقيقية (تنفيذ بالفعل أو اعتراف صريح بالفشل)
-        const looksLikeBareToolJson = /^\s*(?:\[\s*)?\{\s*"(?:tool|tool_name|action|function|name)"/i.test((finalResponse.content || '').trim());
-        if (looksLikeBareToolJson) {
-            if (toolOutcomes.length) {
+        // 🧹 تنقّب نهائي — أزل أي استدعاءات أدوات عارية بقيت في النص (حتى لو ملفوفة في الجملة)
+        const before = finalResponse.content || '';
+        const stripped = this.stripToolJsons(before);
+        if (stripped !== before) {
+            if (stripped) {
+                const suffix = toolOutcomes.length
+                    ? `\n${toolOutcomes.map(o => `• \`${o.tool}\` → ${o.ok ? '✅' : '❌'} ${o.message}`).join('\n')}`
+                    : '';
+                finalResponse = { ...finalResponse, content: stripped + suffix, fallback: finalResponse.fallback };
+            }
+            else if (toolOutcomes.length) {
                 const allOk = toolOutcomes.every(o => o.ok);
-                finalResponse.content =
-                    (allOk ? '✅ **تم تنفيذ الطلب.**\n' : '⚠️ **انتهى التنفيذ مع أن هناك خطوة لم تكتمل.**\n') +
-                        toolOutcomes.map(o => `• \`${o.tool}\` → ${o.ok ? '✅' : '❌'} ${o.message}`).join('\n');
+                finalResponse = {
+                    ...finalResponse,
+                    content: (allOk ? '✅ **تم تنفيذ الطلب.**\n' : '⚠️ **انتهى التنفيذ مع أن هناك خطوة لم تكتمل.**\n') +
+                        toolOutcomes.map(o => `• \`${o.tool}\` → ${o.ok ? '✅' : '❌'} ${o.message}`).join('\n'),
+                };
             }
             else {
-                finalResponse.content = '⚠️ **لم يُنفّذ هذا الطلب فعلياً** — تنسيق استدعاء الأداة لم يصل بشكل صحيح. جرّب إعادة الصياغة بصراحة (مثال: «ابعت خاص للعضو فلان: رسالتك»).';
+                finalResponse = {
+                    ...finalResponse,
+                    content: '⚠️ **لم يُنفّذ هذا الطلب فعلياً** — صيغة الاستدعاء لم تصل بشكل صحيح. جرّب إعادة الصياغة (مثال: «ابعت خاص للعضو فلان: رسالتك»).',
+                };
             }
         }
         return finalResponse;
@@ -1054,6 +1065,39 @@ class AIHandler {
         catch {
             return null;
         }
+    }
+    /** 🧹 أزل أي استدعاءات أدوات معروضة عارية أو داخل سطور من النص (حتى لو في منتصف الجملة) */
+    stripToolJsons(text) {
+        if (!text)
+            return text;
+        let out = text;
+        // 1) كتل الكود المحتوية على أداة — نمسحها كاملة
+        out = out.replace(/```(?:json)?\s*([\s\S]{0,1500}?)```/gi, (m, inner) => /"(?:tool|tool_name|action)"\s*:\s*/.test(inner) ? '' : m);
+        // 2) كائنات JSON متوازنة عارية — نقطع كل كائن يحوي مفتاح أداة معروفة
+        const spans = [];
+        const keyRe = /"(?:tool|tool_name|action)"\s*:\s*"/gi;
+        let m;
+        while ((m = keyRe.exec(out))) {
+            const brace = out.lastIndexOf('{', m.index);
+            if (brace < 0)
+                continue;
+            const raw = this.findBalancedJson(out, brace);
+            if (!raw)
+                continue;
+            let value = null;
+            try {
+                value = this.parseActionValue(JSON.parse(raw));
+            }
+            catch { /* لا */ }
+            if (value && this.normalizeToolName(value.tool)) {
+                spans.push([brace, brace + raw.length]);
+            }
+        }
+        spans.sort((a, b) => b[0] - a[0]);
+        for (const [s, e] of spans) {
+            out = out.slice(0, s) + out.slice(e);
+        }
+        return out.trim();
     }
     /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
     looksLikeActionRequest(text) {
