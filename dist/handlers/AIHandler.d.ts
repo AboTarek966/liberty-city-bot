@@ -86,10 +86,14 @@ export declare class AIHandler {
     private toolNameIndex;
     /** ترجمة اسم الأداة لاسم مسجّل فعلاً — أي JSON عادي لا يُعدّ استدعاء أداة */
     private normalizeToolName;
-    /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
+    /** كشف كل نداءات الأدوات في الرد — يدعم كتلة واحدة أو عدة كتل/مصفوفة/أدوات متعددة */
+    private extractActionCalls;
+    /** أول نداء أداة فقط — للتوافق مع المسارات القديمة */
     private extractActionCall;
     /** تجميع نص {…} متوازن بدءاً من startIdx */
     private findBalancedJson;
+    /** تحويل كائن JSON إلى نداء أداة صالح — يرفض أي اسم غير مسجّل في السجل */
+    private parseActionValue;
     private parseActionCallJson;
     /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
     private looksLikeActionRequest;

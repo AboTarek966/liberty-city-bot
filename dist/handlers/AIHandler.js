@@ -622,28 +622,32 @@ class AIHandler {
         // 🔧 حلقة استدعاء أدوات العمل (Function Calling) — الـ AI ينفذ إجراءات Discord
         // نمرر السياق الكامل: السيرفر، المنفذ، العميل
         let forcedToolTried = false;
+        let totalActionCalls = 0;
+        const executedActionKeys = new Set();
+        const MAX_TOTAL_ACTION_CALLS = 20;
+        const MAX_CALLS_PER_ROUND = 5;
         for (let actionRound = 0; actionRound < 7; actionRound++) {
             if (!response || response.fallback)
                 break;
-            let actionCall = this.extractActionCall(response.content);
+            let actionCalls = this.extractActionCalls(response.content);
             // 🛠️ إجبار الأداة: لو المستخدم طلب أمراً ولم يستدعِ النموذج أي أداة (ردّ نصوص فقط)
-            //    نعيد التوليد برسالة صارمة تُلزمه بإخراج استدعاء JSON واحد — يمنع «تم» الوهمية.
-            if (!actionCall && !forcedToolTried && isActionRequest) {
+            //    نعيد التوليد برسالة صارمة تُلزمه بإخراج استدعاء JSON — يمنع «تم» الوهمية.
+            if (!actionCalls.length && !forcedToolTried && isActionRequest) {
                 forcedToolTried = true;
                 try {
                     logger.warn(`AI emitted no tool call for an action request — forcing tool call`);
                     const forced = await callProviders(this.buildForceToolPrompt(effectiveMessage, response.content), false);
-                    const forcedCall = forced ? this.extractActionCall(forced.content) : null;
-                    if (forced && !forced.fallback && forcedCall) {
+                    const forcedCalls = forced ? this.extractActionCalls(forced.content) : [];
+                    if (forced && !forced.fallback && forcedCalls.length) {
                         response = forced;
-                        actionCall = forcedCall;
+                        actionCalls = forcedCalls;
                     }
                 }
                 catch (forceErr) {
                     logger.warn(`Forced tool-call attempt failed: ${forceErr?.message || forceErr}`);
                 }
             }
-            if (!actionCall)
+            if (!actionCalls.length)
                 break;
             const guild = guildId ? this.client.guilds.cache.get(guildId) : undefined;
             // نستخدم الـ userId الأصلي (مُمرّر للـ generateAIResponse)
@@ -652,27 +656,56 @@ class AIHandler {
             if (guild && !executor) {
                 executor = await guild.members.fetch(userId).catch(() => undefined);
             }
-            if (guild && executor) {
-                const toolContext = {
-                    guild,
-                    executor,
-                    client: this.client,
-                    // 🎯 الهدف الافتراضي (منشن/رد) — يُملأ userId تلقائياً لو الـ AI نسيه
-                    defaultTargetUserId: userContext?.targetUserId,
-                    // 📎 الوسائط المرفقة بالرسالة — يستخدمها AI لصورة السيرفر لو أرفقها المستخدم
-                    attachments,
-                    // 📍 القناة الحالية لتلك المحادثة — يُستخدم لأي أداة تطلب channelId
-                    defaultChannelId: channelId,
-                };
-                const toolResult = await (0, AITools_1.executeAITool)(actionCall.tool, actionCall.args, toolContext);
-                toolOutcomes.push({ tool: actionCall.tool, ok: !!toolResult?.success, message: String(toolResult?.message || '') });
-                // نضيف النتيجة للسياق ونعيد التوليد
-                const followUpMsg = `${effectiveMessage}\n\n=== نتيجة تنفيذ \`${actionCall.tool}\` ===\n${toolResult.message}\n===\nأكمل إجابتك اعتماداً على هذه النتيجة. إذا فشلت الأداة قل السبب الحقيقي — لا تقل «تم» أبداً. لا تخترع ✅.`;
-                response = await callProviders(followUpMsg, false);
-            }
-            else {
+            if (!guild || !executor)
                 break;
+            const toolContext = {
+                guild,
+                executor,
+                client: this.client,
+                // 🎯 الهدف الافتراضي (منشن/رد) — يُملأ userId تلقائياً لو الـ AI نسيه
+                defaultTargetUserId: userContext?.targetUserId,
+                // 📎 الوسائط المرفقة بالرسالة — يستخدمها AI لصورة السيرفر لو أرفقها المستخدم
+                attachments,
+                // 📍 القناة الحالية لتلك المحادثة — يُستخدم لأي أداة تطلب channelId
+                defaultChannelId: channelId,
+            };
+            // 🧹 منع تكرار نفس الأداة بنفس المعاملات قدر الإمكان + سقف إجمالي
+            const freshCalls = actionCalls
+                .filter(call => {
+                const key = `${call.tool}|${JSON.stringify(call.args || {})}`;
+                return !executedActionKeys.has(key);
+            })
+                .slice(0, Math.min(MAX_CALLS_PER_ROUND, MAX_TOTAL_ACTION_CALLS - totalActionCalls));
+            if (!freshCalls.length)
+                break;
+            const roundOutcomes = [];
+            for (const call of freshCalls) {
+                const key = `${call.tool}|${JSON.stringify(call.args || {})}`;
+                executedActionKeys.add(key);
+                totalActionCalls++;
+                const toolResult = await (0, AITools_1.executeAITool)(call.tool, call.args, toolContext);
+                let dataText = '';
+                if (toolResult?.data) {
+                    try {
+                        dataText = JSON.stringify(toolResult.data).slice(0, 1200);
+                    }
+                    catch {
+                        dataText = '';
+                    }
+                }
+                const outcome = { tool: call.tool, ok: !!toolResult?.success, message: String(toolResult?.message || ''), data: dataText };
+                toolOutcomes.push(outcome);
+                roundOutcomes.push(outcome);
             }
+            logger.info(`AI action round ${actionRound + 1}: executed ${roundOutcomes.length} tool(s); total=${totalActionCalls}`);
+            // نضيف كل النتائج للسياق ونعيد التوليد — لو في خطوات تانية ينفذها في نفس الحلقة
+            const resultsText = roundOutcomes
+                .map((r, i) => `${i + 1}) \`${r.tool}\` → ${r.ok ? 'نجحت' : 'فشلت'} — ${r.message}${r.data ? `\n   DATA: ${r.data}` : ''}`)
+                .join('\n');
+            const followUpMsg = `${effectiveMessage}\n\n=== نتائج تنفيذ ${roundOutcomes.length} أداة ===\n${resultsText}\n===\n` +
+                `أكمل إجابتك اعتماداً على النتائج الحقيقية أعلاه. لو لسه في خطوات مطلوبة نفّذها الآن بنفس صيغة JSON.\n` +
+                `لو خلصت: قل «تم ✅» + ملخص مختصر فقط لو كل الأدوات نجحت. أي فشل اذكره بصراحة وسببه الحقيقي — لا تقل «تم» ولا تخترع ✅.`;
+            response = await callProviders(followUpMsg, false);
         }
         // 🔁 حلقة البحث الذاتي: لو النموذج طلب معلومة إضافية عبر [[SEARCH:...]] أو [[FETCH:...]]
         //    ننفّذ الأداة ثم نعيد التوليد بالنتيجة (جولتين للبحث الأعمق)
@@ -702,7 +735,6 @@ class AIHandler {
         const doneClaimRe = /(?:^|[\s،؛:!.])(?:✅|✔️?|تمّ?|تمت|خلّصت|خلصت|اتعملت|اتنفذت|اتسلم|اُنجزت|اُنجز|انجز|غيّرت|غيرت|عملت|أنشأت|انشأت|أضفت|اضفت|حذفت|مسحت|حظرت|طردت|أعطيت|اعطيت|شلت|رفعت|نقلت|ثبّتت|قفلت|فتحت|بعتت|أرسلت|ارسلت|حدّثت|حدثت|فعّلت|فعلت|عطّلت|عطلت|نفّذت|نفذت|سويت|رتبت)(?=[\s،؛:.!]|$)/u;
         const claimsDone = !response?.content?.includes('؟') && !response?.content?.includes('?') &&
             doneClaimRe.test(response?.content || '');
-        const anyOK = toolOutcomes.some(o => o.ok);
         const anyFail = toolOutcomes.some(o => !o.ok);
         if (response && toolOutcomes.length === 0 && claimsDone) {
             const wasActionRequest = isActionRequest;
@@ -722,14 +754,18 @@ class AIHandler {
                     fallback: response.fallback,
                 };
         }
-        else if (response && anyFail && !anyOK && claimsDone) {
-            logger.warn(`AI claimed done despite tool failure(s): "${(response.content || '').slice(0, 120)}"`);
-            response = {
-                ...response,
-                content: `⚠️ **الإجراء لم يُنفّذ فعلياً.** النتيجة الحقيقية:\n` +
-                    toolOutcomes.map(o => `• \`${o.tool}\` → ${o.message}`).join('\n'),
-                fallback: false,
-            };
+        else if (response && anyFail && claimsDone) {
+            // لو الرد نفسه بيذكر الفشل بوضوح → مقبول. غير كده «تم» مضللة حتى لو جزء نجح.
+            const admitsFailure = /(فشل|فشلت|لم أستطع|لم أقدر|مش قادر|مقدرتش|ماقدرتش|تعذّر|تعذر|خطأ|غلط)/.test(response.content || '');
+            if (!admitsFailure) {
+                logger.warn(`AI claimed done despite tool failure(s): "${(response.content || '').slice(0, 120)}"`);
+                response = {
+                    ...response,
+                    content: `⚠️ **بعض خطوات الطلب لم تُنفّذ فعلياً.** النتيجة الحقيقية:\n` +
+                        toolOutcomes.map(o => `• \`${o.tool}\` → ${o.ok ? '✅' : '❌'} ${o.message}`).join('\n'),
+                    fallback: false,
+                };
+            }
         }
         // Fallback — 🆘 محاولة إنقاذ بمزوّد سريع وبرومبت مختصر قبل رسالة الفشل
         const rescued = response ? null : await this.emergencyResponse(effectiveMessage, aiConfig);
@@ -775,53 +811,83 @@ class AIHandler {
         }
         return this.toolNameIndex.get(String(name || '').trim().toLowerCase()) || null;
     }
-    /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
-    extractActionCall(text) {
+    /** كشف كل نداءات الأدوات في الرد — يدعم كتلة واحدة أو عدة كتل/مصفوفة/أدوات متعددة */
+    extractActionCalls(text) {
         if (!text)
-            return null;
-        /** لا نقبل إلا أداة موجودة فعلاً في السجل */
-        const pick = (json) => {
-            if (!json)
-                return null;
-            const parsed = this.parseActionCallJson(json);
+            return [];
+        const calls = [];
+        const seen = new Set();
+        const add = (value) => {
+            if (Array.isArray(value)) {
+                for (const v of value)
+                    add(v);
+                return;
+            }
+            if (!value || typeof value !== 'object')
+                return;
+            // صيغ التجميع: {"tools":[...]} / {"calls":[...]} / {"actions":[...]}
+            const grouped = value.tools ?? value.calls ?? value.actions ?? value.tool_calls;
+            if (Array.isArray(grouped)) {
+                for (const v of grouped)
+                    add(v);
+                return;
+            }
+            const parsed = this.parseActionValue(value);
             if (!parsed)
-                return null;
+                return;
+            // ✅ لا نقبل إلا أداة مسجّلة فعلاً — أي JSON عادي لا يُعدّ استدعاء
             const canonical = this.normalizeToolName(parsed.tool);
-            return canonical ? { tool: canonical, args: parsed.args } : null;
+            if (!canonical)
+                return;
+            const key = `${canonical}|${JSON.stringify(parsed.args || {})}`;
+            if (seen.has(key))
+                return;
+            seen.add(key);
+            calls.push({ tool: canonical, args: parsed.args });
         };
-        // 1) أي كتلة كود (json أو بدون وسم) — نجرّب كل الكتل
+        const scanText = (source) => {
+            const candidates = [];
+            // ⚠️ «name» مستثنى هنا: قد يكون اسم معامل داخل args فيُخدع كأداة
+            const keyRe = /"(?:tool|tool_name|action)"\s*:/gi;
+            let m;
+            while ((m = keyRe.exec(source))) {
+                const brace = source.lastIndexOf('{', m.index);
+                if (brace >= 0 && !candidates.includes(brace))
+                    candidates.push(brace);
+            }
+            for (const idx of candidates) {
+                const raw = this.findBalancedJson(source, idx);
+                if (!raw)
+                    continue;
+                try {
+                    add(JSON.parse(raw));
+                }
+                catch { /* تجاهل */ }
+            }
+        };
+        // 1) الرد كامل JSON (كائن أو مصفوفة)
+        try {
+            add(JSON.parse(text.trim()));
+        }
+        catch { /* ليس JSON خالصاً */ }
+        // 2) كل كتلة كود — JSON خالص أو عدة استدعاءات داخلها
         const fences = [...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)];
         for (const f of fences) {
-            const parsed = pick(f[1]);
-            if (parsed)
-                return parsed;
-        }
-        // 2) أي كائن JSON يحتوي مفتاح أداة — نجمّع كل الأقواس المتوازنة المحتملة
-        const candidates = [];
-        const keyRe = /"(?:tool|tool_name|name|action)"\s*:/gi;
-        let m;
-        while ((m = keyRe.exec(text))) {
-            const brace = text.lastIndexOf('{', m.index);
-            if (brace >= 0 && !candidates.includes(brace))
-                candidates.push(brace);
-        }
-        for (const idx of candidates) {
-            const raw = this.findBalancedJson(text, idx);
-            const parsed = pick(raw);
-            if (parsed)
-                return parsed;
-        }
-        // 3) صيغة OpenAI: {"function": {"name": ..., "arguments": ...}}
-        const fnRe = /"function"\s*:/i;
-        if (fnRe.test(text)) {
-            const brace = text.indexOf('{');
-            if (brace >= 0) {
-                const parsed = pick(this.findBalancedJson(text, brace));
-                if (parsed)
-                    return parsed;
+            const block = f[1].trim();
+            try {
+                add(JSON.parse(block));
+            }
+            catch {
+                scanText(block);
             }
         }
-        return null;
+        // 3) أي كائن JSON يحتوي مفتاح أداة داخل النص الحر
+        scanText(text);
+        return calls;
+    }
+    /** أول نداء أداة فقط — للتوافق مع المسارات القديمة */
+    extractActionCall(text) {
+        return this.extractActionCalls(text)[0] ?? null;
     }
     /** تجميع نص {…} متوازن بدءاً من startIdx */
     findBalancedJson(text, startIdx) {
@@ -855,10 +921,10 @@ class AIHandler {
         }
         return null;
     }
-    parseActionCallJson(json) {
+    /** تحويل كائن JSON إلى نداء أداة صالح — يرفض أي اسم غير مسجّل في السجل */
+    parseActionValue(parsed) {
         try {
-            const parsed = JSON.parse(json.trim());
-            if (!parsed || typeof parsed !== 'object')
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
                 return null;
             // اسم الأداة — ندعم كل الصيغ الشائعة
             const fnName = parsed?.function?.name;
@@ -881,7 +947,7 @@ class AIHandler {
             if (!args || typeof args !== 'object' || Array.isArray(args))
                 args = {};
             if (Object.keys(args).length === 0) {
-                const meta = new Set(['tool', 'tool_name', 'action', 'name', 'args', 'arguments', 'parameters', 'function']);
+                const meta = new Set(['tool', 'tool_name', 'action', 'name', 'args', 'arguments', 'parameters', 'function', 'type', 'id']);
                 const extras = {};
                 for (const [k, v] of Object.entries(parsed)) {
                     if (!meta.has(k))
@@ -897,27 +963,35 @@ class AIHandler {
             return { tool: name, args };
         }
         catch {
-            // ignore
+            return null;
         }
-        return null;
+    }
+    parseActionCallJson(json) {
+        try {
+            return this.parseActionValue(JSON.parse(json.trim()));
+        }
+        catch {
+            return null;
+        }
     }
     /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
     looksLikeActionRequest(text) {
         const t = (text || '').trim();
         if (!t)
             return false;
-        // ❓ سؤال/استفسار أو طلب شرح → ليس أمر تنفيذ (يمنع تنفيذ أمر بالخطأ من سؤال «إزاي أغيّر...؟»)
-        if (/[؟?]/.test(t))
-            return false;
-        if (/(^|\s)(كيف|إزاي|ازاي|إزاى|هل|ينفع|طريقة|شرح|اشرح|علمني|علّمني|عايز أعرف|عاوز أعرف)(\s|$)/i.test(t))
+        // ❓ سؤال شرح/استفسار → ليس أمر تنفيذ (يمنع تنفيذ أمر بالخطأ من «إزاي أغيّر...؟»)
+        // ملاحظة: علامة الاستفهام وحدها لا تكفي — «ممكن تغيّر الاسم؟» طلب تنفيذ مؤدب.
+        if (/(^|\s)(كيف|إزاي|ازاي|إزاى|هل|ينفع|طريقة|شرح|اشرح|علمني|علّمني|عايز أعرف|عاوز أعرف|إيه|ايه|مين|امتى|إمتى|فين)(\s|$)/i.test(t))
             return false;
         // 🚫 نهي/نفي → ليس أمر تنفيذ
         if (/(مات|مت|لا|بلاش|مش)\s*(ت|ي)?(غيّر|غير|عمل|حذف|مسح|حظر|طرد|ضيف|ضف)/i.test(t))
             return false;
-        if (/(مش|لا)\s*(عايز|عاوز|أريد|اريد|محتاج)/i.test(t))
+        if (/(مش|لا|ما)\s*(عايز|عاوز|أريد|اريد|محتاج|ممكن)/i.test(t))
             return false;
-        const action = /(غيّر|غير|بدّل|بدل|عدّل|عدل|اعمل|أنشئ|انشئ|أضف|اضف|ضيف|احذف|امسح|احظر|اطرد|اعطي|أعطي|شيل|ارفع|نزّل|انقل|ثبّت|قفل|افتح|ابعت|ارسل|أرسل|حدّث|حدث|حط|فعّل|فعل|عطّل|عطل|نفّذ|نفذ|سوّي|سوي|رتب)/i;
-        const target = /(سيرفر|قناة|رول|رتبة|عضو|اسم|صورة|بانر|توبيك|صلاحيات|تذكرة|سحب|ثريد|رسالة|دعوة|كنية|نيكنيم|أفاتار|افاتار|ايموجي|إيموجي|ويب هوك|ويبهوك|حماية|نسخة)/i;
+        if (/(مات|مت|لا|بلاش)\s*(تعمل|تغير|تحذف|تمسح|تحظر|تطرد|تضيف)/i.test(t))
+            return false;
+        const action = /(غيّر|غير|بدّل|بدل|عدّل|عدل|اعمل|أنشئ|انشئ|أضف|اضف|ضيف|احذف|امسح|احظر|اطرد|اعطي|أعطي|امنح|شيل|ارفع|نزّل|انقل|ثبّت|قفل|افتح|ابعت|ارسل|أرسل|حدّث|حدث|حط|فعّل|فعل|عطّل|عطل|نفّذ|نفذ|سوّي|سوي|رتب|نظّم|نظم|جهّز|جهز|شغّل|شغل|وقّف|وقف|اقفل|سكّر|سكر|أرشفة|ارشف|أرشف|تفاعل|ريأكت|ريه اكت|أعلن|اعلن|وزّع|وزع|اسحب|سجّل|سجل|خلي|خلّي|اجعل|حوّل|حول|اضبط|ظبط|ضبط|أزل|ازل|نظّف|نظف|امنع|اسمح)/i;
+        const target = /(سيرفر|قناة|رول|رتبة|عضو|أعضاء|اعضاء|اسم|صورة|بانر|توبيك|صلاحيات|تذكرة|سحب|ثريد|رسالة|دعوة|كنية|نيكنيم|أفاتار|افاتار|ايموجي|إيموجي|ستيكر|ويب هوك|ويبهوك|حماية|نسخة|حدث|فعالية|أوتومود|اوتومود|موسيقى|أغنية|اغنية|صوت|منشن|تفاعل|ريأكشن|حالة|ستاتس|ستاتوس|بروفايل|قوانين|إعلان|اعلان|شات|توب|لفل|ليفل|ديسكورد|بوت)/i;
         return action.test(t) && target.test(t);
     }
     /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */

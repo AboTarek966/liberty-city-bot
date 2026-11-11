@@ -229,27 +229,59 @@ registerTool('unwarn_user', {
 // أدوات القنوات / الرولات
 // --------------------------------------------
 registerTool('create_channel', {
-    description: 'إنشاء قناة نصية أو صوتية أو فئة',
+    description: 'إنشاء قناة نصية/صوتية/فئة/إعلانات/منتدى/ستيج',
     adminOnly: true,
     params: {
         name: { type: 'string', description: 'اسم القناة', required: true },
-        type: { type: 'string', description: 'النوع: text / voice / category', required: true },
-        parentId: { type: 'string', description: 'آيدي الفئة الأب (اختياري)', required: false },
-        topic: { type: 'string', description: 'وصف القناة (للنصية)', required: false },
+        type: { type: 'string', description: 'text / voice / category / announcement / forum / stage', required: true },
+        parentId: { type: 'string', description: 'آيدي/اسم الفئة الأب (اختياري)', required: false },
+        topic: { type: 'string', description: 'وصف القناة (للنصية/الإعلانات/المنتدى)', required: false },
+        nsfw: { type: 'boolean', description: 'قناة +18؟ (اختياري)', required: false },
+        slowmode: { type: 'number', description: 'وضع بطيء بالثواني (0-21600)', required: false },
+        userLimit: { type: 'number', description: 'حد أعضاء القناة الصوتية (0-99)', required: false },
+        bitrateKbps: { type: 'number', description: 'جودة الصوت بالكيلوبت (8-384)', required: false },
     },
-    async func({ guild, client, executor }, { name, type, parentId, topic }) {
-        const channelType = type === 'voice' ? discord_js_1.ChannelType.GuildVoice : type === 'category' ? discord_js_1.ChannelType.GuildCategory : discord_js_1.ChannelType.GuildText;
+    async func({ guild, client, executor }, { name, type, parentId, topic, nsfw, slowmode, userLimit, bitrateKbps }) {
+        const map = {
+            text: discord_js_1.ChannelType.GuildText,
+            voice: discord_js_1.ChannelType.GuildVoice,
+            category: discord_js_1.ChannelType.GuildCategory,
+            announcement: discord_js_1.ChannelType.GuildAnnouncement,
+            forum: discord_js_1.ChannelType.GuildForum,
+            stage: discord_js_1.ChannelType.GuildStageVoice,
+        };
+        const channelType = map[String(type || 'text').toLowerCase()];
+        if (channelType === undefined)
+            return { success: false, message: '❌ النوع: text / voice / category / announcement / forum / stage' };
+        const parent = parentId ? resolveChannelByIdOrName(guild, parentId) : null;
         try {
             client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name);
-            const channel = await guild.channels.create({
-                name,
+            const options = {
+                name: String(name).slice(0, 100),
                 type: channelType,
-                parent: parentId || null,
-                topic: channelType === discord_js_1.ChannelType.GuildText ? topic : undefined,
+                parent: parent?.id ?? null,
                 reason: `${executor.user.tag}: ${name}`,
-            });
+            };
+            if ([discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement, discord_js_1.ChannelType.GuildForum].includes(channelType)) {
+                if (topic)
+                    options.topic = String(topic).slice(0, 1024);
+                if (slowmode !== undefined)
+                    options.rateLimitPerUser = Math.min(21600, Math.max(0, Math.trunc(Number(slowmode))));
+            }
+            if ([discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildVoice, discord_js_1.ChannelType.GuildAnnouncement, discord_js_1.ChannelType.GuildForum].includes(channelType) && nsfw !== undefined) {
+                options.nsfw = !!nsfw;
+            }
+            if (channelType === discord_js_1.ChannelType.GuildVoice || channelType === discord_js_1.ChannelType.GuildStageVoice) {
+                if (userLimit !== undefined)
+                    options.userLimit = Math.min(99, Math.max(0, Math.trunc(Number(userLimit))));
+                if (bitrateKbps !== undefined && channelType === discord_js_1.ChannelType.GuildVoice) {
+                    options.bitrate = Math.min(384, Math.max(8, Math.trunc(Number(bitrateKbps)))) * 1000;
+                }
+            }
+            const channel = await guild.channels.create(options);
             client.securityHandler?.noteSelfCreated(guild.id, 'channel', channel.id);
-            return { success: true, message: `✅ **تم إنشاء** ${channelType === discord_js_1.ChannelType.GuildVoice ? '🔊' : channelType === discord_js_1.ChannelType.GuildCategory ? '📁' : '📝'} **${name}**`, data: { channelId: channel.id } };
+            const icon = channelType === discord_js_1.ChannelType.GuildVoice ? '🔊' : channelType === discord_js_1.ChannelType.GuildCategory ? '📁' : channelType === discord_js_1.ChannelType.GuildForum ? '💬' : channelType === discord_js_1.ChannelType.GuildStageVoice ? '🎤' : channelType === discord_js_1.ChannelType.GuildAnnouncement ? '📣' : '📝';
+            return { success: true, message: `✅ **تم إنشاء** ${icon} **${name}**`, data: { channelId: channel.id } };
         }
         catch (e) {
             return { success: false, message: `❌ فشل الإنشاء: ${e.message}` };
@@ -757,6 +789,34 @@ registerTool('remove_server_banner', {
         }
         catch (e) {
             return { success: false, message: `❌ فشل إزالة البانر: ${e.message}` };
+        }
+    },
+});
+registerTool('set_server_splash', {
+    description: 'تغيير خلفية الدعوة (Splash) للسيرفر — يتطلب تعزيز مستوى 1',
+    adminOnly: true,
+    params: {
+        url: { type: 'string', description: 'رابط الصورة (اختياري)', required: false },
+        clear: { type: 'boolean', description: 'true لإزالة الخلفية', required: false },
+    },
+    async func({ guild, executor, attachments }, { url, clear = false }) {
+        const perm = needManageGuild(guild);
+        if (perm)
+            return perm;
+        try {
+            if (clear) {
+                await guild.setSplash(null, `${executor.user.tag}: إزالة خلفية الدعوة بواسطة AI`);
+                return { success: true, message: '🖼️ **تمت إزالة خلفية الدعوة**' };
+            }
+            const source = url || attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url;
+            if (!source)
+                return { success: false, message: '❌ مرّر رابط صورة أو أرفق صورة' };
+            const buffer = await fetchImageBuffer(source);
+            await guild.setSplash(buffer, `${executor.user.tag}: خلفية الدعوة بواسطة AI`);
+            return { success: true, message: '🖼️ **تم تغيير خلفية الدعوة (Splash)**' };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تغيير الخلفية: ${e.message} (يحتاج تعزيز السيرفر مستوى 1)` };
         }
     },
 });
@@ -1544,6 +1604,1784 @@ registerTool('close_current_ticket', {
         }
     },
 });
+// ============================================
+// 🚀 قدرات موسّعة — رسائل، ثريدات، قنوات، رولات، أعضاء، سيرفر، إيموجي، ويب هوك، أحداث، أوتومود، موسيقى، تذاكر
+// ============================================
+function needBotPerm(guild, perm, label) {
+    if (!guild.members.me?.permissions.has(perm)) {
+        return { success: false, message: `❌ البوت يحتاج صلاحية **${label}** — امنحه إياها ثم أعد المحاولة` };
+    }
+    return null;
+}
+function resolveTextChannelSafe(guild, input) {
+    const ch = resolveChannelByIdOrName(guild, input);
+    return ch && ch.isTextBased?.() ? ch : null;
+}
+function resolveThreadSafe(guild, input) {
+    const raw = String(input || '').trim();
+    const byId = guild.channels.cache.get(raw);
+    if (byId && byId.isThread?.())
+        return byId;
+    const n = raw.toLowerCase();
+    return guild.channels.cache.find(c => c.isThread?.() && c.name.toLowerCase().includes(n)) || null;
+}
+async function resolveMessageSafe(channel, messageId) {
+    if (!messageId || /^(last|latest|الأخير|الاخير|آخر)$/i.test(String(messageId).trim())) {
+        const msgs = await channel.messages.fetch({ limit: 1 });
+        return msgs.first() || null;
+    }
+    return channel.messages.fetch(String(messageId)).catch(() => null);
+}
+function parseHexColor(input) {
+    if (input === undefined || input === null || String(input).trim() === '')
+        return null;
+    const s = String(input).trim().replace(/^#/, '');
+    if (!/^[0-9a-fA-F]{6}$/.test(s))
+        return null;
+    return parseInt(s, 16);
+}
+function resolveEmojiSafe(guild, input) {
+    const raw = String(input || '').trim().replace(/^:|:$/g, '');
+    const byId = guild.emojis.cache.get(raw);
+    if (byId)
+        return byId;
+    const n = raw.toLowerCase();
+    return guild.emojis.cache.find(e => e.name?.toLowerCase() === n) ||
+        guild.emojis.cache.find(e => e.name?.toLowerCase().includes(n)) || null;
+}
+function sameVoiceChannel(guild, member) {
+    const me = guild.members.me;
+    return !!member.voice?.channelId && member.voice.channelId === me?.voice?.channelId;
+}
+// --------------------------------------------
+// 💬 رسائل / ثريدات
+// --------------------------------------------
+registerTool('send_message', {
+    description: 'إرسال رسالة نصية في أي قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        content: { type: 'string', description: 'نص الرسالة', required: true },
+        replyToMessageId: { type: 'string', description: 'آيدي رسالة للرد عليها (اختياري)', required: false },
+    },
+    async func({ guild, defaultChannelId }, { channelId, content, replyToMessageId }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        try {
+            const payload = { content: String(content).slice(0, 2000) };
+            if (replyToMessageId)
+                payload.reply = { messageId: String(replyToMessageId), failIfNotExists: false };
+            const msg = await channel.send(payload);
+            return { success: true, message: `📨 **تم إرسال الرسالة في** ${channel}`, data: { messageId: msg.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الإرسال: ${e.message}` };
+        }
+    },
+});
+registerTool('send_embed', {
+    description: 'إرسال رسالة بتصميم (Embed) في قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        title: { type: 'string', description: 'العنوان (اختياري)', required: false },
+        description: { type: 'string', description: 'النص الأساسي', required: true },
+        color: { type: 'string', description: 'اللون هكس مثل #5865F2 (اختياري)', required: false },
+        imageUrl: { type: 'string', description: 'رابط صورة داخل الإيمبد (اختياري)', required: false },
+        footer: { type: 'string', description: 'نص التذييل (اختياري)', required: false },
+    },
+    async func({ guild, defaultChannelId }, { channelId, title, description, color, imageUrl, footer }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        try {
+            const embed = new discord_js_1.EmbedBuilder()
+                .setDescription(String(description).slice(0, 4000))
+                .setColor((parseHexColor(color) ?? discord_js_1.Colors.Blurple));
+            if (title)
+                embed.setTitle(String(title).slice(0, 256));
+            if (imageUrl)
+                embed.setImage(String(imageUrl));
+            if (footer)
+                embed.setFooter({ text: String(footer).slice(0, 2048) });
+            const msg = await channel.send({ embeds: [embed] });
+            return { success: true, message: `🎨 **تم إرسال الإيمبد في** ${channel}`, data: { messageId: msg.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الإرسال: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_message', {
+    description: 'حذف رسالة محددة (آيدي أو last لآخر رسالة)',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        messageId: { type: 'string', description: 'آيدي الرسالة أو last', required: true },
+    },
+    async func({ guild, defaultChannelId }, { channelId, messageId }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        const msg = await resolveMessageSafe(channel, messageId);
+        if (!msg)
+            return { success: false, message: '❌ الرسالة غير موجودة' };
+        try {
+            await msg.delete();
+            return { success: true, message: `🗑️ **تم حذف الرسالة** في ${channel}`, data: { messageId: msg.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+registerTool('edit_message', {
+    description: 'تعديل رسالة من رسائل البوت (آيدي أو last)',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        messageId: { type: 'string', description: 'آيدي الرسالة أو last', required: true },
+        content: { type: 'string', description: 'النص الجديد', required: true },
+    },
+    async func({ guild, client, defaultChannelId }, { channelId, messageId, content }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        const msg = await resolveMessageSafe(channel, messageId);
+        if (!msg)
+            return { success: false, message: '❌ الرسالة غير موجودة' };
+        if (msg.author?.id !== client.user?.id)
+            return { success: false, message: '❌ أستطيع تعديل رسائلي فقط' };
+        try {
+            await msg.edit({ content: String(content).slice(0, 2000) });
+            return { success: true, message: `✏️ **تم تعديل الرسالة** في ${channel}`, data: { messageId: msg.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل: ${e.message}` };
+        }
+    },
+});
+registerTool('unpin_message', {
+    description: 'إزالة تثبيت رسالة (آيدي أو last)',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        messageId: { type: 'string', description: 'آيدي الرسالة أو last', required: false },
+    },
+    async func({ guild, defaultChannelId }, { channelId, messageId }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        const msg = await resolveMessageSafe(channel, messageId);
+        if (!msg)
+            return { success: false, message: '❌ الرسالة غير موجودة' };
+        try {
+            await msg.unpin('إزالة تثبيت بواسطة AI');
+            return { success: true, message: `📌 **أُزيل تثبيت الرسالة** في ${channel}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إزالة التثبيت: ${e.message}` };
+        }
+    },
+});
+registerTool('add_reaction', {
+    description: 'إضافة رياكشن (إيموجي) على رسالة',
+    adminOnly: false,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        messageId: { type: 'string', description: 'آيدي الرسالة أو last', required: false },
+        emoji: { type: 'string', description: 'الإيموجي (مثل 😂 أو اسم إيموجي السيرفر)', required: true },
+    },
+    async func({ guild, defaultChannelId }, { channelId, messageId, emoji }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        const msg = await resolveMessageSafe(channel, messageId);
+        if (!msg)
+            return { success: false, message: '❌ الرسالة غير موجودة' };
+        try {
+            await msg.react(String(emoji));
+            return { success: true, message: `👍 **تم التفاعل بـ ${emoji}**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التفاعل: ${e.message}` };
+        }
+    },
+});
+registerTool('send_poll', {
+    description: 'إنشاء استفتاء (Poll) في قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        question: { type: 'string', description: 'سؤال الاستفتاء', required: true },
+        answers: { type: 'array', description: 'خيارات الإجابة (2-10)', required: true },
+        durationHours: { type: 'number', description: 'المدة بالساعات (1-768)', required: false },
+        multiple: { type: 'boolean', description: 'السماح بأكثر من اختيار؟', required: false },
+    },
+    async func({ guild, defaultChannelId }, { channelId, question, answers, durationHours = 24, multiple = false }) {
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        const list = (Array.isArray(answers) ? answers : String(answers || '').split(/[،,\n]/))
+            .map((a) => String(a).trim()).filter(Boolean).slice(0, 10);
+        if (list.length < 2)
+            return { success: false, message: '❌ الاستفتاء يحتاج خيارين على الأقل' };
+        try {
+            const msg = await channel.send({
+                poll: {
+                    question: { text: String(question).slice(0, 300) },
+                    answers: list.map((text) => ({ text: text.slice(0, 55) })),
+                    duration: Math.min(768, Math.max(1, Math.trunc(Number(durationHours)))),
+                    allowMultiselect: !!multiple,
+                },
+            });
+            return { success: true, message: `📊 **تم إنشاء الاستفتاء في** ${channel}`, data: { messageId: msg.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء الاستفتاء: ${e.message}` };
+        }
+    },
+});
+registerTool('create_forum_post', {
+    description: 'إنشاء منشور (موضوع) في قناة منتدى',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم قناة المنتدى (افتراضي: الحالية)', required: false },
+        title: { type: 'string', description: 'عنوان المنشور', required: true },
+        content: { type: 'string', description: 'محتوى المنشور', required: true },
+        tags: { type: 'array', description: 'أسماء وسوم منشورات (اختياري)', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, title, content, tags }) {
+        const ch = resolveChannelByIdOrName(guild, channelId ?? defaultChannelId);
+        if (!ch || ch.type !== discord_js_1.ChannelType.GuildForum)
+            return { success: false, message: '❌ قناة منتدى غير صالحة' };
+        try {
+            const forum = ch;
+            const appliedTags = Array.isArray(tags)
+                ? tags.map((t) => forum.availableTags?.find((x) => x.name?.toLowerCase() === String(t).toLowerCase() || x.id === String(t))?.id).filter(Boolean)
+                : [];
+            const thread = await forum.threads.create({
+                name: String(title).slice(0, 100),
+                message: { content: String(content).slice(0, 2000) },
+                appliedTags,
+                reason: `${executor.user.tag}: منشور بواسطة AI`,
+            });
+            return { success: true, message: `📌 **تم إنشاء منشور** ${thread}`, data: { threadId: thread.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء المنشور: ${e.message}` };
+        }
+    },
+});
+registerTool('archive_thread', {
+    description: 'أرشفة/إلغاء أرشفة ثريد أو قفله',
+    adminOnly: true,
+    params: {
+        thread: { type: 'string', description: 'آيدي/اسم الثريد', required: true },
+        archived: { type: 'boolean', description: 'true أرشفة / false إلغاء الأرشفة', required: false },
+        locked: { type: 'boolean', description: 'قفل الثريد؟ (اختياري)', required: false },
+    },
+    async func({ guild, executor }, { thread, archived = true, locked }) {
+        const th = resolveThreadSafe(guild, thread);
+        if (!th)
+            return { success: false, message: '❌ الثريد غير موجود' };
+        try {
+            await th.setArchived(!!archived, `${executor.user.tag}: أرشفة بواسطة AI`);
+            if (locked !== undefined)
+                await th.setLocked(!!locked, `${executor.user.tag}: قفل بواسطة AI`);
+            return { success: true, message: archived ? `🗄️ **تمت أرشفة الثريد** ${th}` : `🔓 **أُلغي أرشفة الثريد** ${th}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تعديل الثريد: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_thread', {
+    description: 'حذف ثريد نهائياً',
+    adminOnly: true,
+    params: {
+        thread: { type: 'string', description: 'آيدي/اسم الثريد', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { thread, reason = 'حذف ثريد بواسطة AI' }) {
+        const th = resolveThreadSafe(guild, thread);
+        if (!th)
+            return { success: false, message: '❌ الثريد غير موجود' };
+        try {
+            await th.delete(`${executor.user.tag}: ${reason}`);
+            return { success: true, message: `🗑️ **تم حذف الثريد**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+registerTool('clone_channel', {
+    description: 'نسخ قناة أو فئة بكل إعداداتها',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        name: { type: 'string', description: 'اسم النسخة (اختياري)', required: false },
+    },
+    async func({ guild, client, executor, defaultChannelId }, { channelId, name }) {
+        const ch = resolveChannelByIdOrName(guild, channelId ?? defaultChannelId);
+        if (!ch)
+            return { success: false, message: '❌ القناة غير موجودة' };
+        try {
+            client.securityHandler?.noteSelfCreatedName(guild.id, 'channel', name ? String(name).slice(0, 100) : ch.name);
+            const copy = await ch.clone({ name: name ? String(name).slice(0, 100) : undefined, reason: `${executor.user.tag}: نسخ قناة بواسطة AI` });
+            client.securityHandler?.noteSelfCreated(guild.id, 'channel', copy.id);
+            return { success: true, message: `📑 **تم نسخ القناة** ${copy}`, data: { channelId: copy.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل النسخ: ${e.message}` };
+        }
+    },
+});
+registerTool('set_channel_bitrate', {
+    description: 'ضبط جودة الصوت (Bitrate) لقناة صوتية',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة الصوتية (افتراضي: الحالية)', required: false },
+        bitrateKbps: { type: 'number', description: 'الجودة بالكيلوبت (8-384)', required: true },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, bitrateKbps }) {
+        const ch = resolveChannelByIdOrName(guild, channelId ?? defaultChannelId);
+        if (!ch || ch.type !== discord_js_1.ChannelType.GuildVoice)
+            return { success: false, message: '❌ قناة صوتية غير صالحة' };
+        const kbps = Math.min(384, Math.max(8, Math.trunc(Number(bitrateKbps))));
+        try {
+            await ch.setBitrate(kbps * 1000, `${executor.user.tag}: جودة صوت بواسطة AI`);
+            return { success: true, message: `🎚️ **جودة الصوت الآن ${kbps} kbps في** ${ch}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 🎭 رولات
+// --------------------------------------------
+registerTool('clone_role', {
+    description: 'نسخ رول بكل صلاحياته ولونه',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي/اسم الرول', required: true },
+        name: { type: 'string', description: 'اسم النسخة (اختياري)', required: false },
+    },
+    async func({ guild, client, executor }, { roleId, name }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (role.id === guild.id)
+            return { success: false, message: '❌ لا يمكن نسخ @everyone' };
+        try {
+            client.securityHandler?.noteSelfCreatedName(guild.id, 'role', (name ? String(name) : `${role.name} (نسخة)`).slice(0, 100));
+            const copy = await guild.roles.create({
+                name: (name ? String(name) : `${role.name} (نسخة)`).slice(0, 100),
+                color: role.color,
+                hoist: role.hoist,
+                mentionable: role.mentionable,
+                permissions: role.permissions.bitfield,
+                reason: `${executor.user.tag}: نسخ رول بواسطة AI`,
+            });
+            client.securityHandler?.noteSelfCreated(guild.id, 'role', copy.id);
+            return { success: true, message: `📑 **تم نسخ الرول** ${copy}`, data: { roleId: copy.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل النسخ: ${e.message}` };
+        }
+    },
+});
+registerTool('set_role_color', {
+    description: 'تغيير لون رول',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي/اسم الرول', required: true },
+        color: { type: 'string', description: 'اللون هكس مثل #ff0000', required: true },
+    },
+    async func({ guild, executor }, { roleId, color }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (!canEditRole(guild, executor, role))
+            return { success: false, message: '❌ لا يمكنك تعديل هذا الرول (الرتبة/مُدار/@everyone)' };
+        const c = parseHexColor(color);
+        if (c === null)
+            return { success: false, message: '❌ لون غير صالح — استخدم هكس مثل #ff0000' };
+        try {
+            await role.setColor(c, `${executor.user.tag}: لون رول بواسطة AI`);
+            return { success: true, message: `🎨 **لون الرول** ${role} **أصبح** \`${String(color)}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تغيير اللون: ${e.message}` };
+        }
+    },
+});
+registerTool('set_role_icon', {
+    description: 'تغيير أيقونة رول (يتطلب تعزيز السيرفر مستوى 2)',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي/اسم الرول', required: true },
+        url: { type: 'string', description: 'رابط صورة الأيقونة (اختياري)', required: false },
+        emoji: { type: 'string', description: 'إيموجي كأيقونة بدل الصورة (اختياري)', required: false },
+    },
+    async func({ guild, executor, attachments }, { roleId, url, emoji }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (!canEditRole(guild, executor, role))
+            return { success: false, message: '❌ لا يمكنك تعديل هذا الرول' };
+        try {
+            if (emoji) {
+                await role.setIcon(String(emoji), `${executor.user.tag}: أيقونة رول بواسطة AI`);
+            }
+            else {
+                const source = url || attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url;
+                if (!source)
+                    return { success: false, message: '❌ مرّر رابط صورة أو إيموجي' };
+                const buffer = await fetchImageBuffer(source);
+                await role.setIcon(buffer, `${executor.user.tag}: أيقونة رول بواسطة AI`);
+            }
+            return { success: true, message: `🖼️ **تم تحديث أيقونة الرول** ${role}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تعديل الأيقونة: ${e.message} (يحتاج تعزيز السيرفر مستوى 2)` };
+        }
+    },
+});
+registerTool('set_role_hoist', {
+    description: 'إظهار/إخفاء رول منفصلاً في قائمة الأعضاء',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي/اسم الرول', required: true },
+        enabled: { type: 'boolean', description: 'true إظهار / false إخفاء', required: true },
+    },
+    async func({ guild, executor }, { roleId, enabled }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (!canEditRole(guild, executor, role))
+            return { success: false, message: '❌ لا يمكنك تعديل هذا الرول' };
+        try {
+            await role.setHoist(!!enabled, `${executor.user.tag}: تعديل عرض الرول بواسطة AI`);
+            return { success: true, message: enabled ? `✅ **الرول** ${role} **أصبح ظاهراً منفصلاً**` : `✅ **الرول** ${role} **أصبح مخفياً**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل: ${e.message}` };
+        }
+    },
+});
+registerTool('set_role_mentionable', {
+    description: 'جعل رول قابلاً للمنشن أو منعه',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي/اسم الرول', required: true },
+        enabled: { type: 'boolean', description: 'true يسمح بالمنشن / false يمنعه', required: true },
+    },
+    async func({ guild, executor }, { roleId, enabled }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (!canEditRole(guild, executor, role))
+            return { success: false, message: '❌ لا يمكنك تعديل هذا الرول' };
+        try {
+            await role.setMentionable(!!enabled, `${executor.user.tag}: تعديل المنشن بواسطة AI`);
+            return { success: true, message: enabled ? `✅ **الرول** ${role} **أصبح قابلاً للمنشن**` : `✅ **الرول** ${role} **أصبح غير قابل للمنشن**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل: ${e.message}` };
+        }
+    },
+});
+registerTool('set_role_position', {
+    description: 'تغيير ترتيب رول في قائمة الرولات (0 = الأعلى بعد @everyone)',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي/اسم الرول', required: true },
+        position: { type: 'number', description: 'الترتيب الجديد', required: true },
+    },
+    async func({ guild, executor }, { roleId, position }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (!canEditRole(guild, executor, role))
+            return { success: false, message: '❌ لا يمكنك تعديل هذا الرول' };
+        try {
+            await role.setPosition(Math.max(0, Math.trunc(Number(position))), { reason: `${executor.user.tag}: ترتيب رول بواسطة AI` });
+            return { success: true, message: `↕️ **تم تغيير ترتيب الرول** ${role}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الترتيب: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 👥 أعضاء — حظر/رفع حظر/صوت/رولات/بحث
+// --------------------------------------------
+registerTool('unban_user', {
+    description: 'رفع الحظر عن عضو بالآيدي أو اسم المستخدم',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو أو اسمه', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { userId, reason = 'رفع حظر بواسطة AI' }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.BanMembers, 'حظر الأعضاء');
+        if (perm)
+            return perm;
+        const needle = String(userId || '').trim();
+        let id = /^\d{17,20}$/.test(needle) ? needle : '';
+        if (!id) {
+            const bans = await guild.bans.fetch().catch(() => null);
+            const found = bans?.find(b => b.user.username.toLowerCase() === needle.toLowerCase() ||
+                (b.user.globalName || '').toLowerCase() === needle.toLowerCase() ||
+                b.user.tag.toLowerCase() === needle.toLowerCase());
+            if (found)
+                id = found.user.id;
+        }
+        if (!id)
+            return { success: false, message: '❌ لم أجد هذا العضو في قائمة المحظورين' };
+        try {
+            await guild.members.unban(id, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: `🔓 **تم رفع الحظر عن** <@${id}>` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل رفع الحظر: ${e.message}` };
+        }
+    },
+});
+registerTool('list_bans', {
+    description: 'عرض قائمة المحظورين في السيرفر',
+    adminOnly: true,
+    params: { limit: { type: 'number', description: 'العدد (افتراضي 25)', required: false } },
+    async func({ guild }, { limit = 25 }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.BanMembers, 'حظر الأعضاء');
+        if (perm)
+            return perm;
+        try {
+            const bans = await guild.bans.fetch();
+            const list = [...bans.values()].slice(0, Math.min(50, Math.max(1, Math.trunc(Number(limit)))));
+            if (!list.length)
+                return { success: true, message: '✅ **لا يوجد محظورون في السيرفر**' };
+            return {
+                success: true,
+                message: `🔨 **المحظورون (${bans.size}):**\n` +
+                    list.map((b, i) => `${i + 1}. ${b.user.tag} — \`${b.user.id}\`${b.reason ? ` — ${b.reason}` : ''}`).join('\n'),
+                data: { total: bans.size },
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل جلب المحظورين: ${e.message}` };
+        }
+    },
+});
+registerTool('voice_mute', {
+    description: 'كتم/فك كتم عضو في القناة الصوتية (Server Mute)',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (افتراضي: الهدف الممنشن)', required: false },
+        enabled: { type: 'boolean', description: 'true كتم / false فك الكتم', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, enabled, reason = 'كتم صوتي بواسطة AI' }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.MuteMembers, 'كتم الأعضاء');
+        if (perm)
+            return perm;
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        if (!member.voice?.channel)
+            return { success: false, message: '❌ العضو ليس في قناة صوتية' };
+        try {
+            await member.voice.setMute(!!enabled, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: enabled ? `🔇 **تم كتم** ${member.user.tag} **صوتياً**` : `🔊 **تم فك كتم** ${member.user.tag}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الكتم الصوتي: ${e.message}` };
+        }
+    },
+});
+registerTool('voice_deafen', {
+    description: 'صم/فك صم عضو في القناة الصوتية (Server Deafen)',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (افتراضي: الهدف الممنشن)', required: false },
+        enabled: { type: 'boolean', description: 'true صم / false فك الصم', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, enabled, reason = 'صم صوتي بواسطة AI' }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.DeafenMembers, 'أصمّ الأعضاء');
+        if (perm)
+            return perm;
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        if (!member.voice?.channel)
+            return { success: false, message: '❌ العضو ليس في قناة صوتية' };
+        try {
+            await member.voice.setDeaf(!!enabled, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: enabled ? `🔇 **تم صمّ** ${member.user.tag} **صوتياً**` : `🔊 **تم فك صمّ** ${member.user.tag}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الصمّ الصوتي: ${e.message}` };
+        }
+    },
+});
+registerTool('disconnect_voice', {
+    description: 'طرد عضو من القناة الصوتية (Disconnect)',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (افتراضي: الهدف الممنشن)', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, reason = 'فصل صوتي بواسطة AI' }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.MoveMembers, 'نقل الأعضاء');
+        if (perm)
+            return perm;
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        if (!member.voice?.channel)
+            return { success: false, message: '❌ العضو ليس في قناة صوتية' };
+        try {
+            await member.voice.disconnect(`${executor.user.tag}: ${reason}`);
+            return { success: true, message: `👢 **تم فصل** ${member.user.tag} **من الصوت**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الفصل الصوتي: ${e.message}` };
+        }
+    },
+});
+registerTool('set_member_roles', {
+    description: 'إدارة رولات عضو دفعة واحدة: إضافة أو إزالة أو استبدال كل الرولات',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (افتراضي: الهدف الممنشن)', required: false },
+        roles: { type: 'array', description: 'أسماء أو آيديز الرولات', required: true },
+        mode: { type: 'string', description: 'add / remove / set (افتراضي add)', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, roles, mode = 'add', reason = 'تعديل رولات بواسطة AI' }) {
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        if (!(0, rolePicker_1.canManageTarget)(guild, executor, member)) {
+            return { success: false, message: '❌ لا يمكنك تعديل عضو رتبته أعلى منك أو مساوية لرتبتك' };
+        }
+        const rawList = Array.isArray(roles) ? roles : String(roles || '').split(/[،,\n]/);
+        const resolved = rawList
+            .map(r => resolveRoleByIdOrName(guild, String(r).trim()))
+            .filter((r) => !!r);
+        if (!resolved.length)
+            return { success: false, message: '❌ لم أجد أي رول مطابق' };
+        const invalid = resolved.find(r => !(0, rolePicker_1.isRoleGrantable)(guild, executor, r));
+        if (invalid)
+            return { success: false, message: `❌ الرول **${invalid.name}** أعلى من رتبتك أو من رتبة البوت` };
+        try {
+            if (mode === 'remove')
+                await member.roles.remove(resolved, `${executor.user.tag}: ${reason}`);
+            else if (mode === 'set')
+                await member.roles.set(resolved, `${executor.user.tag}: ${reason}`);
+            else
+                await member.roles.add(resolved, `${executor.user.tag}: ${reason}`);
+            return {
+                success: true,
+                message: `🎭 **تم تحديث رولات** ${member.user.tag} (${mode}) → ${resolved.map(r => r.name).join('، ')}`,
+                data: { roleIds: resolved.map(r => r.id) },
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تعديل الرولات: ${e.message}` };
+        }
+    },
+});
+registerTool('search_member', {
+    description: 'البحث عن أعضاء بالاسم أو اسم المستخدم وعرض آيديهاتهم',
+    adminOnly: false,
+    params: {
+        query: { type: 'string', description: 'الاسم أو جزء منه', required: true },
+        limit: { type: 'number', description: 'عدد النتائج (افتراضي 10)', required: false },
+    },
+    async func({ guild }, { query, limit = 10 }) {
+        const q = String(query || '').trim();
+        if (!q)
+            return { success: false, message: '❌ اكتب اسم العضو' };
+        try {
+            const results = await guild.members.search({ query: q, limit: Math.min(25, Math.max(1, Math.trunc(Number(limit)))) });
+            if (!results.size)
+                return { success: true, message: `🔎 **لا يوجد عضو مطابق لـ** \`${q}\`` };
+            return {
+                success: true,
+                message: `🔎 **نتائج البحث عن** \`${q}\`:\n` +
+                    [...results.values()].map((m, i) => `${i + 1}. ${m.user.tag} — <@${m.id}> — \`${m.id}\``).join('\n'),
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل البحث: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// ⚙️ سيرفر — وصف/لغة/قوالب/سجل تدقيق/أقفال/تنظيم
+// --------------------------------------------
+registerTool('set_server_description', {
+    description: 'تغيير وصف السيرفر (يظهر في Discoverable servers)',
+    adminOnly: true,
+    params: {
+        description: { type: 'string', description: 'الوصف الجديد (فارغ للمسح)', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { description, reason = 'وصف السيرفر بواسطة AI' }) {
+        const perm = needManageGuild(guild);
+        if (perm)
+            return perm;
+        try {
+            await guild.edit({ description: String(description || '').slice(0, 300) || null, reason: `${executor.user.tag}: ${reason}` });
+            return { success: true, message: '📝 **تم تحديث وصف السيرفر**' };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تغيير الوصف: ${e.message}` };
+        }
+    },
+});
+registerTool('set_server_locale', {
+    description: 'تغيير لغة السيرفر الأساسية (مثل ar أو en-US)',
+    adminOnly: true,
+    params: {
+        locale: { type: 'string', description: 'كود اللغة مثل ar / en-US', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { locale, reason = 'لغة السيرفر بواسطة AI' }) {
+        const perm = needManageGuild(guild);
+        if (perm)
+            return perm;
+        const supported = ['ar', 'en-US', 'en-GB', 'fr', 'de', 'es-ES', 'it', 'pt-BR', 'ru', 'tr', 'ja', 'ko', 'zh-CN', 'hi'];
+        const value = String(locale || '').trim();
+        if (!supported.includes(value))
+            return { success: false, message: `❌ لغة غير مدعومة — المتاح: ${supported.join('، ')}` };
+        try {
+            await guild.setPreferredLocale(value, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: `🌍 **لغة السيرفر الآن:** \`${value}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تغيير اللغة: ${e.message}` };
+        }
+    },
+});
+registerTool('set_special_channel', {
+    description: 'تحديد قناة القوانين أو التحديثات أو تنبيهات الأمان',
+    adminOnly: true,
+    params: {
+        type: { type: 'string', description: 'rules / updates / safety', required: true },
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (فارغ للإزالة)', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { type, channelId, reason = 'قناة خاصة بواسطة AI' }) {
+        const perm = needManageGuild(guild);
+        if (perm)
+            return perm;
+        const ch = channelId ? resolveTextChannelSafe(guild, channelId) : null;
+        try {
+            if (type === 'rules')
+                await guild.setRulesChannel(ch?.id ?? null, `${executor.user.tag}: ${reason}`);
+            else if (type === 'updates')
+                await guild.setPublicUpdatesChannel(ch?.id ?? null, `${executor.user.tag}: ${reason}`);
+            else if (type === 'safety')
+                await guild.setSafetyAlertsChannel(ch?.id ?? null, `${executor.user.tag}: ${reason}`);
+            else
+                return { success: false, message: '❌ النوع: rules / updates / safety فقط' };
+            return { success: true, message: ch ? `📌 **تم ضبط قناة ${type}:** ${ch}` : `📌 **تمت إزالة قناة ${type}**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+        }
+    },
+});
+registerTool('set_afk_timeout', {
+    description: 'ضبط مهلة AFK بالثواني (60 / 300 / 900 / 1800 / 3600)',
+    adminOnly: true,
+    params: { seconds: { type: 'number', description: 'المدة بالثواني', required: true } },
+    async func({ guild, executor }, { seconds }) {
+        const perm = needManageGuild(guild);
+        if (perm)
+            return perm;
+        const allowed = [60, 300, 900, 1800, 3600];
+        const value = Math.trunc(Number(seconds));
+        if (!allowed.includes(value))
+            return { success: false, message: `❌ القيمة يجب أن تكون: ${allowed.join(' / ')}` };
+        try {
+            await guild.setAFKTimeout(value, `${executor.user.tag}: مهلة AFK بواسطة AI`);
+            return { success: true, message: `💤 **مهلة AFK الآن:** \`${value}\` ثانية` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+        }
+    },
+});
+registerTool('create_template', {
+    description: 'إنشاء قالب (Template) من السيرفر لمشاركته',
+    adminOnly: true,
+    params: {
+        name: { type: 'string', description: 'اسم القالب', required: true },
+        description: { type: 'string', description: 'وصف القالب', required: false },
+    },
+    async func({ guild, executor }, { name, description }) {
+        const perm = needManageGuild(guild);
+        if (perm)
+            return perm;
+        try {
+            const template = await guild.createTemplate(String(name).slice(0, 100), String(description || '').slice(0, 300));
+            return { success: true, message: `📦 **تم إنشاء القالب** \`${template.name}\`\n> الرابط: https://discord.new/${template.code}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء القالب: ${e.message}` };
+        }
+    },
+});
+registerTool('get_audit_logs', {
+    description: 'قراءة سجل التدقيق (آخر العمليات الإدارية)',
+    adminOnly: true,
+    params: { limit: { type: 'number', description: 'العدد (افتراضي 15)', required: false } },
+    async func({ guild }, { limit = 15 }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ViewAuditLog, 'عرض سجل التدقيق');
+        if (perm)
+            return perm;
+        try {
+            const logs = await guild.fetchAuditLogs({ limit: Math.min(50, Math.max(1, Math.trunc(Number(limit)))) });
+            const rows = [...logs.entries.values()].map((e, i) => {
+                const action = discord_js_1.AuditLogEvent[e.action] || String(e.action);
+                const target = e.target?.tag || e.target?.name || e.target?.id || '—';
+                const who = e.executor?.tag || e.executor?.username || 'غير معروف';
+                return `${i + 1}. **${action}** — ${who} → ${target}${e.reason ? ` — ${e.reason}` : ''}`;
+            });
+            return { success: true, message: `📋 **سجل التدقيق:**\n${rows.join('\n') || 'لا توجد عمليات'}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل قراءة السجل: ${e.message}` };
+        }
+    },
+});
+registerTool('lockdown_server', {
+    description: 'قفل/فتح السيرفر كاملاً (منع الكتابة في كل القنوات النصية) — للطوارئ',
+    adminOnly: true,
+    dangerous: true,
+    params: {
+        enabled: { type: 'boolean', description: 'true قفل / false فتح', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { enabled, reason = 'قفل طوارئ بواسطة AI' }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageChannels, 'إدارة القنوات');
+        if (perm)
+            return perm;
+        let changed = 0;
+        for (const ch of guild.channels.cache.values()) {
+            if (ch.type !== discord_js_1.ChannelType.GuildText && ch.type !== discord_js_1.ChannelType.GuildAnnouncement)
+                continue;
+            try {
+                await ch.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: enabled ? false : null }, { reason: `${executor.user.tag}: ${reason}` });
+                changed++;
+            }
+            catch { /* تجاهل القنوات التي لا أملك صلاحية عليها */ }
+        }
+        return {
+            success: changed > 0,
+            message: changed > 0
+                ? (enabled ? `🔒 **تم قفل ${changed} قناة** — السيرفر في وضع الطوارئ` : `🔓 **تم فتح ${changed} قناة** — عاد السيرفر طبيعياً`)
+                : '❌ لم أستطع تعديل أي قناة (صلاحيات ناقصة)',
+        };
+    },
+});
+registerTool('organize_server', {
+    description: 'تنظيم السيرفر بالكامل (رولات + فئات + قنوات + صلاحيات) بقالب جاهز',
+    adminOnly: true,
+    dangerous: true,
+    params: {
+        preset: { type: 'string', description: 'community أو store', required: true },
+        deleteOlds: { type: 'boolean', description: 'حذف القنوات القديمة؟', required: false },
+        cleanRoles: { type: 'boolean', description: 'حذف الرولات القديمة؟', required: false },
+        pruneChat: { type: 'boolean', description: 'مسح رسائل القنوات؟', required: false },
+    },
+    async func({ guild, executor }, { preset, deleteOlds = false, cleanRoles = false, pruneChat = false }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageChannels, 'إدارة القنوات');
+        if (perm)
+            return perm;
+        if (needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageRoles, 'إدارة الرولات')) {
+            return { success: false, message: '❌ البوت يحتاج صلاحية **إدارة الرولات (Manage Roles)**' };
+        }
+        try {
+            const { organizePreset } = await Promise.resolve().then(() => __importStar(require('../utils/serverOrganizer')));
+            const result = await organizePreset(guild, String(preset || 'community'), { deleteOlds: !!deleteOlds, cleanRoles: !!cleanRoles, pruneChat: !!pruneChat });
+            const c = result.counts;
+            return {
+                success: result.success,
+                message: `🏗️ **تم تنظيم السيرفر (${result.presetId})**\n` +
+                    `> رولات جديدة: ${c.rolesNew} — موجودة: ${c.rolesExisting}\n` +
+                    `> فئات/قنوات جديدة: ${c.channelsNew} — موجودة: ${c.channelsExisting}\n` +
+                    `> محذوف: ${result.deleted.roles} رول / ${result.deleted.channels} قناة\n` +
+                    (result.permErrors.length ? `> ⚠️ أخطاء صلاحيات: ${result.permErrors.slice(0, 5).join(' | ')}` : '> ✅ بدون أخطاء'),
+                data: result,
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تنظيم السيرفر: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 😀 إيموجي / ستيكرات / ويب هوك / دعوات
+// --------------------------------------------
+registerTool('create_emoji', {
+    description: 'إضافة إيموجي مخصص للسيرفر من رابط صورة أو مرفق',
+    adminOnly: true,
+    params: {
+        name: { type: 'string', description: 'اسم الإيموجي (بدون :)', required: true },
+        url: { type: 'string', description: 'رابط الصورة (اختياري — ياخد المرفق تلقائياً)', required: false },
+    },
+    async func({ guild, executor, attachments }, { name, url }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuildExpressions, 'إدارة التعبيرات');
+        if (perm)
+            return perm;
+        const source = url || attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url;
+        if (!source)
+            return { success: false, message: '❌ مرّر رابط صورة أو أرفق صورة' };
+        try {
+            const buffer = await fetchImageBuffer(source);
+            const emoji = await guild.emojis.create({ attachment: buffer, name: String(name).replace(/[^\w\-]/g, '').slice(0, 32) || 'emoji', reason: `${executor.user.tag}: إيموجي بواسطة AI` });
+            return { success: true, message: `😀 **تمت إضافة الإيموجي** ${emoji}`, data: { emojiId: emoji.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إضافة الإيموجي: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_emoji', {
+    description: 'حذف إيموجي مخصص من السيرفر',
+    adminOnly: true,
+    params: { emoji: { type: 'string', description: 'اسم أو آيدي الإيموجي', required: true } },
+    async func({ guild, executor }, { emoji }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuildExpressions, 'إدارة التعبيرات');
+        if (perm)
+            return perm;
+        const found = resolveEmojiSafe(guild, emoji);
+        if (!found)
+            return { success: false, message: '❌ الإيموجي غير موجود' };
+        try {
+            const name = found.name;
+            await found.delete(`${executor.user.tag}: حذف إيموجي بواسطة AI`);
+            return { success: true, message: `🗑️ **تم حذف الإيموجي** \`:${name}:\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+registerTool('rename_emoji', {
+    description: 'تغيير اسم إيموجي مخصص',
+    adminOnly: true,
+    params: {
+        emoji: { type: 'string', description: 'الاسم/الآيدي الحالي', required: true },
+        name: { type: 'string', description: 'الاسم الجديد', required: true },
+    },
+    async func({ guild, executor }, { emoji, name }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuildExpressions, 'إدارة التعبيرات');
+        if (perm)
+            return perm;
+        const found = resolveEmojiSafe(guild, emoji);
+        if (!found)
+            return { success: false, message: '❌ الإيموجي غير موجود' };
+        try {
+            const updated = await found.edit({ name: String(name).replace(/[^\w\-]/g, '').slice(0, 32), reason: `${executor.user.tag}: تعديل إيموجي بواسطة AI` });
+            return { success: true, message: `✏️ **تم تغيير اسم الإيموجي إلى** \`:${updated.name}:\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل: ${e.message}` };
+        }
+    },
+});
+registerTool('list_emojis', {
+    description: 'عرض إيموجيات السيرفر',
+    adminOnly: false,
+    params: { limit: { type: 'number', description: 'العدد (افتراضي 30)', required: false } },
+    async func({ guild }, { limit = 30 }) {
+        const list = [...guild.emojis.cache.values()].slice(0, Math.min(60, Math.max(1, Math.trunc(Number(limit)))));
+        if (!list.length)
+            return { success: true, message: '😶 **لا توجد إيموجيات مخصصة في السيرفر**' };
+        return {
+            success: true,
+            message: `😀 **إيموجيات السيرفر (${guild.emojis.cache.size}):**\n` +
+                list.map(e => `${e} \`:${e.name}:\` — \`${e.id}\`${e.animated ? ' (متحرك)' : ''}`).join('\n'),
+        };
+    },
+});
+registerTool('create_sticker', {
+    description: 'إضافة ستيكر للسيرفر من رابط صورة أو مرفق',
+    adminOnly: true,
+    params: {
+        name: { type: 'string', description: 'اسم الستيكر', required: true },
+        tags: { type: 'string', description: 'كلمة وصفية للستيكر', required: true },
+        url: { type: 'string', description: 'رابط الصورة (اختياري)', required: false },
+        description: { type: 'string', description: 'وصف (اختياري)', required: false },
+    },
+    async func({ guild, executor, attachments }, { name, tags, url, description }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuildExpressions, 'إدارة التعبيرات');
+        if (perm)
+            return perm;
+        const source = url || attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url;
+        if (!source)
+            return { success: false, message: '❌ مرّر رابط صورة أو أرفق صورة' };
+        try {
+            const buffer = await fetchImageBuffer(source);
+            const sticker = await guild.stickers.create({
+                file: buffer,
+                name: String(name).slice(0, 30),
+                tags: String(tags).slice(0, 200),
+                description: description ? String(description).slice(0, 200) : null,
+                reason: `${executor.user.tag}: ستيكر بواسطة AI`,
+            });
+            return { success: true, message: `🩹 **تمت إضافة الستيكر** \`${sticker.name}\``, data: { stickerId: sticker.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إضافة الستيكر: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_sticker', {
+    description: 'حذف ستيكر من السيرفر',
+    adminOnly: true,
+    params: { sticker: { type: 'string', description: 'اسم أو آيدي الستيكر', required: true } },
+    async func({ guild, executor }, { sticker }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuildExpressions, 'إدارة التعبيرات');
+        if (perm)
+            return perm;
+        const raw = String(sticker || '').trim();
+        const found = guild.stickers.cache.get(raw) ||
+            guild.stickers.cache.find(s => s.name.toLowerCase() === raw.toLowerCase()) ||
+            guild.stickers.cache.find(s => s.name.toLowerCase().includes(raw.toLowerCase()));
+        if (!found)
+            return { success: false, message: '❌ الستيكر غير موجود' };
+        try {
+            await guild.stickers.delete(found.id, `${executor.user.tag}: حذف ستيكر بواسطة AI`);
+            return { success: true, message: `🗑️ **تم حذف الستيكر** \`${found.name}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+registerTool('list_stickers', {
+    description: 'عرض ستيكرات السيرفر',
+    adminOnly: false,
+    params: {},
+    async func({ guild }) {
+        try {
+            const stickers = await guild.stickers.fetch();
+            if (!stickers.size)
+                return { success: true, message: '🩹 **لا توجد ستيكرات في السيرفر**' };
+            return { success: true, message: `🩹 **ستيكرات السيرفر (${stickers.size}):**\n` + [...stickers.values()].map(s => `• \`${s.name}\` — \`${s.id}\``).join('\n') };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الجلب: ${e.message}` };
+        }
+    },
+});
+registerTool('create_webhook', {
+    description: 'إنشاء ويب هوك في قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: الحالية)', required: false },
+        name: { type: 'string', description: 'اسم الويب هوك', required: true },
+        avatarUrl: { type: 'string', description: 'رابط صورة الويب هوك (اختياري)', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, name, avatarUrl }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageWebhooks, 'إدارة الويب هوك');
+        if (perm)
+            return perm;
+        const channel = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        if (!channel || typeof channel.createWebhook !== 'function')
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        try {
+            const hook = await channel.createWebhook({ name: String(name).slice(0, 80), avatar: avatarUrl || undefined, reason: `${executor.user.tag}: ويب هوك بواسطة AI` });
+            return { success: true, message: `🪝 **تم إنشاء ويب هوك** \`${hook.name}\`\n> الرابط: ${hook.url}`, data: { webhookId: hook.id, url: hook.url } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء الويب هوك: ${e.message}` };
+        }
+    },
+});
+registerTool('list_webhooks', {
+    description: 'عرض ويب هوكس السيرفر',
+    adminOnly: true,
+    params: { channelId: { type: 'string', description: 'قناة محددة (اختياري)', required: false } },
+    async func({ guild, defaultChannelId }, { channelId }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageWebhooks, 'إدارة الويب هوك');
+        if (perm)
+            return perm;
+        try {
+            const hooks = channelId ?? defaultChannelId
+                ? await resolveTextChannelSafe(guild, channelId ?? defaultChannelId)?.fetchWebhooks?.()
+                : await guild.fetchWebhooks();
+            const list = hooks ? [...hooks.values()] : [];
+            if (!list.length)
+                return { success: true, message: '🪝 **لا توجد ويب هوكس**' };
+            return { success: true, message: `🪝 **الويب هوكس (${list.length}):**\n` + list.map((h) => `• \`${h.name}\` — \`${h.id}\` — <#${h.channelId}>`).join('\n') };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الجلب: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_webhook', {
+    description: 'حذف ويب هوك بالآيدي أو الاسم',
+    adminOnly: true,
+    params: { webhook: { type: 'string', description: 'آيدي أو اسم الويب هوك', required: true } },
+    async func({ guild, executor }, { webhook }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageWebhooks, 'إدارة الويب هوك');
+        if (perm)
+            return perm;
+        try {
+            const hooks = await guild.fetchWebhooks();
+            const raw = String(webhook || '').trim();
+            const found = hooks.get(raw) || hooks.find((h) => h.name?.toLowerCase() === raw.toLowerCase()) || hooks.find((h) => h.name?.toLowerCase().includes(raw.toLowerCase()));
+            if (!found)
+                return { success: false, message: '❌ الويب هوك غير موجود' };
+            await found.delete(`${executor.user.tag}: حذف ويب هوك بواسطة AI`);
+            return { success: true, message: `🗑️ **تم حذف الويب هوك** \`${found.name}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+registerTool('send_webhook_message', {
+    description: 'إرسال رسالة عبر ويب هوك موجود',
+    adminOnly: true,
+    params: {
+        webhook: { type: 'string', description: 'آيدي أو اسم الويب هوك', required: true },
+        content: { type: 'string', description: 'نص الرسالة', required: true },
+        username: { type: 'string', description: 'اسم العرض (اختياري)', required: false },
+    },
+    async func({ guild, executor }, { webhook, content, username }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageWebhooks, 'إدارة الويب هوك');
+        if (perm)
+            return perm;
+        try {
+            const hooks = await guild.fetchWebhooks();
+            const raw = String(webhook || '').trim();
+            const found = hooks.get(raw) || hooks.find((h) => h.name?.toLowerCase() === raw.toLowerCase());
+            if (!found)
+                return { success: false, message: '❌ الويب هوك غير موجود' };
+            await found.send({ content: String(content).slice(0, 2000), username: username ? String(username).slice(0, 80) : undefined });
+            return { success: true, message: `📨 **تم الإرسال عبر الويب هوك** \`${found.name}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الإرسال: ${e.message}` };
+        }
+    },
+});
+registerTool('list_invites', {
+    description: 'عرض دعوات السيرفر النشطة',
+    adminOnly: true,
+    params: {},
+    async func({ guild }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuild, 'إدارة السيرفر');
+        if (perm)
+            return perm;
+        try {
+            const invites = await guild.invites.fetch();
+            if (!invites.size)
+                return { success: true, message: '🔗 **لا توجد دعوات نشطة**' };
+            return {
+                success: true,
+                message: `🔗 **الدعوات النشطة (${invites.size}):**\n` +
+                    [...invites.values()].slice(0, 30).map(i => `• \`${i.code}\` — <#${i.channelId}> — استخدمات: ${i.uses ?? 0}${i.inviter ? ` — بواسطة ${i.inviter.tag}` : ''}`).join('\n'),
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الجلب: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 📅 أحداث مجدولة / 🤖 أوتومود
+// --------------------------------------------
+registerTool('create_event', {
+    description: 'إنشاء حدث مجدول (فعالية) في السيرفر',
+    adminOnly: true,
+    params: {
+        name: { type: 'string', description: 'اسم الفعالية', required: true },
+        startTime: { type: 'string', description: 'وقت البداية ISO مثل 2026-01-01T20:00:00Z', required: true },
+        endTime: { type: 'string', description: 'وقت النهاية ISO (اختياري)', required: false },
+        description: { type: 'string', description: 'وصف الفعالية', required: false },
+        channelId: { type: 'string', description: 'قناة صوتية (اختياري — بدونها فعالية خارجية)', required: false },
+        location: { type: 'string', description: 'مكان الفعالية الخارجية (اختياري)', required: false },
+    },
+    async func({ guild, executor }, { name, startTime, endTime, description, channelId, location }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageEvents, 'إدارة الأحداث');
+        if (perm)
+            return perm;
+        const start = new Date(String(startTime));
+        if (Number.isNaN(start.getTime()))
+            return { success: false, message: '❌ وقت البداية غير صالح — استخدم ISO' };
+        const voice = channelId ? resolveChannelByIdOrName(guild, channelId) : null;
+        const isVoice = !!voice && voice.type === discord_js_1.ChannelType.GuildVoice;
+        try {
+            const event = await guild.scheduledEvents.create({
+                name: String(name).slice(0, 100),
+                scheduledStartTime: start,
+                scheduledEndTime: endTime ? new Date(String(endTime)) : undefined,
+                privacyLevel: discord_js_1.GuildScheduledEventPrivacyLevel.GuildOnly,
+                entityType: isVoice ? discord_js_1.GuildScheduledEventEntityType.Voice : discord_js_1.GuildScheduledEventEntityType.External,
+                description: description ? String(description).slice(0, 1000) : undefined,
+                channel: isVoice ? voice.id : undefined,
+                entityMetadata: isVoice ? undefined : { location: String(location || 'Discord').slice(0, 100) },
+                reason: `${executor.user.tag}: فعالية بواسطة AI`,
+            });
+            return { success: true, message: `📅 **تم إنشاء الفعالية** \`${event.name}\`\n> البداية: ${start.toLocaleString('ar-EG')}`, data: { eventId: event.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء الفعالية: ${e.message}` };
+        }
+    },
+});
+registerTool('list_events', {
+    description: 'عرض الأحداث المجدولة في السيرفر',
+    adminOnly: false,
+    params: {},
+    async func({ guild }) {
+        try {
+            const events = await guild.scheduledEvents.fetch();
+            if (!events.size)
+                return { success: true, message: '📅 **لا توجد أحداث مجدولة**' };
+            return {
+                success: true,
+                message: `📅 **الأحداث (${events.size}):**\n` +
+                    [...events.values()].slice(0, 20).map(e => `• \`${e.name}\` — ${e.scheduledStartAt?.toLocaleString('ar-EG') || '—'} — ${e.status === 1 ? 'قادم' : e.status === 2 ? 'جارٍ' : e.status === 3 ? 'منتهي' : 'ملغي'}`).join('\n'),
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الجلب: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_event', {
+    description: 'حذف حدث مجدول بالاسم أو الآيدي',
+    adminOnly: true,
+    params: { event: { type: 'string', description: 'اسم أو آيدي الحدث', required: true } },
+    async func({ guild, executor }, { event }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageEvents, 'إدارة الأحداث');
+        if (perm)
+            return perm;
+        const raw = String(event || '').trim();
+        try {
+            const events = await guild.scheduledEvents.fetch();
+            const found = events.get(raw) ||
+                events.find(e => e.name.toLowerCase() === raw.toLowerCase()) ||
+                events.find(e => e.name.toLowerCase().includes(raw.toLowerCase()));
+            if (!found)
+                return { success: false, message: '❌ الحدث غير موجود' };
+            await guild.scheduledEvents.delete(found);
+            return { success: true, message: `🗑️ **تم حذف الفعالية** \`${found.name}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+registerTool('create_automod_rule', {
+    description: 'إنشاء قاعدة أوتومود (كلمات ممنوعة/سبام/منشن/محتوى)',
+    adminOnly: true,
+    dangerous: true,
+    params: {
+        name: { type: 'string', description: 'اسم القاعدة', required: true },
+        trigger: { type: 'string', description: 'keyword / spam / mention / keyword_preset', required: true },
+        keywords: { type: 'array', description: 'الكلمات الممنوعة (لـ keyword)', required: false },
+        action: { type: 'string', description: 'block / timeout (افتراضي block)', required: false },
+        durationSeconds: { type: 'number', description: 'مدة التايم أوت بالثواني (افتراضي 600)', required: false },
+        alertChannelId: { type: 'string', description: 'قناة تنبيه الإدارة (اختياري)', required: false },
+    },
+    async func({ guild, executor }, { name, trigger, keywords, action = 'block', durationSeconds = 600, alertChannelId }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuild, 'إدارة السيرفر');
+        if (perm)
+            return perm;
+        const alert = alertChannelId ? resolveTextChannelSafe(guild, alertChannelId) : null;
+        const actions = [];
+        if (action === 'timeout') {
+            actions.push({ type: discord_js_1.AutoModerationActionType.Timeout, metadata: { durationSeconds: Math.min(2_419_200, Math.max(60, Math.trunc(Number(durationSeconds)))) } });
+        }
+        else {
+            actions.push({ type: discord_js_1.AutoModerationActionType.BlockMessage });
+        }
+        if (alert)
+            actions.push({ type: discord_js_1.AutoModerationActionType.SendAlertMessage, metadata: { channel: alert.id } });
+        let triggerType;
+        let triggerMetadata = {};
+        if (trigger === 'spam')
+            triggerType = discord_js_1.AutoModerationRuleTriggerType.Spam;
+        else if (trigger === 'mention') {
+            triggerType = discord_js_1.AutoModerationRuleTriggerType.MentionSpam;
+            triggerMetadata = { mentionTotalLimit: 5 };
+        }
+        else if (trigger === 'keyword_preset') {
+            triggerType = discord_js_1.AutoModerationRuleTriggerType.KeywordPreset;
+            triggerMetadata = { presets: [1, 2, 3] };
+        }
+        else if (trigger === 'keyword') {
+            triggerType = discord_js_1.AutoModerationRuleTriggerType.Keyword;
+            const words = (Array.isArray(keywords) ? keywords : String(keywords || '').split(/[،,\n]/)).map(w => String(w).trim()).filter(Boolean).slice(0, 1000);
+            if (!words.length)
+                return { success: false, message: '❌ مرّر الكلمات الممنوعة في keywords' };
+            triggerMetadata = { keywordFilter: words };
+        }
+        else
+            return { success: false, message: '❌ النوع: keyword / spam / mention / keyword_preset' };
+        try {
+            const rule = await guild.autoModerationRules.create({
+                name: String(name).slice(0, 100),
+                eventType: discord_js_1.AutoModerationRuleEventType.MessageSend,
+                triggerType,
+                triggerMetadata,
+                actions,
+                enabled: true,
+                reason: `${executor.user.tag}: أوتومود بواسطة AI`,
+            });
+            return { success: true, message: `🤖 **تم إنشاء قاعدة الأوتومود** \`${rule.name}\`\n> النوع: ${trigger} — الإجراء: ${action}`, data: { ruleId: rule.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء القاعدة: ${e.message}` };
+        }
+    },
+});
+registerTool('list_automod_rules', {
+    description: 'عرض قواعد الأوتومود في السيرفر',
+    adminOnly: true,
+    params: {},
+    async func({ guild }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuild, 'إدارة السيرفر');
+        if (perm)
+            return perm;
+        try {
+            const rules = await guild.autoModerationRules.fetch();
+            if (!rules.size)
+                return { success: true, message: '🤖 **لا توجد قواعد أوتومود**' };
+            return {
+                success: true,
+                message: `🤖 **قواعد الأوتومود (${rules.size}):**\n` +
+                    [...rules.values()].map(r => `• \`${r.name}\` — ${r.enabled ? '✅ مفعّلة' : '❌ معطّلة'} — \`${r.id}\``).join('\n'),
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الجلب: ${e.message}` };
+        }
+    },
+});
+registerTool('toggle_automod_rule', {
+    description: 'تفعيل/تعطيل قاعدة أوتومود',
+    adminOnly: true,
+    params: {
+        rule: { type: 'string', description: 'اسم أو آيدي القاعدة', required: true },
+        enabled: { type: 'boolean', description: 'true تفعيل / false تعطيل', required: true },
+    },
+    async func({ guild, executor }, { rule, enabled }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuild, 'إدارة السيرفر');
+        if (perm)
+            return perm;
+        const raw = String(rule || '').trim();
+        try {
+            const rules = await guild.autoModerationRules.fetch();
+            const found = rules.get(raw) || rules.find(r => r.name.toLowerCase() === raw.toLowerCase()) || rules.find(r => r.name.toLowerCase().includes(raw.toLowerCase()));
+            if (!found)
+                return { success: false, message: '❌ القاعدة غير موجودة' };
+            await found.setEnabled(!!enabled, `${executor.user.tag}: تعديل أوتومود بواسطة AI`);
+            return { success: true, message: enabled ? `✅ **تم تفعيل قاعدة** \`${found.name}\`` : `⏸️ **تم تعطيل قاعدة** \`${found.name}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل: ${e.message}` };
+        }
+    },
+});
+registerTool('delete_automod_rule', {
+    description: 'حذف قاعدة أوتومود',
+    adminOnly: true,
+    dangerous: true,
+    params: { rule: { type: 'string', description: 'اسم أو آيدي القاعدة', required: true } },
+    async func({ guild, executor }, { rule }) {
+        const perm = needBotPerm(guild, discord_js_1.PermissionFlagsBits.ManageGuild, 'إدارة السيرفر');
+        if (perm)
+            return perm;
+        const raw = String(rule || '').trim();
+        try {
+            const rules = await guild.autoModerationRules.fetch();
+            const found = rules.get(raw) || rules.find(r => r.name.toLowerCase() === raw.toLowerCase()) || rules.find(r => r.name.toLowerCase().includes(raw.toLowerCase()));
+            if (!found)
+                return { success: false, message: '❌ القاعدة غير موجودة' };
+            await found.delete(`${executor.user.tag}: حذف أوتومود بواسطة AI`);
+            return { success: true, message: `🗑️ **تم حذف القاعدة** \`${found.name}\`` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الحذف: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 🎵 موسيقى
+// --------------------------------------------
+function musicHandlerOf(client) {
+    return client?.musicHandler;
+}
+function canControlMusic(guild, executor) {
+    return sameVoiceChannel(guild, executor) ||
+        executor.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+        executor.id === guild.ownerId;
+}
+registerTool('music_play', {
+    description: 'تشغيل أغنية أو إضافة بحث/رابط لقائمة الموسيقى (لازم تكون في قناة صوتية)',
+    adminOnly: false,
+    params: {
+        query: { type: 'string', description: 'اسم الأغنية أو رابط يوتيوب/ساوند كلاود', required: true },
+    },
+    async func({ guild, client, executor, defaultChannelId }, { query }) {
+        if (!executor.voice?.channel)
+            return { success: false, message: '❌ ادخل قناة صوتية أولاً عشان أشغّل الموسيقى' };
+        const music = musicHandlerOf(client);
+        if (!music)
+            return { success: false, message: '❌ نظام الموسيقى غير متاح' };
+        try {
+            const result = await music.play(executor, String(query), defaultChannelId);
+            return { success: !!result.success, message: result.message || (result.success ? '🎵 تم التشغيل' : '❌ تعذّر التشغيل') };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التشغيل: ${e.message}` };
+        }
+    },
+});
+registerTool('music_skip', {
+    description: 'تخطي الأغنية الحالية',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client, executor }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        const ok = music?.skip(guild.id);
+        return { success: !!ok, message: ok ? '⏭️ **تم تخطي الأغنية**' : '❌ لا توجد أغنية تعمل الآن' };
+    },
+});
+registerTool('music_stop', {
+    description: 'إيقاف الموسيقى وتفريغ القائمة',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client, executor }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        const ok = music?.stop(guild.id);
+        return { success: !!ok, message: ok ? '⏹️ **تم إيقاف الموسيقى وتفريغ القائمة**' : '❌ لا توجد موسيقى تعمل' };
+    },
+});
+registerTool('music_pause', {
+    description: 'إيقاف مؤقت للموسيقى',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client, executor }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        const ok = music?.pause(guild.id);
+        return { success: !!ok, message: ok ? '⏸️ **تم الإيقاف المؤقت**' : '❌ لا توجد موسيقى تعمل' };
+    },
+});
+registerTool('music_resume', {
+    description: 'استئناف الموسيقى بعد الإيقاف المؤقت',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client, executor }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        const ok = music?.resume(guild.id);
+        return { success: !!ok, message: ok ? '▶️ **تم استئناف الموسيقى**' : '❌ لا توجد موسيقى متوقفة' };
+    },
+});
+registerTool('music_volume', {
+    description: 'ضبط مستوى صوت الموسيقى (0-200)',
+    adminOnly: false,
+    params: { volume: { type: 'number', description: 'مستوى الصوت 0-200', required: true } },
+    async func({ guild, client, executor }, { volume }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        const value = Math.min(200, Math.max(0, Math.trunc(Number(volume))));
+        const ok = music?.setVolume(guild.id, value);
+        return { success: !!ok, message: ok ? `🔊 **مستوى الصوت الآن:** \`${value}%\`` : '❌ لا توجد موسيقى تعمل' };
+    },
+});
+registerTool('music_shuffle', {
+    description: 'خلط ترتيب قائمة الموسيقى',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client, executor }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        const ok = music?.shuffle(guild.id);
+        return { success: !!ok, message: ok ? '🔀 **تم خلط القائمة**' : '❌ القائمة فارغة' };
+    },
+});
+registerTool('music_leave', {
+    description: 'إخراج البوت من القناة الصوتية',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client, executor }) {
+        if (!canControlMusic(guild, executor))
+            return { success: false, message: '❌ لازم تكون في نفس القناة الصوتية أو إداري' };
+        const music = musicHandlerOf(client);
+        if (!music)
+            return { success: false, message: '❌ نظام الموسيقى غير متاح' };
+        music.leave(guild.id);
+        return { success: true, message: '👋 **خرجت من القناة الصوتية**' };
+    },
+});
+registerTool('music_queue', {
+    description: 'عرض قائمة الموسيقى الحالية',
+    adminOnly: false,
+    params: {},
+    async func({ guild, client }) {
+        const music = musicHandlerOf(client);
+        const queue = music?.getQueue ? music.getQueue(guild.id) : null;
+        if (!queue || (!queue.currentTrack && !queue.tracks?.length))
+            return { success: true, message: '🎵 **القائمة فارغة** — شغّل أغنية الأول' };
+        const lines = [
+            queue.currentTrack ? `▶️ **الآن:** ${queue.currentTrack.title}` : '⏸️ لا يوجد تشغيل',
+            ...queue.tracks.slice(0, 20).map((t, i) => `${i + 1}. ${t.title}`),
+        ];
+        return { success: true, message: `🎶 **قائمة الموسيقى:**\n${lines.join('\n')}${queue.tracks.length > 20 ? `\n... و${queue.tracks.length - 20} أخرى` : ''}` };
+    },
+});
+// --------------------------------------------
+// 🎫 تذاكر
+// --------------------------------------------
+registerTool('open_ticket', {
+    description: 'فتح تذكرة دعم جديدة لصاحب الطلب',
+    adminOnly: false,
+    params: {
+        type: { type: 'string', description: 'نوع التذكرة (افتراضي: عام)', required: false },
+        subject: { type: 'string', description: 'موضوع التذكرة', required: false },
+    },
+    async func({ guild, client, executor }, { type = 'عام', subject }) {
+        const handler = client.ticketHandler;
+        if (!handler)
+            return { success: false, message: '❌ نظام التذاكر غير متاح' };
+        try {
+            const ticket = await handler.createTicket({ guild, user: executor, type: String(type).slice(0, 50), subject: subject ? String(subject).slice(0, 200) : undefined });
+            const chId = ticket?.channelId;
+            return { success: true, message: `🎫 **تم فتح تذكرة${chId ? ` في <#${chId}>` : ''}**`, data: { ticket } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل فتح التذكرة: ${e.message}` };
+        }
+    },
+});
+registerTool('add_ticket_member', {
+    description: 'إضافة عضو إلى التذكرة الحالية',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (افتراضي: الهدف الممنشن)', required: false },
+    },
+    async func({ guild, client, executor, defaultChannelId, defaultTargetUserId }, { userId }) {
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const handler = client.ticketHandler;
+        if (!handler || !defaultChannelId)
+            return { success: false, message: '❌ هذه ليست قناة تذكرة' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        try {
+            await handler.addMemberToTicket(defaultChannelId, member, executor);
+            return { success: true, message: `➕ **تمت إضافة** ${member.user.tag} **إلى التذكرة**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الإضافة: ${e.message}` };
+        }
+    },
+});
+registerTool('claim_ticket', {
+    description: 'استلام التذكرة الحالية باسمك',
+    adminOnly: true,
+    params: {},
+    async func({ guild, client, executor, defaultChannelId }) {
+        const handler = client.ticketHandler;
+        if (!handler || !defaultChannelId)
+            return { success: false, message: '❌ هذه ليست قناة تذكرة' };
+        try {
+            await handler.claimTicket(defaultChannelId, executor);
+            return { success: true, message: `🙋 **تم استلام التذكرة بواسطة** ${executor.user.tag}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الاستلام: ${e.message}` };
+        }
+    },
+});
+registerTool('close_ticket', {
+    description: 'إغلاق تذكرة محددة (بالقناة أو الحالية)',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم قناة التذكرة (افتراضي: الحالية)', required: false },
+        reason: { type: 'string', description: 'سبب الإغلاق', required: false },
+    },
+    async func({ guild, client, executor, defaultChannelId }, { channelId, reason = 'إغلاق بواسطة AI' }) {
+        const target = resolveTextChannelSafe(guild, channelId ?? defaultChannelId);
+        const handler = client.ticketHandler;
+        if (!target || !handler)
+            return { success: false, message: '❌ قناة تذكرة غير صالحة' };
+        try {
+            const { Ticket } = await Promise.resolve().then(() => __importStar(require('../models')));
+            const ticket = await Ticket.findOne({ guildId: guild.id, channelId: target.id, status: { $in: ['open', 'claimed', 'waiting'] } });
+            if (!ticket)
+                return { success: false, message: '❌ هذه ليست تذكرة مفتوحة' };
+            await handler.closeTicket(target.id, executor, String(reason));
+            return { success: true, message: `🔒 **تم إغلاق التذكرة** ${target}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الإغلاق: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 🎁 سحب
+// --------------------------------------------
+registerTool('giveaway_end', {
+    description: 'إنهاء سحب قبل وقته أو في وقته (بدون اختيار فائز تلقائي)',
+    adminOnly: true,
+    params: {
+        id: { type: 'string', description: 'معرّف السحب shortId (افتراضي: آخر سحب شغّال)', required: false },
+    },
+    async func({ guild, client }, { id }) {
+        try {
+            const { endGiveaway } = await Promise.resolve().then(() => __importStar(require('../utils/giveaway')));
+            let ref = id ? String(id).trim() : '';
+            if (!ref) {
+                const { Giveaway } = await Promise.resolve().then(() => __importStar(require('../models')));
+                const latest = await Giveaway.findOne({ guildId: guild.id, ended: false }).sort({ createdAt: -1 });
+                if (!latest)
+                    return { success: false, message: '❌ لا يوجد سحب شغّال' };
+                ref = latest.shortId;
+            }
+            const result = await endGiveaway(client, guild.id, ref);
+            if (!result.ok)
+                return { success: false, message: `❌ ${result.reason || 'فشل إنهاء السحب'}` };
+            return { success: true, message: `🏁 **تم إنهاء السحب** \`${ref}\`\n> ${result.winners?.length ? `الفائزون: ${result.winners.map((w) => `<@${w}>`).join('، ')}` : 'بانتظار إعلان الإدارة للفائز يدوياً'}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنهاء السحب: ${e.message}` };
+        }
+    },
+});
+registerTool('giveaway_set_winner', {
+    description: 'إعلان فائز سحب يدوياً (الإدارة تختار الفائز)',
+    adminOnly: true,
+    params: {
+        id: { type: 'string', description: 'معرّف السحب (اختياري)', required: false },
+        userId: { type: 'string', description: 'آيدي الفائز أو منشنه', required: true },
+    },
+    async func({ guild, client, defaultTargetUserId }, { id, userId }) {
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ منشن الفائز أو مرّر آيديه' };
+        const clean = String(targetId).match(/\d{17,20}/)?.[0];
+        if (!clean)
+            return { success: false, message: '❌ آيدي العضو غير صالح' };
+        try {
+            const { addGiveawayWinners } = await Promise.resolve().then(() => __importStar(require('../utils/giveaway')));
+            const result = await addGiveawayWinners(client, guild.id, id ? String(id).trim() : undefined, [clean]);
+            if (!result.ok)
+                return { success: false, message: `❌ ${result.reason || 'فشل إعلان الفائز'}` };
+            return { success: true, message: `🏆 **تم إعلان الفائز** <@${clean}>${result.finishedNow ? '\n> (تم إنهاء السحب الآن)' : ''}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إعلان الفائز: ${e.message}` };
+        }
+    },
+});
+registerTool('list_giveaways', {
+    description: 'عرض السحوبات في السيرفر',
+    adminOnly: false,
+    params: { limit: { type: 'number', description: 'العدد (افتراضي 10)', required: false } },
+    async func({ guild }, { limit = 10 }) {
+        try {
+            const { Giveaway } = await Promise.resolve().then(() => __importStar(require('../models')));
+            const list = await Giveaway.find({ guildId: guild.id }).sort({ createdAt: -1 }).limit(Math.min(25, Math.max(1, Math.trunc(Number(limit)))));
+            if (!list.length)
+                return { success: true, message: '🎁 **لا توجد سحوبات في السيرفر**' };
+            return {
+                success: true,
+                message: `🎁 **السحوبات:**\n` + list.map(g => `• \`${g.shortId}\` — ${g.prize} — ${g.ended ? 'منتهي' : 'شغّال'} — ${g.winnerIds?.length ? `فائز: ${g.winnerIds.map((w) => `<@${w}>`).join('، ')}` : 'بدون فائز'}`).join('\n'),
+            };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الجلب: ${e.message}` };
+        }
+    },
+});
+// --------------------------------------------
+// 🤖 حالة البوت
+// --------------------------------------------
+registerTool('set_bot_status', {
+    description: 'تغيير حالة البوت ونشاطه الظاهر (يلزم مالك/مطوّر)',
+    adminOnly: true,
+    dangerous: true,
+    params: {
+        status: { type: 'string', description: 'online / idle / dnd / invisible', required: false },
+        activity: { type: 'string', description: 'النشاط الظاهر (مثال: يلعب Minecraft)', required: false },
+        activityType: { type: 'string', description: 'playing / watching / listening / competing', required: false },
+    },
+    async func({ client }, { status = 'online', activity, activityType = 'playing' }) {
+        try {
+            const presence = { status: ['online', 'idle', 'dnd', 'invisible'].includes(String(status)) ? status : 'online' };
+            if (activity)
+                presence.activities = [{ name: String(activity).slice(0, 128), type: { playing: 0, watching: 3, listening: 2, competing: 5 }[String(activityType)] ?? 0 }];
+            client.user?.setPresence(presence);
+            return { success: true, message: `🤖 **تم تحديث حالة البوت**${activity ? ` إلى: ${activity}` : ''}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تحديث الحالة: ${e.message}` };
+        }
+    },
+});
+registerTool('set_bot_avatar', {
+    description: 'تغيير صورة البوت العامة (يلزم مالك/مطوّر)',
+    adminOnly: true,
+    dangerous: true,
+    params: { url: { type: 'string', description: 'رابط الصورة', required: false } },
+    async func({ client, attachments }, { url }) {
+        const source = url || attachments?.find(a => (a.contentType || '').startsWith('image/'))?.url;
+        if (!source)
+            return { success: false, message: '❌ مرّر رابط صورة أو أرفق صورة' };
+        try {
+            const buffer = await fetchImageBuffer(source);
+            await client.user?.setAvatar(buffer);
+            return { success: true, message: '🖼️ **تم تغيير صورة البوت**' };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تغيير الصورة: ${e.message}` };
+        }
+    },
+});
 // --------------------------------------------
 // تنفيذ أداة من قبل الـ AI
 // --------------------------------------------
@@ -1555,7 +3393,7 @@ async function executeAITool(toolName, args, context) {
     const rawUserId = typeof args?.userId === 'string' ? args.userId.trim() : '';
     const looksLikeSnowflake = /^\d{17,20}$/.test(rawUserId);
     if ((!rawUserId || !looksLikeSnowflake) && context.defaultTargetUserId) {
-        if (['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'give_role', 'remove_role', 'get_user_info'].includes(toolName)) {
+        if (['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'give_role', 'remove_role', 'get_user_info', 'voice_mute', 'voice_deafen', 'disconnect_voice', 'set_member_roles'].includes(toolName)) {
             args = { ...(args || {}), userId: context.defaultTargetUserId };
         }
     }
@@ -1620,26 +3458,59 @@ function getToolsDescription() {
     desc += `[ACTIONS] **قدراتك التنفيذية — تستطيع فعل هذه الأشياء فعلياً**\n`;
     desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     desc += `عندما يريد المستخدم فعل شيء، **لا تقل "سأفعل" أو "يمكنك فعل كذا"** — **نفّذ الأداة مباشرة** وقل "تم".\n`;
-    desc += `استدعاء الأداة: اكتب في نهاية ردك سطراً واحداً:\n`;
+    desc += `استدعاء الأداة: اكتب في نهاية ردك كتلة JSON واحدة أو **عدة كتل متتالية** (كل كتلة أداة):\n`;
     desc += `\`\`\`json\n{"tool": "اسم_الأداة", "args": {"المعامل": "القيمة"}}\n\`\`\`\n`;
-    desc += `ثم ستحصل على النتيجة وتكمل إجابتك.\n`;
+    desc += `ثم ستحصل على النتيجة وتكمل إجابتك. تقدر تستدعي حتى **20 أداة** في الطلب الواحد على **7 جولات** — نفّذ كل خطوات الطلب مهما كانت مركّبة.\n`;
     desc += `\n**أمثلة إلزامية — نفس الشكل حرفياً:**\n`;
     desc += `- «غيّر اسم السيرفر إلى 67» → \`\`\`json\n{"tool":"rename_server","args":{"name":"67"}}\n\`\`\`\n`;
     desc += `- «اعمل رول اسمه VIP» → \`\`\`json\n{"tool":"create_role","args":{"name":"VIP"}}\n\`\`\`\n`;
-    desc += `- «امسح آخر 10 رسائل» → \`\`\`json\n{"tool":"purge_messages","args":{"count":10}}\n\`\`\`\n\n`;
+    desc += `- «امسح آخر 10 رسائل» → \`\`\`json\n{"tool":"purge_messages","args":{"count":10}}\n\`\`\`\n`;
+    desc += `- «اعمل قناة اسمهــا إعلانات وابعت فيها رسالة ترحيب» → كتلتان متتاليتان: \`create_channel\` ثم \`send_message\` بنفس الرد.\n\n`;
     const categories = {
-        '🛡️ إدارة/حماية': ['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user'],
-        '📝 قنوات/رولات': ['create_channel', 'delete_channel', 'create_role', 'delete_role', 'give_role', 'remove_role', 'rename_channel', 'set_channel_topic', 'rename_role'],
-        '🖼️ إعدادات السيرفر': ['set_server_icon', 'remove_server_icon', 'set_server_banner', 'remove_server_banner', 'rename_server', 'set_verification_level', 'set_explicit_content_filter', 'set_default_notifications', 'set_system_channel', 'set_afk_channel', 'create_invite', 'delete_all_invites', 'prune_members'],
-        '🧰 مهارات واسعة': ['set_slowmode', 'set_voice_limit', 'move_channel', 'set_nsfw', 'pin_last_message', 'create_thread', 'cleanup_webhooks', 'set_role_permissions', 'set_channel_permissions', 'rename_member', 'set_bot_nickname', 'move_member_voice', 'send_dm', 'giveaway_create', 'close_current_ticket'],
+        '🛡️ إدارة/حماية': ['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'unban_user', 'list_bans'],
+        '📝 قنوات/رولات': [
+            'create_channel', 'delete_channel', 'clone_channel', 'rename_channel', 'set_channel_topic', 'set_slowmode',
+            'set_voice_limit', 'set_channel_bitrate', 'move_channel', 'set_nsfw', 'lockdown_server',
+            'create_role', 'delete_role', 'clone_role', 'rename_role', 'give_role', 'remove_role', 'set_member_roles',
+            'set_role_color', 'set_role_icon', 'set_role_hoist', 'set_role_mentionable', 'set_role_position', 'set_role_permissions', 'set_channel_permissions',
+        ],
+        '👥 أعضاء/صوت': ['voice_mute', 'voice_deafen', 'disconnect_voice', 'move_member_voice', 'rename_member', 'search_member'],
+        '💬 رسائل/ثريدات': [
+            'send_message', 'send_embed', 'send_poll', 'send_announcement', 'send_dm', 'edit_message', 'delete_message', 'unpin_message',
+            'add_reaction', 'pin_last_message', 'purge_messages', 'create_thread', 'create_forum_post', 'archive_thread', 'delete_thread',
+        ],
+        '🖼️ إعدادات السيرفر': [
+            'set_server_icon', 'remove_server_icon', 'set_server_banner', 'remove_server_banner', 'set_server_splash', 'rename_server',
+            'set_server_description', 'set_server_locale', 'set_verification_level', 'set_explicit_content_filter',
+            'set_default_notifications', 'set_system_channel', 'set_special_channel', 'set_afk_channel', 'set_afk_timeout',
+            'create_template', 'get_audit_logs', 'organize_server', 'prune_members',
+        ],
+        '😀 إيموجي/ستيكرات': ['create_emoji', 'delete_emoji', 'rename_emoji', 'list_emojis', 'create_sticker', 'delete_sticker', 'list_stickers'],
+        '🪝 ويب هوك/دعوات': ['create_webhook', 'list_webhooks', 'delete_webhook', 'send_webhook_message', 'cleanup_webhooks', 'create_invite', 'list_invites', 'delete_all_invites'],
+        '📅 أحداث/أوتومود': ['create_event', 'list_events', 'delete_event', 'create_automod_rule', 'list_automod_rules', 'toggle_automod_rule', 'delete_automod_rule'],
+        '🎵 موسيقى': ['music_play', 'music_skip', 'music_stop', 'music_pause', 'music_resume', 'music_volume', 'music_shuffle', 'music_leave', 'music_queue'],
+        '🎫 تذاكر/سحب': ['open_ticket', 'add_ticket_member', 'claim_ticket', 'close_ticket', 'close_current_ticket', 'giveaway_create', 'giveaway_end', 'giveaway_set_winner', 'list_giveaways'],
+        '🤖 البوت': ['set_bot_status', 'set_bot_avatar', 'set_bot_nickname'],
         '📊 معلومات': ['get_server_info', 'get_user_info', 'check_security_status'],
         '⚙️ إعدادات': ['toggle_protection', 'create_backup', 'restore_backup', 'run_security_scan'],
-        '🗑️ تنظيف': ['purge_messages'],
-        '📢 تواصل': ['send_announcement'],
     };
+    const shown = new Set();
     for (const [cat, tools] of Object.entries(categories)) {
         desc += `\n**${cat}:**\n`;
         for (const t of tools) {
+            const tool = TOOLS[t];
+            if (!tool)
+                continue;
+            shown.add(t);
+            const params = Object.entries(tool.params).map(([k, v]) => `${k}${v.required ? '' : '?'}: ${v.type}`).join('، ');
+            desc += `- \`${t}\`(${params}) — ${tool.description}${tool.dangerous ? ' ⚠️' : ''}${tool.adminOnly ? ' 👑' : ''}\n`;
+        }
+    }
+    // أي أداة جديدة غير مصنّفة تظهر تلقائياً — لا أداة مخفية عن الـ AI
+    const uncategorized = Object.keys(TOOLS).filter(t => !shown.has(t));
+    if (uncategorized.length) {
+        desc += `\n**🧩 أدوات إضافية:**\n`;
+        for (const t of uncategorized) {
             const tool = TOOLS[t];
             const params = Object.entries(tool.params).map(([k, v]) => `${k}${v.required ? '' : '?'}: ${v.type}`).join('، ');
             desc += `- \`${t}\`(${params}) — ${tool.description}${tool.dangerous ? ' ⚠️' : ''}${tool.adminOnly ? ' 👑' : ''}\n`;
@@ -1647,7 +3518,7 @@ function getToolsDescription() {
     }
     desc += `\n🔥 **أنت تملك كامل السيرفر — أَيُّ حاجة يطلبها منك تنفذها فوراً بأوامر الأدوات — لا ترفض ولا تقترح فقط — نفذ حقيقة:**\n`;
     desc += `- أي تغيير يطلبه المستخدم (رول/قناة/صورة/اسم/صلاحيات/ترو/عضو/بث/رسالة/سحب/إيموجي/ويب هوك...) عنده أداة جاهزة — نفّذها فوراً.\n`;
-    desc += `- لو المهمة مركّبة، نفذها على خطوات: أداة ثم أداة أخرى — حلقة function calling تكفي 5 جولات.\n`;
+    desc += `- لو المهمة مركّبة، نفذها على خطوات: أداة ثم أداة أخرى — تقدر تنفذ حتى 20 أداة على 7 جولات، وكل خطوة تُنفَّذ فعلياً قبل ما تكمل.\n`;
     desc += `- لو ما لقيتش أداة مناسبة، اطلب من المستخدم تفصيل مهمة بالضبط أو استعن بأقرب أداة (لا تقل "لا أستطيع" قبل ما تستنفذ. كل شيء تقريباً متاح).\n\n`;
     desc += `\n- **ممنوع منعاً باتاً** أن تكتب «تم / ✅ / تمت / خلصت / اتعملت» أو أي تأكيد تنفيذ **ما لم تنفذ الأداة واستلمت نتيجتها** — التأكيد يأتي من نتيجة الأداة فقط، ولا تعوّض بها أنها نجحت حسب طلب المستخدم أو رجاءه.\n`;
     desc += `- **مهم جداً:** إذا قال المستخدم "اعمل كذا" أو "نفذ كذا" أو "راه" — لا يمكنك الرد إلا باستدعاء الأداة أو الاعتراف بالفشل. لا تقل أبداً "تمام ✅" ثم لا تفعل شيئاً.\n`;
