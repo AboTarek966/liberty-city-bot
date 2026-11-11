@@ -1282,9 +1282,9 @@ class AIHandler {
                 preferred = ['groq'];
                 break;
             case 'both':
-                preferred = ['requesty', 'openrouter', 'gemini', 'anthropic', 'openai'];
+                preferred = ['openrouter', 'requesty', 'gemini', 'anthropic', 'openai'];
                 break;
-            default: preferred = ['requesty', 'openrouter', 'groq', 'gemini', 'anthropic', 'openai']; // auto: الأعلى سعة يومية أولاً
+            default: preferred = ['openrouter', 'requesty', 'groq', 'gemini', 'anthropic', 'openai']; // auto: ernie الأسرع أولاً ثم Requesty (200/يوم) كاحتياطي
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));
