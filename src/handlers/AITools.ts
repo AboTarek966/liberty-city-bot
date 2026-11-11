@@ -1570,7 +1570,11 @@ export function getToolsDescription(): string {
   desc += `عندما يريد المستخدم فعل شيء، **لا تقل "سأفعل" أو "يمكنك فعل كذا"** — **نفّذ الأداة مباشرة** وقل "تم".\n`;
   desc += `استدعاء الأداة: اكتب في نهاية ردك سطراً واحداً:\n`;
   desc += `\`\`\`json\n{"tool": "اسم_الأداة", "args": {"المعامل": "القيمة"}}\n\`\`\`\n`;
-  desc += `ثم ستحصل على النتيجة وتكمل إجابتك.\n\n`;
+  desc += `ثم ستحصل على النتيجة وتكمل إجابتك.\n`;
+  desc += `\n**أمثلة إلزامية — نفس الشكل حرفياً:**\n`;
+  desc += `- «غيّر اسم السيرفر إلى 67» → \`\`\`json\n{"tool":"rename_server","args":{"name":"67"}}\n\`\`\`\n`;
+  desc += `- «اعمل رول اسمه VIP» → \`\`\`json\n{"tool":"create_role","args":{"name":"VIP"}}\n\`\`\`\n`;
+  desc += `- «امسح آخر 10 رسائل» → \`\`\`json\n{"tool":"purge_messages","args":{"count":10}}\n\`\`\`\n\n`;
 
   const categories: Record<string, string[]> = {
     '🛡️ إدارة/حماية': ['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user'],

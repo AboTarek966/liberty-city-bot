@@ -614,20 +614,44 @@ class AIHandler {
             }
             return null;
         };
-        let response = await callProviders(effectiveMessage, true);
+        // 🛠️ لو الطلب أمر تنفيذي → نمنع البث المباشر حتى لا يظهر «تم» الوهمي قبل تنفيذ الأداة
+        const isActionRequest = this.looksLikeActionRequest(effectiveMessage);
+        let response = await callProviders(effectiveMessage, !isActionRequest);
         // 🔍 تتبع نتائج الأدوات — للتحقق النهائي أن أي «تم» مكتوب هنا كان نتيجة تنفيذ حقيقي
         const toolOutcomes = [];
         // 🔧 حلقة استدعاء أدوات العمل (Function Calling) — الـ AI ينفذ إجراءات Discord
         // نمرر السياق الكامل: السيرفر، المنفذ، العميل
-        for (let actionRound = 0; actionRound < 5; actionRound++) {
+        let forcedToolTried = false;
+        for (let actionRound = 0; actionRound < 7; actionRound++) {
             if (!response || response.fallback)
                 break;
-            const actionCall = this.extractActionCall(response.content);
+            let actionCall = this.extractActionCall(response.content);
+            // 🛠️ إجبار الأداة: لو المستخدم طلب أمراً ولم يستدعِ النموذج أي أداة (ردّ نصوص فقط)
+            //    نعيد التوليد برسالة صارمة تُلزمه بإخراج استدعاء JSON واحد — يمنع «تم» الوهمية.
+            if (!actionCall && !forcedToolTried && isActionRequest) {
+                forcedToolTried = true;
+                try {
+                    logger.warn(`AI emitted no tool call for an action request — forcing tool call`);
+                    const forced = await callProviders(this.buildForceToolPrompt(effectiveMessage, response.content), false);
+                    const forcedCall = forced ? this.extractActionCall(forced.content) : null;
+                    if (forced && !forced.fallback && forcedCall) {
+                        response = forced;
+                        actionCall = forcedCall;
+                    }
+                }
+                catch (forceErr) {
+                    logger.warn(`Forced tool-call attempt failed: ${forceErr?.message || forceErr}`);
+                }
+            }
             if (!actionCall)
                 break;
-            const guild = this.client.guilds.cache.get(guildId);
+            const guild = guildId ? this.client.guilds.cache.get(guildId) : undefined;
             // نستخدم الـ userId الأصلي (مُمرّر للـ generateAIResponse)
-            const executor = guild?.members.cache.get(userId);
+            let executor = guild?.members.cache.get(userId);
+            // 👤 العضو قد لا يكون في الكاش (سيرفر كبير) — نجلبه مباشرة حتى لا تفشل الأداة بصمت
+            if (guild && !executor) {
+                executor = await guild.members.fetch(userId).catch(() => undefined);
+            }
             if (guild && executor) {
                 const toolContext = {
                     guild,
@@ -680,14 +704,22 @@ class AIHandler {
         const anyOK = toolOutcomes.some(o => o.ok);
         const anyFail = toolOutcomes.some(o => !o.ok);
         if (response && toolOutcomes.length === 0 && claimsDone) {
+            const wasActionRequest = isActionRequest;
             logger.warn(`AI claimed done without calling any tool: "${(response.content || '').slice(0, 120)}"`);
-            response = {
-                ...response,
-                content: `${response.content}\n\n` +
-                    `⚠️ **تنبيه:** لم يُنفّذ البوت أي إجراء فعلي في السيرفر — لا توجد نتيجة أداة. ` +
-                    `الرسالة أعلاه غير حقيقية كتأكيد تنفيذ؛ تحقق بنفسك أو أعد الطلب بصيغة واضحة.`,
-                fallback: response.fallback,
-            };
+            response = wasActionRequest
+                ? {
+                    ...response,
+                    content: `⚠️ **لم أنفّذ الطلب فعلياً** — لم يتم استدعاء أي أداة تنفيذ. ` +
+                        `أعد صياغة طلبك بشكل واضح (مثال: «غيّر اسم السيرفر إلى 67») وسأنفّذه فوراً.`,
+                    fallback: false,
+                }
+                : {
+                    ...response,
+                    content: `${response.content}\n\n` +
+                        `⚠️ **تنبيه:** لم يُنفّذ البوت أي إجراء فعلي في السيرفر — لا توجد نتيجة أداة. ` +
+                        `الرسالة أعلاه غير حقيقية كتأكيد تنفيذ؛ تحقق بنفسك أو أعد الطلب بصيغة واضحة.`,
+                    fallback: response.fallback,
+                };
         }
         else if (response && anyFail && !anyOK && claimsDone) {
             logger.warn(`AI claimed done despite tool failure(s): "${(response.content || '').slice(0, 120)}"`);
@@ -705,6 +737,13 @@ class AIHandler {
         const leaked = (finalResponse.content || '').match(/\[\[\s*(SEARCH|FETCH)\s*:[\s\S]{1,400}?\]\]/i);
         if (leaked) {
             finalResponse.content = finalResponse.content.replace(leaked[0], '').trim() || finalResponse.content;
+        }
+        // 🔒 ولا أي كتلة JSON لاستدعاء أداة (حتى لو فشل التعرف عليها)
+        const leakedToolJson = /```(?:json)?\s*\{[\s\S]{0,800}?"(?:tool|tool_name|action)"\s*:\s*"[^"]+"[\s\S]{0,800}?\}\s*```/gi;
+        if (leakedToolJson.test(finalResponse.content || '')) {
+            const cleaned = (finalResponse.content || '').replace(leakedToolJson, '').trim();
+            if (cleaned)
+                finalResponse.content = cleaned;
         }
         return finalResponse;
     }
@@ -724,20 +763,62 @@ class AIHandler {
             label: type === 'SEARCH' ? 'نتائج بحث ويب إضافية' : 'محتوى صفحة ويب',
         };
     }
+    /** فهرس أسماء الأدوات الفعلية (lowercase → الاسم المسجّل) */
+    toolNameIndex = null;
+    /** ترجمة اسم الأداة لاسم مسجّل فعلاً — أي JSON عادي لا يُعدّ استدعاء أداة */
+    normalizeToolName(name) {
+        if (!this.toolNameIndex) {
+            this.toolNameIndex = new Map();
+            for (const n of (0, AITools_1.getAllToolNames)())
+                this.toolNameIndex.set(n.toLowerCase(), n);
+        }
+        return this.toolNameIndex.get(String(name || '').trim().toLowerCase()) || null;
+    }
     /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
     extractActionCall(text) {
         if (!text)
             return null;
-        // 1) داخل كتلة كود ```json ...```
-        const fenced = text.match(/```json\s*(\{[\s\S]*?\})\s*```/i);
-        if (fenced)
-            return this.parseActionCallJson(fenced[1]);
-        // 2) JSON خام في منتصف/آخر الرسالة — بحث متوازن للأقواس
-        const startIdx = text.indexOf('{"tool"') >= 0 ? text.indexOf('{"tool"') : text.indexOf('{ "tool"');
-        if (startIdx >= 0) {
-            const raw = this.findBalancedJson(text, startIdx);
-            if (raw)
-                return this.parseActionCallJson(raw);
+        /** لا نقبل إلا أداة موجودة فعلاً في السجل */
+        const pick = (json) => {
+            if (!json)
+                return null;
+            const parsed = this.parseActionCallJson(json);
+            if (!parsed)
+                return null;
+            const canonical = this.normalizeToolName(parsed.tool);
+            return canonical ? { tool: canonical, args: parsed.args } : null;
+        };
+        // 1) أي كتلة كود (json أو بدون وسم) — نجرّب كل الكتل
+        const fences = [...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)];
+        for (const f of fences) {
+            const parsed = pick(f[1]);
+            if (parsed)
+                return parsed;
+        }
+        // 2) أي كائن JSON يحتوي مفتاح أداة — نجمّع كل الأقواس المتوازنة المحتملة
+        const candidates = [];
+        const keyRe = /"(?:tool|tool_name|name|action)"\s*:/gi;
+        let m;
+        while ((m = keyRe.exec(text))) {
+            const brace = text.lastIndexOf('{', m.index);
+            if (brace >= 0 && !candidates.includes(brace))
+                candidates.push(brace);
+        }
+        for (const idx of candidates) {
+            const raw = this.findBalancedJson(text, idx);
+            const parsed = pick(raw);
+            if (parsed)
+                return parsed;
+        }
+        // 3) صيغة OpenAI: {"function": {"name": ..., "arguments": ...}}
+        const fnRe = /"function"\s*:/i;
+        if (fnRe.test(text)) {
+            const brace = text.indexOf('{');
+            if (brace >= 0) {
+                const parsed = pick(this.findBalancedJson(text, brace));
+                if (parsed)
+                    return parsed;
+            }
         }
         return null;
     }
@@ -776,14 +857,65 @@ class AIHandler {
     parseActionCallJson(json) {
         try {
             const parsed = JSON.parse(json.trim());
-            if (parsed.tool && typeof parsed.tool === 'string') {
-                return { tool: parsed.tool, args: parsed.args || {} };
+            if (!parsed || typeof parsed !== 'object')
+                return null;
+            // اسم الأداة — ندعم كل الصيغ الشائعة
+            const fnName = parsed?.function?.name;
+            const rawName = parsed?.tool ?? parsed?.tool_name ?? parsed?.action ?? fnName ?? parsed?.name;
+            if (!rawName || typeof rawName !== 'string')
+                return null;
+            const name = rawName.trim();
+            if (!name || name.toLowerCase() === 'none')
+                return null;
+            // المعاملات — args/arguments/parameters أو الحقول الزائدة على نفس المستوى
+            let args = parsed?.args ?? parsed?.arguments ?? parsed?.parameters ?? parsed?.function?.arguments;
+            if (typeof args === 'string') {
+                try {
+                    args = JSON.parse(args);
+                }
+                catch {
+                    args = {};
+                }
             }
+            if (!args || typeof args !== 'object' || Array.isArray(args))
+                args = {};
+            if (Object.keys(args).length === 0) {
+                const meta = new Set(['tool', 'tool_name', 'action', 'name', 'args', 'arguments', 'parameters', 'function']);
+                const extras = {};
+                for (const [k, v] of Object.entries(parsed)) {
+                    if (!meta.has(k))
+                        extras[k] = v;
+                }
+                // بعض الموديلات تضع معامل «name» بجانب الأداة بدل داخل args
+                if (extras.name === undefined && parsed.tool && typeof parsed.name === 'string') {
+                    extras.name = parsed.name;
+                }
+                if (Object.keys(extras).length)
+                    args = extras;
+            }
+            return { tool: name, args };
         }
         catch {
             // ignore
         }
         return null;
+    }
+    /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
+    looksLikeActionRequest(text) {
+        const action = /(غيّر|غير|بدّل|بدل|عدّل|عدل|اعمل|أنشئ|انشئ|أضف|اضف|ضيف|احذف|امسح|احظر|اطرد|اعطي|أعطي|شيل|ارفع|نزّل|انقل|ثبّت|قفل|افتح|ابعت|ارسل|أرسل|حدّث|حدث|حط|فعّل|فعل|عطّل|عطل|نفّذ|نفذ|سوّي|سوي|رتب)/i;
+        const target = /(سيرفر|قناة|رول|رتبة|عضو|اسم|صورة|بانر|توبيك|صلاحيات|تذكرة|سحب|ثريد|رسالة|دعوة|كنية|نيكنيم|أفاتار|افاتار|ايموجي|إيموجي|ويب هوك|ويبهوك|حماية|نسخة)/i;
+        return action.test(text) && target.test(text);
+    }
+    /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
+    buildForceToolPrompt(userMessage, previousReply) {
+        return (`⚠️ نظام: طلب المستخدم التالي يتطلب تنفيذاً فعلياً في السيرفر، لكن ردك السابق لم يتضمن أي استدعاء أداة.\n` +
+            `طلب المستخدم: "${String(userMessage).slice(0, 800)}"\n` +
+            `ردك السابق: "${String(previousReply).slice(0, 500)}"\n\n` +
+            `الآن اختر الأداة المناسبة من قائمة الأدوات وأخرج **فقط** كتلة JSON واحدة بهذا الشكل، بدون أي كلام قبلها أو بعدها:\n` +
+            '```json\n{"tool":"اسم_الأداة","args":{}}\n```\n' +
+            `- استخدم أسماء المعاملات كما هي في وصف الأداة بالضبط.\n` +
+            `- لا تكتب "تم" ولا أي شرح الآن — استدعاء الأداة فقط.\n` +
+            `- لو مفيش أداة مناسبة أخرج {"tool":"none","args":{}}.`);
     }
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     async runResearchTool(tool) {

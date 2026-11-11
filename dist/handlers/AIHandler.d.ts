@@ -82,11 +82,19 @@ export declare class AIHandler {
     private generateAIResponse;
     /** كشف نداء الأداة في رد النموذج: [[SEARCH: استعلام]] أو [[FETCH: رابط]] */
     private extractToolCall;
+    /** فهرس أسماء الأدوات الفعلية (lowercase → الاسم المسجّل) */
+    private toolNameIndex;
+    /** ترجمة اسم الأداة لاسم مسجّل فعلاً — أي JSON عادي لا يُعدّ استدعاء أداة */
+    private normalizeToolName;
     /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
     private extractActionCall;
     /** تجميع نص {…} متوازن بدءاً من startIdx */
     private findBalancedJson;
     private parseActionCallJson;
+    /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
+    private looksLikeActionRequest;
+    /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
+    private buildForceToolPrompt;
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     private runResearchTool;
     private loadHistory;
