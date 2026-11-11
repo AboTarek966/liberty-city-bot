@@ -265,6 +265,25 @@ export class AITicketAssistant {
       // لو إداري بشري استلم التذكرة → الـ AI يسكت أمام صاحب التذكرة فقط (يستلمها بشرياً)
       if (isOwner && ticket.claimedBy && ticket.claimedBy !== this.client.user?.id) return;
 
+      // 🤫 البوت هو المستلم — لا يرد على أي رسالة داخل التذكرة إلا إذا كانت ردّاً لرسالة البوت أو منشنته
+      const botId = this.client.user?.id;
+      if (botId && ticket.claimedBy === botId) {
+        const mentioned =
+          !!message.mentions?.users?.has(botId) ||
+          !!message.mentions?.members?.has(botId);
+        let repliedToBot = false;
+        if (!mentioned && message.reference?.messageId) {
+          try {
+            const cached = message.channel.messages.cache.get(message.reference.messageId);
+            const refMessage = cached || (await message.channel.messages.fetch(message.reference.messageId));
+            repliedToBot = !!refMessage && refMessage.author?.id === botId;
+          } catch {
+            repliedToBot = false;
+          }
+        }
+        if (!mentioned && !repliedToBot) return; // لا يرد أبداً بلا طلب صريح
+      }
+
       const aiConfig = await this.getConfig(channel.guild.id);
       if (!aiConfig?.enabled) return;
       if (aiConfig.replyToMessages === false) return;
