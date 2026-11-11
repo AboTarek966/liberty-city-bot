@@ -31,6 +31,14 @@ export interface IAIConfig extends Document {
   customPersonality: string;        // شخصية مخصصة
   responseRules: IAIResponseRule[]; // قواعد رد مخصصة
   rolePersonalities: Record<string, string>; // شخصية لكل رول
+  /** 🔌 مزوّد API خارجي متوافق مع OpenAI (أي مزوّد: OpenAI/OpenRouterx/Groq/Together/...) — يُضاف من لوحة الإعدادات */
+  customProvider?: {
+    enabled: boolean;
+    label: string;
+    baseURL: string;
+    apiKey: string;
+    model: string;
+  } | null;
   maxTokens: number;
   temperature: number;
   cooldown: number;                 // كولداون بين الردود (ثانية)
@@ -64,6 +72,16 @@ const AIConfigSchema = new Schema<IAIConfig>({
   customPersonality: { type: String, default: '' },
   responseRules: [AIResponseRuleSchema],
   rolePersonalities: { type: Schema.Types.Mixed, default: {} },
+  customProvider: {
+    type: new Schema({
+      enabled: { type: Boolean, default: false },
+      label: { type: String, default: '' },
+      baseURL: { type: String, default: '' },
+      apiKey: { type: String, default: '' },
+      model: { type: String, default: '' },
+    }, { _id: false }),
+    default: null,
+  },
   maxTokens: { type: Number, default: 500 },
   temperature: { type: Number, default: 0.7 },
   cooldown: { type: Number, default: 3 },

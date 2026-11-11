@@ -60,6 +60,32 @@ export class AIHandler {
   private openrouter: any = null;
   /** Requesty — بوابة مجانية (200 طلب/يوم · 20 RPM · بدون بطاقة) */
   private requesty: any = null;
+  /** 🔌 مزوّدو API خارجية خاصة (متوافقة مع OpenAI) — يُبنى عميل لكل إعدادات سيرفر، يُحدَّث تلقائياً عند تغييرها */
+  private customClients: Map<string, any> = new Map();
+  /** مفتاح إنشاء عميل Custom لكل (guild + baseURL + model) — تتجدد تلقائياً عند تغيير الإعدادات */
+  private customClientKey(guildId: string, provider: any): string {
+    return `${guildId}|${provider?.baseURL || ''}|${provider?.model || ''}|${(provider?.apiKey || '').slice(-6)}`;
+  }
+  private getCustomClient(guildId: string | undefined, provider: any): any {
+    if (!provider?.apiKey || !provider?.baseURL || !provider?.model) return null;
+    const key = this.customClientKey(guildId || 'global', provider);
+    let client = this.customClients.get(key);
+    if (!client) {
+      const { OpenAI } = require('openai');
+      client = new OpenAI({
+        apiKey: String(provider.apiKey).trim(),
+        baseURL: String(provider.baseURL).trim().replace(/\/+$/, ''),
+        defaultHeaders: {
+          'HTTP-Referer': 'https://github.com/liberty-city-bot',
+          'X-Title': 'Omni Bot',
+        },
+        timeout: 60000,
+        maxRetries: 2,
+      });
+      this.customClients.set(key, client);
+    }
+    return client;
+  }
   private cooldowns: Map<string, number> = new Map();
   /** ⏳ تهدئة المزوّدين — المزوّد الذي فشل (مفتاح ميت/حصة/ازدحام) نتخطاه مؤقتاً بدل إهدار ثوانٍ كل رسالة */
   private providerCooldowns: Map<string, number> = new Map();
@@ -690,7 +716,7 @@ export class AIHandler {
     // Try AI providers (preferred first, others as automatic failover) + حلقة بحث ذاتية
     const callProviders = async (msg: string, useStream: boolean): Promise<AIResponse | null> => {
       // عند وجود صور نُقدّم مزوّدي الرؤية أولاً (Gemini ثم OpenRouter)
-      let providerOrder = this.resolveProviderOrder(aiConfig.provider);
+      let providerOrder = this.resolveProviderOrder(aiConfig.provider, this.customProviderAvailable(aiConfig));
       if (passImages?.length) {
         providerOrder = [
           ...providerOrder.filter((p) => p === 'gemini' || p === 'openrouter' || p === 'requesty'),
@@ -703,6 +729,7 @@ export class AIHandler {
         if (this.isProviderCooling(provider)) continue;
         try {
           if (provider === 'gemini') return await this.generateGemini(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
+          if (provider === 'custom') return await this.generateCustom(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined);
           if (provider === 'openrouter') return await this.generateOpenRouter(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
           if (provider === 'requesty') return await this.generateRequesty(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
           if (provider === 'groq') {
@@ -726,6 +753,7 @@ export class AIHandler {
             try {
               logger.warn(`AI handler: retrying "${provider}" without history (413)`);
               if (provider === 'gemini') return await this.generateGemini(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
+              if (provider === 'custom') return await this.generateCustom(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined);
               if (provider === 'openrouter') return await this.generateOpenRouter(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
               if (provider === 'requesty') return await this.generateRequesty(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
               if (provider === 'groq') return await this.generateGroq(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined);
@@ -1373,8 +1401,15 @@ export class AIHandler {
    * Uses aiConfig.provider if set, otherwise AI_PROVIDER from .env (default: auto).
    * Any available provider not in the preferred list is appended as failover.
    */
-  private resolveProviderOrder(configured?: string): Array<'groq' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'requesty'> {
-    const available: Array<'groq' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'requesty'> = [];
+  /** 🔍 هل السيرفر المحدد لديه مزوّد API مخصص جاهز؟ */
+  private customProviderAvailable(aiConfig: any): boolean {
+    const p = aiConfig?.customProvider;
+    return !!p?.enabled && !!p?.apiKey?.trim() && !!p?.baseURL?.trim() && !!p?.model?.trim();
+  }
+
+  private resolveProviderOrder(configured?: string, customAvailable: boolean = false): Array<'groq' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'requesty' | 'custom'> {
+    const available: Array<'groq' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'requesty' | 'custom'> = [];
+    if (customAvailable) available.push('custom');       // 🔌 المزوّد الخاص بالسيرفر — الأولوية القصوى
     if (this.geminiReady) available.push('gemini');      // الأقوى للرؤية + التفكير
     if (this.requesty) available.push('requesty');       // مجاني 100% — 200 طلب/يوم
     if (this.openrouter) available.push('openrouter');   // بديل قوي للرؤية
@@ -1383,17 +1418,20 @@ export class AIHandler {
     if (this.groq) available.push('groq');               // سريع لكن أقل دقة
 
     const pref = (configured || config.ai.provider || 'auto') as string;
-    let preferred: Array<'groq' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'requesty'>;
+    let preferred: Array<'groq' | 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'requesty' | 'custom'>;
 
     switch (pref) {
       case 'gemini': preferred = ['gemini']; break;
       case 'openrouter': preferred = ['openrouter']; break;
       case 'requesty': preferred = ['requesty']; break;
+      case 'custom': preferred = ['custom', 'openrouter', 'requesty', 'groq']; break;
       case 'anthropic': preferred = ['anthropic']; break;
       case 'openai': preferred = ['openai']; break;
       case 'groq': preferred = ['groq']; break;
-      case 'both': preferred = ['openrouter', 'requesty', 'gemini', 'anthropic', 'openai']; break;
-      default: preferred = ['openrouter', 'requesty', 'groq', 'gemini', 'anthropic', 'openai']; // auto: ernie الأسرع أولاً ثم Requesty (200/يوم) كاحتياطي
+      case 'both': preferred = customAvailable ? ['custom', 'openrouter', 'requesty', 'gemini', 'anthropic', 'openai'] : ['openrouter', 'requesty', 'gemini', 'anthropic', 'openai']; break;
+      default: preferred = customAvailable
+        ? ['custom', 'openrouter', 'requesty', 'groq', 'gemini', 'anthropic', 'openai']
+        : ['openrouter', 'requesty', 'groq', 'gemini', 'anthropic', 'openai']; // auto: ernie الأسرع أولاً ثم Requesty (200/يوم) كاحتياطي
     }
 
     const primary = preferred.filter(p => available.includes(p));
@@ -2014,6 +2052,78 @@ export class AIHandler {
     throw lastError || new Error('Requesty request failed');
   }
 
+  // --------------------------------------------
+  // 🔌 مزوّد API خارجي مخصص (OpenAI-Compatible) — يضاف من لوحة الإعدادات لكل سيرفر على حدة
+  //    مثال: OpenAI (‎https://api.openai.com/v1‎) · Groq · Together · OpenRouter · Local Ollama (‎http://localhost:11434/v1‎)
+  // --------------------------------------------
+  private async generateCustom(
+    message: string,
+    systemPrompt: string,
+    aiConfig: any,
+    history: HistoryMessage[] = [],
+    stream?: AIStreamHandlers
+  ): Promise<AIResponse> {
+    const provider = aiConfig?.customProvider;
+    const client = provider?.enabled ? this.getCustomClient(aiConfig?.guildId, provider) : null;
+    if (!client) throw new Error('Custom provider not configured');
+
+    const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : 0.7;
+    const configured = Number(aiConfig.maxTokens || 0) || 1200;
+    const messages = this.buildMessages(systemPrompt, history, message);
+    const model = String(provider.model).trim();
+
+    try {
+      // 📡 بث مباشر لو المزوّد يدعمه — وإلا نكمل بدون بث
+      if (stream?.onFirstChunk) {
+        try {
+          const completion = await client.chat.completions.create(
+            { model, messages, temperature, max_tokens: Math.max(1200, Math.min(configured, 2048)), stream: true },
+            { responseType: 'stream' }
+          );
+          let full = '';
+          let started = false;
+          for await (const chunk of completion as any) {
+            const piece = chunk?.choices?.[0]?.delta?.content || '';
+            if (!piece) continue;
+            full += piece;
+            if (!started) { started = true; await stream.onFirstChunk(piece); }
+            else if (stream.onUpdate) await stream.onUpdate(full);
+          }
+          if (full) {
+            if (stream.onUpdate) await stream.onUpdate(full);
+            return { content: full, tokensUsed: 0, model: 'custom-' + model, fallback: false };
+          }
+        } catch (streamErr: any) {
+          logger.warn(`Custom provider stream failed for model "${model}" — retrying without stream: ${streamErr?.message || streamErr}`);
+        }
+      }
+
+      const completion = await client.chat.completions.create({
+        model,
+        messages,
+        temperature,
+        max_tokens: Math.max(1200, Math.min(configured, 2048)),
+      });
+      const msg = completion?.choices?.[0]?.message;
+      const content = (typeof msg?.content === 'string' ? msg.content : '').trim();
+      if (!content) throw Object.assign(new Error('Empty response from custom provider'), { status: 400 });
+
+      return {
+        content,
+        tokensUsed: completion?.usage?.total_tokens || 0,
+        model: 'custom-' + model,
+        fallback: false,
+      };
+    } catch (error: any) {
+      const status = Number(error?.status ?? error?.response?.status ?? 0);
+      const msg = String(error?.message || error);
+      logger.warn(`Custom provider failed (${status || '?'}): ${msg.slice(0, 160)}`);
+      if (status === 429) this.coolProvider('custom', 45_000, 'حد معدل / حصة مؤقتة');
+      else if (status === 402 || status === 401 || status === 403) this.coolProvider('custom', 2 * 60_000, 'رصيد منتهي أو مفتاح غير صالح');
+      throw error;
+    }
+  }
+
   /** بث رد Groq مباشرة أثناء التوليد */
   private async streamGroq(
     model: string,
@@ -2135,7 +2245,20 @@ export class AIHandler {
     const userMsg = String(message || '').slice(0, 4000);
     const models = ['baidu/ernie-5.5-flash-preview:free', 'recursive/flint-v1.0:free'];
 
-    // 0) Requesty — مجاني (200 طلب/يوم) — نحاوله قبل أو بعد OpenRouter
+    // 0) المزوّد المخصص للسيرفر (لو مشغل) — أولاً
+    if (aiConfig?.customProvider?.enabled) {
+      try {
+        const r = await this.generateCustom(userMsg, systemPrompt, aiConfig, [], undefined);
+        if (r?.content?.trim()) {
+          logger.info(`🆘 Emergency AI reply via Custom/${r.model}`);
+          return { ...r, fallback: false };
+        }
+      } catch (e: any) {
+        logger.warn(`Emergency Custom provider failed: ${e?.message || e}`);
+      }
+    }
+
+    // 0.5) Requesty — مجاني (200 طلب/يوم) — نحاوله قبل أو بعد OpenRouter
     if (this.requesty) {
       for (const model of ['google/gemma-4-31b-it', 'mistral/leanstral-1-5']) {
         try {

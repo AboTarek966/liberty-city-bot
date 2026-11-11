@@ -25,6 +25,14 @@ export interface IAIConfig extends Document {
     customPersonality: string;
     responseRules: IAIResponseRule[];
     rolePersonalities: Record<string, string>;
+    /** 🔌 مزوّد API خارجي متوافق مع OpenAI (أي مزوّد: OpenAI/OpenRouterx/Groq/Together/...) — يُضاف من لوحة الإعدادات */
+    customProvider?: {
+        enabled: boolean;
+        label: string;
+        baseURL: string;
+        apiKey: string;
+        model: string;
+    } | null;
     maxTokens: number;
     temperature: number;
     cooldown: number;

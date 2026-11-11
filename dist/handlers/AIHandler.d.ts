@@ -33,6 +33,11 @@ export declare class AIHandler {
     private openrouter;
     /** Requesty — بوابة مجانية (200 طلب/يوم · 20 RPM · بدون بطاقة) */
     private requesty;
+    /** 🔌 مزوّدو API خارجية خاصة (متوافقة مع OpenAI) — يُبنى عميل لكل إعدادات سيرفر، يُحدَّث تلقائياً عند تغييرها */
+    private customClients;
+    /** مفتاح إنشاء عميل Custom لكل (guild + baseURL + model) — تتجدد تلقائياً عند تغيير الإعدادات */
+    private customClientKey;
+    private getCustomClient;
     private cooldowns;
     /** ⏳ تهدئة المزوّدين — المزوّد الذي فشل (مفتاح ميت/حصة/ازدحام) نتخطاه مؤقتاً بدل إهدار ثوانٍ كل رسالة */
     private providerCooldowns;
@@ -119,6 +124,8 @@ export declare class AIHandler {
      * Uses aiConfig.provider if set, otherwise AI_PROVIDER from .env (default: auto).
      * Any available provider not in the preferred list is appended as failover.
      */
+    /** 🔍 هل السيرفر المحدد لديه مزوّد API مخصص جاهز؟ */
+    private customProviderAvailable;
     private resolveProviderOrder;
     private buildSystemPrompt;
     private generateOpenAI;
@@ -138,6 +145,7 @@ export declare class AIHandler {
     /** موديلات Requesty النصية — مجانية تماماً (input_price=0) */
     private requestyTextCandidates;
     private generateRequesty;
+    private generateCustom;
     /** بث رد Groq مباشرة أثناء التوليد */
     private streamGroq;
     private generateAnthropic;

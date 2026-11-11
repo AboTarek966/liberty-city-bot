@@ -62,6 +62,16 @@ const AIConfigSchema = new mongoose_1.Schema({
     customPersonality: { type: String, default: '' },
     responseRules: [AIResponseRuleSchema],
     rolePersonalities: { type: mongoose_1.Schema.Types.Mixed, default: {} },
+    customProvider: {
+        type: new mongoose_1.Schema({
+            enabled: { type: Boolean, default: false },
+            label: { type: String, default: '' },
+            baseURL: { type: String, default: '' },
+            apiKey: { type: String, default: '' },
+            model: { type: String, default: '' },
+        }, { _id: false }),
+        default: null,
+    },
     maxTokens: { type: Number, default: 500 },
     temperature: { type: Number, default: 0.7 },
     cooldown: { type: Number, default: 3 },

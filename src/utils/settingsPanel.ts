@@ -272,7 +272,7 @@ export async function buildPanel(
     case 'tickets':
       return buildTickets(guild, settings);
     case 'ai':
-      return buildAI(guild, settings);
+      return await buildAI(guild, settings);
     case 'welcome':
       return buildWelcome(guild, settings);
     case 'leave':
@@ -1468,8 +1468,14 @@ export function buildTicketAdvancedPanel(guild: Guild, s: any): BuiltPanel {
 // --------------------------------------------
 // AI
 // --------------------------------------------
-function buildAI(guild: Guild, s: any): BuiltPanel {
+async function buildAI(guild: Guild, s: any): Promise<BuiltPanel> {
   const ai = s.ai;
+  // 🔌 المزوّد المخصص (OpenAI-Compatible) — مخزّن في AIConfig منفصلاً عن إعدادات السيرفر
+  const aiConfig: any = await import('../models')
+    .then(m => (m as any).AIConfig?.findOne({ guildId: guild.id }).catch(() => null) ?? null)
+    .catch(() => null);
+  const cp: any = aiConfig?.customProvider || null;
+  const cpEnabled = !!(cp?.enabled && cp?.apiKey && cp?.baseURL && cp?.model);
   const translator = s.protection?.aiTranslator;
   const tEnabled = translator?.enabled ?? false;
   const tDefault = translator?.defaultTargetLang ?? 'ar';
@@ -1481,7 +1487,8 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
     `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +
     `> ⚡ **الذكاء الاصطناعي:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
     `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
-    `> 🧠 **المزود:** Groq (مجاني — gpt-oss-120b)\n\n` +
+    `> 🔌 **API مخصص:** ${cpEnabled ? `✅ ${cp.label || 'مخصص'} — \`${cp.model}\`` : 'معطّل — استخدم أي API (OpenAI/Groq/Together/محلي/...) من زر «API مخصص»'}\n` +
+    `> 🧠 **المزود:** ${cpEnabled ? (cp.label || 'مزوّد خاص') : 'Groq (مجاني — gpt-oss-120b)'}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n` +
     `> 📊 **تحليل المزاج:** ${on(insights.moodEnabled)} ${insights.moodEnabled ? 'مفعّل — /mood' : 'معطّل'}\n` +
@@ -1500,6 +1507,7 @@ function buildAI(guild: Guild, s: any): BuiltPanel {
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('aiTranslator', 'enabled', '🌐 Translator', '🌐', tEnabled),
     btn('settings_btn:translator:settings', 'إعدادات الترجمة', ButtonStyle.Primary, '⚙️'),
+    btn('settings_btn:ai:custom', 'API مخصص', cpEnabled ? ButtonStyle.Success : ButtonStyle.Primary, '🔌'),
     btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠'),
   );
 

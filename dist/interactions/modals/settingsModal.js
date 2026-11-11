@@ -488,6 +488,84 @@ const handler = {
                 await models_1.AIConfig.findOneAndUpdate({ guildId }, { customPersonality: value }, { upsert: true }).catch(() => { });
                 break;
             }
+            case 'ai:custom': {
+                const baseURL = String(interaction.fields.getTextInputValue('baseURL') || '').trim().replace(/\/+$/, '');
+                const apiKey = String(interaction.fields.getTextInputValue('apiKey') || '').trim();
+                const model = String(interaction.fields.getTextInputValue('model') || '').trim();
+                const label = String(interaction.fields.getTextInputValue('label') || '').trim().slice(0, 100);
+                // 🗑️ مسح كامل — أوقف المزوّد الخاص ورجع للإعدادات الافتراضية
+                if (!baseURL && !apiKey && !model) {
+                    await interaction.deferReply({ ephemeral: true }).catch(() => { });
+                    await models_1.AIConfig.findOneAndUpdate({ guildId }, {
+                        $set: {
+                            'customProvider.enabled': false,
+                            'customProvider.baseURL': '',
+                            'customProvider.apiKey': '',
+                            'customProvider.model': '',
+                            'customProvider.label': '',
+                        },
+                    }, { upsert: true });
+                    const aiPanel = await (0, settingsPanel_1.buildPanel)('ai', interaction.guild, interaction.user.id);
+                    await interaction.editReply({ embeds: aiPanel.embeds, components: aiPanel.components });
+                    await interaction.followUp({
+                        content: '↩️ **تمت إزالة المزوّد المخصص** — البوت يرجع للمزوّدين المزوَّدين الافتراضيين.',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                if (!baseURL || !apiKey || !model) {
+                    await interaction.deferReply({ ephemeral: true }).catch(() => { });
+                    await interaction.editReply({ content: '❌ **حقول مطلوبة ناقصة:** Endpoint + API Key + اسم الموديل الثلاثة مطلوبين.' });
+                    return;
+                }
+                await interaction.deferReply({ ephemeral: true }).catch(() => { });
+                try {
+                    // 🔍 فحص سريع قبل التفعيل — طلب صغير للتأكد أن المفتاح والموديل يشتغلان
+                    const { OpenAI } = require('openai');
+                    const probe = new OpenAI({ apiKey, baseURL, timeout: 15000, maxRetries: 0 });
+                    const r = await probe.chat.completions.create({
+                        model,
+                        messages: [{ role: 'user', content: 'Say hi in one short word.' }],
+                        max_tokens: 16,
+                    });
+                    const answer = String(r?.choices?.[0]?.message?.content || '').trim();
+                    // ✅ الفاحص نجح — احفظ وفعّل المزوّد
+                    await models_1.AIConfig.findOneAndUpdate({ guildId }, {
+                        $set: {
+                            'customProvider.enabled': true,
+                            'customProvider.baseURL': baseURL,
+                            'customProvider.apiKey': apiKey,
+                            'customProvider.model': model,
+                            'customProvider.label': label || baseURL.split('/').pop() || 'مخصص',
+                        },
+                    }, { upsert: true });
+                    const aiPanel = await (0, settingsPanel_1.buildPanel)('ai', interaction.guild, interaction.user.id);
+                    await interaction.editReply({ embeds: aiPanel.embeds, components: aiPanel.components });
+                    await interaction.followUp({
+                        content: `✅ **تم تشغيل المزوّد "${label || 'مخصص'}"**\n` +
+                            `نموذج: \`${model}\`\n` +
+                            `رد الفاحص: ${answer ? `«${answer}»` : '«ok»'}\n` +
+                            `البوت سيرد على رسائلكم بهذا المزوّد من الآن. للإلغاء: افتح نفس الزر وامسح الحقول ثم احفظ.`,
+                        ephemeral: true,
+                    });
+                }
+                catch (e) {
+                    // ⚠️ الفحص فشل — لا نفعّل المزوّد مع إبراز السبب الحقيقي
+                    await models_1.AIConfig.findOneAndUpdate({ guildId }, { $set: { 'customProvider.enabled': false } }, { upsert: true });
+                    const raw = String(e?.message || e || '');
+                    const hint = /401|unauthorized|invalid api key/i.test(raw) ? 'المفتاح غير صالح أو غير مصرح به لهذا الموديل.'
+                        : /404|model not found|not found/i.test(raw) ? 'الموديل غير موجود لدى هذا المزوّد — تأكد من اسم الموديل.'
+                            : /402|credit|billing|insufficient/i.test(raw) ? 'رصيد المزوّد منتهي أو يحتاج للشحن.'
+                                : /endpoint|url|baseURL|invalid url/i.test(raw) ? 'الـ URL غلط — استخدم صيغة https://.../v1 (OpenAI-compatible).'
+                                    : 'تحقق من: URL صحيح (OpenAI-compatible /v1) + اسم الموديل + المفتاح + رصيد حسابك عند المزوّد.';
+                    await interaction.editReply({
+                        content: `❌ **تعذّر تشغيل المزوّد:**\n` +
+                            `\`\`\`${raw.slice(0, 300)}\`\`\`\n` +
+                            `${hint}\n**لم تُنشئ/تُفعّل المزوّد** — راجع الإعدادات وحاول مرة أخرى.`,
+                    });
+                }
+                return;
+            }
             case 'tickets:aiPersona': {
                 // 🎭 شخصية AI التكتات فقط — تُحفظ في إعدادات مساعد التذاكر (protection)
                 const prot = settings.protection || (settings.protection = {});

@@ -61,7 +61,7 @@ const handler: ButtonHandler = {
     // الإجراءات التي ترد فوراً (مودال أو رد مباشر) — لا يمكن deferUpdate قبلها
     const immediateKeys = new Set([
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
-      'automod:words', 'ai:personality', 'welcome:title', 'welcome:color',
+      'automod:words', 'ai:personality', 'ai:custom', 'welcome:title', 'welcome:color',
       'welcome:imgurl', 'welcome:cardurl', 'tickets:autotext', 'tickets:pimg',
       'tickets:types', 'tickets:panel', 'tickets:max', 'tickets:welcomeMsg', 'tickets:aiPersona', 'verification:msg', 'verification:age', 'verification:log', 'verification:emoji', 'verification:quarantineage', 'levels:msg',
       'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
@@ -387,7 +387,7 @@ const handler: ButtonHandler = {
     // الإجراءات التي تفتح مودال → ترجع فوراً (showModal هو الرد)
     const modalActions = [
       'general:prefix', 'general:tz', 'welcome:msg', 'leave:msg',
-      'automod:words', 'ai:personality',
+      'automod:words', 'ai:personality', 'ai:custom',
       'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
       'tickets:autotext', 'tickets:pimg', 'tickets:types', 'tickets:max', 'tickets:welcomeMsg',
       'translator:settings',
@@ -423,6 +423,59 @@ const handler: ButtonHandler = {
             2000,
             aiConfig?.customPersonality || ''
           );
+        }
+        case 'ai:custom': {
+          const aiConfig = await AIConfig.findOne({ guildId }).catch(() => null);
+          const cp: any = (aiConfig as any)?.customProvider || {};
+          const hasCurrent = cp?.enabled && (cp?.baseURL || cp?.model || cp?.apiKey);
+
+          const baseInput = new TextInputBuilder()
+            .setCustomId('baseURL')
+            .setLabel('API Endpoint (Base URL)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('https://api.openai.com/v1 · https://api.groq.com/openai/v1 · ...')
+            .setMaxLength(500)
+            .setRequired(true)
+            .setValue(String(cp?.baseURL || '').substring(0, 500));
+
+          const keyInput = new TextInputBuilder()
+            .setCustomId('apiKey')
+            .setLabel('API Key')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('sk-... (تُحفظ في قاعدة بيانات السيرفر)')
+            .setMaxLength(500)
+            .setRequired(true)
+            .setValue(String(cp?.apiKey || '').substring(0, 500));
+
+          const modelInput = new TextInputBuilder()
+            .setCustomId('model')
+            .setLabel('Model ID')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('gpt-4o-mini · llama-3.3-70b-versatile · google/gemma-4-31b-it ...')
+            .setMaxLength(150)
+            .setRequired(true)
+            .setValue(String(cp?.model || '').substring(0, 150));
+
+          const labelInput = new TextInputBuilder()
+            .setCustomId('label')
+            .setLabel('اسم المزوّد (اختياري)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('مثلاً: OpenAI GPT-4o · Groq Llama · Local Ollama')
+            .setMaxLength(100)
+            .setRequired(false)
+            .setValue(String(cp?.label || '').substring(0, 100));
+
+          const modal = new ModalBuilder()
+            .setCustomId('settings_modal:ai:custom')
+            .setTitle('🔌 مزوّد API خارجي (OpenAI-Compatible)'.substring(0, 45))
+            .addComponents(
+              new ActionRowBuilder<TextInputBuilder>().addComponents(baseInput),
+              new ActionRowBuilder<TextInputBuilder>().addComponents(keyInput),
+              new ActionRowBuilder<TextInputBuilder>().addComponents(modelInput),
+              new ActionRowBuilder<TextInputBuilder>().addComponents(labelInput),
+            );
+          await interaction.showModal(modal);
+          return;
         }
         case 'translator:settings': {
           const prot = settings.protection;
