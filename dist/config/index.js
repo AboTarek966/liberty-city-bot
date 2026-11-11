@@ -124,6 +124,16 @@ exports.config = {
             maxTokens: getEnvNumber('OPENROUTER_MAX_TOKENS', 4000),
             temperature: parseFloat(getEnv('OPENROUTER_TEMPERATURE', '0.8')),
         },
+        // Requesty — بوابة مجانية (200 طلب/يوم للحسابات الجديدة، 20 RPM، بدون بطاقة)
+        // الموديلات المجانية عندهم: google/gemma-4-31b-it · nvidia/nemotron-3-ultra-550b-a55b · mistral/leanstral-1-5 ...
+        // المفتاح يبدأ بـ rqsty-sk- ويُقرأ من REQUESTY_API_KEY (لا يُلتزم في المستودع أبداً)
+        requesty: {
+            apiKey: process.env.REQUESTY_API_KEY || '',
+            model: getEnv('REQUESTY_MODEL', 'google/gemma-4-31b-it'), // مجاني + عربي قوي + tool calling + vision
+            visionModel: getEnv('REQUESTY_VISION_MODEL', 'google/gemma-4-31b-it'),
+            maxTokens: getEnvNumber('REQUESTY_MAX_TOKENS', 2048), // الموديلات بتستهلك توكنز كبيرة في "التفكير"
+            temperature: parseFloat(getEnv('REQUESTY_TEMPERATURE', '0.8')),
+        },
         // Hugging Face Spaces — توليد الموسيقى والفيديو مجاناً (ZeroGPU)
         // ⚠️ يتطلب حساب Hugging Face مجاني (بلا بطاقة ائتمان) — https://huggingface.co/settings/tokens
         // ملاحظة: fn_index = ترقيم الدالة داخل المساحة (من /config → dependencies[i])
@@ -307,11 +317,11 @@ function validateConfig() {
     if (exports.config.ai.enabled && exports.config.ai.provider === 'anthropic' && !exports.config.ai.anthropic.apiKey) {
         console.warn('[WARN] AI is enabled with Anthropic provider but ANTHROPIC_API_KEY is not set');
     }
-    if (exports.config.ai.enabled && !exports.config.ai.groq.apiKey && !exports.config.ai.openai.apiKey && !exports.config.ai.anthropic.apiKey && !exports.config.ai.gemini.apiKey && !exports.config.ai.openrouter.apiKey) {
-        console.warn('[WARN] AI is enabled but no API key set (GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
+    if (exports.config.ai.enabled && !exports.config.ai.groq.apiKey && !exports.config.ai.openai.apiKey && !exports.config.ai.anthropic.apiKey && !exports.config.ai.gemini.apiKey && !exports.config.ai.openrouter.apiKey && !exports.config.ai.requesty.apiKey) {
+        console.warn('[WARN] AI is enabled but no API key set (REQUESTY_API_KEY / OPENROUTER_API_KEY / GROQ_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY). Using fallback responses only.');
     }
-    if (exports.config.ai.enabled && !exports.config.ai.gemini.apiKey && !exports.config.ai.openrouter.apiKey) {
-        console.warn('[INFO] No vision provider set (GEMINI_API_KEY or OPENROUTER_API_KEY) → images/video analysis is disabled (voice notes + web search still work). Free keys: https://aistudio.google.com/apikey · https://openrouter.ai/keys');
+    if (exports.config.ai.enabled && !exports.config.ai.gemini.apiKey && !exports.config.ai.openrouter.apiKey && !exports.config.ai.requesty.apiKey) {
+        console.warn('[INFO] No vision provider set (GEMINI_API_KEY / OPENROUTER_API_KEY / REQUESTY_API_KEY) → images/video analysis is disabled (voice notes + web search still work). Free keys: https://aistudio.google.com/apikey · https://openrouter.ai/keys · https://app.requesty.ai/api-keys');
     }
     if (exports.config.dashboard.enabled && !exports.config.dashboard.secret) {
         throw new Error('DASHBOARD_SECRET is required when dashboard is enabled');

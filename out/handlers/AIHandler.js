@@ -54,6 +54,8 @@ class AIHandler {
     geminiReady = false;
     /** OpenRouter — بديل مجاني يدعم الرؤية عبر موديلات :free */
     openrouter = null;
+    /** Requesty — بوابة مجانية (200 طلب/يوم · 20 RPM · بدون بطاقة) */
+    requesty = null;
     cooldowns = new Map();
     /** ⏳ تهدئة المزوّدين — المزوّد الذي فشل (مفتاح ميت/حصة/ازدحام) نتخطاه مؤقتاً بدل إهدار ثوانٍ كل رسالة */
     providerCooldowns = new Map();
@@ -89,6 +91,27 @@ class AIHandler {
             }
             catch (error) {
                 logger.warn('Failed to initialize OpenRouter:', error);
+            }
+        }
+        // Initialize Requesty (free gateway — 200 req/day new orgs · $0 · no card)
+        const rqKey = config_1.config.ai.requesty?.apiKey;
+        if (rqKey && rqKey.startsWith('rqsty-sk-')) {
+            try {
+                const { OpenAI } = require('openai');
+                this.requesty = new OpenAI({
+                    apiKey: rqKey,
+                    baseURL: 'https://router.requesty.ai/v1',
+                    defaultHeaders: {
+                        'HTTP-Referer': 'https://github.com/liberty-city-bot',
+                        'X-Title': 'Omni Bot',
+                    },
+                    timeout: 60000, // موديلات مجانية استدلالية بطيئة شوية أحياناً
+                    maxRetries: 2,
+                });
+                logger.info(`Requesty provider initialized (model: ${config_1.config.ai.requesty.model})`);
+            }
+            catch (error) {
+                logger.warn('Failed to initialize Requesty:', error);
             }
         }
         // Initialize Groq (free tier - preferred)
@@ -127,7 +150,7 @@ class AIHandler {
                 logger.warn('Failed to initialize Anthropic:', error);
             }
         }
-        if (!this.openai && !this.anthropic && !this.groq) {
+        if (!this.openai && !this.anthropic && !this.groq && !this.requesty && !this.openrouter && !this.geminiReady) {
             logger.warn('No AI providers configured. Using fallback responses only.');
         }
     }
@@ -235,8 +258,8 @@ class AIHandler {
             if (attachments && attachments.length > 0) {
                 try {
                     const { analyzeAttachments } = await Promise.resolve().then(() => __importStar(require('../utils/attachmentAnalyzer')));
-                    // 🔭 الرؤية متاحة مع Gemini أو OpenRouter (كلاهما مزوّدان يدعمان الصور)
-                    const canUseInlineVision = this.geminiReady || !!this.openrouter;
+                    // 🔭 الرؤية متاحة مع Gemini / OpenRouter / Requesty (كلهم مزوّدون يدعمان الصور)
+                    const canUseInlineVision = this.geminiReady || !!this.openrouter || !!this.requesty;
                     const analysis = await analyzeAttachments(attachments, {
                         apiKey: config_1.config.ai.groq.apiKey?.startsWith('gsk_') ? config_1.config.ai.groq.apiKey : '',
                         question: message,
@@ -543,8 +566,8 @@ class AIHandler {
         if (!effectiveMessage.trim()) {
             effectiveMessage = media?.context ? 'حلّل وأجب عن المحتوى المرفق أعلاه.' : 'مرحباً';
         }
-        // 🔭 الصور تحتاج مزوّد يدعم الرؤية — Gemini أو OpenRouter (Groq لا يملك موديل رؤية)
-        const canSeeImages = (this.geminiReady || !!this.openrouter) && !!media?.images?.length;
+        // 🔭 الصور تحتاج مزوّد يدعم الرؤية — Gemini / OpenRouter / Requesty
+        const canSeeImages = (this.geminiReady || !!this.openrouter || !!this.requesty) && !!media?.images?.length;
         const passImages = canSeeImages ? media.images : undefined;
         // Try AI providers (preferred first, others as automatic failover) + حلقة بحث ذاتية
         const callProviders = async (msg, useStream) => {
@@ -552,8 +575,8 @@ class AIHandler {
             let providerOrder = this.resolveProviderOrder(aiConfig.provider);
             if (passImages?.length) {
                 providerOrder = [
-                    ...providerOrder.filter((p) => p === 'gemini' || p === 'openrouter'),
-                    ...providerOrder.filter((p) => p !== 'gemini' && p !== 'openrouter'),
+                    ...providerOrder.filter((p) => p === 'gemini' || p === 'openrouter' || p === 'requesty'),
+                    ...providerOrder.filter((p) => p !== 'gemini' && p !== 'openrouter' && p !== 'requesty'),
                 ];
             }
             for (const provider of providerOrder) {
@@ -565,6 +588,8 @@ class AIHandler {
                         return await this.generateGemini(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
                     if (provider === 'openrouter')
                         return await this.generateOpenRouter(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+                    if (provider === 'requesty')
+                        return await this.generateRequesty(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
                     if (provider === 'groq') {
                         // Groq لا يدعم الصور — نتجاهلها حتى لا نستهلك محاولات فاشلة
                         if (passImages?.length)
@@ -603,6 +628,8 @@ class AIHandler {
                                 return await this.generateGemini(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
                             if (provider === 'openrouter')
                                 return await this.generateOpenRouter(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
+                            if (provider === 'requesty')
+                                return await this.generateRequesty(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined, passImages);
                             if (provider === 'groq')
                                 return await this.generateGroq(msg, systemPrompt, aiConfig, [], useStream ? stream : undefined);
                         }
@@ -1096,7 +1123,22 @@ class AIHandler {
                 `اكتب الملخص فقط بدون مقدمات أو عنوان — نصاً عربياً مفصلاً يصلح لإعادة استخدامه لاحقاً.`;
             const sumSystem = 'أنت محرر استخلاص الذاكرة طويلة المدى للمستخدم. اكتب بالعربية الفصحى بدون مقدمات، واحتفظ بكل الحقائق المهمة.';
             let clean = '';
-            // 1) OpenRouter — الأثبت حالياً (مفتاح Gemini القديم قد يكون معطلاً)
+            // 1) Requesty — مجاني (200 طلب/يوم) — نص عربي قوي عبر gemma-4-31b-it
+            if (this.requesty) {
+                try {
+                    const c = await this.requesty.chat.completions.create({
+                        model: 'google/gemma-4-31b-it',
+                        messages: [{ role: 'system', content: sumSystem }, { role: 'user', content: prompt }],
+                        temperature: 0.3,
+                        max_tokens: 1200,
+                    });
+                    clean = String(c?.choices?.[0]?.message?.content || '').trim();
+                }
+                catch (e) {
+                    logger.debug(`AI summary (Requesty) skipped: ${e?.message || e}`);
+                }
+            }
+            // 2) OpenRouter — الأثبت حالياً (مفتاح Gemini القديم قد يكون معطلاً)
             if (this.openrouter) {
                 try {
                     const c = await this.openrouter.chat.completions.create({
@@ -1208,6 +1250,8 @@ class AIHandler {
         const available = [];
         if (this.geminiReady)
             available.push('gemini'); // الأقوى للرؤية + التفكير
+        if (this.requesty)
+            available.push('requesty'); // مجاني 100% — 200 طلب/يوم
         if (this.openrouter)
             available.push('openrouter'); // بديل قوي للرؤية
         if (this.anthropic)
@@ -1225,6 +1269,9 @@ class AIHandler {
             case 'openrouter':
                 preferred = ['openrouter'];
                 break;
+            case 'requesty':
+                preferred = ['requesty'];
+                break;
             case 'anthropic':
                 preferred = ['anthropic'];
                 break;
@@ -1235,9 +1282,9 @@ class AIHandler {
                 preferred = ['groq'];
                 break;
             case 'both':
-                preferred = ['openrouter', 'gemini', 'anthropic', 'openai'];
+                preferred = ['requesty', 'openrouter', 'gemini', 'anthropic', 'openai'];
                 break;
-            default: preferred = ['openrouter', 'groq', 'gemini', 'anthropic', 'openai']; // auto: الأكثر ثباتاً أولاً
+            default: preferred = ['requesty', 'openrouter', 'groq', 'gemini', 'anthropic', 'openai']; // auto: الأعلى سعة يومية أولاً
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));
@@ -1660,6 +1707,109 @@ class AIHandler {
         }
         throw lastError || new Error('OpenRouter request failed');
     }
+    // --------------------------------------------
+    // Requesty — بوابة مجانية (200 طلب/يوم للحسابات الجديدة · 20 RPM · بدون بطاقة)
+    // --------------------------------------------
+    /** موديلات Requesty للرؤية — المجرّبة فعلياً مجانية (vision=true) */
+    requestyVisionCandidates() {
+        const preferred = config_1.config.ai.requesty?.visionModel;
+        const list = [
+            preferred,
+            'google/gemma-4-31b-it',
+            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+            'nvidia/muse-glimmer-30b',
+        ].filter(Boolean);
+        return [...new Set(list)];
+    }
+    /** موديلات Requesty النصية — مجانية تماماً (input_price=0) */
+    requestyTextCandidates() {
+        const preferred = config_1.config.ai.requesty?.model;
+        const list = [
+            preferred,
+            'google/gemma-4-31b-it',
+            'mistral/leanstral-1-5',
+            'nvidia/nemotron-3-ultra-550b-a55b',
+            'novita/ling-3.1-flash',
+        ].filter(Boolean);
+        return [...new Set(list)];
+    }
+    async generateRequesty(message, systemPrompt, aiConfig, history = [], stream, images) {
+        if (!this.requesty)
+            throw new Error('Requesty not configured');
+        const temperature = typeof aiConfig.temperature === 'number' ? aiConfig.temperature : config_1.config.ai.requesty.temperature;
+        const configured = Number(aiConfig.maxTokens || 0) || config_1.config.ai.requesty.maxTokens;
+        const imageList = (images || []).filter(i => i.mimeType.startsWith('image/'));
+        const messages = this.buildMessages(systemPrompt, history, message, imageList.length ? imageList : undefined);
+        const candidates = imageList.length
+            ? this.requestyVisionCandidates()
+            : this.requestyTextCandidates();
+        // 🔭 الموديلات استدلالية — تستهلك توكنز في "التفكير" قبل النص — نرفع الحد من البداية
+        const effMaxTokens = imageList.length ? Math.max(configured, 2048) : Math.max(configured, 1600);
+        let lastError = null;
+        for (const model of candidates) {
+            const attempts = 2;
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+                try {
+                    if (stream?.onFirstChunk && !imageList.length) {
+                        const completion = await this.requesty.chat.completions.create({ model, messages, temperature, max_tokens: Math.max(effMaxTokens, 1600), stream: true }, { responseType: 'stream' });
+                        let full = '';
+                        let started = false;
+                        for await (const chunk of completion) {
+                            const piece = chunk?.choices?.[0]?.delta?.content || '';
+                            if (!piece)
+                                continue;
+                            full += piece;
+                            if (!started) {
+                                started = true;
+                                await stream.onFirstChunk(piece);
+                            }
+                            else if (stream.onUpdate)
+                                await stream.onUpdate(full);
+                        }
+                        if (full) {
+                            if (stream.onUpdate)
+                                await stream.onUpdate(full);
+                            return { content: full, tokensUsed: 0, model: 'requesty-' + model, fallback: false };
+                        }
+                        logger.warn(`Requesty stream "${model}" produced no text — retrying non-stream with more tokens`);
+                    }
+                    const completion = await this.requesty.chat.completions.create({
+                        model,
+                        messages,
+                        temperature,
+                        max_tokens: Math.max(effMaxTokens, imageList.length ? 2048 : 1600),
+                    });
+                    const msg = completion?.choices?.[0]?.message;
+                    const content = msg?.content?.trim();
+                    if (!content)
+                        throw Object.assign(new Error('Empty response from Requesty'), { status: 400 });
+                    return {
+                        content,
+                        tokensUsed: completion?.usage?.total_tokens || 0,
+                        model: 'requesty-' + model,
+                        fallback: false,
+                    };
+                }
+                catch (error) {
+                    lastError = error;
+                    const status = Number(error?.status ?? error?.response?.status ?? 0);
+                    const msg = String(error?.message || '');
+                    if (status === 429 && attempt < attempts) {
+                        await new Promise((r) => setTimeout(r, 2000));
+                        continue;
+                    }
+                    // نموذج متقاعد/لا يدعم الرؤية/نفاد الحصة → انتقل للموديل التالي
+                    const retryable = status === 400 || status === 402 || status === 404 || status === 410 || status === 429 || status === 503 ||
+                        /image|vision|modalit|prompt tokens limit|gone/i.test(msg);
+                    if (!retryable)
+                        throw error;
+                    logger.warn(`Requesty model "${model}" failed (${status}): ${msg.slice(0, 140)}`);
+                    break;
+                }
+            }
+        }
+        throw lastError || new Error('Requesty request failed');
+    }
     /** بث رد Groq مباشرة أثناء التوليد */
     async streamGroq(model, messages, temperature, maxTokens, stream) {
         const s = await this.groq.chat.completions.create({
@@ -1761,6 +1911,27 @@ class AIHandler {
             'لا تدّعي أنك نفّذت أي إجراء في السيرفر — إن طلب المستخدم إجراءً فقل إنك لم تنفذه الآن وسيعاد المحاولة.';
         const userMsg = String(message || '').slice(0, 4000);
         const models = ['baidu/ernie-5.5-flash-preview:free', 'recursive/flint-v1.0:free'];
+        // 0) Requesty — مجاني (200 طلب/يوم) — نحاوله قبل أو بعد OpenRouter
+        if (this.requesty) {
+            for (const model of ['google/gemma-4-31b-it', 'mistral/leanstral-1-5']) {
+                try {
+                    const c = await this.requesty.chat.completions.create({
+                        model,
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+                        temperature: typeof aiConfig?.temperature === 'number' ? aiConfig.temperature : 0.7,
+                        max_tokens: 900,
+                    });
+                    const content = c?.choices?.[0]?.message?.content?.trim();
+                    if (content) {
+                        logger.info(`🆘 Emergency AI reply via Requesty/${model}`);
+                        return { content, tokensUsed: c?.usage?.total_tokens || 0, model: 'requesty-emergency-' + model, fallback: false };
+                    }
+                }
+                catch (e) {
+                    logger.warn(`Emergency Requesty/${model} failed: ${e?.message || e}`);
+                }
+            }
+        }
         if (this.openrouter) {
             for (const model of models) {
                 try {
@@ -1844,9 +2015,9 @@ class AIHandler {
         const channelId = interaction.channelId;
         await interaction.deferReply({ ephemeral: options.ephemeral });
         // Check if AI is available
-        if (!this.openai && !this.anthropic && !this.groq && !this.openrouter && !this.geminiReady) {
+        if (!this.openai && !this.anthropic && !this.groq && !this.openrouter && !this.requesty && !this.geminiReady) {
             await interaction.editReply({
-                content: '❌ ميزة الذكاء الاصطناعي غير مفعلة. يرجى إضافة `OPENAI_API_KEY` أو `ANTHROPIC_API_KEY` في ملف `.env` وتفعيل البوت.',
+                content: '❌ ميزة الذكاء الاصطناعي غير مفعلة. يرجى إضافة `REQUESTY_API_KEY` أو `OPENROUTER_API_KEY` أو `GROQ_API_KEY` في ملف `.env` وتفعيل البوت.',
             });
             return;
         }
@@ -1931,6 +2102,9 @@ class AIHandler {
                     case 'openrouter':
                         response = await this.generateOpenRouter(prompt, systemPrompt, aiConfig);
                         break;
+                    case 'requesty':
+                        response = await this.generateRequesty(prompt, systemPrompt, aiConfig);
+                        break;
                     case 'anthropic':
                         response = await this.generateAnthropic(prompt, systemPrompt, aiConfig);
                         break;
@@ -1963,12 +2137,14 @@ class AIHandler {
     // Utility
     // --------------------------------------------
     isAvailable() {
-        return !!this.openai || !!this.anthropic || !!this.groq || this.geminiReady || !!this.openrouter;
+        return !!this.openai || !!this.anthropic || !!this.groq || this.geminiReady || !!this.openrouter || !!this.requesty;
     }
     getProviders() {
         const providers = [];
         if (this.geminiReady)
             providers.push('Gemini');
+        if (this.requesty)
+            providers.push('Requesty');
         if (this.openrouter)
             providers.push('OpenRouter');
         if (this.groq)
@@ -2014,7 +2190,7 @@ class AIHandler {
     getProviderInfo() {
         return {
             provider: this.getProviders().join(' + '),
-            model: this.groq ? config_1.config.ai.groq.model : (config_1.config.ai.openai.model || 'gpt-4o-mini'),
+            model: this.requesty ? config_1.config.ai.requesty.model : this.groq ? config_1.config.ai.groq.model : (config_1.config.ai.openai.model || 'gpt-4o-mini'),
             openaiAvailable: !!this.openai,
             anthropicAvailable: !!this.anthropic,
             groqAvailable: !!this.groq,

@@ -18,7 +18,7 @@ export declare const config: {
         uri: string;
     };
     ai: {
-        provider: "auto" | "openai" | "anthropic" | "groq" | "gemini" | "openrouter" | "both";
+        provider: "auto" | "openai" | "anthropic" | "groq" | "gemini" | "openrouter" | "requesty" | "both";
         openai: {
             apiKey: string;
             model: string;
@@ -39,6 +39,13 @@ export declare const config: {
             temperature: number;
         };
         openrouter: {
+            apiKey: string;
+            model: string;
+            visionModel: string;
+            maxTokens: number;
+            temperature: number;
+        };
+        requesty: {
             apiKey: string;
             model: string;
             visionModel: string;

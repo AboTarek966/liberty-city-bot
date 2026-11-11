@@ -31,6 +31,8 @@ export declare class AIHandler {
     private geminiReady;
     /** OpenRouter — بديل مجاني يدعم الرؤية عبر موديلات :free */
     private openrouter;
+    /** Requesty — بوابة مجانية (200 طلب/يوم · 20 RPM · بدون بطاقة) */
+    private requesty;
     private cooldowns;
     /** ⏳ تهدئة المزوّدين — المزوّد الذي فشل (مفتاح ميت/حصة/ازدحام) نتخطاه مؤقتاً بدل إهدار ثوانٍ كل رسالة */
     private providerCooldowns;
@@ -129,6 +131,11 @@ export declare class AIHandler {
     /** موديلات OpenRouter النصية — مجانية أولاً ثم المدفوع كاحتياطي أخير */
     private openrouterTextCandidates;
     private generateOpenRouter;
+    /** موديلات Requesty للرؤية — المجرّبة فعلياً مجانية (vision=true) */
+    private requestyVisionCandidates;
+    /** موديلات Requesty النصية — مجانية تماماً (input_price=0) */
+    private requestyTextCandidates;
+    private generateRequesty;
     /** بث رد Groq مباشرة أثناء التوليد */
     private streamGroq;
     private generateAnthropic;
