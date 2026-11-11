@@ -336,7 +336,7 @@ class AIHandler {
                 }
             }
             // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle, attachments);
+            let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle, attachments, channelId);
             this.cooldowns.set(cooldownKey, now);
             // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
             //   تتم قبل الحفظ — حتى تتذكّر الذاكرة الرد الفعلي الذي رآه المستخدم
@@ -506,7 +506,7 @@ class AIHandler {
     // --------------------------------------------
     // Generate AI Response
     // --------------------------------------------
-    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media, brief = false, independentFeature = false, attachments) {
+    async generateAIResponse(message, aiConfig, userRoles, guildId, userId, userContext, history = [], stream, searchContext = '', media, brief = false, independentFeature = false, attachments, channelId) {
         // Check for role-specific personality
         // 🔌 الميزات المستقلة (مثل مساعد التذاكر) لا ترث شخصية الذكاء العام — لكل ميزة شخصيتها الخاصة
         let personality = independentFeature ? '' : aiConfig.customPersonality;
@@ -526,7 +526,13 @@ class AIHandler {
             const configuredMax = typeof aiConfig.maxTokens === 'number' ? aiConfig.maxTokens : 500;
             aiConfig.maxTokens = Math.min(configuredMax, 320);
         }
-        const systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext, guildId ? await (0, knowledge_1.buildKnowledgeContext)(guildId, message, 4) : '', brevity);
+        let systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext, guildId ? await (0, knowledge_1.buildKnowledgeContext)(guildId, message, 4) : '', brevity);
+        // 📍 القناة الحالية — الـ AI لا يسأل عن ID القناة أبداً بعد الآن
+        if (channelId) {
+            systemPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+            systemPrompt += `\n📍 **القناة الحالية:** <#${channelId}> (channelId: \`${channelId}\`)`;
+            systemPrompt += `\n**قاعدة صارمة:** أي أمر يحتاج "channelId" (delete_channel / purge_messages / create_invite / set_system_channel / set_afk_channel / rename_channel / set_channel_topic) استخدم القناة الحالية تلقائياً \`${channelId}\` ولا تطلب من المستخدم ID القناة إطلاقاً — لا في تذكرة ولا في قناة عادية. لو المستخدم بيقصد قناة تانية يقولك اسمها وحينها حلّها من الاسم.`;
+        }
         // سياق الوسائط يُدمَج مع رسالة المستخدم (النموذج يرى الوصف + الصور نفسها)
         let effectiveMessage = media?.context
             ? `${media.context}\n\n${message}`.trim()
@@ -616,6 +622,8 @@ class AIHandler {
                     defaultTargetUserId: userContext?.targetUserId,
                     // 📎 الوسائط المرفقة بالرسالة — يستخدمها AI لصورة السيرفر لو أرفقها المستخدم
                     attachments,
+                    // 📍 القناة الحالية لتلك المحادثة — يُستخدم لأي أداة تطلب channelId
+                    defaultChannelId: channelId,
                 };
                 const toolResult = await (0, AITools_1.executeAITool)(actionCall.tool, actionCall.args, toolContext);
                 toolOutcomes.push({ tool: actionCall.tool, ok: !!toolResult?.success, message: String(toolResult?.message || '') });
@@ -652,7 +660,8 @@ class AIHandler {
         }
         // 🔍 تحقق أخير قبل الإرسال: أي «تم» يجب أن يكون متفوقاً عليه بنتيجة أداة فعلية
         //   يمنع النموذج من ادّعاء تنفيذ شيء لم يحدث
-        const claimsDone = /(✅|✔|تم[ّ]?|تمت|خلّصت|خلصت|اتعملت|اتنفذت|اتسلم|اُنجزت|اُنجز|انجز)/u.test(response?.content || '');
+        const claimsDone = !response?.content?.includes('؟') && !response?.content?.includes('?') &&
+            /(✅|✔|تم[ّ]?|تمت|خلّصت|خلصت|اتعملت|اتنفذت|اتسلم|اُنجزت|اُنجز|انجز)/u.test(response?.content || '');
         const anyOK = toolOutcomes.some(o => o.ok);
         const anyFail = toolOutcomes.some(o => !o.ok);
         if (response && toolOutcomes.length === 0 && claimsDone) {
@@ -701,17 +710,62 @@ class AIHandler {
     }
     /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
     extractActionCall(text) {
-        const m = (text || '').match(/```json\s*(\{[\s\S]*?\})\s*```/i);
-        if (!m)
+        if (!text)
             return null;
+        // 1) داخل كتلة كود ```json ...```
+        const fenced = text.match(/```json\s*(\{[\s\S]*?\})\s*```/i);
+        if (fenced)
+            return this.parseActionCallJson(fenced[1]);
+        // 2) JSON خام في منتصف/آخر الرسالة — بحث متوازن للأقواس
+        const startIdx = text.indexOf('{"tool"') >= 0 ? text.indexOf('{"tool"') : text.indexOf('{ "tool"');
+        if (startIdx >= 0) {
+            const raw = this.findBalancedJson(text, startIdx);
+            if (raw)
+                return this.parseActionCallJson(raw);
+        }
+        return null;
+    }
+    /** تجميع نص {…} متوازن بدءاً من startIdx */
+    findBalancedJson(text, startIdx) {
+        let depth = 0, inStr = false, esc = false;
+        for (let i = startIdx; i < text.length; i++) {
+            const c = text[i];
+            if (inStr) {
+                if (esc) {
+                    esc = false;
+                    continue;
+                }
+                if (c === '\\') {
+                    esc = true;
+                    continue;
+                }
+                if (c === '"')
+                    inStr = false;
+                continue;
+            }
+            if (c === '"') {
+                inStr = true;
+                continue;
+            }
+            if (c === '{')
+                depth++;
+            else if (c === '}') {
+                depth--;
+                if (depth === 0)
+                    return text.slice(startIdx, i + 1);
+            }
+        }
+        return null;
+    }
+    parseActionCallJson(json) {
         try {
-            const parsed = JSON.parse(m[1]);
+            const parsed = JSON.parse(json.trim());
             if (parsed.tool && typeof parsed.tool === 'string') {
                 return { tool: parsed.tool, args: parsed.args || {} };
             }
         }
         catch {
-            return null;
+            // ignore
         }
         return null;
     }

@@ -1049,6 +1049,14 @@ async function executeAITool(toolName, args, context) {
         if (byName)
             args = { ...args, userId: byName.id };
     }
+    // 📍 ملء channelId تلقائياً من القناة الحالية لو غاب أو غير صالح (17-20 رقم ديسكورد)
+    const rawChannelId = typeof args?.channelId === 'string' ? args.channelId.trim() : '';
+    const looksLikeSnowflakeCh = /^\d{17,20}$/.test(rawChannelId);
+    if ((!rawChannelId || !looksLikeSnowflakeCh) && context.defaultChannelId) {
+        if (['delete_channel', 'purge_messages', 'create_invite', 'set_system_channel', 'set_afk_channel', 'set_channel_topic', 'rename_channel'].includes(toolName)) {
+            args = { ...(args || {}), channelId: context.defaultChannelId };
+        }
+    }
     // فحص صلاحيات: الأدمن فقط للأدوات adminOnly
     if (tool.adminOnly) {
         const isAdmin = context.executor.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||

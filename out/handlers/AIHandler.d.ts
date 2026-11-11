@@ -82,6 +82,9 @@ export declare class AIHandler {
     private extractToolCall;
     /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
     private extractActionCall;
+    /** تجميع نص {…} متوازن بدءاً من startIdx */
+    private findBalancedJson;
+    private parseActionCallJson;
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */
     private runResearchTool;
     private loadHistory;

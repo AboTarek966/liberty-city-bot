@@ -53,6 +53,8 @@ export interface ToolContext {
   reason?: string;
   /** 🎯 العضو المستهدف افتراضياً (منشن/رد في الرسالة الحالية) */
   defaultTargetUserId?: string;
+  /** 📍 القناة الحالية — يستخدمها أي أمر يحتاج channelId تلقائياً */
+  defaultChannelId?: string;
   /** 📎 وسائط الرسالة الأصلية — يستخدمها set_server_icon لو الصورة مرفقة بالطلب */
   attachments?: Array<{ url: string; contentType?: string | null; name?: string | null }>;
 }
@@ -1058,6 +1060,15 @@ export async function executeAITool(
         m => m.user.username.toLowerCase().includes(needle) || m.displayName.toLowerCase().includes(needle)
       );
     if (byName) args = { ...args, userId: byName.id };
+  }
+
+  // 📍 ملء channelId تلقائياً من القناة الحالية لو غاب أو غير صالح (17-20 رقم ديسكورد)
+  const rawChannelId = typeof args?.channelId === 'string' ? args.channelId.trim() : '';
+  const looksLikeSnowflakeCh = /^\d{17,20}$/.test(rawChannelId);
+  if ((!rawChannelId || !looksLikeSnowflakeCh) && context.defaultChannelId) {
+    if (['delete_channel', 'purge_messages', 'create_invite', 'set_system_channel', 'set_afk_channel', 'set_channel_topic', 'rename_channel'].includes(toolName)) {
+      args = { ...(args || {}), channelId: context.defaultChannelId };
+    }
   }
 
   // فحص صلاحيات: الأدمن فقط للأدوات adminOnly

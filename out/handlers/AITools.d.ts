@@ -12,6 +12,8 @@ export interface ToolContext {
     reason?: string;
     /** 🎯 العضو المستهدف افتراضياً (منشن/رد في الرسالة الحالية) */
     defaultTargetUserId?: string;
+    /** 📍 القناة الحالية — يستخدمها أي أمر يحتاج channelId تلقائياً */
+    defaultChannelId?: string;
     /** 📎 وسائط الرسالة الأصلية — يستخدمها set_server_icon لو الصورة مرفقة بالطلب */
     attachments?: Array<{
         url: string;

@@ -389,7 +389,7 @@ export class AIHandler {
       }
 
       // Generate AI response (مع سياق البحث والوسائط إن وُجدوا)
-      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle, attachments);
+      let response = await this.generateAIResponse(message, aiConfig, userRoles, guildId!, userId, userContext, history, stream, searchContext, media, brief, ignoreGlobalToggle, attachments, channelId);
       this.cooldowns.set(cooldownKey, now);
 
       // 🔁 إزالة تكرار سؤال المستخدم من بداية الرد (نموذجان صغار يعيدون السؤال قبل الإجابة)
@@ -599,7 +599,8 @@ export class AIHandler {
     media?: { context: string; images: Array<{ data: string; mimeType: string }> },
     brief: boolean = false,
     independentFeature: boolean = false,
-    attachments?: Array<{ url: string; contentType?: string | null; name?: string | null }>
+    attachments?: Array<{ url: string; contentType?: string | null; name?: string | null }>,
+    channelId?: string
   ): Promise<AIResponse> {
     // Check for role-specific personality
     // 🔌 الميزات المستقلة (مثل مساعد التذاكر) لا ترث شخصية الذكاء العام — لكل ميزة شخصيتها الخاصة
@@ -622,7 +623,7 @@ export class AIHandler {
       aiConfig.maxTokens = Math.min(configuredMax, 320);
     }
 
-    const systemPrompt = await this.buildSystemPrompt(
+    let systemPrompt = await this.buildSystemPrompt(
       aiConfig,
       personality,
       guildId,
@@ -631,6 +632,13 @@ export class AIHandler {
       guildId ? await buildKnowledgeContext(guildId, message, 4) : '',
       brevity
     );
+
+    // 📍 القناة الحالية — الـ AI لا يسأل عن ID القناة أبداً بعد الآن
+    if (channelId) {
+      systemPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      systemPrompt += `\n📍 **القناة الحالية:** <#${channelId}> (channelId: \`${channelId}\`)`;
+      systemPrompt += `\n**قاعدة صارمة:** أي أمر يحتاج "channelId" (delete_channel / purge_messages / create_invite / set_system_channel / set_afk_channel / rename_channel / set_channel_topic) استخدم القناة الحالية تلقائياً \`${channelId}\` ولا تطلب من المستخدم ID القناة إطلاقاً — لا في تذكرة ولا في قناة عادية. لو المستخدم بيقصد قناة تانية يقولك اسمها وحينها حلّها من الاسم.`;
+    }
 
     // سياق الوسائط يُدمَج مع رسالة المستخدم (النموذج يرى الوصف + الصور نفسها)
     let effectiveMessage = media?.context
@@ -712,6 +720,8 @@ export class AIHandler {
           defaultTargetUserId: userContext?.targetUserId,
           // 📎 الوسائط المرفقة بالرسالة — يستخدمها AI لصورة السيرفر لو أرفقها المستخدم
           attachments,
+          // 📍 القناة الحالية لتلك المحادثة — يُستخدم لأي أداة تطلب channelId
+          defaultChannelId: channelId,
         };
         
         const toolResult = await executeAITool(actionCall.tool, actionCall.args, toolContext);
@@ -753,7 +763,9 @@ export class AIHandler {
 
     // 🔍 تحقق أخير قبل الإرسال: أي «تم» يجب أن يكون متفوقاً عليه بنتيجة أداة فعلية
     //   يمنع النموذج من ادّعاء تنفيذ شيء لم يحدث
-    const claimsDone = /(✅|✔|تم[ّ]?|تمت|خلّصت|خلصت|اتعملت|اتنفذت|اتسلم|اُنجزت|اُنجز|انجز)/u.test(response?.content || '');
+    const claimsDone =
+      !response?.content?.includes('؟') && !response?.content?.includes('?') &&
+      /(✅|✔|تم[ّ]?|تمت|خلّصت|خلصت|اتعملت|اتنفذت|اتسلم|اُنجزت|اُنجز|انجز)/u.test(response?.content || '');
     const anyOK = toolOutcomes.some(o => o.ok);
     const anyFail = toolOutcomes.some(o => !o.ok);
     if (response && toolOutcomes.length === 0 && claimsDone) {
@@ -804,15 +816,48 @@ export class AIHandler {
 
   /** كشف نداء أداة العمل (Function Calling): {"tool": "اسم", "args": {...}} */
   private extractActionCall(text: string): { tool: string; args: any } | null {
-    const m = (text || '').match(/```json\s*(\{[\s\S]*?\})\s*```/i);
-    if (!m) return null;
+    if (!text) return null;
+    // 1) داخل كتلة كود ```json ...```
+    const fenced = text.match(/```json\s*(\{[\s\S]*?\})\s*```/i);
+    if (fenced) return this.parseActionCallJson(fenced[1]);
+    // 2) JSON خام في منتصف/آخر الرسالة — بحث متوازن للأقواس
+    const startIdx = text.indexOf('{"tool"') >= 0 ? text.indexOf('{"tool"') : text.indexOf('{ "tool"');
+    if (startIdx >= 0) {
+      const raw = this.findBalancedJson(text, startIdx);
+      if (raw) return this.parseActionCallJson(raw);
+    }
+    return null;
+  }
+
+  /** تجميع نص {…} متوازن بدءاً من startIdx */
+  private findBalancedJson(text: string, startIdx: number): string | null {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = startIdx; i < text.length; i++) {
+      const c = text[i];
+      if (inStr) {
+        if (esc) { esc = false; continue; }
+        if (c === '\\') { esc = true; continue; }
+        if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') { inStr = true; continue; }
+      if (c === '{') depth++;
+      else if (c === '}') {
+        depth--;
+        if (depth === 0) return text.slice(startIdx, i + 1);
+      }
+    }
+    return null;
+  }
+
+  private parseActionCallJson(json: string): { tool: string; args: any } | null {
     try {
-      const parsed = JSON.parse(m[1]);
+      const parsed = JSON.parse(json.trim());
       if (parsed.tool && typeof parsed.tool === 'string') {
         return { tool: parsed.tool, args: parsed.args || {} };
       }
     } catch {
-      return null;
+      // ignore
     }
     return null;
   }
