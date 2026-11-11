@@ -126,7 +126,7 @@ export declare class AIHandler {
     private generateGemini;
     /** موديلات OpenRouter للرؤية — المجرّبة فعلياً أولاً (Gemini المباشر قد يكون مفتاحه معطلاً) */
     private openrouterVisionCandidates;
-    /** موديلات OpenRouter النصية — الأسرع/الأرخص/الأثبت أولاً (بلا نماذج استدلالية تُستهلك في التفكير) */
+    /** موديلات OpenRouter النصية — مجانية أولاً ثم المدفوع كاحتياطي أخير */
     private openrouterTextCandidates;
     private generateOpenRouter;
     /** بث رد Groq مباشرة أثناء التوليد */

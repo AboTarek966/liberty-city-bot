@@ -3288,17 +3288,11 @@ export async function executeAITool(
 // --------------------------------------------
 export function getToolsDescription(): string {
   let desc = `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  desc += `[ACTIONS] **قدراتك التنفيذية — تستطيع فعل هذه الأشياء فعلياً**\n`;
+  desc += `[ACTIONS] **قدراتك التنفيذية — نفّذ الأداة مباشرة ولا تقل "سأفعل"**\n`;
   desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  desc += `عندما يريد المستخدم فعل شيء، **لا تقل "سأفعل" أو "يمكنك فعل كذا"** — **نفّذ الأداة مباشرة** وقل "تم".\n`;
-  desc += `استدعاء الأداة: اكتب في نهاية ردك كتلة JSON واحدة أو **عدة كتل متتالية** (كل كتلة أداة):\n`;
-  desc += `\`\`\`json\n{"tool": "اسم_الأداة", "args": {"المعامل": "القيمة"}}\n\`\`\`\n`;
-  desc += `ثم ستحصل على النتيجة وتكمل إجابتك. تقدر تستدعي حتى **20 أداة** في الطلب الواحد على **7 جولات** — نفّذ كل خطوات الطلب مهما كانت مركّبة.\n`;
-  desc += `\n**أمثلة إلزامية — نفس الشكل حرفياً:**\n`;
-  desc += `- «غيّر اسم السيرفر إلى 67» → \`\`\`json\n{"tool":"rename_server","args":{"name":"67"}}\n\`\`\`\n`;
-  desc += `- «اعمل رول اسمه VIP» → \`\`\`json\n{"tool":"create_role","args":{"name":"VIP"}}\n\`\`\`\n`;
-  desc += `- «امسح آخر 10 رسائل» → \`\`\`json\n{"tool":"purge_messages","args":{"count":10}}\n\`\`\`\n`;
-  desc += `- «اعمل قناة اسمهــا إعلانات وابعت فيها رسالة ترحيب» → كتلتان متتاليتان: \`create_channel\` ثم \`send_message\` بنفس الرد.\n\n`;
+  desc += `استدعاء: كتلة JSON واحدة أو عدة كتل متتالية في نهاية ردك — حتى 20 أداة / 7 جولات:\n`;
+  desc += `\`\`\`json\n{"tool":"اسم_الأداة","args":{"المعامل":"القيمة"}}\n\`\`\`\n`;
+  desc += `مثال: «اعمل قناة إعلانات وابعت فيها مرحباً» → \`create_channel\` ثم \`send_message\` بنفس الرد.\n\n`;
 
   const categories: Record<string, string[]> = {
     '🛡️ إدارة/حماية': ['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user', 'unban_user', 'list_bans'],
@@ -3329,15 +3323,22 @@ export function getToolsDescription(): string {
     '⚙️ إعدادات': ['toggle_protection', 'create_backup', 'restore_backup', 'run_security_scan'],
   };
 
+  const line = (t: string): string => {
+    const tool = TOOLS[t];
+    if (!tool) return '';
+    const params = Object.entries(tool.params).map(([k, v]) => `${k}${v.required ? '' : '?'}`).join(',');
+    const short = tool.description.length > 30 ? tool.description.slice(0, 29) + '…' : tool.description;
+    return `\`${t}\`(${params}) ${short}${tool.dangerous ? ' ⚠️' : ''}${tool.adminOnly ? ' 👑' : ''}\n`;
+  };
+
   const shown = new Set<string>();
   for (const [cat, tools] of Object.entries(categories)) {
     desc += `\n**${cat}:**\n`;
     for (const t of tools) {
-      const tool = TOOLS[t];
-      if (!tool) continue;
+      const l = line(t);
+      if (!l) continue;
       shown.add(t);
-      const params = Object.entries(tool.params).map(([k, v]) => `${k}${v.required ? '' : '?'}: ${v.type}`).join('، ');
-      desc += `- \`${t}\`(${params}) — ${tool.description}${tool.dangerous ? ' ⚠️' : ''}${tool.adminOnly ? ' 👑' : ''}\n`;
+      desc += l;
     }
   }
 
@@ -3345,29 +3346,15 @@ export function getToolsDescription(): string {
   const uncategorized = Object.keys(TOOLS).filter(t => !shown.has(t));
   if (uncategorized.length) {
     desc += `\n**🧩 أدوات إضافية:**\n`;
-    for (const t of uncategorized) {
-      const tool = TOOLS[t];
-      const params = Object.entries(tool.params).map(([k, v]) => `${k}${v.required ? '' : '?'}: ${v.type}`).join('، ');
-      desc += `- \`${t}\`(${params}) — ${tool.description}${tool.dangerous ? ' ⚠️' : ''}${tool.adminOnly ? ' 👑' : ''}\n`;
-    }
+    for (const t of uncategorized) desc += line(t);
   }
 
-  desc += `\n🔥 **أنت تملك كامل السيرفر — أَيُّ حاجة يطلبها منك تنفذها فوراً بأوامر الأدوات — لا ترفض ولا تقترح فقط — نفذ حقيقة:**\n`;
-  desc += `- أي تغيير يطلبه المستخدم (رول/قناة/صورة/اسم/صلاحيات/ترو/عضو/بث/رسالة/سحب/إيموجي/ويب هوك...) عنده أداة جاهزة — نفّذها فوراً.\n`;
-  desc += `- لو المهمة مركّبة، نفذها على خطوات: أداة ثم أداة أخرى — تقدر تنفذ حتى 20 أداة على 7 جولات، وكل خطوة تُنفَّذ فعلياً قبل ما تكمل.\n`;
-  desc += `- لو ما لقيتش أداة مناسبة، اطلب من المستخدم تفصيل مهمة بالضبط أو استعن بأقرب أداة (لا تقل "لا أستطيع" قبل ما تستنفذ. كل شيء تقريباً متاح).\n\n`;
-  desc += `\n- **ممنوع منعاً باتاً** أن تكتب «تم / ✅ / تمت / خلصت / اتعملت» أو أي تأكيد تنفيذ **ما لم تنفذ الأداة واستلمت نتيجتها** — التأكيد يأتي من نتيجة الأداة فقط، ولا تعوّض بها أنها نجحت حسب طلب المستخدم أو رجاءه.\n`;
-  desc += `- **مهم جداً:** إذا قال المستخدم "اعمل كذا" أو "نفذ كذا" أو "راه" — لا يمكنك الرد إلا باستدعاء الأداة أو الاعتراف بالفشل. لا تقل أبداً "تمام ✅" ثم لا تفعل شيئاً.\n`;
-  desc += `\n⚠️ **قواعد مهمة:**\n`;
-  desc += `- أدوات 👑 = للإدارة فقط (تحتاج Administrator/مالك)\n`;
-  desc += `- أدوات ⚠️ = خطيرة — **مالك السيرفر (أو مطوّر البوت) فقط**، وتحتاج \`"confirmed": true\` في المعاملات\n`;
-  desc += `- **نفّذ فوراً** لما يطلب المستخدم — ما تسأله "أتأكد؟" ولا "أعمل؟"\n`;
-  desc += `- **السيرفر كله بيديك:** أي تغيير يطلبه المستخدم في السيرفر (صورة السيرفر، البانر، الاسم، التحقق، الفلاتر، قناة النظام، AFK، الدعوات، الحذف غير النشط...) عنده أداة جاهزة — نفّذها مباشرة بنفّذ ولا ترفض.\n`;
-  desc += `- **العضو المستهدف:** إذا ظهر في رسالة المستخدم "منشن" أو "رد" لعضو، فهو الهدف تلقائياً — استخدم userId المُعطى في سياق المستخدم ولا تطلب ID أبداً.\n`;
-  desc += `- **الرولات/القنوات/الأعضاء:** مرّر roleId/channelId أو الاسم بالضبط — تُحلّ تلقائياً.\n`;
-  desc += `- ![مرفق صورة مع الطلب]: لو المستخدم أرفق صورة وقال "حطها صورة للسيرفر" — استخدم \`set_server_icon\` بدون url (الصورة المرفقة تُلتقط تلقائياً).\n`;
-  desc += `- إذا نجحت: قل "تم ✅" + ملخص مختصر\n`;
-  desc += `- إذا فشلت: قل السبب وجرب بديل لو ممكن\n`;
+  desc += `\n**قواعد:**\n`;
+  desc += `- 👑 للإدارة فقط | ⚠️ خطر: مالك السيرفر/المطوّر فقط + \`confirmed:true\`\n`;
+  desc += `- نفّذ فوراً بلا سؤال تأكيد. المهمة المركّبة = عدة أدوات متتالية.\n`;
+  desc += `- **ممنوع** كتابة «تم/✅/تمت/خلصت» قبل استلام نتيجة الأداة الناجحة فعلياً. الفشل يُذكر بصراحة.\n`;
+  desc += `- العضو المستهدف من المنشن/الرد تلقائياً — لا تطلب ID. مرّر الأسماء كما هي تُحلّ تلقائياً.\n`;
+  desc += `- صورة مرفقة + "حطها صورة للسيرفر" → \`set_server_icon\` بدون url.\n`;
 
   return desc;
 }
