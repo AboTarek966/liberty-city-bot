@@ -3,6 +3,39 @@
 // Omni Bot - AI Tools / Function Calling
 // ============================================
 // أدوات يستطيع الـ AI استدعاؤها لتنفيذ إجراءات Discord حقيقية
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeAITool = executeAITool;
 exports.getToolsDescription = getToolsDescription;
@@ -1026,6 +1059,491 @@ registerTool('prune_members', {
         }
     },
 });
+// ============================================
+// 🧰 مهارات واسعة جداً — ينفذها الـ AI بطلب الإدارة فقط
+// ============================================
+// قاموس صلاحيات ديسكورد — يُبنى من إحصائيات lib نفسه (يغطي كل الصلاحيات تلقائياً)
+const PERM_LOOKUP = new Map();
+for (const [name, bit] of Object.entries(discord_js_1.PermissionFlagsBits)) {
+    PERM_LOOKUP.set(String(name).toLowerCase().replace(/[_\s-]+/g, ''), { name, bit: bit });
+}
+const ARABIC_PERM_ALIAS = {
+    'حظر': 'BanMembers', 'طرد': 'KickMembers', 'كتم': 'ModerateMembers', 'ادمن': 'Administrator',
+    'وومنشن': 'MentionEveryone', 'علاقات': 'ManageRoles', 'رولات': 'ManageRoles', 'قنوات': 'ManageChannels',
+    'رسائل': 'SendMessages', 'إرسال': 'SendMessages', 'عرض': 'ViewChannel', 'الكتب': 'AttachFiles',
+    'روابط': 'EmbedLinks', 'إيموجيات': 'UseExternalEmojis', 'نشر': 'Stream', 'صوت': 'Connect',
+    'تكلم': 'Speak', 'اعجاب': 'AddReactions', 'تثبيت': 'ManageMessages', 'مهام': 'ManageWebhooks',
+};
+function resolvePerm(input) {
+    const norm = String(input).toLowerCase().replace(/[_\s-]+/g, '');
+    if (PERM_LOOKUP.has(norm))
+        return PERM_LOOKUP.get(norm);
+    const alias = ARABIC_PERM_ALIAS[String(input).trim()];
+    if (alias) {
+        const n2 = alias.toLowerCase().replace(/[_\s-]+/g, '');
+        return PERM_LOOKUP.get(n2) ?? null;
+    }
+    return null;
+}
+function parsePermList(v) {
+    const raw = Array.isArray(v) ? v : String(v ?? '').split(',');
+    const perms = [];
+    const unknown = [];
+    for (const item of raw) {
+        const t = String(item).trim();
+        if (!t)
+            continue;
+        const p = resolvePerm(t);
+        if (p)
+            perms.push(p);
+        else
+            unknown.push(t);
+    }
+    return { perms, unknown };
+}
+function canEditRole(guild, executor, role) {
+    if (role.id === guild.id)
+        return false;
+    if (role.managed)
+        return false;
+    const isOwner = executor.id === guild.ownerId;
+    const isAdmin = executor.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+    const myPos = guild.members.me?.roles.highest.position ?? 0;
+    if (!isOwner && !isAdmin && executor.roles.highest.position <= role.position)
+        return false;
+    if (myPos <= role.position)
+        return false;
+    return true;
+}
+function overwriteKey(p) { return p.name; }
+registerTool('set_slowmode', {
+    description: 'ضبط سلو موود (الحد الأدنى لفاصل الرسائل) لقناة نصية',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        seconds: { type: 'number', description: 'الثواني بين كل رسالتين (0-21600)', required: true },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, seconds }) {
+        const targetId = channelId ?? defaultChannelId;
+        const ch = (targetId ? guild.channels.cache.get(String(targetId)) : null);
+        const channel = ch && ch.type === discord_js_1.ChannelType.GuildText ? ch
+            : resolveChannelByIdOrName(guild, targetId);
+        if (!channel || channel.type !== discord_js_1.ChannelType.GuildText)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        const secs = Math.min(21600, Math.max(0, Math.trunc(Number(seconds))));
+        try {
+            await channel.setRateLimitPerUser?.(secs, `${executor.user.tag}: slowmode بواسطة AI`);
+            return { success: true, message: `⏱️ **سلو موود الآن ${secs} ثانية في** ${channel}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل ضبط السلو موود: ${e.message}` };
+        }
+    },
+});
+registerTool('set_voice_limit', {
+    description: 'ضبط الحد الأقصى للأعضاء في قناة صوتية',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        limit: { type: 'number', description: 'الحد الأقصى (0 = بلا حدود)', required: true },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, limit }) {
+        const targetId = channelId ?? defaultChannelId;
+        const ch = (targetId ? guild.channels.cache.get(String(targetId)) : null);
+        const channel = ch && ch.type === discord_js_1.ChannelType.GuildVoice ? ch
+            : resolveChannelByIdOrName(guild, targetId);
+        if (!channel || channel.type !== discord_js_1.ChannelType.GuildVoice)
+            return { success: false, message: '❌ قناة صوتية غير صالحة' };
+        const n = Math.min(99, Math.max(0, Math.trunc(Number(limit))));
+        try {
+            await channel.setUserLimit(n, `${executor.user.tag}: حد الأعضاء بواسطة AI`);
+            return { success: true, message: `🔊 **حد أعضاء** ${channel} **الآن: ${n}**` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل ضبط الحد: ${e.message}` };
+        }
+    },
+});
+registerTool('move_channel', {
+    description: 'نقل قناة/فئة إلى فئة أخرى أو تغيير ترتيبها',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        categoryId: { type: 'string', description: 'آيدي/اسم الفئة المنقول إليها (اختياري)', required: false },
+        position: { type: 'number', description: 'الترتيب الجديد (اختياري)', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, categoryId, position }) {
+        const targetId = channelId ?? defaultChannelId;
+        const channel = resolveChannelByIdOrName(guild, targetId);
+        if (!channel)
+            return { success: false, message: '❌ القناة غير موجودة' };
+        try {
+            if (categoryId !== undefined && categoryId !== null && String(categoryId).toLowerCase() !== 'none') {
+                const cat = resolveChannelByIdOrName(guild, categoryId);
+                const catId = cat?.type === discord_js_1.ChannelType.GuildCategory ? cat.id
+                    : guild.channels.cache.get(String(categoryId))?.id;
+                if (!catId)
+                    return { success: false, message: '❌ الفئة غير موجودة' };
+                await channel.setParent(catId, { reason: `${executor.user.tag}: نقل بواسطة AI`, lockPermissions: false });
+            }
+            if (position !== undefined && position !== null) {
+                await channel.setPosition(Math.trunc(Number(position)), { reason: `${executor.user.tag}: ترتيب بواسطة AI` });
+            }
+            return { success: true, message: `✅ **تم نقل/ترتيب** ${channel}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل النقل: ${e.message}` };
+        }
+    },
+});
+registerTool('set_nsfw', {
+    description: 'تحديد/إزالة علامة NSFW لقناة نصية',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        enabled: { type: 'boolean', description: 'true للتفعيل / false للإزالة', required: true },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, enabled }) {
+        const targetId = channelId ?? defaultChannelId;
+        const channel = resolveChannelByIdOrName(guild, targetId);
+        if (!channel || channel.type !== discord_js_1.ChannelType.GuildText)
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        try {
+            await channel.setNSFW?.(!!enabled, `${executor.user.tag}: NSFW بواسطة AI`);
+            return { success: true, message: enabled ? `🔞 **أُضيفت علامة NSFW** على ${channel}` : `✅ **أُزيلت علامة NSFW** من ${channel}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الضبط: ${e.message}` };
+        }
+    },
+});
+registerTool('pin_last_message', {
+    description: 'تثبيت آخر رسالة في قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId }) {
+        const targetId = channelId ?? defaultChannelId;
+        const channel = resolveChannelByIdOrName(guild, targetId);
+        if (!channel || !channel.isTextBased())
+            return { success: false, message: '❌ قناة نصية غير صالحة' };
+        try {
+            const messages = await channel.messages.fetch({ limit: 1 });
+            const last = messages.first();
+            if (!last)
+                return { success: false, message: '❌ لا توجد رسائل للتثبيت' };
+            await last.pin(`${executor.user.tag}: تثبيت بواسطة AI`);
+            return { success: true, message: `📌 **تم تثبيت آخر رسالة** في ${channel}`, data: { messageId: last.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التثبيت: ${e.message}` };
+        }
+    },
+});
+registerTool('send_dm', {
+    description: 'إرسال رسالة خاصة (DM) لعضو',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي/منشن العضو (لو مفيش — الهدف في الرسالة)', required: false },
+        message: { type: 'string', description: 'نص الرسالة', required: true },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, message }) {
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه في الرسالة' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        try {
+            await member.send(String(message).slice(0, 1900));
+            return { success: true, message: `📩 **تم الإرسال إلى** ${member.user.tag}` };
+        }
+        catch {
+            return { success: false, message: '❌ تعذّر الإرسال الخاص (ربما أغلق الفياضي)' };
+        }
+    },
+});
+registerTool('set_role_permissions', {
+    description: 'إضافة/إزالة صلاحيات لرول (add, remove) — من آيدي أو اسم الرول',
+    adminOnly: true,
+    params: {
+        roleId: { type: 'string', description: 'آيدي الرول أو اسمه', required: true },
+        add: { type: 'array', description: 'صلاحيات تُضاف (مثل ["SendMessages","ManageChannels"]) — مصفوفة من السلاسل', required: false },
+        remove: { type: 'array', description: 'صلاحيات تُزال — مصفوفة من السلاسل', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { roleId, add, remove, reason = 'تعديل صلاحيات بواسطة AI' }) {
+        const role = resolveRoleByIdOrName(guild, roleId);
+        if (!role)
+            return { success: false, message: '❌ الرول غير موجود' };
+        if (!canEditRole(guild, executor, role))
+            return { success: false, message: '❌ لا يمكنك تعديل هذا الرول (الرتبة أو @everyone أو رول مُدار)' };
+        const added = parsePermList(add);
+        const removed = parsePermList(remove);
+        const unknown = [...added.unknown, ...removed.unknown];
+        if (unknown.length)
+            return { success: false, message: `❌ صلاحيات غير معروفة: ${unknown.join('، ')}` };
+        try {
+            let bits = role.permissions.bitfield;
+            for (const p of added.perms)
+                bits = (bits | p.bit);
+            for (const p of removed.perms)
+                bits = (bits & ~p.bit);
+            await role.setPermissions(bits, `${executor.user.tag}: ${reason}`);
+            const listOf = (xs) => xs.map(x => x.name).join('، ') || '—';
+            return { success: true, message: `✅ **عُدّلت صلاحيات** ${role}\n> ➕ ${listOf(added.perms)}\n> ➖ ${listOf(removed.perms)}`, data: { roleId: role.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل (قد يكون الرول أعلى من رتبتي): ${e.message}` };
+        }
+    },
+});
+registerTool('set_channel_permissions', {
+    description: 'تعديل صلاحيات هدف (رول/عضو/الجميع) على قناة — allow و deny بقائمة صلاحيات',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        target: { type: 'string', description: "آيدي/اسم رول أو عضو، أو 'everyone'", required: true },
+        allow: { type: 'array', description: 'صلاحيات تُمنح — مصفوفة من السلاسل', required: false },
+        deny: { type: 'array', description: 'صلاحيات تُمنع — مصفوفة من السلاسل', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, target, allow, deny, reason = 'تعديل صلاحيات القناة بواسطة AI' }) {
+        const targetId = channelId ?? defaultChannelId;
+        const channel = resolveChannelByIdOrName(guild, targetId);
+        if (!channel)
+            return { success: false, message: '❌ القناة غير موجودة' };
+        const added = parsePermList(allow);
+        const removed = parsePermList(deny);
+        const unknown = [...added.unknown, ...removed.unknown];
+        if (unknown.length)
+            return { success: false, message: `❌ صلاحيات غير معروفة: ${unknown.join('، ')}` };
+        let overwriteTarget;
+        const t = String(target).trim();
+        if (/^everyone$/i.test(t) || t === String(guild.id)) {
+            overwriteTarget = guild.id;
+        }
+        else {
+            const asRole = resolveRoleByIdOrName(guild, t);
+            if (asRole)
+                overwriteTarget = asRole;
+            else {
+                const asMember = guild.members.cache.get(t) ||
+                    guild.members.cache.find(m => m.user.username.toLowerCase() === t.toLowerCase() || m.displayName.toLowerCase() === t.toLowerCase());
+                if (asMember)
+                    overwriteTarget = asMember;
+                else
+                    return { success: false, message: '❌ لم أجد رول/عضو بهذا الاسم أو ID' };
+            }
+        }
+        const overwrite = {};
+        for (const p of added.perms)
+            overwrite[overwriteKey(p)] = true;
+        for (const p of removed.perms)
+            overwrite[overwriteKey(p)] = false;
+        if (!Object.keys(overwrite).length)
+            return { success: false, message: '❌ حدد صلاحيات (allow أو deny)' };
+        try {
+            await channel.permissionOverwrites.edit(overwriteTarget, overwrite, { reason: `${executor.user.tag}: ${reason}` });
+            const list = Object.entries(overwrite).map(([k, v]) => `${v ? '✅' : '❌'} ${k}`).join('، ');
+            return { success: true, message: `✅ **تم تعديل صلاحيات ${channel}** لـ ${overwriteTarget === guild.id ? '@everyone' : overwriteTarget}\n${list}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل التعديل: ${e.message}` };
+        }
+    },
+});
+registerTool('rename_member', {
+    description: 'تغيير اسم عضو في السيرفر (آيدي/منشن/اسم — لو مش محدد: الهدف المُمنشن/المردود)',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (اختياري)', required: false },
+        nickname: { type: 'string', description: 'الاسم الجديد (فارغ للمسح)', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, nickname, reason = 'تغيير الاسم بواسطة AI' }) {
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        if (member.id === guild.ownerId)
+            return { success: false, message: '❌ لا يمكن تغيير اسم المالك' };
+        if (member.roles.highest.position >= (guild.members.me?.roles.highest.position ?? 0)) {
+            return { success: false, message: '❌ رتبة العضو أعلى من رتبتي' };
+        }
+        try {
+            await member.setNickname(String(nickname).slice(0, 32) || null, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: nickname ? `✅ **تم تغيير اسم** ${member.user.tag} **إلى** \`${String(nickname).slice(0, 32)}\`` : `✅ **تمت إزالة اسم** ${member.user.tag}` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل تغيير الاسم: ${e.message}` };
+        }
+    },
+});
+registerTool('create_thread', {
+    description: 'إنشاء ثريد (نقاش) في قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        name: { type: 'string', description: 'اسم الثريد', required: true },
+        autoArchiveMinutes: { type: 'number', description: 'دقائق حتى الأرشفة التلقائية (60/1440/4320/10080)', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, name, autoArchiveMinutes = 1440, reason = 'ثريد بواسطة AI' }) {
+        const targetId = channelId ?? defaultChannelId;
+        const channel = resolveChannelByIdOrName(guild, targetId);
+        if (!channel || channel.type !== discord_js_1.ChannelType.GuildText)
+            return { success: false, message: '❌ قناة نصية غير صالحة (أو قناة لا تدعم الثريد)' };
+        const valid = [60, 1440, 4320, 10080];
+        const mins = valid.includes(Math.trunc(Number(autoArchiveMinutes))) ? Math.trunc(Number(autoArchiveMinutes)) : 1440;
+        try {
+            const thread = await channel.threads.create({ name: String(name).slice(0, 100), autoArchiveDuration: mins, reason: `${executor.user.tag}: ${reason}` });
+            return { success: true, message: `🧵 **تم إنشاء الثريد** ${thread}`, data: { threadId: thread.id } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء الثريد: ${e.message}` };
+        }
+    },
+});
+registerTool('set_bot_nickname', {
+    description: 'تغيير كنية البوت داخل السيرفر',
+    adminOnly: true,
+    params: {
+        nickname: { type: 'string', description: 'الكنية الجديدة (فارغ للمسح)', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor }, { nickname, reason = 'كنية البوت بواسطة AI' }) {
+        try {
+            await guild.members.me?.setNickname(String(nickname).slice(0, 32) || null, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: nickname ? `✅ **تم ضبط كنية البوت إلى** \`${String(nickname).slice(0, 32)}\`` : '✅ **أُزيلت كنية البوت**' };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل ضبط الكنية: ${e.message}` };
+        }
+    },
+});
+registerTool('move_member_voice', {
+    description: 'نقل عضو من قناة صوتية إلى أخرى (آيدي/منشن — لو مش محدد: الهدف المُمنشن/المردود)',
+    adminOnly: true,
+    params: {
+        userId: { type: 'string', description: 'آيدي العضو (اختياري)', required: false },
+        channelId: { type: 'string', description: 'آيدي/اسم القناة الصوتية المنقول إليها', required: true },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultTargetUserId }, { userId, channelId, reason = 'نقل صوتي بواسطة AI' }) {
+        const targetId = userId || defaultTargetUserId;
+        if (!targetId)
+            return { success: false, message: '❌ حدد العضو أو منشنِه' };
+        const member = await guild.members.fetch(String(targetId)).catch(() => null);
+        if (!member)
+            return { success: false, message: '❌ العضو غير موجود' };
+        if (!member.voice?.channel)
+            return { success: false, message: '❌ العضو ليس داخل قناة صوتية' };
+        const dest = resolveChannelByIdOrName(guild, channelId);
+        const destId = dest && dest.type === discord_js_1.ChannelType.GuildVoice ? dest.id : guild.channels.cache.get(String(channelId))?.id;
+        if (!destId)
+            return { success: false, message: '❌ قناة صوتية غير صالحة' };
+        try {
+            await member.voice.setChannel(destId, `${executor.user.tag}: ${reason}`);
+            return { success: true, message: `✅ **نُقل** ${member.user.tag} **إلى** <#${destId}>` };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل النقل: ${e.message}` };
+        }
+    },
+});
+registerTool('cleanup_webhooks', {
+    description: 'حذف كل الويب هوكس في قناة',
+    adminOnly: true,
+    params: {
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        reason: { type: 'string', description: 'السبب', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { channelId, reason = 'تنظيف الويب هوكس بواسطة AI' }) {
+        const targetId = channelId ?? defaultChannelId;
+        const channel = resolveChannelByIdOrName(guild, targetId);
+        if (!channel)
+            return { success: false, message: '❌ القناة غير موجودة' };
+        try {
+            const hooks = await channel.fetchWebhooks?.();
+            const list = hooks && typeof hooks.values === 'function' ? [...hooks.values()] : (Array.isArray(hooks) ? hooks : []);
+            for (const hook of list)
+                await hook.delete(`${executor.user.tag}: ${reason}`).catch(() => null);
+            return { success: true, message: `🧹 **تم حذف ${list.length} ويب هوك** من ${channel}`, data: { count: list.length } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل: ${e.message}` };
+        }
+    },
+});
+registerTool('giveaway_create', {
+    description: 'إنشاء سحب (Giveaway) في قناة',
+    adminOnly: true,
+    params: {
+        prize: { type: 'string', description: 'الجائزة', required: true },
+        durationMinutes: { type: 'number', description: 'المدة بالدقائق (مثال: 60 = ساعة)', required: false },
+        winners: { type: 'number', description: 'عدد الفائزين (1-10)', required: false },
+        channelId: { type: 'string', description: 'آيدي/اسم القناة (افتراضي: القناة الحالية)', required: false },
+        description: { type: 'string', description: 'وصف إضافي', required: false },
+    },
+    async func({ guild, executor, defaultChannelId }, { prize, durationMinutes = 60, winners = 1, channelId, description }) {
+        const { createGiveaway, buildGiveawayPayload, scheduleGiveaway } = await Promise.resolve().then(() => __importStar(require('../utils/giveaway')));
+        const targetId = channelId ?? defaultChannelId;
+        const ch = resolveChannelByIdOrName(guild, targetId);
+        const channel = ch && ch.type === discord_js_1.ChannelType.GuildText ? ch : null;
+        if (!channel)
+            return { success: false, message: '❌ قناة نصية غير صالحة للسحب' };
+        try {
+            const giveaway = await createGiveaway({
+                guildId: guild.id,
+                channelId: channel.id,
+                hostId: executor.id,
+                prize: String(prize).slice(0, 200),
+                description: String(description || '').slice(0, 1000),
+                winnersCount: Math.min(10, Math.max(1, Math.trunc(Number(winners)))),
+                durationMs: Math.max(10_000, Math.trunc(Number(durationMinutes) * 60_000)),
+                requirements: {},
+            });
+            const payload = buildGiveawayPayload(giveaway, {}, guild.name);
+            const message = await channel.send({ embeds: payload.embeds, components: payload.components });
+            giveaway.messageId = message.id;
+            await giveaway.save();
+            const { Giveaway } = await Promise.resolve().then(() => __importStar(require('../models')));
+            void Giveaway; // تم الحفظ عبر giveaway.save()
+            scheduleGiveaway(executor.client, giveaway);
+            return { success: true, message: `🎁 **تم إنشاء السحب** ${channel}\n> المعرّف: \`${giveaway.shortId}\` — ينتهي خلال \`${durationMinutes}\` دقيقة — الفائزون: ${winners}`, data: { shortId: giveaway.shortId } };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل إنشاء السحب: ${e.message}` };
+        }
+    },
+});
+registerTool('close_current_ticket', {
+    description: 'إغلاق التذكرة الحالية (التذكرة اللي في القناة دي) بالسبب',
+    adminOnly: true,
+    params: {
+        reason: { type: 'string', description: 'سبب الإغلاق', required: false },
+    },
+    async func({ guild, executor, defaultChannelId, client }, { reason }) {
+        const { default: Ticket } = await Promise.resolve().then(() => __importStar(require('../models'))).then(m => ({ default: m.Ticket }));
+        const channelId = defaultChannelId || '';
+        if (!channelId)
+            return { success: false, message: '❌ هذه القناة ليست تذكرة' };
+        const ticket = await Ticket.findOne({ guildId: guild.id, channelId, status: { $in: ['open', 'claimed', 'waiting'] } });
+        if (!ticket)
+            return { success: false, message: '❌ هذه ليست قناة تذكرة مفتوحة' };
+        try {
+            await client.ticketHandler.closeTicket(channelId, executor, reason || 'إغلاق عبر AI من داخل التذكرة');
+            return { success: true, message: '🔒 **تم إغلاق التذكرة**' };
+        }
+        catch (e) {
+            return { success: false, message: `❌ فشل الإغلاق: ${e.message}` };
+        }
+    },
+});
 // --------------------------------------------
 // تنفيذ أداة من قبل الـ AI
 // --------------------------------------------
@@ -1109,6 +1627,7 @@ function getToolsDescription() {
         '🛡️ إدارة/حماية': ['ban_user', 'kick_user', 'timeout_user', 'remove_timeout', 'warn_user', 'unwarn_user'],
         '📝 قنوات/رولات': ['create_channel', 'delete_channel', 'create_role', 'delete_role', 'give_role', 'remove_role', 'rename_channel', 'set_channel_topic', 'rename_role'],
         '🖼️ إعدادات السيرفر': ['set_server_icon', 'remove_server_icon', 'set_server_banner', 'remove_server_banner', 'rename_server', 'set_verification_level', 'set_explicit_content_filter', 'set_default_notifications', 'set_system_channel', 'set_afk_channel', 'create_invite', 'delete_all_invites', 'prune_members'],
+        '🧰 مهارات واسعة': ['set_slowmode', 'set_voice_limit', 'move_channel', 'set_nsfw', 'pin_last_message', 'create_thread', 'cleanup_webhooks', 'set_role_permissions', 'set_channel_permissions', 'rename_member', 'set_bot_nickname', 'move_member_voice', 'send_dm', 'giveaway_create', 'close_current_ticket'],
         '📊 معلومات': ['get_server_info', 'get_user_info', 'check_security_status'],
         '⚙️ إعدادات': ['toggle_protection', 'create_backup', 'restore_backup', 'run_security_scan'],
         '🗑️ تنظيف': ['purge_messages'],
@@ -1122,6 +1641,10 @@ function getToolsDescription() {
             desc += `- \`${t}\`(${params}) — ${tool.description}${tool.dangerous ? ' ⚠️' : ''}${tool.adminOnly ? ' 👑' : ''}\n`;
         }
     }
+    desc += `\n🔥 **أنت تملك كامل السيرفر — أَيُّ حاجة يطلبها منك تنفذها فوراً بأوامر الأدوات — لا ترفض ولا تقترح فقط — نفذ حقيقة:**\n`;
+    desc += `- أي تغيير يطلبه المستخدم (رول/قناة/صورة/اسم/صلاحيات/ترو/عضو/بث/رسالة/سحب/إيموجي/ويب هوك...) عنده أداة جاهزة — نفّذها فوراً.\n`;
+    desc += `- لو المهمة مركّبة، نفذها على خطوات: أداة ثم أداة أخرى — حلقة function calling تكفي 5 جولات.\n`;
+    desc += `- لو ما لقيتش أداة مناسبة، اطلب من المستخدم تفصيل مهمة بالضبط أو استعن بأقرب أداة (لا تقل "لا أستطيع" قبل ما تستنفذ. كل شيء تقريباً متاح).\n\n`;
     desc += `\n- **ممنوع منعاً باتاً** أن تكتب «تم / ✅ / تمت / خلصت / اتعملت» أو أي تأكيد تنفيذ **ما لم تنفذ الأداة واستلمت نتيجتها** — التأكيد يأتي من نتيجة الأداة فقط، ولا تعوّض بها أنها نجحت حسب طلب المستخدم أو رجاءه.\n`;
     desc += `- **مهم جداً:** إذا قال المستخدم "اعمل كذا" أو "نفذ كذا" أو "راه" — لا يمكنك الرد إلا باستدعاء الأداة أو الاعتراف بالفشل. لا تقل أبداً "تمام ✅" ثم لا تفعل شيئاً.\n`;
     desc += `\n⚠️ **قواعد مهمة:**\n`;
