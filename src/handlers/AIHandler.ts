@@ -839,6 +839,7 @@ export class AIHandler {
       const followUpMsg =
         `${effectiveMessage}\n\n=== نتائج تنفيذ ${roundOutcomes.length} أداة ===\n${resultsText}\n===\n` +
         `أكمل إجابتك اعتماداً على النتائج الحقيقية أعلاه. لو لسه في خطوات مطلوبة نفّذها الآن بنفس صيغة JSON.\n` +
+        `لا تكرر استدعاءات الأدوات ولا تكتب JSON الأداة مرة أخرى — اكتب الرد النهائي فقط للمستخدم. ` +
         `لو خلصت: قل «تم ✅» + ملخص مختصر فقط لو كل الأدوات نجحت. أي فشل اذكره بصراحة وسببه الحقيقي — لا تقل «تم» ولا تخترع ✅.`;
       response = await callProviders(followUpMsg, false);
     }
@@ -924,6 +925,20 @@ export class AIHandler {
     if (leakedToolJson.test(finalResponse.content || '')) {
       const cleaned = (finalResponse.content || '').replace(leakedToolJson, '').trim();
       if (cleaned) finalResponse.content = cleaned;
+    }
+
+    // 🔒 الموديل كتب استدعاء الأداة عارياً (بلات أسوار codeblock) — لا يظهر لينتشر كالنص
+    //    لو محتوى الرد كله تقريباً استدعاء → نحوله لنتيجة حقيقية (تنفيذ بالفعل أو اعتراف صريح بالفشل)
+    const looksLikeBareToolJson = /^\s*(?:\[\s*)?\{\s*"(?:tool|tool_name|action|function|name)"/i.test((finalResponse.content || '').trim());
+    if (looksLikeBareToolJson) {
+      if (toolOutcomes.length) {
+        const allOk = toolOutcomes.every(o => o.ok);
+        finalResponse.content =
+          (allOk ? '✅ **تم تنفيذ الطلب.**\n' : '⚠️ **انتهى التنفيذ مع أن هناك خطوة لم تكتمل.**\n') +
+          toolOutcomes.map(o => `• \`${o.tool}\` → ${o.ok ? '✅' : '❌'} ${o.message}`).join('\n');
+      } else {
+        finalResponse.content = '⚠️ **لم يُنفّذ هذا الطلب فعلياً** — تنسيق استدعاء الأداة لم يصل بشكل صحيح. جرّب إعادة الصياغة بصراحة (مثال: «ابعت خاص للعضو فلان: رسالتك»).';
+      }
     }
     return finalResponse;
   }
