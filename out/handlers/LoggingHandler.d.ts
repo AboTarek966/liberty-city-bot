@@ -55,6 +55,12 @@ export declare class LoggingHandler {
      * لذلك نجرّب 3 مرات بفارق 600ms حتى لا يظهر "غير معروف" في السجل.
      */
     private fetchAuditInfo;
+    /**
+     * 🔎 من حذف رسائل من قناة معيّنة؟
+     * Discord يسجّل فقط الحذف الذي يقوم به مشرف بصلاحيات (Manage Messages).
+     * حذف الكاتب لرسالته بنفسه لا يُسجَّل، فالنتيجة `null` ⇒ أغلب الظن الكاتب بنفسه.
+     */
+    private fetchMessageDeleter;
     /** Human-readable executor field value (moderator) */
     private executorValue;
     handleMemberJoin(member: any): Promise<void>;

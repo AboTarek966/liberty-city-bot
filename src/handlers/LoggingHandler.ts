@@ -441,6 +441,43 @@ const EVENT_COLORS: Record<LogEventType, number> = {
     }
   }
 
+  /**
+   * 🔎 من حذف رسائل من قناة معيّنة؟
+   * Discord يسجّل فقط الحذف الذي يقوم به مشرف بصلاحيات (Manage Messages).
+   * حذف الكاتب لرسالته بنفسه لا يُسجَّل، فالنتيجة `null` ⇒ أغلب الظن الكاتب بنفسه.
+   */
+  private async fetchMessageDeleter(
+    guild: Guild,
+    channelId: string,
+    bulk: boolean,
+    maxAgeMs = 60000
+  ): Promise<{ executor: any; reason: string | null; count: number | null } | null> {
+    try {
+      const type = bulk ? AuditLogEvent.MessageBulkDelete : AuditLogEvent.MessageDelete;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const logs = await guild.fetchAuditLogs({ type, limit: 5 }).catch(() => null);
+        const now = Date.now();
+        const entry = logs?.entries?.find((e: any) => {
+          const eChannel = (e?.extra as any)?.channel?.id ?? e?.targetId;
+          const fresh = now - e.createdTimestamp <= maxAgeMs;
+          // single: extra.channel.id · bulk: target هو القناة
+          return fresh && eChannel === channelId;
+        });
+        if (entry) {
+          return {
+            executor: entry.executor ?? null,
+            reason: entry.reason ?? null,
+            count: typeof (entry?.extra as any)?.count === 'number' ? Number((entry?.extra as any).count) : null,
+          };
+        }
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Human-readable executor field value (moderator) */
   private executorValue(executor: any): string {
     return executor ? this.formatUser(executor) : 'غير معروف';
@@ -544,15 +581,43 @@ const EVENT_COLORS: Record<LogEventType, number> = {
       }
     }
 
+    // 🔎 من حذف الرسالة؟ (سجل التدقيق — دقيق عند حذف مشرف ويصمت عند حذف الكاتب لرسالته)
+    const deleter = message.channel?.id
+      ? await this.fetchMessageDeleter(message.guild, message.channel.id, false)
+      : null;
+    let deleterValue: string;
+    if (deleter?.executor) {
+      const who = this.formatUser(deleter.executor);
+      const kind = deleter.executor.bot ? '🤖 بوت' : '👮 مشرف';
+      const self = message.author?.id && deleter.executor.id === message.author.id ? ' — الكاتب بنفسه' : '';
+      deleterValue = `${kind} • ${who}${self}`;
+    } else {
+      deleterValue = 'غير محدد — لا يوجد سجل تدقيق حديث\n(غالباً الكاتب بنفسه — حذف ذاته لا يُسجَّل)';
+    }
+
     const fields: Array<{ name: string; value: string; inline: boolean }> = [
       { name: '👤 الكاتب', value: author, inline: true },
+      { name: '👮 حذفت بواسطة', value: deleterValue, inline: true },
       { name: '📍 القناة', value: message.channel?.id ? `<#${message.channel.id}>` : 'غير معروف', inline: true },
       { name: '🆔 معرّف الرسالة', value: `\`${message.id}\``, inline: true },
       { name: '📝 المحتوى', value: content, inline: false },
     ];
 
+    if (message.createdTimestamp) {
+      const ts = Math.floor(message.createdTimestamp / 1000);
+      fields.push({ name: '🕒 تاريخ الرسالة', value: `<t:${ts}:F> (<t:${ts}:R>)`, inline: true });
+    }
+
     if (attachmentCount > 0) {
-      fields.push({ name: '📎 المرفقات', value: `${attachmentCount}`, inline: true });
+      try {
+        const names = [...message.attachments.values()]
+          .slice(0, 3)
+          .map((a: any) => String(a?.name ?? 'ملف').slice(0, 48))
+          .join('، ');
+        fields.push({ name: `📎 المرفقات (${attachmentCount})`, value: names ? this.truncate(names, 200) : '—', inline: true });
+      } catch {
+        fields.push({ name: '📎 المرفقات', value: `${attachmentCount}`, inline: true });
+      }
     }
 
     const embed = new EmbedBuilder()
@@ -593,9 +658,23 @@ const EVENT_COLORS: Record<LogEventType, number> = {
         rows.push(`• ${who}: ${this.truncate(text, 120)}`);
       }
 
+      // 🔎 من نفّذ الحذف الجماعي؟ (سجل التدقيق — يسجّل فقط الأفعال ذات صلاحية)
+      const bulkDeleter = channel?.id
+        ? await this.fetchMessageDeleter(guild, channel.id, true)
+        : null;
+      let bulkDeleterValue: string;
+      if (bulkDeleter?.executor) {
+        const kind = bulkDeleter.executor.bot ? '🤖 بوت' : '👮 مشرف';
+        bulkDeleterValue = `${kind} • ${this.formatUser(bulkDeleter.executor)}${bulkDeleter.count !== null ? ` — حذف ${bulkDeleter.count} رسالة دفعة واحدة` : ''}`;
+        if (bulkDeleter.reason) bulkDeleterValue += `\n📝 السبب: ${this.truncate(bulkDeleter.reason, 200)}`;
+      } else {
+        bulkDeleterValue = 'غير محدد — لا يوجد سجل تدقيق حديث (لا يسجّل Discord الحذف الجماعي دائماً)';
+      }
+
       const fields: Array<{ name: string; value: string; inline: boolean }> = [
         { name: '📍 القناة', value: channel?.id ? `<#${channel.id}>` : 'غير معروف', inline: true },
         { name: '🔢 عدد الرسائل المحذوفة', value: `${list.length}`, inline: true },
+        { name: '👮 حذف بواسطة', value: bulkDeleterValue, inline: true },
       ];
       if (rows.length > 0) {
         fields.push({ name: '📝 عيّنة من المحتوى', value: this.truncate(rows.join('\n'), 1000), inline: false });
@@ -632,16 +711,22 @@ const EVENT_COLORS: Record<LogEventType, number> = {
       ? this.truncate(before, 500)
       : '⚠️ غير متاح — الرسالة الأصلية لم تكن مخزّنة';
 
-    const embed = new EmbedBuilder()
-      .setTitle('✏️ تعديل رسالة')
-      .setColor(EVENT_COLORS.messageEdit)
-      .addFields(
+    const editFields: Array<{ name: string; value: string; inline: boolean }> = [
         { name: '👤 الكاتب', value: this.formatUser(newMessage.author), inline: true },
         { name: '📍 القناة', value: newMessage.channel?.id ? `<#${newMessage.channel.id}>` : 'غير معروف', inline: true },
         { name: '🆔 معرّف الرسالة', value: `\`${newMessage.id}\``, inline: true },
         { name: '📝 المحتوى قبل التعديل', value: beforeText, inline: false },
         { name: '📝 المحتوى بعد التعديل', value: this.truncate(newMessage.content, 500), inline: false },
-      );
+    ];
+    if (newMessage.createdTimestamp) {
+      const ts = Math.floor(newMessage.createdTimestamp / 1000);
+      editFields.push({ name: '🕒 تاريخ الرسالة', value: `<t:${ts}:F> (<t:${ts}:R>)`, inline: true });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('✏️ تعديل رسالة')
+      .setColor(EVENT_COLORS.messageEdit)
+      .addFields(...editFields);
 
     if (typeof newMessage.author.displayAvatarURL === 'function') {
       embed.setThumbnail(newMessage.author.displayAvatarURL());
@@ -966,9 +1051,12 @@ const EVENT_COLORS: Record<LogEventType, number> = {
     } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
       // Moved
       title = '🔄 نقل بين القنوات الصوتية';
+      const mover = await this.fetchAuditInfo(guild, AuditLogEvent.MemberMove, member.id).catch(() => null);
+      const moverText = mover?.executor ? this.executorValue(mover.executor) : null;
       fields = [
         { name: '📍 من', value: `<#${oldState.channelId}>`, inline: true },
         { name: '📍 إلى', value: `<#${newState.channelId}>`, inline: true },
+        ...(moverText ? [{ name: '👮 نقلها', value: moverText, inline: true }] : []),
       ];
     } else {
       return;
@@ -1044,11 +1132,38 @@ const EVENT_COLORS: Record<LogEventType, number> = {
   async handleWebhookUpdate(channel: any): Promise<void> {
     if (!channel.guild) return;
 
+    // 🔎 نحاول نعرف مين اللي اتعامل مع الويب هوك من سجل التدقيق (ويب هوك في نفس القناة خلال آخر 30 ثانية)
+    let executor: any = null;
+    let actionLabel = '';
+    try {
+      const now = Date.now();
+      const types: Array<[AuditLogEvent, string]> = [
+        [AuditLogEvent.WebhookCreate, 'إنشاء'],
+        [AuditLogEvent.WebhookUpdate, 'تعديل'],
+        [AuditLogEvent.WebhookDelete, 'حذف'],
+      ];
+      for (const [type, label] of types) {
+        const logs = await channel.guild.fetchAuditLogs({ type, limit: 5 }).catch(() => null);
+        const entry = logs?.entries?.find((e: any) => {
+          const ch = (e?.target as any)?.channelId ?? (e?.extra as any)?.channel?.id ?? (e?.target as any)?.id;
+          return now - e.createdTimestamp <= 30000 && (!ch || ch === channel.id);
+        });
+        if (entry) {
+          executor = entry.executor ?? null;
+          actionLabel = label;
+          break;
+        }
+      }
+    } catch {
+      /* تجاهل — نعرض "غير محدد" */
+    }
+
     const embed = new EmbedBuilder()
       .setTitle('🪝 تحديث ويب هوك')
       .setColor(EVENT_COLORS.webhookUpdate)
       .addFields(
         { name: '📍 القناة', value: channel.id ? `<#${channel.id}>` : 'غير معروف', inline: true },
+        { name: '👮 المنفذ', value: executor ? `${this.executorValue(executor)}${actionLabel ? ` — ${actionLabel}` : ''}` : 'غير محدد', inline: true },
         { name: 'ℹ️ الحالة', value: 'تم إنشاء أو تعديل أو حذف ويب هوك في هذه القناة', inline: false }
       );
 
@@ -1061,12 +1176,15 @@ const EVENT_COLORS: Record<LogEventType, number> = {
   async handleThreadCreate(thread: any): Promise<void> {
     if (!thread.guild) return;
 
+    const audit = await this.fetchAuditInfo(thread.guild, AuditLogEvent.ThreadCreate, thread.id);
+
     const embed = new EmbedBuilder()
       .setTitle('🧵 إنشاء محادثة')
       .setColor(EVENT_COLORS.threadCreate)
       .addFields(
         { name: '🧵 المحادثة', value: thread.name ? `${thread.name} • \`#${thread.id}\`` : 'غير معروف', inline: true },
         { name: '📍 القناة الأصلية', value: thread.parentId ? `<#${thread.parentId}>` : 'غير معروف', inline: true },
+        { name: '👮 أنشأها', value: this.executorValue(audit?.executor), inline: true },
         {
           name: '⏱️ الأرشفة التلقائية',
           value: thread.autoArchiveDuration ? `بعد ${thread.autoArchiveDuration} دقيقة` : 'غير معروف',
@@ -1080,12 +1198,15 @@ const EVENT_COLORS: Record<LogEventType, number> = {
   async handleThreadDelete(thread: any): Promise<void> {
     if (!thread.guild) return;
 
+    const audit = await this.fetchAuditInfo(thread.guild, AuditLogEvent.ThreadDelete, thread.id);
+
     const embed = new EmbedBuilder()
       .setTitle('🧵 حذف محادثة')
       .setColor(EVENT_COLORS.threadDelete)
       .addFields(
         { name: '🧵 المحادثة', value: thread.name || 'غير معروف', inline: true },
         { name: '📍 القناة الأصلية', value: thread.parentId ? `<#${thread.parentId}>` : 'غير معروف', inline: true },
+        { name: '👮 حذفها', value: this.executorValue(audit?.executor), inline: true },
         { name: '🔢 معرّف المحادثة', value: `\`${thread.id}\``, inline: true }
       );
 
