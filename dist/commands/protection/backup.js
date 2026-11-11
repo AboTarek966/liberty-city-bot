@@ -20,6 +20,14 @@ const command = {
         .setName('number')
         .setDescription('رقم النسخة (من /backup list) — اتركه فارغاً للأحدث')
         .setMinValue(1)))
+        .addSubcommand(sub => sub
+        .setName('delete')
+        .setDescription('حذف نسخة احتياطية محددة (بترتيبها في /backup list)')
+        .addIntegerOption(opt => opt
+        .setName('number')
+        .setDescription('رقم النسخة المراد حذفها (من /backup list)')
+        .setRequired(true)
+        .setMinValue(1)))
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
     cooldown: 5,
@@ -70,7 +78,7 @@ const command = {
                     .join('\n');
                 const embed = new discord_js_1.EmbedBuilder()
                     .setTitle('📦 النسخ الاحتياطية المحفوظة')
-                    .setDescription(`${lines}\n\n*لاستعادة نسخة محددة: \`/backup restore number:<رقم>\`*`)
+                    .setDescription(`${lines}\n\n*لاستعادة نسخة محددة: \`/backup restore number:<رقم>\` • لحذفها: \`/backup delete number:<رقم>\`*`)
                     .setColor(embeds_1.Colors.primary)
                     .setFooter({ text: `${guild.name} • Backup` })
                     .setTimestamp();
@@ -105,6 +113,22 @@ const command = {
                     .setFooter({ text: `${guild.name} • Backup` })
                     .setTimestamp();
                 await interaction.editReply({ embeds: [embed] });
+                return;
+            }
+            // ------------------------------------------
+            // حذف نسخة
+            // ------------------------------------------
+            case 'delete': {
+                const number = interaction.options.getInteger('number', true);
+                const result = await lc.securityHandler.deleteBackup(guild.id, number);
+                if (!result.ok) {
+                    await interaction.editReply({ content: `❌ ${result.reason}` });
+                    return;
+                }
+                const backups = await lc.securityHandler.listBackups(guild.id);
+                await interaction.editReply({
+                    content: `🗑️ **تم حذف النسخة #${number}**\n> 📦 النسخ المتبقية: **${backups.length} / 5**`,
+                });
                 return;
             }
             // ------------------------------------------

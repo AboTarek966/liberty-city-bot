@@ -8,10 +8,18 @@ import {
   PermissionFlagsBits,
   EmbedBuilder,
   User,
+  Guild,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { Colors } from '../../utils/embeds';
+
+/** 🤖 إضافة/إزالة بوت من الوايت ليست (الاستثناء الوقائي) = حصري لمالك البوت (DEVELOPER_USER_ID) أو مالك السيرفر */
+export function canManageBotWhitelist(guild: Guild, userId: string): boolean {
+  const devId = process.env.DEVELOPER_USER_ID;
+  if (devId && userId === devId) return true; // 🛠️ مالك البوت
+  return guild?.ownerId === userId; // 👑 مالك السيرفر
+}
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -81,6 +89,16 @@ const command: Command = {
       const user = interaction.options.getUser('user', true);
       const reason = interaction.options.getString('reason') || 'لا يوجد سبب';
 
+      // 🔒 إضافة بوت للوايت ليست = مالك البوت أو مالك السيرفر فقط
+      if (user.bot && !canManageBotWhitelist(guild, interaction.user.id)) {
+        await interaction.editReply({
+          content:
+            '🔒 **إضافة بوت إلى القائمة البيضاء محصورة بمالك البوت فقط ومالك السيرفر**\n' +
+            'إذا كنت تحتاج استثناء بوت معين، تواصل مع 👑 مالك السيرفر أو 🛠️ مالك البوت.',
+        });
+        return;
+      }
+
       if (wl.userIds.includes(user.id)) {
         if (!wl.enabled) {
           wl.enabled = true;
@@ -130,6 +148,14 @@ const command: Command = {
 
     if (subcommand === 'remove') {
       const user = interaction.options.getUser('user', true);
+
+      // 🔒 إزالة بوت من الوايت ليست = مالك البوت أو مالك السيرفر فقط
+      if (user.bot && !canManageBotWhitelist(guild, interaction.user.id)) {
+        await interaction.editReply({
+          content: '🔒 **إزالة بوت من القائمة البيضاء محصورة بمالك البوت أو مالك السيرفر**',
+        });
+        return;
+      }
 
       if (!wl.userIds.includes(user.id)) {
         await interaction.editReply({ content: `⚠️ ${user} غير موجود في القائمة البيضاء` });

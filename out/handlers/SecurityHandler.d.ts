@@ -274,5 +274,9 @@ export declare class SecurityHandler {
         channels: number;
         roles: number;
     }>>;
+    deleteBackup(guildId: string, index: number): Promise<{
+        ok: boolean;
+        reason?: string;
+    }>;
 }
 //# sourceMappingURL=SecurityHandler.d.ts.map

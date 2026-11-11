@@ -4881,4 +4881,19 @@ export class SecurityHandler {
       roles: b.data?.roles?.length ?? 0,
     }));
   }
+
+  // 🗑️ حذف نسخة احتياطية محددة (بترتيبها في /backup list)
+  async deleteBackup(guildId: string, index: number): Promise<{ ok: boolean; reason?: string }> {
+    const doc = await BackupConfig.findOne({ guildId });
+    if (!doc?.backups?.length) return { ok: false, reason: 'لا توجد نسخ احتياطية' };
+    const i = Math.trunc(index) - 1;
+    if (i < 0 || i >= doc.backups.length) {
+      return { ok: false, reason: `رقم غير صحيح — المتاح: #1 حتى #${doc.backups.length}` };
+    }
+    const removed = doc.backups[i];
+    doc.backups.splice(i, 1);
+    await doc.save();
+    logger.info(`🗑️ Backup #${index} deleted for ${guildId} (${removed?.data?.channels?.length ?? 0} channels, ${(removed?.size / 1024 || 0).toFixed(1)} KB)`);
+    return { ok: true };
+  }
 }

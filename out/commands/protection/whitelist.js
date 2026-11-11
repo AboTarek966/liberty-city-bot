@@ -3,9 +3,17 @@
 // Omni Bot - Whitelist Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.canManageBotWhitelist = canManageBotWhitelist;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const embeds_1 = require("../../utils/embeds");
+/** 🤖 إضافة/إزالة بوت من الوايت ليست (الاستثناء الوقائي) = حصري لمالك البوت (DEVELOPER_USER_ID) أو مالك السيرفر */
+function canManageBotWhitelist(guild, userId) {
+    const devId = process.env.DEVELOPER_USER_ID;
+    if (devId && userId === devId)
+        return true; // 🛠️ مالك البوت
+    return guild?.ownerId === userId; // 👑 مالك السيرفر
+}
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('whitelist')
@@ -51,6 +59,14 @@ const command = {
         if (subcommand === 'add') {
             const user = interaction.options.getUser('user', true);
             const reason = interaction.options.getString('reason') || 'لا يوجد سبب';
+            // 🔒 إضافة بوت للوايت ليست = مالك البوت أو مالك السيرفر فقط
+            if (user.bot && !canManageBotWhitelist(guild, interaction.user.id)) {
+                await interaction.editReply({
+                    content: '🔒 **إضافة بوت إلى القائمة البيضاء محصورة بمالك البوت فقط ومالك السيرفر**\n' +
+                        'إذا كنت تحتاج استثناء بوت معين، تواصل مع 👑 مالك السيرفر أو 🛠️ مالك البوت.',
+                });
+                return;
+            }
             if (wl.userIds.includes(user.id)) {
                 if (!wl.enabled) {
                     wl.enabled = true;
@@ -88,6 +104,13 @@ const command = {
         }
         if (subcommand === 'remove') {
             const user = interaction.options.getUser('user', true);
+            // 🔒 إزالة بوت من الوايت ليست = مالك البوت أو مالك السيرفر فقط
+            if (user.bot && !canManageBotWhitelist(guild, interaction.user.id)) {
+                await interaction.editReply({
+                    content: '🔒 **إزالة بوت من القائمة البيضاء محصورة بمالك البوت أو مالك السيرفر**',
+                });
+                return;
+            }
             if (!wl.userIds.includes(user.id)) {
                 await interaction.editReply({ content: `⚠️ ${user} غير موجود في القائمة البيضاء` });
                 return;

@@ -7,6 +7,7 @@ const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
 const ownerApproval_1 = require("../../utils/ownerApproval");
+const whitelist_1 = require("./whitelist");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('protection')
@@ -470,10 +471,25 @@ async function configureAntiBot(interaction, settings) {
         if (!add.bot) {
             note = `ℹ️ \`${add.tag}\` ليس بوتاً — للبوتات استخدم /whitelist، وهذا الاستثناء الوقائي يشمل الأعضاء أيضاً`;
         }
+        // 🔒 إضافة بوت للاستثناء الوقائي لآلة مضاد البوتات = مالك البوت أو مالك السيرفر فقط
+        if (add.bot && !(0, whitelist_1.canManageBotWhitelist)(interaction.guild, interaction.user.id)) {
+            await interaction.editReply({
+                content: '🔒 **إضافة بوت لهذه القائمة محصورة بمالك البوت ومالك السيرفر فقط**\n' +
+                    'تواصل مع 👑 مالك السيرفر أو 🛠️ مالك البوت لإضافة أي بوت.',
+            });
+            return;
+        }
         if (!wl.includes(add.id))
             wl.push(add.id);
     }
     if (remove) {
+        // 🔒 إزالة بوت أيضاً محصورة بمالك البوت أو مالك السيرفر فقط
+        if (remove.bot && !(0, whitelist_1.canManageBotWhitelist)(interaction.guild, interaction.user.id)) {
+            await interaction.editReply({
+                content: '🔒 **إزالة بوت من هذه القائمة محصورة بمالك البوت أو مالك السيرفر فقط**',
+            });
+            return;
+        }
         const idx = wl.indexOf(remove.id);
         if (idx >= 0)
             wl.splice(idx, 1);
