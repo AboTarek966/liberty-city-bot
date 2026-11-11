@@ -196,6 +196,12 @@ const GuildSettingsSchema = new mongoose_1.Schema({
             action: { type: String, enum: ['delete', 'warn', 'mute'], default: 'delete' },
             logChannel: { type: String },
         },
+        antiExplicit: {
+            enabled: { type: Boolean, default: true },
+            action: { type: String, enum: ['ban', 'kick', 'mute', 'delete', 'warn'], default: 'ban' },
+            ignoreRoles: [{ type: String }],
+            logChannel: { type: String },
+        },
         antiNuke: {
             enabled: { type: Boolean, default: true },
             threshold: { type: Number, default: 1 },

@@ -73,6 +73,13 @@ export interface IGuildSettings extends Document {
             action: 'delete' | 'warn' | 'mute';
             logChannel?: string;
         };
+        /** 🚫 مكافحة المحتوى الإباحي — حذف الرسالة وحظر المرسل فوراً (Direct Ban) عند اكتشاف محتوى إباحي */
+        antiExplicit: {
+            enabled: boolean;
+            action: 'ban' | 'kick' | 'mute' | 'delete' | 'warn';
+            ignoreRoles: string[];
+            logChannel?: string;
+        };
         antiNuke: {
             enabled: boolean;
             threshold: number;

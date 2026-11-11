@@ -343,6 +343,7 @@ function buildProtection(guild, s) {
     const active = [
         p.antiRaid.enabled, p.antiSpam.enabled, p.antiLink.enabled,
         p.antiInvite.enabled, p.antiMention.enabled, p.antiCaps.enabled, p.antiEmoji.enabled,
+        p.antiExplicit?.enabled,
         p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
         p.antiBotAbuse?.enabled,
         p.scamFilter?.enabled, p.autoScan?.enabled,
@@ -350,7 +351,7 @@ function buildProtection(guild, s) {
         p.aiAutoMod?.enabled,
     ].filter(Boolean).length;
     const embed = categoryEmbed('protection', guild, `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-        `**المحميات المفعّلة: ${active}/18**\n\n` +
+        `**المحميات المفعّلة: ${active}/19**\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
         `> ${on(p.antiSpam.enabled)} **مكافحة السبام** — يوقف تكرار الرسائل\n` +
@@ -359,6 +360,7 @@ function buildProtection(guild, s) {
         `> ${on(p.antiMention.enabled)} **مكافحة المنشنز** — يمنع المنشن الجماعي\n` +
         `> ${on(p.antiCaps.enabled)} **مكافحة الكابس** — يمنع الحروف الكبيرة\n` +
         `> ${on(p.antiEmoji.enabled)} **مكافحة الإيموجي** — يمنع الإيموجي المتكرر\n` +
+        `> ${on(p.antiExplicit?.enabled)} **مكافحة المحتوى الإباحي 🔞** — يحذف الرسالة ويحظر المرسل فوراً\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> ${on(p.antiNuke?.enabled)} **مضاد النيوك** — استجابة فورية من أول حذف/طرد/حظر ويعاقب المخالف\n` +
         `> ${on(p.blockMaliciousNames !== false)} ☢️ **مسح الاسم المشبوه** — حذف/إرجاع أي روم/رول اسمه nuke/nuker/هاكر... (${p.blockMaliciousNames !== false ? 'مفعّل' : 'مطفأ ✋'})\n` +
@@ -379,7 +381,7 @@ function buildProtection(guild, s) {
         `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n` +
         `> ${on(p.punishmentTracker?.enabled !== false)} **تتبع العقوبات 🔄** — يمنع تجاوز العقوبات بالمغادرة والعودة (يُعيد السجن/الكتم تلقائياً)\n\n` +
         `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``);
-    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled), btn('settings_cat:giveaways', 'السحوبات', discord_js_1.ButtonStyle.Primary, '🎁'));
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled), toggleBtn('protection', 'antiExplicit', 'إباحي', '🔞', !!p.antiExplicit?.enabled));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiMention', 'منشنز', '📣', p.antiMention.enabled), toggleBtn('protection', 'antiCaps', 'كابس', '🔠', p.antiCaps.enabled), toggleBtn('protection', 'antiEmoji', 'إيموجي', '😀', p.antiEmoji.enabled), toggleBtn('protection', 'punishmentTracker', 'تتبع العقوبات', '🔄', !!p.punishmentTracker?.enabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled), toggleBtn('protection', 'antiBotAbuse', 'مكافحة الإساءة للبوت', '🚫', !!p.antiBotAbuse?.enabled));
     const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'), toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false));

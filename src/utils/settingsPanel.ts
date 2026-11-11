@@ -417,6 +417,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
   const active = [
     p.antiRaid.enabled, p.antiSpam.enabled, p.antiLink.enabled,
     p.antiInvite.enabled, p.antiMention.enabled, p.antiCaps.enabled, p.antiEmoji.enabled,
+    p.antiExplicit?.enabled,
     p.antiNuke?.enabled, p.antiBot?.enabled, p.antiAdmin?.enabled, p.autoBackup?.enabled,
     p.antiBotAbuse?.enabled,
     p.scamFilter?.enabled, p.autoScan?.enabled,
@@ -428,7 +429,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     'protection',
     guild,
     `حماية شاملة لسيرفرك من الرويد والسبام والهجمات\n` +
-    `**المحميات المفعّلة: ${active}/18**\n\n` +
+    `**المحميات المفعّلة: ${active}/19**\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiRaid.enabled)} **مكافحة الرويد** — يحمي من الانضمام السريع\n` +
     `> ${on(p.antiSpam.enabled)} **مكافحة السبام** — يوقف تكرار الرسائل\n` +
@@ -437,6 +438,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(p.antiMention.enabled)} **مكافحة المنشنز** — يمنع المنشن الجماعي\n` +
     `> ${on(p.antiCaps.enabled)} **مكافحة الكابس** — يمنع الحروف الكبيرة\n` +
     `> ${on(p.antiEmoji.enabled)} **مكافحة الإيموجي** — يمنع الإيموجي المتكرر\n` +
+    `> ${on(p.antiExplicit?.enabled)} **مكافحة المحتوى الإباحي 🔞** — يحذف الرسالة ويحظر المرسل فوراً\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> ${on(p.antiNuke?.enabled)} **مضاد النيوك** — استجابة فورية من أول حذف/طرد/حظر ويعاقب المخالف\n` +
     `> ${on(p.blockMaliciousNames !== false)} ☢️ **مسح الاسم المشبوه** — حذف/إرجاع أي روم/رول اسمه nuke/nuker/هاكر... (${p.blockMaliciousNames !== false ? 'مفعّل' : 'مطفأ ✋'})\n` +
@@ -464,7 +466,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled),
     toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled),
     toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled),
-    btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Primary, '🎁'),
+    toggleBtn('protection', 'antiExplicit', 'إباحي', '🔞', !!p.antiExplicit?.enabled),
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(

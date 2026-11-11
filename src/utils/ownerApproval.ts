@@ -25,6 +25,7 @@ export const PROTECTION_LABELS: Record<string, string> = {
   antiMention: 'مضاد المنشنز 📣',
   antiCaps: 'مضاد الكابس 🔠',
   antiEmoji: 'مضاد الإيموجي 😀',
+  antiExplicit: 'مضاد المحتوى الإباحي 🔞',
   antiNuke: 'مضاد النيوك 💣',
   antiBot: 'مضاد البوتات 🤖',
   antiBotAbuse: 'مكافحة الإساءة للبوت 🚫',

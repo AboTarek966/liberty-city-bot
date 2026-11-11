@@ -92,6 +92,13 @@ export interface IGuildSettings extends Document {
       action: 'delete' | 'warn' | 'mute';
       logChannel?: string;
     };
+    /** 🚫 مكافحة المحتوى الإباحي — حذف الرسالة وحظر المرسل فوراً (Direct Ban) عند اكتشاف محتوى إباحي */
+    antiExplicit: {
+      enabled: boolean;
+      action: 'ban' | 'kick' | 'mute' | 'delete' | 'warn';
+      ignoreRoles: string[];
+      logChannel?: string;
+    };
     antiNuke: {
       enabled: boolean;
       threshold: number;
@@ -965,6 +972,12 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       enabled: { type: Boolean, default: true },
       max: { type: Number, default: 10 },
       action: { type: String, enum: ['delete', 'warn', 'mute'], default: 'delete' },
+      logChannel: { type: String },
+    },
+    antiExplicit: {
+      enabled: { type: Boolean, default: true },
+      action: { type: String, enum: ['ban', 'kick', 'mute', 'delete', 'warn'], default: 'ban' },
+      ignoreRoles: [{ type: String }],
       logChannel: { type: String },
     },
     antiNuke: {

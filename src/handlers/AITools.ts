@@ -521,11 +521,11 @@ registerTool('toggle_protection', {
   adminOnly: true,
   dangerous: true,
   params: {
-    feature: { type: 'string', description: 'الميزة: antiNuke/antiRaid/antiSpam/antiLink/antiInvite/antiMention/antiCaps/antiEmoji/antiBot/antiAdmin/autoBackup/autoScan/scamFilter', required: true },
+    feature: { type: 'string', description: 'الميزة: antiNuke/antiRaid/antiSpam/antiLink/antiInvite/antiMention/antiCaps/antiEmoji/antiExplicit/antiBot/antiAdmin/autoBackup/autoScan/scamFilter', required: true },
     enabled: { type: 'boolean', description: 'true للتفعيل / false للتعطيل', required: true },
   },
   async func({ guild, client }, { feature, enabled }) {
-    const validFeatures = ['antiNuke','antiRaid','antiSpam','antiLink','antiInvite','antiMention','antiCaps','antiEmoji','antiBot','antiAdmin','autoBackup','autoScan','scamFilter'];
+    const validFeatures = ['antiNuke','antiRaid','antiSpam','antiLink','antiInvite','antiMention','antiCaps','antiEmoji','antiExplicit','antiBot','antiAdmin','autoBackup','autoScan','scamFilter'];
     if (!validFeatures.includes(feature)) {
       return { success: false, message: `❌ ميزة غير معروفة. المتاح: ${validFeatures.join('، ')}` };
     }

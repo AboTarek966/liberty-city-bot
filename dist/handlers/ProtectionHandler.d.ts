@@ -3,6 +3,8 @@ interface ProtectionAction {
     type: 'delete' | 'warn' | 'mute' | 'kick' | 'ban';
     reason: string;
     duration?: number;
+    /** 🚫 تجاوز نظام "التحذير قبل الحظر" (الجدار الوقائي) — الحظر فوري: محتوى إباحي */
+    directBan?: boolean;
 }
 export declare class ProtectionHandler {
     private client;
@@ -25,6 +27,9 @@ export declare class ProtectionHandler {
     private checkAntiEmoji;
     private checkAutoMod;
     private checkZalgo;
+    /** قائمة صارمة عمداً — كل الكلمات هنا إباحية/صريحة، بدون أي كلمة عربية بريئة تطابق كـ substring */
+    private static readonly EXPLICIT_RE;
+    private checkAntiExplicit;
     private executeAction;
     private executeUserAction;
     private logAction;

@@ -199,6 +199,7 @@ class ProtectionHandler {
             { name: 'antiMention', check: this.checkAntiMention.bind(this), adminBypass: true },
             { name: 'antiCaps', check: this.checkAntiCaps.bind(this), adminBypass: true },
             { name: 'antiEmoji', check: this.checkAntiEmoji.bind(this), adminBypass: true },
+            { name: 'antiExplicit', check: this.checkAntiExplicit.bind(this), adminBypass: true },
             { name: 'autoMod', check: this.checkAutoMod.bind(this), adminBypass: true, requiresAdministrator: true },
             { name: 'zalgo', check: this.checkZalgo.bind(this), adminBypass: false }, // للكل
         ];
@@ -376,6 +377,36 @@ class ProtectionHandler {
         };
     }
     // --------------------------------------------
+    // Anti-Explicit (محظور: اباحي) — حظر فوري بدون نظام التحذير
+    // --------------------------------------------
+    /** قائمة صارمة عمداً — كل الكلمات هنا إباحية/صريحة، بدون أي كلمة عربية بريئة تطابق كـ substring */
+    static EXPLICIT_RE = /(?:اباحي|اباحية|اباحيات|سكس|نيك|ككس|كس|بظر|hentai|pornhub|xvideos|xnxx|xhamster|redtube|youporn|eporner|chaturbate|livejasmin|stripchat|rule34|nhentai|\.(?:xxx|porn|sex|adult|hentai)(?:[\/?#\s]|$))/i;
+    async checkAntiExplicit(message, settings) {
+        const cfg = settings?.protection?.antiExplicit;
+        if (!cfg?.enabled)
+            return null;
+        if (cfg.ignoreRoles?.some((roleId) => message.member?.roles.cache.has(roleId))) {
+            return null;
+        }
+        const content = (message.content || '').toLowerCase();
+        const embedText = (message.embeds || [])
+            .map((e) => `${e?.url ?? ''} ${e?.title ?? ''} ${e?.description ?? ''}`)
+            .join(' ')
+            .toLowerCase();
+        const attachmentText = [...(message.attachments?.values() ?? [])]
+            .map((a) => `${a?.name ?? ''} ${a?.url ?? ''}`)
+            .join(' ')
+            .toLowerCase();
+        const hay = `${content} ${embedText} ${attachmentText}`;
+        if (!ProtectionHandler.EXPLICIT_RE.test(hay))
+            return null;
+        return {
+            type: (cfg.action ?? 'ban'),
+            reason: 'محتوى إباحي (Anti-Explicit)',
+            directBan: true, // 🚫 الحظر فوري — بدون نظام التحذير/الإيقاف (رغبة صريحة للأدمن ضد هجمات الإباحية)
+        };
+    }
+    // --------------------------------------------
     // Execute Protection Action
     // --------------------------------------------
     async executeAction(message, action, settings) {
@@ -437,12 +468,15 @@ class ProtectionHandler {
                 await member.kick(action.reason).catch(() => { });
                 break;
             case 'ban':
-                if (this.client.securityHandler?.takeStrike?.(message.guildId, message.author.id) === 'first')
+                // 🚫 Anti-Explicit / أفعال صريحة: حظر فوري بدون "التحذير قبل الحظر" (الجدار الوقائي)
+                if (!action.directBan && this.client.securityHandler?.takeStrike?.(message.guildId, message.author.id) === 'first')
                     break;
                 await message.guild?.members.ban(message.author.id, {
                     reason: action.reason,
-                    deleteMessageSeconds: 3600,
-                }).catch(() => { });
+                    deleteMessageSeconds: action.directBan ? 86400 : 3600,
+                }).catch((err) => {
+                    logger.warn(`Anti-Explicit ban failed for ${message.author?.tag ?? message.author?.id}: ${err?.message ?? err}`);
+                });
                 break;
         }
     }
@@ -722,6 +756,8 @@ class ProtectionHandler {
             return 'antiCaps';
         if (reason.includes('Anti-Emoji'))
             return 'antiEmoji';
+        if (reason.includes('Anti-Explicit'))
+            return 'antiExplicit';
         return 'antiRaid';
     }
     // --------------------------------------------

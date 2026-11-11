@@ -41,6 +41,12 @@ export interface AIConfig {
     enabled: boolean;
     cooldown: number;
 }
+export interface AntiExplicitConfig {
+    enabled: boolean;
+    action: 'ban' | 'kick' | 'mute' | 'delete' | 'warn';
+    ignoreRoles: string[];
+    logChannel?: string;
+}
 export interface ProtectionConfig {
     antiRaid: AntiRaidConfig;
     antiSpam: AntiSpamConfig;
@@ -49,6 +55,7 @@ export interface ProtectionConfig {
     antiMention: AntiMentionConfig;
     antiCaps: AntiCapsConfig;
     antiEmoji: AntiEmojiConfig;
+    antiExplicit: AntiExplicitConfig;
 }
 export interface AntiRaidConfig {
     enabled: boolean;
@@ -246,6 +253,9 @@ export interface ProtectionSettings {
         logChannel?: string;
     };
     antiEmoji: AntiEmojiConfig & {
+        logChannel?: string;
+    };
+    antiExplicit: AntiExplicitConfig & {
         logChannel?: string;
     };
 }
