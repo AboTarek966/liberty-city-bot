@@ -551,7 +551,11 @@ class AIHandler {
             const configuredMax = typeof aiConfig.maxTokens === 'number' ? aiConfig.maxTokens : 500;
             aiConfig.maxTokens = Math.min(configuredMax, 320);
         }
-        let systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext, guildId ? await (0, knowledge_1.buildKnowledgeContext)(guildId, message, 4) : '', brevity);
+        // 🧰 هل نحتاج أدوات السيرفر في البرومبت؟ — الدردشة العادية تتخطاها (توفير ~9 آلاف حرف → ردود أسرع)
+        const wantsTools = this.looksLikeActionRequest(message) ||
+            this.looksLikeCapabilityQuestion(message) ||
+            (!!media?.context && this.looksLikeActionRequest(media.context));
+        let systemPrompt = await this.buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext, guildId ? await (0, knowledge_1.buildKnowledgeContext)(guildId, message, 4) : '', brevity, wantsTools);
         // 📍 القناة الحالية — الـ AI لا يسأل عن ID القناة أبداً بعد الآن
         if (channelId) {
             systemPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
@@ -569,6 +573,8 @@ class AIHandler {
         // 🔭 الصور تحتاج مزوّد يدعم الرؤية — Gemini / OpenRouter / Requesty
         const canSeeImages = (this.geminiReady || !!this.openrouter || !!this.requesty) && !!media?.images?.length;
         const passImages = canSeeImages ? media.images : undefined;
+        // 🔁 التاريخ المُرسَل للمزوّد — يُضغط بعد أول جولة أدوات حتى لا تتضخم الجولات (أسرع)
+        let compactHistory = history;
         // Try AI providers (preferred first, others as automatic failover) + حلقة بحث ذاتية
         const callProviders = async (msg, useStream) => {
             // عند وجود صور نُقدّم مزوّدي الرؤية أولاً (Gemini ثم OpenRouter)
@@ -585,26 +591,26 @@ class AIHandler {
                     continue;
                 try {
                     if (provider === 'gemini')
-                        return await this.generateGemini(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+                        return await this.generateGemini(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
                     if (provider === 'openrouter')
-                        return await this.generateOpenRouter(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+                        return await this.generateOpenRouter(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
                     if (provider === 'requesty')
-                        return await this.generateRequesty(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+                        return await this.generateRequesty(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
                     if (provider === 'groq') {
                         // Groq لا يدعم الصور — نتجاهلها حتى لا نستهلك محاولات فاشلة
                         if (passImages?.length)
                             continue;
-                        return await this.generateGroq(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+                        return await this.generateGroq(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined);
                     }
                     if (provider === 'openai') {
                         if (passImages?.length)
                             continue;
-                        return await this.generateOpenAI(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+                        return await this.generateOpenAI(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined);
                     }
                     if (provider === 'anthropic') {
                         if (passImages?.length)
                             continue;
-                        return await this.generateAnthropic(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+                        return await this.generateAnthropic(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined);
                     }
                 }
                 catch (error) {
@@ -705,6 +711,8 @@ class AIHandler {
                 .slice(0, Math.min(MAX_CALLS_PER_ROUND, MAX_TOTAL_ACTION_CALLS - totalActionCalls));
             if (!freshCalls.length)
                 break;
+            // 🗜️ بعد أول جولة أدوات نضغط التاريخ المُرسَل — الجولات التالية أسرع بكثير
+            compactHistory = history.length > 2 ? history.slice(-2) : history;
             const roundOutcomes = [];
             for (const call of freshCalls) {
                 const key = `${call.tool}|${JSON.stringify(call.args || {})}`;
@@ -1021,6 +1029,11 @@ class AIHandler {
         const target = /(سيرفر|قناة|رول|رتبة|عضو|أعضاء|اعضاء|اسم|صورة|بانر|توبيك|صلاحيات|تذكرة|سحب|ثريد|رسالة|دعوة|كنية|نيكنيم|أفاتار|افاتار|ايموجي|إيموجي|ستيكر|ويب هوك|ويبهوك|حماية|نسخة|حدث|فعالية|أوتومود|اوتومود|موسيقى|أغنية|اغنية|صوت|منشن|تفاعل|ريأكشن|حالة|ستاتس|ستاتوس|بروفايل|قوانين|إعلان|اعلان|شات|توب|لفل|ليفل|ديسكورد|بوت)/i;
         return action.test(t) && target.test(t);
     }
+    /** سؤال عن قدرات البوت/الأدوات → يكفي ضمّ [ACTIONS] القصيرة بدل إلغائها */
+    looksLikeCapabilityQuestion(text) {
+        const t = (text || '').toLowerCase();
+        return /(وش|ايش|شنو|شو|ماذا|إيه|ايه|كيف)[^؟?\n]{0,25}(تعمل|تسوي|تنفذ|تقدر|تستطيع)|قدرات(ك)?|إمكانيات(ك)?|ماذا تستطيع|what can you|capabilities|how can you help/i.test(t);
+    }
     /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
     buildForceToolPrompt(userMessage, previousReply) {
         return (`⚠️ نظام: طلب المستخدم التالي يتطلب تنفيذاً فعلياً في السيرفر، لكن ردك السابق لم يتضمن أي استدعاء أداة.\n` +
@@ -1290,7 +1303,7 @@ class AIHandler {
         const failover = available.filter(p => !primary.includes(p));
         return [...primary, ...failover];
     }
-    async buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext = '', knowledgeContext = '', brevity = false) {
+    async buildSystemPrompt(aiConfig, personality, guildId, userContext, searchContext = '', knowledgeContext = '', brevity = false, includeTools = true) {
         const guildName = this.client.guilds.cache.get(guildId)?.name;
         const botName = guildName || this.client.user?.username || 'Omni';
         const base = aiConfig.systemPrompt || config_1.config.ai.systemPrompt;
@@ -1334,8 +1347,13 @@ class AIHandler {
         prompt += `\n- لا تستخدمها للأسئلة الشخصية، الآراء، الرياضيات، الشفرات، أو أي شيء تستطيع الإجابة عنه بنفسك.`;
         prompt += `\n- بعد التنفيذ ستصلك النتيجة فوراً وتُجب بالكامل — لا تعتذر ولا تقل "سأبحث".`;
         prompt += `\n- لا تذكر أبداً أنك استخدمت أداة؛ قدّم المعلومة كأنها من معرفتك مع الإشارة للمصدر عند الحاجة.`;
-        // 🛠️ قدرات التنفيذ (Function Calling) — تقدر تعمل حاجات فعلياً في السيرفر
-        prompt += (0, AITools_1.getToolsDescription)();
+        // 🛠️ قدرات التنفيذ (Function Calling) — تُضمّن فقط عند الحاجة (توفير ~9 آلاف حرف كل رسالة)
+        if (includeTools) {
+            prompt += (0, AITools_1.getToolsDescription)();
+        }
+        else {
+            prompt += `\n\n🛠️ **ملاحظة:** إذا طلب المستخدم تنفيذ أي إجراء في السيرفر (حظر/رول/قناة/رسالة/سحب/ذاكرة...)، أنت جاهز للتنفيذ — ستصلك أدوات السيرفر تلقائياً في طلب المتابعة. **لا تدّعي أنك نفّذت شيئاً لم ينفّذ.**`;
+        }
         // ---------------- سياق السيرفر (معلومات عامة اختيارية) ----------------
         const guild = this.client.guilds.cache.get(guildId);
         if (guild) {

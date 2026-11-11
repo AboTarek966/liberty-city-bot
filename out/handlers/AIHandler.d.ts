@@ -99,6 +99,8 @@ export declare class AIHandler {
     private parseActionCallJson;
     /** هل نص المستخدم أمر تنفيذي (تغيير/إنشاء/حذف...) وليس مجرد سؤال؟ */
     private looksLikeActionRequest;
+    /** سؤال عن قدرات البوت/الأدوات → يكفي ضمّ [ACTIONS] القصيرة بدل إلغائها */
+    private looksLikeCapabilityQuestion;
     /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
     private buildForceToolPrompt;
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */

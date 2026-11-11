@@ -647,6 +647,12 @@ export class AIHandler {
       aiConfig.maxTokens = Math.min(configuredMax, 320);
     }
 
+    // 🧰 هل نحتاج أدوات السيرفر في البرومبت؟ — الدردشة العادية تتخطاها (توفير ~9 آلاف حرف → ردود أسرع)
+    const wantsTools =
+      this.looksLikeActionRequest(message) ||
+      this.looksLikeCapabilityQuestion(message) ||
+      (!!media?.context && this.looksLikeActionRequest(media.context));
+
     let systemPrompt = await this.buildSystemPrompt(
       aiConfig,
       personality,
@@ -654,7 +660,8 @@ export class AIHandler {
       userContext,
       searchContext,
       guildId ? await buildKnowledgeContext(guildId, message, 4) : '',
-      brevity
+      brevity,
+      wantsTools
     );
 
     // 📍 القناة الحالية — الـ AI لا يسأل عن ID القناة أبداً بعد الآن
@@ -677,6 +684,9 @@ export class AIHandler {
     const canSeeImages = (this.geminiReady || !!this.openrouter || !!this.requesty) && !!media?.images?.length;
     const passImages = canSeeImages ? media!.images : undefined;
 
+    // 🔁 التاريخ المُرسَل للمزوّد — يُضغط بعد أول جولة أدوات حتى لا تتضخم الجولات (أسرع)
+    let compactHistory = history;
+
     // Try AI providers (preferred first, others as automatic failover) + حلقة بحث ذاتية
     const callProviders = async (msg: string, useStream: boolean): Promise<AIResponse | null> => {
       // عند وجود صور نُقدّم مزوّدي الرؤية أولاً (Gemini ثم OpenRouter)
@@ -692,16 +702,16 @@ export class AIHandler {
         // ⏳ تخطّي المزوّد الذي فشل مؤخراً (مفتاح ميت/حصة منتهية/ازدحام) — لا نضيّع ثواني كل رسالة
         if (this.isProviderCooling(provider)) continue;
         try {
-          if (provider === 'gemini') return await this.generateGemini(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
-          if (provider === 'openrouter') return await this.generateOpenRouter(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
-          if (provider === 'requesty') return await this.generateRequesty(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined, passImages);
+          if (provider === 'gemini') return await this.generateGemini(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
+          if (provider === 'openrouter') return await this.generateOpenRouter(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
+          if (provider === 'requesty') return await this.generateRequesty(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined, passImages);
           if (provider === 'groq') {
             // Groq لا يدعم الصور — نتجاهلها حتى لا نستهلك محاولات فاشلة
             if (passImages?.length) continue;
-            return await this.generateGroq(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined);
+            return await this.generateGroq(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined);
           }
-          if (provider === 'openai') { if (passImages?.length) continue; return await this.generateOpenAI(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined); }
-          if (provider === 'anthropic') { if (passImages?.length) continue; return await this.generateAnthropic(msg, systemPrompt, aiConfig, history, useStream ? stream : undefined); }
+          if (provider === 'openai') { if (passImages?.length) continue; return await this.generateOpenAI(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined); }
+          if (provider === 'anthropic') { if (passImages?.length) continue; return await this.generateAnthropic(msg, systemPrompt, aiConfig, compactHistory, useStream ? stream : undefined); }
         } catch (error: any) {
           const errMsg = String(error?.message || error);
           const status = Number(error?.status ?? error?.response?.status ?? 0);
@@ -801,6 +811,9 @@ export class AIHandler {
         .slice(0, Math.min(MAX_CALLS_PER_ROUND, MAX_TOTAL_ACTION_CALLS - totalActionCalls));
 
       if (!freshCalls.length) break;
+
+      // 🗜️ بعد أول جولة أدوات نضغط التاريخ المُرسَل — الجولات التالية أسرع بكثير
+      compactHistory = history.length > 2 ? history.slice(-2) : history;
 
       const roundOutcomes: Array<{ tool: string; ok: boolean; message: string; data?: string }> = [];
       for (const call of freshCalls) {
@@ -1093,6 +1106,12 @@ export class AIHandler {
     return action.test(t) && target.test(t);
   }
 
+  /** سؤال عن قدرات البوت/الأدوات → يكفي ضمّ [ACTIONS] القصيرة بدل إلغائها */
+  private looksLikeCapabilityQuestion(text: string): boolean {
+    const t = (text || '').toLowerCase();
+    return /(وش|ايش|شنو|شو|ماذا|إيه|ايه|كيف)[^؟?\n]{0,25}(تعمل|تسوي|تنفذ|تقدر|تستطيع)|قدرات(ك)?|إمكانيات(ك)?|ماذا تستطيع|what can you|capabilities|how can you help/i.test(t);
+  }
+
   /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
   private buildForceToolPrompt(userMessage: string, previousReply: string): string {
     return (
@@ -1374,7 +1393,8 @@ export class AIHandler {
     userContext?: AIUserContext,
     searchContext: string = '',
     knowledgeContext: string = '',
-    brevity: boolean = false
+    brevity: boolean = false,
+    includeTools: boolean = true
   ): Promise<string> {
     const guildName = this.client.guilds.cache.get(guildId)?.name;
     const botName = guildName || this.client.user?.username || 'Omni';
@@ -1428,8 +1448,12 @@ export class AIHandler {
     prompt += `\n- بعد التنفيذ ستصلك النتيجة فوراً وتُجب بالكامل — لا تعتذر ولا تقل "سأبحث".`;
     prompt += `\n- لا تذكر أبداً أنك استخدمت أداة؛ قدّم المعلومة كأنها من معرفتك مع الإشارة للمصدر عند الحاجة.`;
 
-    // 🛠️ قدرات التنفيذ (Function Calling) — تقدر تعمل حاجات فعلياً في السيرفر
-    prompt += getToolsDescription();
+    // 🛠️ قدرات التنفيذ (Function Calling) — تُضمّن فقط عند الحاجة (توفير ~9 آلاف حرف كل رسالة)
+    if (includeTools) {
+      prompt += getToolsDescription();
+    } else {
+      prompt += `\n\n🛠️ **ملاحظة:** إذا طلب المستخدم تنفيذ أي إجراء في السيرفر (حظر/رول/قناة/رسالة/سحب/ذاكرة...)، أنت جاهز للتنفيذ — ستصلك أدوات السيرفر تلقائياً في طلب المتابعة. **لا تدّعي أنك نفّذت شيئاً لم ينفّذ.**`;
+    }
 
     // ---------------- سياق السيرفر (معلومات عامة اختيارية) ----------------
     const guild = this.client.guilds.cache.get(guildId);
