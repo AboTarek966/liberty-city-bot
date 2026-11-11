@@ -211,14 +211,12 @@ class AITicketAssistant {
             // الـ AI يرد على صاحب التذكرة + الإدارة/المدّعي (طرد الناس اللي مش ذات صلة)
             if (!isOwner && !isClaimer && !isStaff)
                 return;
-            // لو إداري بشري استلم التذكرة → الـ AI يسكت أمام صاحب التذكرة فقط (يستلمها بشرياً)
-            if (isOwner && ticket.claimedBy && ticket.claimedBy !== this.client.user?.id)
-                return;
-            // 🤫 البوت هو المستلم — لا يرد على أي رسالة داخل التذكرة إلا إذا كانت ردّاً لرسالة البوت أو منشنته
-            const botId = this.client.user?.id;
-            if (botId && ticket.claimedBy === botId) {
-                const mentioned = !!message.mentions?.users?.has(botId) ||
-                    !!message.mentions?.members?.has(botId);
+            // 🤫 صمت كامل — البوت لا يتحدث داخل التذكرة إلا بطلب صريح.
+            //    ينطبق سواء كان المستلم هو (claimَه البوت) أو استلمها إداري بشري بعده:
+            //    الجواب فقط عند منشن البوت أو الرد على رسالة منه. أي كلام آخر = صمت كامل.
+            const botId = this.client.user?.id ?? '';
+            if (ticket.claimedBy) {
+                const mentioned = !!botId && (message.mentions?.users?.has(botId) || message.mentions?.members?.has(botId));
                 let repliedToBot = false;
                 if (!mentioned && message.reference?.messageId) {
                     try {
@@ -231,7 +229,7 @@ class AITicketAssistant {
                     }
                 }
                 if (!mentioned && !repliedToBot)
-                    return; // لا يرد أبداً بلا طلب صريح
+                    return; // التذكرة متاحة للإدارة — البوت لا ينطق إلا عند استدعاؤه
             }
             const aiConfig = await this.getConfig(channel.guild.id);
             if (!aiConfig?.enabled)
