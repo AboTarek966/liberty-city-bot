@@ -1,8 +1,8 @@
 // ============================================
 // Omni Bot - Anti Bot Abuse
 // ============================================
-// إذا كان الذكاء العام مفعّل + تفعيل module الحماية:
 // الإساءة إلى البوت → تحذير → سحب كل الرولات القابلة للإزالة → حظر
+// (مفعّل افتراضياً مع إمكانية الإطفاء من لوحة الحماية)
 
 import { Message, PermissionFlagsBits, EmbedBuilder, TextChannel } from 'discord.js';
 import { getGuildSettings } from '../models';
@@ -15,11 +15,14 @@ const logger = createLogger('AntiBotAbuse');
 
 // 🧠 قائمة أساسية للإساءة (عربية + إنجليزية) — تستهدف البوت حصراً
 const INSULT_WORDS = [
-  // عربي
-  'كلب', 'حيوان', 'حمار', 'عاهر', 'عاهرة', 'خول', 'عرص', 'حقير', 'قذر', 'تافه', 'غبي', 'فاشل',
-  'نصاب', 'احتيال', 'نصب', 'scam', 'scammer', 'fraud', 'fake', 'rip off',
+  // عربي — شتائم وإساءات شائعة (صريحة فقط)
+  'كلب', 'حيوان', 'حمار', 'عاهر', 'عاهرة', 'قحبة', 'خول', 'عرص', 'حقير', 'قذر', 'تافه', 'غبي', 'فاشل',
+  'نصاب', 'احتيال', 'نصب', 'شرموطة', 'شرموط', 'خرا', 'عاهة', 'عاهات', 'خسيس', 'قبيح', 'زق',
+  'scam', 'scammer', 'fraud', 'fake', 'rip off',
   // إنجليزي
-  'fuck', 'fucking', 'shit', 'bitch', 'asshole', 'dick', 'stupid', 'idiot', 'dumb', 'worst', 'terrible', 'useless', 'annoying',
+  'fuck', 'fucking', 'shit', 'bitch', 'asshole', 'dick', 'stupid', 'idiot', 'dumb', 'worst', 'terrible',
+  'useless', 'annoying', 'kys', 'trash', 'garbage', 'wtf', 'whore', 'slut',
+  'go die', 'kill yourself', 'fuck you', 'fuck off', 'go to hell',
 ];
 
 function normalize(s: string): string {
@@ -67,8 +70,7 @@ export async function handleBotAbuse(
   try {
     const settings = await getGuildSettings(message.guild.id);
 
-    // 🚫 البوابة: لا يعمل إلا إذا الذكاء العام مفعّل + module الحماية مفعّل
-    if (!settings.ai?.enabled) return false;
+    // 🔓 لا يشترط تفعيل الذكاء العام — التحليل محلي (قاموس + تحليل أسلوب)
     const anti = (settings.protection as any)?.antiBotAbuse;
     if (!anti?.enabled) return false;
 

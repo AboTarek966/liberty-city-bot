@@ -915,7 +915,7 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
     ownerApproval: { type: Boolean, default: true },
     antiBotAbuse: {
-      enabled: { type: Boolean, default: false },
+      enabled: { type: Boolean, default: true },
     },
     // ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — مفعّل افتراضياً
     blockMaliciousNames: { type: Boolean, default: true },
@@ -1639,6 +1639,20 @@ const SETTINGS_CACHE_TTL_MS = 30_000;
 // كانت تنشئ وثيقتين في نفس اللحظة → E11000 duplicate key
 const settingsLoading = new Map<string, Promise<IGuildSettings>>();
 
+/** ♻️ ترقية كسولة: تفعيل مكافحة الإساءة للبوت للسيرفرات القديمة (الافتراضية الآن) — يحترم الإطفاء الصريح */
+async function migrateAntiBotAbuse(settings: IGuildSettings): Promise<IGuildSettings> {
+  try {
+    const prot: any = settings?.protection;
+    if (prot && prot.antiBotAbuse === undefined) {
+      prot.antiBotAbuse = { enabled: true };
+      await settings.save();
+    }
+  } catch {
+    /* لا توقف القراءة لو فشل الحفظ */
+  }
+  return settings;
+}
+
 async function loadGuildSettings(guildId: string): Promise<IGuildSettings> {
   // upsert ذرّي: لا يرمي خطأ لو وُجدت الوثيقة بالفعل
   try {
@@ -1647,14 +1661,14 @@ async function loadGuildSettings(guildId: string): Promise<IGuildSettings> {
       { $setOnInsert: { guildId } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    if (settings) return settings;
+    if (settings) return migrateAntiBotAbuse(settings);
   } catch (error: any) {
     // سباق نادر بين عمليتي upsert — نقرأ الوثيقة الموجودة
     if (error?.code !== 11000) throw error;
   }
 
   const existing = await GuildSettings.findOne({ guildId });
-  if (existing) return existing;
+  if (existing) return migrateAntiBotAbuse(existing);
 
   // احتياط أخير (لو فشل الـupsert لأي سبب)
   try {

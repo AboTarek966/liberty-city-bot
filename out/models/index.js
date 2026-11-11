@@ -137,7 +137,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
         ownerApproval: { type: Boolean, default: true },
         antiBotAbuse: {
-            enabled: { type: Boolean, default: false },
+            enabled: { type: Boolean, default: true },
         },
         // ☢️ حذف/إرجاع القنوات والرولات بسبب الاسم المشبوه (nuke/nuker...) — مفعّل افتراضياً
         blockMaliciousNames: { type: Boolean, default: true },
@@ -811,12 +811,26 @@ const SETTINGS_CACHE_TTL_MS = 30_000;
 // 🛡️ منع سباق إنشاء الإعدادات: عدة استدعاءات متزامنة لنفس السيرفر
 // كانت تنشئ وثيقتين في نفس اللحظة → E11000 duplicate key
 const settingsLoading = new Map();
+/** ♻️ ترقية كسولة: تفعيل مكافحة الإساءة للبوت للسيرفرات القديمة (الافتراضية الآن) — يحترم الإطفاء الصريح */
+async function migrateAntiBotAbuse(settings) {
+    try {
+        const prot = settings?.protection;
+        if (prot && prot.antiBotAbuse === undefined) {
+            prot.antiBotAbuse = { enabled: true };
+            await settings.save();
+        }
+    }
+    catch {
+        /* لا توقف القراءة لو فشل الحفظ */
+    }
+    return settings;
+}
 async function loadGuildSettings(guildId) {
     // upsert ذرّي: لا يرمي خطأ لو وُجدت الوثيقة بالفعل
     try {
         const settings = await exports.GuildSettings.findOneAndUpdate({ guildId }, { $setOnInsert: { guildId } }, { upsert: true, new: true, setDefaultsOnInsert: true });
         if (settings)
-            return settings;
+            return migrateAntiBotAbuse(settings);
     }
     catch (error) {
         // سباق نادر بين عمليتي upsert — نقرأ الوثيقة الموجودة
@@ -825,7 +839,7 @@ async function loadGuildSettings(guildId) {
     }
     const existing = await exports.GuildSettings.findOne({ guildId });
     if (existing)
-        return existing;
+        return migrateAntiBotAbuse(existing);
     // احتياط أخير (لو فشل الـupsert لأي سبب)
     try {
         return await exports.GuildSettings.create({ guildId });
