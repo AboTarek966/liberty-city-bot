@@ -594,6 +594,8 @@ class AIHandler {
             return null;
         };
         let response = await callProviders(effectiveMessage, true);
+        // 🔍 تتبع نتائج الأدوات — للتحقق النهائي أن أي «تم» مكتوب هنا كان نتيجة تنفيذ حقيقي
+        const toolOutcomes = [];
         // 🔧 حلقة استدعاء أدوات العمل (Function Calling) — الـ AI ينفذ إجراءات Discord
         // نمرر السياق الكامل: السيرفر، المنفذ، العميل
         for (let actionRound = 0; actionRound < 5; actionRound++) {
@@ -616,8 +618,9 @@ class AIHandler {
                     attachments,
                 };
                 const toolResult = await (0, AITools_1.executeAITool)(actionCall.tool, actionCall.args, toolContext);
+                toolOutcomes.push({ tool: actionCall.tool, ok: !!toolResult?.success, message: String(toolResult?.message || '') });
                 // نضيف النتيجة للسياق ونعيد التوليد
-                const followUpMsg = `${effectiveMessage}\n\n=== نتيجة تنفيذ \`${actionCall.tool}\` ===\n${toolResult.message}\n===\nأكمل إجابتك اعتماداً على هذه النتيجة.`;
+                const followUpMsg = `${effectiveMessage}\n\n=== نتيجة تنفيذ \`${actionCall.tool}\` ===\n${toolResult.message}\n===\nأكمل إجابتك اعتماداً على هذه النتيجة. إذا فشلت الأداة قل السبب الحقيقي — لا تقل «تم» أبداً. لا تخترع ✅.`;
                 response = await callProviders(followUpMsg, false);
             }
             else {
@@ -646,6 +649,30 @@ class AIHandler {
                 // فشلت الجولة → نُعيد الرد الأصلي منزوع العلامة
                 response = { ...response, content: cleaned };
             }
+        }
+        // 🔍 تحقق أخير قبل الإرسال: أي «تم» يجب أن يكون متفوقاً عليه بنتيجة أداة فعلية
+        //   يمنع النموذج من ادّعاء تنفيذ شيء لم يحدث
+        const claimsDone = /(✅|✔|تم[ّ]?|تمت|خلّصت|خلصت|اتعملت|اتنفذت|اتسلم|اُنجزت|اُنجز|انجز)/u.test(response?.content || '');
+        const anyOK = toolOutcomes.some(o => o.ok);
+        const anyFail = toolOutcomes.some(o => !o.ok);
+        if (response && toolOutcomes.length === 0 && claimsDone) {
+            logger.warn(`AI claimed done without calling any tool: "${(response.content || '').slice(0, 120)}"`);
+            response = {
+                ...response,
+                content: `${response.content}\n\n` +
+                    `⚠️ **تنبيه:** لم يُنفّذ البوت أي إجراء فعلي في السيرفر — لا توجد نتيجة أداة. ` +
+                    `الرسالة أعلاه غير حقيقية كتأكيد تنفيذ؛ تحقق بنفسك أو أعد الطلب بصيغة واضحة.`,
+                fallback: response.fallback,
+            };
+        }
+        else if (response && anyFail && !anyOK && claimsDone) {
+            logger.warn(`AI claimed done despite tool failure(s): "${(response.content || '').slice(0, 120)}"`);
+            response = {
+                ...response,
+                content: `⚠️ **الإجراء لم يُنفّذ فعلياً.** النتيجة الحقيقية:\n` +
+                    toolOutcomes.map(o => `• \`${o.tool}\` → ${o.message}`).join('\n'),
+                fallback: false,
+            };
         }
         // Fallback
         const finalResponse = response || this.getFallbackResponse(aiConfig.language || 'ar');
