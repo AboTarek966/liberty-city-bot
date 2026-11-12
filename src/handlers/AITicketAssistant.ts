@@ -262,25 +262,21 @@ export class AITicketAssistant {
       // الـ AI يرد على صاحب التذكرة + الإدارة/المدّعي (طرد الناس اللي مش ذات صلة)
       if (!isOwner && !isClaimer && !isStaff) return;
 
-      // 🤫 صمت كامل — البوت لا يتحدث داخل التذكرة إلا بطلب صريح.
-      //    ينطبق سواء كان المستلم هو (claimَه البوت) أو استلمها إداري بشري بعده:
-      //    الجواب فقط عند منشن البوت أو الرد على رسالة منه. أي كلام آخر = صمت كامل.
+      // 🔐 الإدارة/المدّعي: البوت يسكت إلا إذا طلبه صراحة (منشن) أو ردّ عليه.
+      //     فاتح التذكرة (صاحب التذكرة) يرد عليه عادي بدون حاجة لأي منشن/رد.
       const botId = this.client.user?.id ?? '';
-      if (ticket.claimedBy) {
-        const mentioned =
-          !!botId && (message.mentions?.users?.has(botId) || message.mentions?.members?.has(botId));
-        let repliedToBot = false;
-        if (!mentioned && message.reference?.messageId) {
-          try {
-            const cached = message.channel.messages.cache.get(message.reference.messageId);
-            const refMessage = cached || (await message.channel.messages.fetch(message.reference.messageId));
-            repliedToBot = !!refMessage && refMessage.author?.id === botId;
-          } catch {
-            repliedToBot = false;
-          }
+      const mentioned = !!botId && (message.mentions?.users?.has(botId) || message.mentions?.members?.has(botId));
+      let repliedToBot = false;
+      if (message.reference?.messageId) {
+        try {
+          const cached = message.channel.messages.cache.get(message.reference.messageId);
+          const refMessage = cached || (await message.channel.messages.fetch(message.reference.messageId));
+          repliedToBot = !!refMessage && refMessage.author?.id === botId;
+        } catch {
+          repliedToBot = false;
         }
-        if (!mentioned && !repliedToBot) return; // التذكرة متاحة للإدارة — البوت لا ينطق إلا عند استدعاؤه
       }
+      if (!isOwner && !mentioned && !repliedToBot) return;
 
       const aiConfig = await this.getConfig(channel.guild.id);
       if (!aiConfig?.enabled) return;
