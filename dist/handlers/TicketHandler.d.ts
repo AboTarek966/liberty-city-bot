@@ -67,6 +67,8 @@ export declare class TicketHandler {
     private ticketLogQueues;
     constructor(client: OmniClient);
     buildTicketControls(claimed: boolean, claimedByBot?: boolean): ActionRowBuilder<any>[];
+    /** 🔒 يُنادى عند حذف قناة — لو كانت قناة تذكرة نُحدّها «خصافة محذوفة» حتى ما تحتسب مستقبلاً */
+    cleanupTicketByDeletedChannel(channelId: string, guildId?: string): Promise<void>;
     createTicketCategory(guild: Guild, name: string): Promise<CategoryChannel>;
     createLogChannel(guild: Guild, name: string, category?: CategoryChannel): Promise<TextChannel>;
     createTicket(options: CreateTicketOptions): Promise<ITicket>;

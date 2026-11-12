@@ -250,6 +250,26 @@ export class TicketHandler {
   // --------------------------------------------
   // Create Ticket Category
   // --------------------------------------------
+  /** 🔒 يُنادى عند حذف قناة — لو كانت قناة تذكرة نُحدّها «خصافة محذوفة» حتى ما تحتسب مستقبلاً */
+  async cleanupTicketByDeletedChannel(channelId: string, guildId?: string): Promise<void> {
+    try {
+      const filter: any = { channelId, status: { $in: ['open', 'claimed', 'waiting'] } };
+      if (guildId) filter.guildId = guildId;
+      await TicketModel.updateOne(
+        filter,
+        {
+          $set: {
+            status: 'closed',
+            closeReason: 'تم حذف القناة',
+            closedAt: new Date(),
+          },
+        }
+      );
+    } catch (err: any) {
+      logger.warn(`Ticket cleanup on channel deletion failed: ${err?.message || err}`);
+    }
+  }
+
   async createTicketCategory(guild: Guild, name: string): Promise<CategoryChannel> {
     const existingCategory = guild.channels.cache.find(
       c => c.type === ChannelType.GuildCategory && c.name === name
@@ -307,6 +327,45 @@ export class TicketHandler {
       userId: user.id,
       status: { $in: ['open', 'claimed', 'waiting'] },
     });
+
+    // 🧹 تنظيف التذاكر «الشبح» — أي تذكرة مسجّلة مفتوحة لكن قناتها انحذفت نغلقها تلقائياً
+    // حتى لا يظل المستخدم محظور من فتح تذكرة جديدة لسبب وهمي
+    const stale: typeof userTickets = [];
+    for (const ticket of [...userTickets]) {
+      let exists = guild.channels.cache.has(ticket.channelId);
+      if (!exists) {
+        try {
+          const fetched = await guild.channels.fetch(ticket.channelId).catch(() => null);
+          exists = !!fetched;
+        } catch {
+          exists = false;
+        }
+      }
+      if (!exists) stale.push(ticket);
+    }
+    if (stale.length > 0) {
+      await TicketModel.updateMany(
+        { _id: { $in: stale.map(t => t._id) } },
+        {
+          $set: {
+            status: 'closed',
+            closeReason: 'القناة محذوفة — تنظيف تلقائي',
+            closedAt: new Date(),
+          },
+        }
+      ).catch((err: any) => logger.warn(`Ticket stale cleanup failed: ${err?.message || err}`));
+      for (const s of stale) {
+        const idx = userTickets.indexOf(s);
+        if (idx !== -1) userTickets.splice(idx, 1);
+      }
+    }
+
+    // 🧹 لو القنوات موجودة لكن التذكرة مربوطة بقناة قديمة من سيرفر آخر، تجاهلها كمان
+    const unrelated = userTickets.filter((t: any) => t?.guildId && String(t.guildId) !== String(guild.id));
+    for (const uTicket of unrelated) {
+      const idx = userTickets.indexOf(uTicket);
+      if (idx !== -1) userTickets.splice(idx, 1);
+    }
 
     if (userTickets.length >= settings.tickets.maxPerUser) {
       throw new Error(`لديك بالفعل ${userTickets.length} تذاكر مفتوحة. الحد الأقصى هو ${settings.tickets.maxPerUser}`);
