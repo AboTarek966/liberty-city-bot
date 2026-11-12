@@ -457,6 +457,33 @@ registerTool('get_server_info', {
         };
     },
 });
+registerTool('find_channel', {
+    description: 'البحث عن قناة في السيرفر باسمها/وصفها — يرجّع منشن القناة',
+    adminOnly: false,
+    params: {
+        query: { type: 'string', description: 'اسم القناة أو جزء منه أو كلمة من توبك القناة', required: true },
+    },
+    async func({ guild }, { query }) {
+        const raw = String(query || '').trim().toLowerCase();
+        if (!raw)
+            return { success: false, message: '❌ اكتب اسم القناة أو جزء منه' };
+        const normalized = raw.replace(/[-_]/g, ' ');
+        const results = [];
+        for (const ch of guild.channels.cache.values()) {
+            const name = ch.name.toLowerCase();
+            const topic = ('topic' in ch ? String(ch.topic || '') : '').toLowerCase();
+            const category = ch.parent ? guild.channels.cache.get(ch.parentId ?? ch.parent?.id)?.name?.toLowerCase() || '' : '';
+            const hay = `${name.replace(/[-_]/g, ' ')} ${topic.replace(/[-_]/g, ' ')} ${category}`.trim();
+            const match = hay.includes(normalized);
+            if (match && ch.isTextBased() && results.length < 8)
+                results.push(ch);
+        }
+        if (!results.length)
+            return { success: false, message: `❌ لم أجد قناة مطابقة لـ «${query}»` };
+        const message = results.map(r => `<#${r.id}> — **${r.name}**${('topic' in r && r.topic) ? ` — ${String(r.topic).slice(0, 140)}` : ''}`).join('\n');
+        return { success: true, message: `🔎 **قنوات مطابقة لـ «${query}»:**\n${message}`, data: results.map(r => r.id) };
+    },
+});
 registerTool('get_user_info', {
     description: 'جلب معلومات عضو',
     adminOnly: false,
@@ -3529,7 +3556,7 @@ function getToolsDescription() {
         '🎵 موسيقى': ['music_play', 'music_skip', 'music_stop', 'music_pause', 'music_resume', 'music_volume', 'music_shuffle', 'music_leave', 'music_queue'],
         '🎫 تذاكر/سحب': ['open_ticket', 'add_ticket_member', 'claim_ticket', 'close_ticket', 'close_current_ticket', 'giveaway_create', 'giveaway_end', 'giveaway_set_winner', 'list_giveaways'],
         '🤖 البوت': ['set_bot_status', 'set_bot_avatar', 'set_bot_nickname'],
-        '📊 معلومات': ['get_server_info', 'get_user_info', 'check_security_status'],
+        '📊 معلومات': ['get_server_info', 'find_channel', 'get_user_info', 'check_security_status'],
         '⚙️ إعدادات': ['toggle_protection', 'create_backup', 'restore_backup', 'run_security_scan'],
     };
     const line = (t) => {

@@ -1501,9 +1501,12 @@ class AIHandler {
         const guild = this.client.guilds.cache.get(guildId);
         if (guild) {
             const textChannels = guild.channels.cache
-                .filter(c => c.type === discord_js_1.ChannelType.GuildText)
-                .map(c => `#${c.name}`)
-                .slice(0, 15);
+                .filter(c => [discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement, discord_js_1.ChannelType.GuildForum, discord_js_1.ChannelType.GuildVoice].includes(c.type))
+                .map(c => {
+                const t = 'topic' in c ? String(c.topic || '') : '';
+                return `#${c.name}${t ? ` — ${t.slice(0, 80)}` : ''}`;
+            })
+                .slice(0, 40);
             const roleNames = guild.roles.cache
                 .filter(r => r.name !== '@everyone')
                 .map(r => r.name)

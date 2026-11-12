@@ -1598,9 +1598,12 @@ export class AIHandler {
     const guild = this.client.guilds.cache.get(guildId);
     if (guild) {
       const textChannels = guild.channels.cache
-        .filter(c => c.type === ChannelType.GuildText)
-        .map(c => `#${c.name}`)
-        .slice(0, 15);
+        .filter(c => [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum, ChannelType.GuildVoice].includes(c.type))
+        .map(c => {
+          const t = 'topic' in c ? String((c as any).topic || '') : '';
+          return `#${c.name}${t ? ` — ${t.slice(0, 80)}` : ''}`;
+        })
+        .slice(0, 40);
       const roleNames = guild.roles.cache
         .filter(r => r.name !== '@everyone')
         .map(r => r.name)
