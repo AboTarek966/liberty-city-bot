@@ -101,17 +101,16 @@ const handler: SelectMenuHandler = {
             return;
           }
 
-          const isOwner = ticket.userId === selectInteraction.user.id;
-          const canManage = member.permissions.has(PermissionFlagsBits.ManageChannels);
-          if (!isOwner && !canManage) {
-            await selectInteraction.editReply({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة' });
+          // الإغلاق لفريق الدعم/الإدارة فقط
+          if (!(await client.ticketHandler.isStaff(member))) {
+            await selectInteraction.editReply({ content: '❌ إغلاق التذاكر متاح لفريق الدعم والإدارة فقط' });
             return;
           }
 
           await client.ticketHandler.closeTicket(
             selectInteraction.channelId,
             member,
-            isOwner ? 'أُغلقت بواسطة صاحب التذكرة' : 'أُغلقت بواسطة المشرف'
+            'أُغلقت بواسطة فريق الدعم'
           );
           await selectInteraction.editReply({ content: '🔒 تم إغلاق التذكرة بنجاح' });
           break;
@@ -125,10 +124,9 @@ const handler: SelectMenuHandler = {
             return;
           }
 
-          const isOwner = ticket.userId === selectInteraction.user.id;
-          const canManage = member.permissions.has(PermissionFlagsBits.ManageChannels);
-          if (!isOwner && !canManage) {
-            await selectInteraction.editReply({ content: '❌ ليس لديك صلاحية لحذف هذه التذكرة' });
+          // الحذف النهائي لفريق الدعم/الإدارة فقط
+          if (!(await client.ticketHandler.isStaff(member))) {
+            await selectInteraction.editReply({ content: '❌ حذف التذاكر متاح لفريق الدعم والإدارة فقط' });
             return;
           }
 

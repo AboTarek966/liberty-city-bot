@@ -3,7 +3,6 @@
 // Omni Bot - Ticket Close Modal Handler
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const handler = {
     id: 'ticket_close_modal',
@@ -20,17 +19,15 @@ const handler = {
                 await interaction.followUp({ content: '❌ لم يتم العثور على التذكرة', ephemeral: true });
                 return;
             }
-            // التحقق من الصلاحيات
+            // التحقق من الصلاحيات — الإغلاق لفريق الدعم/الإدارة فقط
             const member = interaction.guild.members.cache.get(interaction.user.id) ??
                 await interaction.guild.members.fetch(interaction.user.id);
-            const isOwner = ticket.userId === interaction.user.id;
-            const canManage = member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels);
-            if (!isOwner && !canManage) {
-                await interaction.followUp({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة', ephemeral: true });
+            const client = interaction.client;
+            if (!(await client.ticketHandler.isStaff(member))) {
+                await interaction.followUp({ content: '❌ إغلاق التذاكر متاح لفريق الدعم والإدارة فقط', ephemeral: true });
                 return;
             }
             const reason = interaction.fields.getTextInputValue('reason').trim() || 'غير محدد';
-            const client = interaction.client;
             await client.ticketHandler.closeTicket(ticket.channelId, member, reason);
             // لا نرد هنا لأن closeTicket ترسل رسالة في القناة مع الأزرار
         }

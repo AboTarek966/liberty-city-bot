@@ -343,13 +343,10 @@ async function handleClose(interaction, client) {
         });
         return;
     }
-    // Check permissions (ticket creator or support role)
-    const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
-    const isSupport = settings.tickets.supportRoleIds.some((r) => member.roles.cache.has(r));
-    const isCreator = ticket.userId === interaction.user.id;
-    if (!isSupport && !isCreator && !member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+    // 🔐 الإغلاق لفريق الدعم/الإدارة فقط — صاحب التذكرة لا يغلقها بنفسه
+    if (!(await client.ticketHandler.isStaff(member))) {
         await interaction.editReply({
-            content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة',
+            content: '❌ إغلاق التذاكر متاح لفريق الدعم والإدارة فقط',
         });
         return;
     }

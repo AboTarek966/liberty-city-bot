@@ -2,7 +2,7 @@
 // Omni Bot - Ticket Delete Button
 // ============================================
 
-import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
+import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
 import { Ticket } from '../../models';
@@ -32,11 +32,10 @@ const handler: ButtonHandler = {
 
       const member = interaction.guild.members.cache.get(interaction.user.id) ??
         await interaction.guild.members.fetch(interaction.user.id);
-      const isOwner = ticket.userId === interaction.user.id;
-      const canManage = member.permissions.has(PermissionFlagsBits.ManageChannels);
 
-      if (!isOwner && !canManage) {
-        await interaction.editReply({ content: '❌ ليس لديك صلاحية لحذف هذه التذكرة' });
+      // 🔐 الحذف النهائي لفريق الدعم/الإدارة فقط — صاحب التذكرة لا يحذفها
+      if (!(await client.ticketHandler.isStaff(member))) {
+        await interaction.editReply({ content: '❌ حذف التذاكر متاح لفريق الدعم والإدارة فقط' });
         return;
       }
 

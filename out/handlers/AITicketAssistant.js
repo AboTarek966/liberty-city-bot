@@ -172,21 +172,12 @@ class AITicketAssistant {
                 return;
             if (['closed', 'deleted'].includes(String(ticket.status)))
                 return;
-            // 🔒 طلب قفل/إغلاق التذكرة من داخل التذكرة نفسها — أي مسؤول/صاحب التذكرة يقدر يطلبها (بدون ID)
+            // 🔒 طلب قفل/إغلاق التذكرة من داخل التذكرة نفسها — فريق الدعم/الإدارة فقط
             if (this.isCloseIntent(message.content || '')) {
                 const member = message.member;
-                const guild = channel.guild;
-                const settings = await (0, models_1.getGuildSettings)(guild.id).catch(() => null);
-                const isSupport = !!settings?.tickets?.supportRoleIds?.some((r) => member?.roles.cache.has(r));
-                const isAdminRole = !!settings?.tickets?.adminRoleIds?.some((r) => member?.roles.cache.has(r));
-                const isCreator = String(ticket.userId) === message.author.id;
-                const canClose = isCreator ||
-                    isSupport ||
-                    isAdminRole ||
-                    member?.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
-                    member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+                const canClose = !!member && (await this.client.ticketHandler.isStaff(member));
                 if (!canClose) {
-                    await message.reply({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة — يملكها فريق الدعم أو صاحب التذكرة فقط.' }).catch(() => { });
+                    await message.reply({ content: '❌ إغلاق التذاكر متاح لفريق الدعم والإدارة فقط.' }).catch(() => { });
                     return;
                 }
                 try {

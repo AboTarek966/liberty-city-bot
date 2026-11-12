@@ -2,7 +2,7 @@
 // Omni Bot - Ticket Close Button
 // ============================================
 
-import { ButtonInteraction, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
+import { ButtonInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
 import { Ticket } from '../../models';
@@ -20,14 +20,12 @@ const handler: ButtonHandler = {
         return;
       }
 
-      // التحقق من الصلاحيات
+      // التحقق من الصلاحيات — الإغلاق لفريق الدعم/الإدارة فقط
       const member = interaction.guild.members.cache.get(interaction.user.id) ??
         await interaction.guild.members.fetch(interaction.user.id);
-      const isOwner = ticket.userId === interaction.user.id;
-      const canManage = member.permissions.has(PermissionFlagsBits.ManageChannels);
 
-      if (!isOwner && !canManage) {
-        await interaction.reply({ content: '❌ ليس لديك صلاحية لإغلاق هذه التذكرة', ephemeral: true });
+      if (!(await client.ticketHandler.isStaff(member))) {
+        await interaction.reply({ content: '❌ إغلاق التذاكر متاح لفريق الدعم والإدارة فقط', ephemeral: true });
         return;
       }
 

@@ -91,6 +91,50 @@ export interface ReopenAccessArgs {
   adminRoleIds?: string[] | null;
 }
 
+// --------------------------------------------
+// صلاحية إدارة التذكرة (إغلاق/حذف) — فريق الدعم والإدارة فقط
+// --------------------------------------------
+export interface StaffAccessArgs {
+  member: {
+    id: string;
+    permissions?: { has: (p: bigint) => boolean };
+    roles?: { cache?: { has: (id: string) => boolean } };
+  };
+  guildOwnerId?: string;
+  supportRoleIds?: string[] | null;
+  adminRoleIds?: string[] | null;
+}
+
+export function isTicketStaff(args: StaffAccessArgs): boolean {
+  const { member, guildOwnerId } = args;
+
+  // رولات فريق الدعم + رولات الإدارة العليا
+  const staffRoles = [...(args.supportRoleIds || []), ...(args.adminRoleIds || [])];
+  if (staffRoles.length > 0) {
+    const hasRole = staffRoles.some((roleId) => {
+      try {
+        return !!member.roles?.cache?.has(roleId);
+      } catch {
+        return false;
+      }
+    });
+    if (hasRole) return true;
+  }
+
+  // صلاحيات رفعية (بما فيها Administrator)
+  try {
+    if (member.permissions?.has(PermissionFlagsBits.ManageChannels)) return true;
+    if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  } catch {
+    /* bitfield غير صالح — تجاهل */
+  }
+
+  // صاحب السيرفر لا يُعلَّق أبداً
+  if (guildOwnerId && guildOwnerId === member.id) return true;
+
+  return false;
+}
+
 export function canReopenTicket(args: ReopenAccessArgs): boolean {
   const { ticket, member, guildOwnerId } = args;
 
@@ -137,6 +181,17 @@ export class TicketHandler {
 
   constructor(client: OmniClient) {
     this.client = client;
+  }
+
+  /** 🛡️ هل العضو من فريق الدعم/الإدارة؟ (إغلاق/حذف التذاكر مقصور عليهم) */
+  async isStaff(member: GuildMember): Promise<boolean> {
+    const settings = await getGuildSettings(member.guild.id);
+    return isTicketStaff({
+      member,
+      guildOwnerId: member.guild.ownerId,
+      supportRoleIds: settings.tickets.supportRoleIds,
+      adminRoleIds: settings.tickets.adminRoleIds,
+    });
   }
 
   // --------------------------------------------
@@ -544,6 +599,11 @@ export class TicketHandler {
     const channel = guild.channels.cache.get(channelId) as TextChannel;
     if (!channel) throw new Error('لم يتم العثور على القناة');
 
+    // 🔐 الإغلاق لفريق الدعم/الإدارة فقط — البوت مستثنى (الإغلاق التلقائي)
+    if (!closedBy.user.bot && !(await this.isStaff(closedBy))) {
+      throw new Error('إغلاق التذاكر متاح لفريق الدعم والإدارة فقط');
+    }
+
     const transcript = await this.generateTranscript(channel);
 
     ticket.status = 'closed';
@@ -700,6 +760,11 @@ export class TicketHandler {
   async deleteTicket(channelId: string, deletedBy: GuildMember): Promise<void> {
     const ticket = await TicketModel.findOne({ channelId });
     if (!ticket) throw new Error('لم يتم العثور على التذكرة');
+
+    // 🔐 الحذف النهائي لفريق الدعم/الإدارة فقط — لا يستطيع صاحب التذكرة حذفها
+    if (!deletedBy.user.bot && !(await this.isStaff(deletedBy))) {
+      throw new Error('حذف التذاكر متاح لفريق الدعم والإدارة فقط');
+    }
 
     const guild = deletedBy.guild;
     const channel = guild.channels.cache.get(channelId) as TextChannel;

@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TicketHandler = exports.DEFAULT_TICKET_TYPES = void 0;
+exports.isTicketStaff = isTicketStaff;
 exports.canReopenTicket = canReopenTicket;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
@@ -18,6 +19,37 @@ exports.DEFAULT_TICKET_TYPES = [
     { label: 'استفسار', description: 'للاستفسارات العامة', emoji: '❓' },
     { label: 'إبلاغ', description: 'للإبلاغ عن مشكلة', emoji: '⚠️' },
 ];
+function isTicketStaff(args) {
+    const { member, guildOwnerId } = args;
+    // رولات فريق الدعم + رولات الإدارة العليا
+    const staffRoles = [...(args.supportRoleIds || []), ...(args.adminRoleIds || [])];
+    if (staffRoles.length > 0) {
+        const hasRole = staffRoles.some((roleId) => {
+            try {
+                return !!member.roles?.cache?.has(roleId);
+            }
+            catch {
+                return false;
+            }
+        });
+        if (hasRole)
+            return true;
+    }
+    // صلاحيات رفعية (بما فيها Administrator)
+    try {
+        if (member.permissions?.has(discord_js_1.PermissionFlagsBits.ManageChannels))
+            return true;
+        if (member.permissions?.has(discord_js_1.PermissionFlagsBits.Administrator))
+            return true;
+    }
+    catch {
+        /* bitfield غير صالح — تجاهل */
+    }
+    // صاحب السيرفر لا يُعلَّق أبداً
+    if (guildOwnerId && guildOwnerId === member.id)
+        return true;
+    return false;
+}
 function canReopenTicket(args) {
     const { ticket, member, guildOwnerId } = args;
     // من أغلقها يعاد فتحها دائماً
@@ -63,6 +95,16 @@ class TicketHandler {
     ticketLogQueues = new Map();
     constructor(client) {
         this.client = client;
+    }
+    /** 🛡️ هل العضو من فريق الدعم/الإدارة؟ (إغلاق/حذف التذاكر مقصور عليهم) */
+    async isStaff(member) {
+        const settings = await (0, models_1.getGuildSettings)(member.guild.id);
+        return isTicketStaff({
+            member,
+            guildOwnerId: member.guild.ownerId,
+            supportRoleIds: settings.tickets.supportRoleIds,
+            adminRoleIds: settings.tickets.adminRoleIds,
+        });
     }
     // --------------------------------------------
     // بناء عناصر التحكم داخل التذكرة:
@@ -421,6 +463,10 @@ class TicketHandler {
         const channel = guild.channels.cache.get(channelId);
         if (!channel)
             throw new Error('لم يتم العثور على القناة');
+        // 🔐 الإغلاق لفريق الدعم/الإدارة فقط — البوت مستثنى (الإغلاق التلقائي)
+        if (!closedBy.user.bot && !(await this.isStaff(closedBy))) {
+            throw new Error('إغلاق التذاكر متاح لفريق الدعم والإدارة فقط');
+        }
         const transcript = await this.generateTranscript(channel);
         ticket.status = 'closed';
         ticket.closedBy = closedBy.id;
@@ -556,6 +602,10 @@ class TicketHandler {
         const ticket = await models_1.Ticket.findOne({ channelId });
         if (!ticket)
             throw new Error('لم يتم العثور على التذكرة');
+        // 🔐 الحذف النهائي لفريق الدعم/الإدارة فقط — لا يستطيع صاحب التذكرة حذفها
+        if (!deletedBy.user.bot && !(await this.isStaff(deletedBy))) {
+            throw new Error('حذف التذاكر متاح لفريق الدعم والإدارة فقط');
+        }
         const guild = deletedBy.guild;
         const channel = guild.channels.cache.get(channelId);
         // Save transcript before deleting

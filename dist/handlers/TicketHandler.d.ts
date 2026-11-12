@@ -58,6 +58,23 @@ export interface ReopenAccessArgs {
     supportRoleIds?: string[] | null;
     adminRoleIds?: string[] | null;
 }
+export interface StaffAccessArgs {
+    member: {
+        id: string;
+        permissions?: {
+            has: (p: bigint) => boolean;
+        };
+        roles?: {
+            cache?: {
+                has: (id: string) => boolean;
+            };
+        };
+    };
+    guildOwnerId?: string;
+    supportRoleIds?: string[] | null;
+    adminRoleIds?: string[] | null;
+}
+export declare function isTicketStaff(args: StaffAccessArgs): boolean;
 export declare function canReopenTicket(args: ReopenAccessArgs): boolean;
 export declare class TicketHandler {
     private client;
@@ -66,6 +83,8 @@ export declare class TicketHandler {
     /** ⚡ طابور إرسال سجلات التذاكر لكل سيرفر — ترتيب تام + لا يعطّل مسار التذكرة */
     private ticketLogQueues;
     constructor(client: OmniClient);
+    /** 🛡️ هل العضو من فريق الدعم/الإدارة؟ (إغلاق/حذف التذاكر مقصور عليهم) */
+    isStaff(member: GuildMember): Promise<boolean>;
     buildTicketControls(claimed: boolean, claimedByBot?: boolean): ActionRowBuilder<any>[];
     /** 🔒 يُنادى عند حذف قناة — لو كانت قناة تذكرة نُحدّها «خصافة محذوفة» حتى ما تحتسب مستقبلاً */
     cleanupTicketByDeletedChannel(channelId: string, guildId?: string): Promise<void>;
