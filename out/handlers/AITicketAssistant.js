@@ -351,11 +351,12 @@ ${this.personaBlock(aiConfig)}
             catch (error) {
                 logger.warn(`AI claim permission update failed: ${error.message}`);
             }
+            const ownerPing = ticket.userId ? `<@${ticket.userId}>` : '';
             const embed = new discord_js_1.EmbedBuilder()
-                .setTitle('🤖 AI Assistant — استلام التذكرة')
-                .setDescription('تم استلام التذكرة تلقائياً بواسطة الذكاء الاصطناعي. جاري تحليل المشكلة...')
+                .setTitle('🤖 مساعد الدعم — استلام التذكرة')
+                .setDescription(`أهلاً ${ownerPing || ''}! أنا استلمت تذكرتك الآن.\nاكتب وصف المشكلة بالتفصيل وأنا على طول أبدأ أحلها.`)
                 .setColor(0x5865f2)
-                .setFooter({ text: `${channel.guild.name} • AI Ticket Assistant` })
+                .setFooter({ text: `${channel.guild.name} • مساعد الدعم` })
                 .setTimestamp();
             await channel.send({ embeds: [embed] }).catch(() => { });
             // 🤖 تحديث الأزرار: استلام من البوت + إلغاء استلام البوت (للمسؤول فقط)
@@ -398,7 +399,18 @@ ${this.personaBlock(aiConfig)}
                     .setTimestamp();
                 await channel.send({ embeds: [embed] }).catch(() => { });
                 logger.info(`AI auto-response sent in ${channel.guild.name}`);
+                return;
             }
+            // 🆘 لو الذكاء فشل/ما ردش — نرسل رسالة ودودة ثابتة بدل ما تسيب العضو صامت
+            const fallback = new discord_js_1.EmbedBuilder()
+                .setTitle('🤖 مساعد الدعم')
+                .setDescription(`أهلاً! أنا استلمت تذكرتك الآن.\n` +
+                `اكتب وصف المشكلة بالتفصيل (مع أيصور أو ملفات لو فيه حاجة) وأنا على طول أبدأ أحلها.`)
+                .setColor(0x5865f2)
+                .setFooter({ text: `${channel.guild.name} • مساعد الدعم` })
+                .setTimestamp();
+            await channel.send({ embeds: [fallback] }).catch(() => { });
+            logger.warn(`AI auto-response fallback sent in ${channel.guild.name} (AI returned empty content)`);
         }
         catch (error) {
             logger.warn(`Auto-response failed: ${error.message}`);
