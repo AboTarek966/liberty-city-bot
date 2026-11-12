@@ -2295,20 +2295,25 @@ export class AIHandler {
   // Security Filter
   // --------------------------------------------
   private containsSensitiveContent(message: string, keywords: string[] = []): boolean {
-    const defaultSensitive = [
-      'password', 'كلمة مرور', 'كلمة السر', 'باسورد',
-      'token', 'توكن', 'api key', 'مفتاح',
-      'credit card', 'بطاقة ائتمان', 'رقم بطاقة',
-      'ssn', 'رقم وطني', 'هوية',
-      'address', 'عنوان سكن', 'موقع سكن',
-      'phone', 'رقم هاتف', 'جوال',
-      'email', 'بريد إلكتروني', 'إيميل',
+    const lower = message.toLowerCase();
+    // ✅ فقط أنماط أسرار واضحة — الكلمات العادية مثل «مفتاح الباب» أو «إيميل» لا تُعتبر حساسة
+    const patterns = [
+      /\bpasswords?\b/i,
+      /\bpass\b/i,
+      /باسورد/i,
+      /كلمة\s*(المرور|السر)/i,
+      /كلمة مرور/i,
+      /api[- ]?key/i,
+      /sk-[A-Za-z0-9_-]{10,}/i,
+      /rk-[A-Za-z0-9_-]{10,}/i,
+      /(^|\s)(secret)\s/i,
+      /\bsecret\b/i,
+      /credit\s*card|بطاقة\s*ائتمان|رقم\s*البطاقة/i,
+      /\bssn\b|social\s*security|الهوية\s*الوطنية|رقم\s*وطني/i,
+      /\b(cvv|ccv)\b/i,
+      /\btokent|توكن\b/i,
     ];
-
-    const allKeywords = [...defaultSensitive, ...keywords];
-    const lowerMessage = message.toLowerCase();
-
-    return allKeywords.some(keyword => lowerMessage.includes(keyword.toLowerCase()));
+    return patterns.some(p => p.test(lower)) || keywords.some(k => k && k.length > 3 && lower.includes(k.toLowerCase()));
   }
 
   // --------------------------------------------
