@@ -108,6 +108,8 @@ export declare class AIHandler {
     private looksLikeActionRequest;
     /** سؤال عن قدرات البوت/الأدوات → يكفي ضمّ [ACTIONS] القصيرة بدل إلغائها */
     private looksLikeCapabilityQuestion;
+    /** 👋 تحية بسيطة → رد فوري محلي بدون استدعاء أي مزوّد */
+    private fastGreeting;
     /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
     private buildForceToolPrompt;
     /** تنفيذ أداة البحث/الجلب وإرجاع نص النتيجة أو نص فشل مُعلَّم */

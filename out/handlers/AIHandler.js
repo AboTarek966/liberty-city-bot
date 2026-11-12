@@ -261,6 +261,13 @@ class AIHandler {
             const shouldRespond = fromCommand || isMention || repliedToBot || !guildId || (guildId && await this.shouldAutoReply(guildId, channelId, message));
             if (!shouldRespond)
                 return null;
+            // 👋 رد فوري للتحيات البسيطة — بدون استدعاء مزوّد AI (0 ثوانٍ)
+            const directGreeting = this.fastGreeting(message);
+            if (directGreeting) {
+                this.cooldowns.set(cooldownKey, now);
+                await this.saveHistory(userId, guildId || 'dm', message, directGreeting.content);
+                return directGreeting;
+            }
             // Check sensitive keywords (الإداريين يتجاوزون الفلتر - فالذكاء الاصطناعي لا يملك أي أسرار حقيقية)
             if (!userContext?.isPrivileged && this.containsSensitiveContent(message, aiConfig.sensitiveKeywords)) {
                 return {
@@ -1124,6 +1131,33 @@ class AIHandler {
         const t = (text || '').toLowerCase();
         return /(وش|ايش|شنو|شو|ماذا|إيه|ايه|كيف)[^؟?\n]{0,25}(تعمل|تسوي|تنفذ|تقدر|تستطيع)|قدرات(ك)?|إمكانيات(ك)?|ماذا تستطيع|what can you|capabilities|how can you help/i.test(t);
     }
+    /** 👋 تحية بسيطة → رد فوري محلي بدون استدعاء أي مزوّد */
+    fastGreeting(text) {
+        const t = (text || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').toLowerCase().trim().replace(/\s+/g, ' ');
+        if (!t || t.length > 40)
+            return null;
+        // علامات التحية العربية/الإنجليزية — نكتفي بأقل من 4 كلمات ولا تتضمن أوامر تنفيذ
+        const greetings = [
+            'سلام', 'أهلا', 'مرحبا', 'صباح الخير', 'صباحو', 'صباح النور', 'مساء الخير', 'مساءو', 'مساء النور',
+            'هاي', 'هلو', 'أهلاً', 'hello', 'hi', 'hey', 'good morning', 'good evening',
+        ];
+        const words = t.split(' ').filter(Boolean);
+        const greet = words.find(w => greetings.includes(w));
+        if (!greet || words.length > 4)
+            return null;
+        // لو فيها أي أمر تنفيذ/استدعاء → نرجع للـ AI
+        if (/(غيّر|غير|سوي|اعمل|احذف|اطرد|امنع|ارسل|أغلق|ابعت|اعطي|احظر|ادعم|زوّد|أنشئ|جهز)/.test(t))
+            return null;
+        const replies = [
+            `أهلاً 👋`,
+            `أهلاً! كيف أقدر أساعدك اليوم؟`,
+            `أهلاً بيك! موجود عشانك`,
+            `هلا! تفضل`,
+            `أهلاً وسهلاً`,
+        ];
+        const reply = replies[Math.floor(Math.random() * replies.length)];
+        return { content: reply, tokensUsed: 0, model: 'fast-greeting', fallback: true };
+    }
     /** رسالة إجبار النموذج على إخراج استدعاء أداة واحد فقط بعد ردّ ادّعى التنفيذ بلا أداة */
     buildForceToolPrompt(userMessage, previousReply) {
         return (`⚠️ نظام: طلب المستخدم التالي يتطلب تنفيذاً فعلياً في السيرفر، لكن ردك السابق لم يتضمن أي استدعاء أداة.\n` +
@@ -1395,11 +1429,11 @@ class AIHandler {
                 preferred = ['groq'];
                 break;
             case 'both':
-                preferred = customAvailable ? ['custom', 'openrouter', 'requesty', 'gemini', 'anthropic', 'openai'] : ['openrouter', 'requesty', 'gemini', 'anthropic', 'openai'];
+                preferred = customAvailable ? ['custom', 'groq', 'openrouter', 'requesty', 'gemini', 'anthropic', 'openai'] : ['groq', 'openrouter', 'requesty', 'gemini', 'anthropic', 'openai'];
                 break;
             default: preferred = customAvailable
-                ? ['custom', 'openrouter', 'requesty', 'groq', 'gemini', 'anthropic', 'openai']
-                : ['openrouter', 'requesty', 'groq', 'gemini', 'anthropic', 'openai']; // auto: ernie الأسرع أولاً ثم Requesty (200/يوم) كاحتياطي
+                ? ['custom', 'groq', 'openrouter', 'requesty', 'gemini', 'anthropic', 'openai']
+                : ['groq', 'openrouter', 'requesty', 'gemini', 'anthropic', 'openai']; // auto: Groq أسرع (200k token/يوم)، ثم OpenRouter المجاني
         }
         const primary = preferred.filter(p => available.includes(p));
         const failover = available.filter(p => !primary.includes(p));
