@@ -2378,7 +2378,7 @@ export function buildProtectionChannelOverridePanel(
   rows.push(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       btn('settings_btn:protection:channels', 'رجوع لقنوات الحماية', ButtonStyle.Secondary, '↩️'),
-      btn('settings_btn:protection:clear_channel', 'مسح استثناءات هذه القناة', ButtonStyle.Danger, '🧹')
+      btn(`settings_btn:protection:clear_channel:${channelId}`, 'مسح استثناءات هذه القناة', ButtonStyle.Danger, '🧹')
     )
   );
 

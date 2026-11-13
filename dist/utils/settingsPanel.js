@@ -1605,7 +1605,7 @@ function buildProtectionChannelOverridePanel(guild, s, channelId) {
     for (let i = 0; i < buttons.length; i += 5) {
         rows.push(new discord_js_1.ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
     }
-    rows.push(new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:protection:channels', 'رجوع لقنوات الحماية', discord_js_1.ButtonStyle.Secondary, '↩️'), btn('settings_btn:protection:clear_channel', 'مسح استثناءات هذه القناة', discord_js_1.ButtonStyle.Danger, '🧹')));
+    rows.push(new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:protection:channels', 'رجوع لقنوات الحماية', discord_js_1.ButtonStyle.Secondary, '↩️'), btn(`settings_btn:protection:clear_channel:${channelId}`, 'مسح استثناءات هذه القناة', discord_js_1.ButtonStyle.Danger, '🧹')));
     return { embeds: [embed], components: rows };
 }
 //# sourceMappingURL=settingsPanel.js.map
