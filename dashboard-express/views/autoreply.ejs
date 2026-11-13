@@ -141,7 +141,9 @@
 
     // ضغط داخل المتصفح — يقلل الحجم قبل إرساله للبوت/قاعدة البيانات
     const compressImage = async (file) => {
-      if (!file.type || !file.type.startsWith('image/')) throw new Error('اختر ملف صورة صالح');
+      if (!(file.type && file.type.startsWith('image/')) && !/\.(png|jpe?g|webp|gif)$/i.test(file.name || '')) {
+        throw new Error('اختر ملف صورة صالح (JPG/PNG/WebP/GIF)');
+      }
       if (file.size > 12 * 1024 * 1024) throw new Error('حجم الصورة أكبر من 12MB');
       const img = await loadImageFile(file);
       const attempts = [[1280, 0.85], [1100, 0.72], [900, 0.6], [720, 0.52]];
