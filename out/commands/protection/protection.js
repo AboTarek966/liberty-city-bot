@@ -471,11 +471,11 @@ async function configureAntiBot(interaction, settings) {
         if (!add.bot) {
             note = `ℹ️ \`${add.tag}\` ليس بوتاً — للبوتات استخدم /whitelist، وهذا الاستثناء الوقائي يشمل الأعضاء أيضاً`;
         }
-        // 🔒 إضافة بوت للاستثناء الوقائي لآلة مضاد البوتات = مالك البوت أو مالك السيرفر فقط
-        if (add.bot && !(0, whitelist_1.canManageBotWhitelist)(interaction.guild, interaction.user.id)) {
+        // 🔒 إضافة أي شخص للاستثناء الوقائي = مالك البوت أو صاحب أعلى رول في السيرفر فقط
+        if (!(await (0, whitelist_1.canManageWhitelist)(interaction.client, interaction.guild, interaction.user.id))) {
             await interaction.editReply({
-                content: '🔒 **إضافة بوت لهذه القائمة محصورة بمالك البوت ومالك السيرفر فقط**\n' +
-                    'تواصل مع 👑 مالك السيرفر أو 🛠️ مالك البوت لإضافة أي بوت.',
+                content: '🔒 **إضافة أي شخص إلى هذه القائمة محصورة بمالك البوت وصاحب أعلى رول في السيرفر فقط**\n' +
+                    'تواصل مع 👑 صاحب أعلى رول أو 🛠️ مالك البوت لإضافة أي شخص.',
             });
             return;
         }
@@ -483,10 +483,10 @@ async function configureAntiBot(interaction, settings) {
             wl.push(add.id);
     }
     if (remove) {
-        // 🔒 إزالة بوت أيضاً محصورة بمالك البوت أو مالك السيرفر فقط
-        if (remove.bot && !(0, whitelist_1.canManageBotWhitelist)(interaction.guild, interaction.user.id)) {
+        // 🔒 إزالة أي شخص أيضاً محصورة بمالك البوت أو صاحب أعلى رول في السيرفر فقط
+        if (!(await (0, whitelist_1.canManageWhitelist)(interaction.client, interaction.guild, interaction.user.id))) {
             await interaction.editReply({
-                content: '🔒 **إزالة بوت من هذه القائمة محصورة بمالك البوت أو مالك السيرفر فقط**',
+                content: '🔒 **إزالة أي شخص من هذه القائمة محصورة بمالك البوت أو صاحب أعلى رول في السيرفر فقط**',
             });
             return;
         }

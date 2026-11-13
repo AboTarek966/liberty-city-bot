@@ -3,16 +3,25 @@
 // Omni Bot - Whitelist Command
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.canManageBotWhitelist = canManageBotWhitelist;
+exports.canManageWhitelist = canManageWhitelist;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const embeds_1 = require("../../utils/embeds");
-/** 🤖 إضافة/إزالة بوت من الوايت ليست (الاستثناء الوقائي) = حصري لمالك البوت (DEVELOPER_USER_ID) أو مالك السيرفر */
-function canManageBotWhitelist(guild, userId) {
-    const devId = process.env.DEVELOPER_USER_ID;
-    if (devId && userId === devId)
-        return true; // 🛠️ مالك البوت
-    return guild?.ownerId === userId; // 👑 مالك السيرفر
+const botOwner_1 = require("../../utils/botOwner");
+/** 🛡️ إدارة الوايت ليست (إضافة/إزالة) = مالك البوت فقط + صاحب أعلى رول في السيرفر */
+async function canManageWhitelist(client, guild, userId) {
+    // 🛠️ مالك البوت
+    if (await (0, botOwner_1.isBotOwner)(client, userId))
+        return true;
+    // 👑 صاحب أعلى رول في السيرفر (ومنطقي فقط لو السيرفر فيه رول أعلى من @everyone)
+    if (!guild || guild.roles.highest.position <= 0)
+        return false;
+    let member = guild.members.cache.get(userId);
+    if (!member)
+        member = await guild.members.fetch(userId).catch(() => undefined);
+    if (!member)
+        return false;
+    return member.roles.highest.position === guild.roles.highest.position;
 }
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -34,7 +43,8 @@ const command = {
         .setName('toggle')
         .setDescription('تفعيل/تعطيل استثناء الحظر الوقائي')
         .addBooleanOption(option => option.setName('enabled').setDescription('حالة التفعيل').setRequired(true)))
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator)
+        // 🎯 السماح للجميع بفتح الأمر — التحكم الفعلي مضمون في الكود (مالك البوت + أعلى رول فقط)
+        .setDefaultMemberPermissions(0)
         .setDMPermission(false),
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
@@ -59,11 +69,11 @@ const command = {
         if (subcommand === 'add') {
             const user = interaction.options.getUser('user', true);
             const reason = interaction.options.getString('reason') || 'لا يوجد سبب';
-            // 🔒 إضافة بوت للوايت ليست = مالك البوت أو مالك السيرفر فقط
-            if (user.bot && !canManageBotWhitelist(guild, interaction.user.id)) {
+            // 🔒 إضافة أي شخص للوايت ليست = مالك البوت أو صاحب أعلى رول في السيرفر فقط
+            if (!(await canManageWhitelist(interaction.client, guild, interaction.user.id))) {
                 await interaction.editReply({
-                    content: '🔒 **إضافة بوت إلى القائمة البيضاء محصورة بمالك البوت فقط ومالك السيرفر**\n' +
-                        'إذا كنت تحتاج استثناء بوت معين، تواصل مع 👑 مالك السيرفر أو 🛠️ مالك البوت.',
+                    content: '🔒 **إضافة أي شخص إلى القائمة البيضاء محصورة بمالك البوت وصاحب أعلى رول في السيرفر فقط**\n' +
+                        'إذا كنت تحتاج استثناء شخص معين، تواصل مع 👑 صاحب أعلى رول أو 🛠️ مالك البوت.',
                 });
                 return;
             }
@@ -104,10 +114,10 @@ const command = {
         }
         if (subcommand === 'remove') {
             const user = interaction.options.getUser('user', true);
-            // 🔒 إزالة بوت من الوايت ليست = مالك البوت أو مالك السيرفر فقط
-            if (user.bot && !canManageBotWhitelist(guild, interaction.user.id)) {
+            // 🔒 إزالة أي شخص من الوايت ليست = مالك البوت أو صاحب أعلى رول في السيرفر فقط
+            if (!(await canManageWhitelist(interaction.client, guild, interaction.user.id))) {
                 await interaction.editReply({
-                    content: '🔒 **إزالة بوت من القائمة البيضاء محصورة بمالك البوت أو مالك السيرفر**',
+                    content: '🔒 **إزالة أي شخص من القائمة البيضاء محصورة بمالك البوت أو صاحب أعلى رول في السيرفر**',
                 });
                 return;
             }

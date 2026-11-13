@@ -407,8 +407,15 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   drawPointer();
   const { data: sampleData } = ctx.getImageData(0, 0, W, H);
 
+  // ترميز GIF (مضمّن مع البوت — لا يعتمد على node_modules في الاستضافة)
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { GIFEncoder, quantize, applyPalette } = require('gifenc');
+  let gifenc: any;
+  try {
+    gifenc = require('./vendor/gifenc');
+  } catch {
+    gifenc = require('gifenc');
+  }
+  const { GIFEncoder, quantize, applyPalette } = gifenc;
   const palette = quantize(sampleData as any, 224);
 
   const gif = GIFEncoder();

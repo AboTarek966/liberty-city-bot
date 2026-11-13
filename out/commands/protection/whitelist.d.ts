@@ -1,7 +1,7 @@
-import { Guild } from 'discord.js';
+import { Guild, Client } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
-/** 🤖 إضافة/إزالة بوت من الوايت ليست (الاستثناء الوقائي) = حصري لمالك البوت (DEVELOPER_USER_ID) أو مالك السيرفر */
-export declare function canManageBotWhitelist(guild: Guild, userId: string): boolean;
+/** 🛡️ إدارة الوايت ليست (إضافة/إزالة) = مالك البوت فقط + صاحب أعلى رول في السيرفر */
+export declare function canManageWhitelist(client: Client, guild: Guild, userId: string): Promise<boolean>;
 declare const command: Command;
 export default command;
 //# sourceMappingURL=whitelist.d.ts.map
