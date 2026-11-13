@@ -1,15 +1,21 @@
 ﻿// ============================================
 // Omni Bot - Roulette (روليت)
 // يختار شخصاً عشوائياً من المذكورين (أو من الأعضاء النشطين)
+// وعجلة الحظ تظهر كصورة متحركة GIF وتستقر على الضحية
 // ============================================
 
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  AttachmentBuilder,
+} from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
+import { renderWheelOfFortuneGif, fetchAvatarBuffer, WheelSegmentInput } from '../../utils/wheelOfFortune';
 
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName('roulette')
-    .setDescription('🔫 لعبة الروليت — البارودة تدور وتُصيب شخصاً واحداً!')
+    .setDescription('🔫 لعبة الروليت — عجلة الحظ تختار ضحية عشوائية من المشاركين!')
     .addUserOption(opt =>
       opt.setName('user').setDescription('أول مشارك').setRequired(false)
     )
@@ -25,17 +31,31 @@ const command: Command = {
     await interaction.deferReply();
 
     // جمع المشاركين (من المنشونات) أو اختيار عشوائي من الأعضاء
-    const players: string[] = [];
+    const players: Array<{ id: string; username: string; avatarUrl?: string }> = [];
+    const mentionMap = new Map<string, { id: string; username: string; avatarUrl?: string }>();
     for (const name of ['user', 'user2', 'user3', 'user4', 'user5']) {
       const u = interaction.options.getUser(name);
-      if (u && !u.bot && !players.includes(u.id)) players.push(u.id);
+      if (u && !u.bot && !mentionMap.has(u.id)) {
+        mentionMap.set(u.id, {
+          id: u.id,
+          username: u.username,
+          avatarUrl: u.displayAvatarURL({ extension: 'png', size: 64 }),
+        });
+      }
     }
+    players.push(...mentionMap.values());
 
     if (players.length < 2) {
       const members = interaction.guild!.members.cache.filter(m => !m.user.bot);
-      const shuffled = shuffleArray(members.map(m => m.id));
+      const shuffled = shuffleArray([...members.values()]);
       players.length = 0;
-      players.push(...shuffled.slice(0, 5));
+      for (const m of shuffled.slice(0, 5)) {
+        players.push({
+          id: m.id,
+          username: m.user.username,
+          avatarUrl: m.user.displayAvatarURL({ extension: 'png', size: 64 }),
+        });
+      }
     }
 
     if (players.length < 2) {
@@ -43,24 +63,68 @@ const command: Command = {
       return;
     }
 
-    const playersLine = players.map(p => `🔘 <@${p}>`).join(' • ');
+    // قرار الفائز منذ البداية — العجلة ستتوقف عليه
+    const victimIndex = Math.floor(Math.random() * players.length);
+    const victim = players[victimIndex];
+    const survivors = players.filter((_, i) => i !== victimIndex);
 
-    await interaction.editReply({ content: `🔫 لعبة الروليت! • المشاركون: ${playersLine} • البارودة تدور...` });
-    await new Promise(r => setTimeout(r, 1500));
-    await interaction.editReply({
-      content: `🔫 اللعبة تدور... 🔊 جرررررخ...`,
-    }).catch(() => {});
-    await new Promise(r => setTimeout(r, 1500));
+    // حمّل الآفاتارات بالتوازي (مع مهلة قصيرة — لا توقف اللعبة عند الفشل)
+    const avatarBuffers = await Promise.all(
+      players.map((p) => (p.avatarUrl ? fetchAvatarBuffer(p.avatarUrl) : Promise.resolve(null)))
+    );
 
-    const victimId = players[Math.floor(Math.random() * players.length)];
-    const survivors = players.filter(p => p !== victimId);
+    const segments: WheelSegmentInput[] = players.map((p, i) => ({
+      label: p.username.slice(0, 12),
+      image: avatarBuffers[i],
+    }));
 
-    await interaction.editReply({
-      content:
-        `💥 البارودة أصابت! 💀 الضحية: <@${victimId}> • ` +
-        `الناجون: ${survivors.map(s => `✅ <@${s}>`).join(' • ') || 'لا أحد'} • ` +
-        `_جرّب حظك مرة أخرى!_`,
-    });
+    const playersLine = players.map(p => `🔘 <@${p.id}>`).join(' • ');
+
+    let gifBuffer: Buffer | null = null;
+    try {
+      gifBuffer = await renderWheelOfFortuneGif({
+        title: 'روليت',
+        subtitle: 'من ستصيبه البارودة؟',
+        segments,
+        winnerIndex: victimIndex,
+        hubText: 'OMNI',
+      });
+    } catch (err: any) {
+      // لو فشل التوليد — تكملة اللعبة نصياً بدون الصورة
+      console.warn(`[Roulette] wheel gif failed: ${err?.message || err}`);
+    }
+
+    if (gifBuffer) {
+      const file = new AttachmentBuilder(gifBuffer, { name: 'roulette.gif' });
+      await interaction.editReply({
+        content: `🔫 **لعبة الروليت!** • المشاركون: ${playersLine}\nالعجلة تدور... 🔊`,
+        files: [file],
+      });
+      // انتظر حتى تنتهي حركة العجلة ثم أعلن النتيجة
+      await new Promise(r => setTimeout(r, 2700));
+      await interaction.editReply({
+        content:
+          `🔫 **لعبة الروليت!** • المشاركون: ${playersLine}\n` +
+          `💥 البارودة أصابت! 💀 الضحية: <@${victim.id}> • ` +
+          `الناجون: ${survivors.map(s => `✅ <@${s.id}>`).join(' • ') || 'لا أحد'} • ` +
+          `_جرّب حظك مرة أخرى!_`,
+      });
+    } else {
+      await interaction.editReply({
+        content: `🔫 لعبة الروليت! • المشاركون: ${playersLine} • البارودة تدور...`,
+      });
+      await new Promise(r => setTimeout(r, 1500));
+      await interaction.editReply({
+        content: `🔫 اللعبة تدور... 🔊 جرررررخ...`,
+      }).catch(() => {});
+      await new Promise(r => setTimeout(r, 1500));
+      await interaction.editReply({
+        content:
+          `💥 البارودة أصابت! 💀 الضحية: <@${victim.id}> • ` +
+          `الناجون: ${survivors.map(s => `✅ <@${s.id}>`).join(' • ') || 'لا أحد'} • ` +
+          `_جرّب حظك مرة أخرى!_`,
+      });
+    }
   },
 };
 
@@ -75,4 +139,3 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 export default command;
-

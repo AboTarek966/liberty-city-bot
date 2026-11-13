@@ -9,7 +9,7 @@ const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 exports.GAMES_LIST = [
     // ⚔️ تحدي مباشر
-    { value: 'roulette', label: '🔫 روليت', usage: '/roulette @user @user2 ... — البارودة تختار ضحية عشوائية من المشاركين' },
+    { value: 'roulette', label: '🔫 روليت', usage: '/roulette @user @user2 ... — عجلة حظ متحركة (GIF) تختار ضحية عشوائية من المشاركين' },
     { value: 'duel', label: '⚔️ مبارزة', usage: '/duel @user — معركة جولة بجولة مع شريط صحة' },
     { value: 'tug', label: '🧱 سحب الحبل', usage: '/tug @user ... — فريقان يسحبان الحبل حتى خط النهاية' },
     { value: 'dragon', label: '🐉 معركة التنين', usage: '/dragon — اهزم التنين وانقذ القرية' },
@@ -20,7 +20,7 @@ exports.GAMES_LIST = [
     { value: 'power', label: '🏋️ تدريب القوة', usage: '/power [user] — اضرب الكيس وشوف قوتك، أو واجه صديقاً' },
     // 🍀 حظ وجوائز
     { value: 'slots', label: '🎰 ماكينة الحظ', usage: '/slots amount:100 — رهان من رصيدك، ثلاث نفسية = ×5' },
-    { value: 'wheel', label: '🍀 عجلة الحظ', usage: '/wheel — دوّر العجلة وشوف ماذا تربح' },
+    { value: 'wheel', label: '🍀 عجلة الحظ', usage: '/wheel — دوّر العجلة كصورة متحركة (GIF) وشوف ماذا تربح' },
     { value: 'treasure', label: '💰 صناديق الكنز', usage: '/treasure — ثلاثة صناديق وكنز واحد، اختر بحكمة' },
     { value: 'bomb', label: '💣 اقطع السلك', usage: '/bomb — أربعة أسلاك وسلك واحد ينقذك، حدد المجموع أولاً' },
     { value: 'flip', label: '🪙 عملة', usage: '/flip — صورة أو كتابة' },
