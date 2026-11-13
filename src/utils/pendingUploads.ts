@@ -8,8 +8,8 @@ interface PendingUpload {
   channelId: string;
   userId: string;
   expiresAt: number;
-  /** وجهة الصورة: لوحة التذاكر أو خلفية بطاقة الترحيب */
-  kind: 'ticket' | 'welcomeCard';
+  /** وجهة الصورة: لوحة التذاكر أو خلفية بطاقة الترحيب أو الرد التلقائي */
+  kind: 'ticket' | 'welcomeCard' | 'autoReply';
 }
 
 const pending = new Map<string, PendingUpload>();
@@ -20,7 +20,7 @@ export function setPendingImageUpload(
   userId: string,
   guildId: string,
   channelId: string,
-  kind: 'ticket' | 'welcomeCard' = 'ticket'
+  kind: 'ticket' | 'welcomeCard' | 'autoReply' = 'ticket'
 ): void {
   pending.set(userId, { guildId, channelId, userId, kind, expiresAt: Date.now() + TTL_MS });
 }

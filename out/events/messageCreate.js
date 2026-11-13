@@ -53,6 +53,7 @@ const messageSystems_1 = require("../utils/messageSystems");
 const giveaway_1 = require("../utils/giveaway");
 const emoji_1 = require("../utils/emoji");
 const pendingUploads_1 = require("../utils/pendingUploads");
+const autoReplyImage_1 = require("../utils/autoReplyImage");
 const imageGen_1 = require("../utils/imageGen");
 const rolePicker_1 = require("../utils/rolePicker");
 const mediaGen_1 = require("../utils/mediaGen");
@@ -164,8 +165,48 @@ const event = {
                 const upload = (0, pendingUploads_1.consumePendingImageUpload)(message.author.id);
                 if (upload && upload.guildId === message.guild.id) {
                     const attachment = message.attachments.first();
-                    if (attachment && /\.(png|jpe?g|gif|webp)$/i.test(attachment.name || attachment.url)) {
+                    if (attachment &&
+                        (/\.(png|jpe?g|gif|webp)$/i.test(attachment.name || attachment.url) ||
+                            String(attachment.contentType || '').toLowerCase().startsWith('image/'))) {
                         const settings = await (0, models_1.getGuildSettings)(message.guild.id);
+                        // 💬 صورة الرد التلقائي — من جهاز المستخدم إلى قاعدة البيانات
+                        if (upload.kind === 'autoReply') {
+                            try {
+                                const buffer = await (0, autoReplyImage_1.downloadAutoReplyAttachment)(attachment.url);
+                                const prepared = await (0, autoReplyImage_1.prepareAutoReplyImage)(buffer, attachment.contentType || '', attachment.name || '');
+                                if (!settings.autoReply) {
+                                    settings.autoReply = {
+                                        enabled: false,
+                                        channelIds: [],
+                                        text: '',
+                                        deleteTrigger: false,
+                                        replyToMessage: true,
+                                        ignoreStaff: true,
+                                        cooldownSeconds: 30,
+                                    };
+                                }
+                                settings.autoReply.imageData = prepared.base64;
+                                settings.autoReply.imageMimeType = prepared.mimeType;
+                                settings.autoReply.imageName = prepared.name;
+                                settings.autoReply.imageUrl = '';
+                                settings.markModified('autoReply');
+                                await settings.save();
+                                await message
+                                    .reply(`✅ **تم حفظ صورة الرد التلقائي من جهازك**\n` +
+                                    `> 📦 الحجم بعد الضغط: ${Math.round(prepared.bytes / 1024)} KB\n` +
+                                    `> 🖼️ الاسم: ${prepared.name}\n` +
+                                    (settings.autoReply.channelIds?.length
+                                        ? '> افتح `/settings` ← 💬 الرد التلقائي للمعاينة'
+                                        : '> ⚠️ لا توجد قنوات بعد — أضف قناة من `/settings` أو `/autoreply add`'))
+                                    .catch(() => { });
+                            }
+                            catch (err) {
+                                await message
+                                    .reply(`❌ تعذّر حفظ الصورة: ${err?.message || 'صيغة غير مدعومة'}`)
+                                    .catch(() => { });
+                            }
+                            return;
+                        }
                         // 🎴 خلفية بطاقة الترحيب
                         if (upload.kind === 'welcomeCard') {
                             settings.set('welcome.card.backgroundUrl', attachment.url);

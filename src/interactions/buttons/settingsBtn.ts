@@ -15,6 +15,7 @@ import {
   RoleSelectMenuBuilder,
   ChannelSelectMenuBuilder,
   EmbedBuilder,
+  AttachmentBuilder,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildLevelRewardsPanel, buildTicketMovePanel, buildTicketAdvancedPanel, buildTicketAIPanel, buildVerificationPanel, buildCommands, buildShop, buildLoggingSplitPanel, sendWelcomeCardPanel, getCardEditor, getCardElementValues, nextCardStep, nextCardElement, getActivePanel, buildWarnRolesPanel, buildProtectionChannelsPanel, SettingsCategory } from '../../utils/settingsPanel';
@@ -25,6 +26,7 @@ import { DEFAULT_TICKET_WELCOME_MESSAGE } from '../../utils/ticketMessages';
 import { handleWelcome } from '../../events/guildMemberAdd';
 import { handleLeave } from '../../events/guildMemberRemove';
 import { setPendingImageUpload } from '../../utils/pendingUploads';
+import { autoReplyAttachmentName, getAutoReplyImageBuffer } from '../../utils/autoReplyImage';
 import { getPendingWarnRoles, clearPendingWarnRoles, setPendingWarnRoles } from '../../utils/pendingWarnRoles';
 import { CARD_DEFAULTS } from '../../utils/welcomeCard';
 import { createLogger } from '../../utils/helpers';
@@ -420,8 +422,8 @@ const handler: ButtonHandler = {
         case 'autoreply:image': {
           const ai = String(settings.autoReply?.imageUrl || '');
           return openModal(
-            '🖼️ صورة الرد التلقائي',
-            'رابط مباشر يبدأ بـ https:// — فارغ لإزالة الصورة',
+            '🔗 رابط صورة الرد التلقائي (اختياري)',
+            'رابط https:// — أو استخدم زر «من الجهاز» / لوحة التحكم لرفع صورة',
             TextInputStyle.Short,
             500,
             ai,
@@ -729,19 +731,47 @@ const handler: ButtonHandler = {
     // ---------- إجراءات تحدث اللوحة (تم تأكيدها deferUpdate في الأعلى) ----------
 
     switch (`${section}:${action}`) {
+      case 'autoreply:imageupload': {
+        // 📱 أول صورة يرسلها المستخدم في نفس القناة خلال 60 ثانية تُحفظ كصورة الرد التلقائي
+        setPendingImageUpload(
+          interaction.user.id,
+          interaction.guild.id,
+          interaction.channelId,
+          'autoReply'
+        );
+        await interaction.followUp({
+          content:
+            '📱 **أرسل الصورة الآن في هذه القناة** خلال 60 ثانية — تُضغط وتُحفظ تلقائياً.\n' +
+            '> تقدر أيضاً ترفعها من لوحة التحكم ← الرد التلقائي، أو بالأمر `/autoreply image`',
+          ephemeral: true,
+        });
+        return;
+      }
       case 'autoreply:preview': {
         // 👀 معاينة الرد كما سيظهر في القناة
         const a = (settings as any).autoReply || {};
         const text = String(a.text || '').trim();
         const imageUrl = String(a.imageUrl || '').trim();
-        if (!text && !imageUrl) {
+        const deviceImage = getAutoReplyImageBuffer(a);
+        if (!text && !imageUrl && !deviceImage) {
           await interaction.followUp({
             content: '⚠️ لا يوجد نص ولا صورة — عدّل النص أو الصورة أولاً',
             ephemeral: true,
           });
           return;
         }
-        if (imageUrl) {
+        if (deviceImage) {
+          const attachmentName = autoReplyAttachmentName(String(a.imageMimeType || 'image/jpeg'));
+          const embed = new EmbedBuilder()
+            .setImage(`attachment://${attachmentName}`)
+            .setColor(0x1abc9c);
+          if (text) embed.setDescription(text);
+          await interaction.followUp({
+            embeds: [embed],
+            files: [new AttachmentBuilder(deviceImage, { name: attachmentName })],
+            ephemeral: true,
+          });
+        } else if (imageUrl) {
           const embed = new EmbedBuilder().setImage(imageUrl).setColor(0x1abc9c);
           if (text) embed.setDescription(text);
           await interaction.followUp({ embeds: [embed], ephemeral: true });

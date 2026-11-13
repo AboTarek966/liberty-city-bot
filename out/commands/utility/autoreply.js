@@ -5,16 +5,36 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
+const autoReplyImage_1 = require("../../utils/autoReplyImage");
 const DEFAULTS = {
     enabled: false,
     channelIds: [],
     text: '',
     imageUrl: undefined,
+    imageData: undefined,
+    imageMimeType: undefined,
+    imageName: undefined,
     deleteTrigger: false,
     replyToMessage: true,
     ignoreStaff: true,
     cooldownSeconds: 30,
 };
+async function prepareAttachmentImage(attachment) {
+    const buffer = await (0, autoReplyImage_1.downloadAutoReplyAttachment)(attachment.url);
+    return (0, autoReplyImage_1.prepareAutoReplyImage)(buffer, attachment.contentType || '', attachment.name || '');
+}
+function applyDeviceImage(cfg, prepared) {
+    cfg.imageData = prepared.base64;
+    cfg.imageMimeType = prepared.mimeType;
+    cfg.imageName = prepared.name;
+    // الصورة من الجهاز لها أولوية — لا نُبقي رابطاً قديماً يربك المستخدم
+    cfg.imageUrl = '';
+}
+function clearDeviceImage(cfg) {
+    cfg.imageData = '';
+    cfg.imageMimeType = '';
+    cfg.imageName = '';
+}
 async function ensureConfig(settings) {
     if (!settings.autoReply)
         settings.autoReply = { ...DEFAULTS, channelIds: [] };
@@ -46,7 +66,15 @@ const command = {
         .addChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
         .setRequired(true))
         .addStringOption((opt) => opt.setName('text').setDescription('الكلمة أو النص الذي يرسله البوت').setMaxLength(2000).setRequired(false))
-        .addStringOption((opt) => opt.setName('image').setDescription('رابط صورة يرسلها البوت (اختياري)').setMaxLength(500).setRequired(false))
+        .addStringOption((opt) => opt
+        .setName('image')
+        .setDescription('رابط صورة خارجي (اختياري — أو استخدم image_file من جهازك)')
+        .setMaxLength(500)
+        .setRequired(false))
+        .addAttachmentOption((opt) => opt
+        .setName('image_file')
+        .setDescription('🖼️ اختر صورة من جهازك بدلاً من الرابط (اختياري)')
+        .setRequired(false))
         .addIntegerOption((opt) => opt
         .setName('cooldown')
         .setDescription('الفاصل الزمني بالثواني لكل عضو (0 = بدون)')
@@ -72,6 +100,14 @@ const command = {
         .setDescription('القناة المراد إزالتها')
         .addChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
         .setRequired(true)))
+        .addSubcommand((sub) => sub
+        .setName('image')
+        .setDescription('🖼️ اختر صورة من جهازك للرد التلقائي')
+        .addAttachmentOption((opt) => opt
+        .setName('file')
+        .setDescription('الصورة من جهازك (JPG/PNG/WebP/GIF)')
+        .setRequired(true)))
+        .addSubcommand((sub) => sub.setName('remove_image').setDescription('🗑️ حذف صورة الرد التلقائي (الجهاز والرابط)'))
         .addSubcommand((sub) => sub.setName('on').setDescription('تشغيل الرد التلقائي'))
         .addSubcommand((sub) => sub.setName('off').setDescription('إيقاف الرد التلقائي'))
         .addSubcommand((sub) => sub.setName('status').setDescription('عرض إعدادات الرد التلقائي الحالية'))
@@ -102,22 +138,41 @@ const command = {
                 const channel = interaction.options.getChannel('channel', true);
                 const text = interaction.options.getString('text');
                 const image = interaction.options.getString('image');
+                const imageFile = interaction.options.getAttachment('image_file');
                 const cooldown = interaction.options.getInteger('cooldown');
                 const del = interaction.options.getBoolean('delete');
                 const reply = interaction.options.getBoolean('reply');
                 const ignoreStaff = interaction.options.getBoolean('ignore_staff');
-                if (image && !/^https?:\/\/\S+$/i.test(image)) {
-                    await interaction.reply({
+                // تحميل/ضغط صورة الجهاز قد يتجاوز مهلة 3 ثوانٍ
+                if (imageFile)
+                    await interaction.deferReply({ ephemeral: true });
+                const respond = async (payload) => imageFile ? interaction.editReply(payload) : interaction.reply(payload);
+                if (image && !imageFile && !/^https?:\/\/\S+$/i.test(image)) {
+                    await respond({
                         content: '❌ رابط الصورة يجب أن يبدأ بـ http:// أو https://',
-                        ephemeral: true,
                     });
                     return;
+                }
+                let prepared = null;
+                if (imageFile) {
+                    try {
+                        prepared = await prepareAttachmentImage(imageFile);
+                    }
+                    catch (err) {
+                        await interaction.editReply({ content: `❌ ${err?.message || 'تعذّر تجهيز الصورة'}` });
+                        return;
+                    }
                 }
                 cfg.channelIds = [channel.id];
                 if (text !== null && text !== undefined)
                     cfg.text = text.trim();
-                if (image !== null && image !== undefined)
+                if (prepared) {
+                    applyDeviceImage(cfg, prepared);
+                }
+                else if (image !== null && image !== undefined) {
                     cfg.imageUrl = image.trim();
+                    clearDeviceImage(cfg);
+                }
                 if (cooldown !== null && cooldown !== undefined)
                     cfg.cooldownSeconds = cooldown;
                 if (del !== null && del !== undefined)
@@ -127,22 +182,55 @@ const command = {
                 if (ignoreStaff !== null && ignoreStaff !== undefined)
                     cfg.ignoreStaff = ignoreStaff;
                 cfg.enabled = true;
-                if (!String(cfg.text || '').trim() && !String(cfg.imageUrl || '').trim()) {
-                    await interaction.reply({
-                        content: '⚠️ تم تحديد القناة، لكن لا يوجد نص ولا صورة بعد — أضف `text` أو `image`',
-                        ephemeral: true,
+                const hasImage = Boolean(String(cfg.imageData || '').trim() || String(cfg.imageUrl || '').trim());
+                if (!String(cfg.text || '').trim() && !hasImage) {
+                    await respond({
+                        content: '⚠️ تم تحديد القناة، لكن لا يوجد نص ولا صورة بعد — أضف `text` أو `image` (رابط) أو `image_file` (من جهازك)',
                     });
                 }
                 else {
-                    await interaction.reply({
+                    await respond({
                         content: `✅ **تم تفعيل الرد التلقائي** في ${channelsText()}\n` +
                             `> 💬 النص: ${cfg.text ? cfg.text.slice(0, 200) : '—'}\n` +
-                            `> 🖼️ الصورة: ${cfg.imageUrl ? '✅ موجودة' : '—'}\n` +
+                            `> 🖼️ الصورة: ${String(cfg.imageData || '').trim()
+                                ? '✅ من الجهاز'
+                                : cfg.imageUrl
+                                    ? '✅ رابط خارجي'
+                                    : '—'}\n` +
                             `> ⏱️ الفاصل: ${cfg.cooldownSeconds} ثانية`,
-                        ephemeral: true,
                     });
                 }
                 await save();
+                return;
+            }
+            case 'image': {
+                const file = interaction.options.getAttachment('file', true);
+                await interaction.deferReply({ ephemeral: true });
+                let prepared;
+                try {
+                    prepared = await prepareAttachmentImage(file);
+                }
+                catch (err) {
+                    await interaction.editReply({ content: `❌ ${err?.message || 'تعذّر تجهيز الصورة'}` });
+                    return;
+                }
+                applyDeviceImage(cfg, prepared);
+                await save();
+                await interaction.editReply({
+                    content: `✅ **تم حفظ صورة الرد التلقائي من جهازك**\n` +
+                        `> 🖼️ الاسم: ${prepared.name}\n` +
+                        `> 📦 الحجم بعد الضغط: ${Math.round(prepared.bytes / 1024)} KB` +
+                        (cfg.channelIds.length
+                            ? `\n> 📍 القنوات: ${channelsText()}`
+                            : '\n> ⚠️ لا توجد قنوات بعد — أضف قناة بـ `/autoreply setup` أو `/autoreply add`'),
+                });
+                return;
+            }
+            case 'remove_image': {
+                clearDeviceImage(cfg);
+                cfg.imageUrl = '';
+                await save();
+                await interaction.reply({ content: '🗑️ تم حذف صورة الرد التلقائي (الجهاز والرابط)', ephemeral: true });
                 return;
             }
             case 'add': {
@@ -203,7 +291,11 @@ const command = {
                     .setDescription(`> ⚡ **الحالة:** ${cfg.enabled ? '🟢 مفعّل' : '🔴 معطّل'}\n` +
                     `> 📍 **القنوات:** ${channelsText()}\n` +
                     `> 💬 **النص:** ${cfg.text ? cfg.text.slice(0, 500) : '— لا يوجد —'}\n` +
-                    `> 🖼️ **الصورة:** ${cfg.imageUrl ? `[عرض](${cfg.imageUrl})` : '— لا توجد —'}\n` +
+                    `> 🖼️ **الصورة:** ${String(cfg.imageData || '').trim()
+                        ? `✅ من الجهاز${cfg.imageName ? ` (${cfg.imageName})` : ''}`
+                        : cfg.imageUrl
+                            ? `[عرض الرابط](${cfg.imageUrl})`
+                            : '— لا توجد —'}\n` +
                     `> 🗑️ **حذف رسالة العضو:** ${cfg.deleteTrigger ? 'نعم' : 'لا'}\n` +
                     `> ↩️ **الرد كـ Reply:** ${cfg.replyToMessage !== false ? 'نعم' : 'لا'}\n` +
                     `> 🛡️ **تجاهل الإداريين:** ${cfg.ignoreStaff !== false ? 'نعم' : 'لا'}\n` +
@@ -213,7 +305,14 @@ const command = {
                 return;
             }
             case 'clear': {
-                settings.autoReply = { ...DEFAULTS, channelIds: [] };
+                settings.autoReply = {
+                    ...DEFAULTS,
+                    channelIds: [],
+                    imageUrl: '',
+                    imageData: '',
+                    imageMimeType: '',
+                    imageName: '',
+                };
                 await save();
                 await interaction.reply({ content: '🧹 تم مسح الرد التلقائي بالكامل وتوقفه', ephemeral: true });
                 return;

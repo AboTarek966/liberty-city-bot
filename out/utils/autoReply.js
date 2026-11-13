@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleAutoReply = handleAutoReply;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
+const autoReplyImage_1 = require("./autoReplyImage");
 /** ⏱️ آخر رد لكل (سيرفر/قناة/عضو) — يمنع السبام عند الرسائل السريعة */
 const lastSent = new Map();
 function pruneCooldowns(now) {
@@ -34,7 +35,9 @@ async function handleAutoReply(message) {
         return false;
     const text = String(cfg.text || '').trim();
     const imageUrl = String(cfg.imageUrl || '').trim();
-    if (!text && !imageUrl)
+    // 🖼️ الصورة المرفوعة من الجهاز لها أولوية على الرابط
+    const deviceImage = (0, autoReplyImage_1.getAutoReplyImageBuffer)(cfg);
+    if (!text && !deviceImage && !imageUrl)
         return false;
     // 🛡️ تجاهل الإداريين (اختياري — مفعّل افتراضياً)
     if (cfg.ignoreStaff !== false && message.member) {
@@ -54,9 +57,19 @@ async function handleAutoReply(message) {
         lastSent.set(key, now);
         pruneCooldowns(now);
     }
-    // 🖼️ بناء الرد — صورة + نص أو نص فقط
+    // 🖼️ بناء الرد — صورة من الجهاز + نص، أو رابط صورة، أو نص فقط
     let payload;
-    if (imageUrl) {
+    if (deviceImage) {
+        const attachmentName = (0, autoReplyImage_1.autoReplyAttachmentName)(String(cfg.imageMimeType || 'image/jpeg'));
+        const embed = new discord_js_1.EmbedBuilder().setImage(`attachment://${attachmentName}`).setColor(0x2b2d31);
+        if (text)
+            embed.setDescription(text);
+        payload = {
+            embeds: [embed],
+            files: [new discord_js_1.AttachmentBuilder(deviceImage, { name: attachmentName })],
+        };
+    }
+    else if (imageUrl) {
         const embed = new discord_js_1.EmbedBuilder().setImage(imageUrl).setColor(0x2b2d31);
         if (text)
             embed.setDescription(text);

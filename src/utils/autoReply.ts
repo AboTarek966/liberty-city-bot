@@ -2,8 +2,9 @@
 // Omni Bot - Auto Reply (صورة/كلمة في قنوات محددة)
 // ============================================
 
-import { EmbedBuilder, Message, PermissionFlagsBits } from 'discord.js';
+import { AttachmentBuilder, EmbedBuilder, Message, PermissionFlagsBits } from 'discord.js';
 import { getGuildSettings } from '../models';
+import { autoReplyAttachmentName, getAutoReplyImageBuffer } from './autoReplyImage';
 
 /** ⏱️ آخر رد لكل (سيرفر/قناة/عضو) — يمنع السبام عند الرسائل السريعة */
 const lastSent = new Map<string, number>();
@@ -32,7 +33,9 @@ export async function handleAutoReply(message: Message): Promise<boolean> {
 
   const text = String(cfg.text || '').trim();
   const imageUrl = String(cfg.imageUrl || '').trim();
-  if (!text && !imageUrl) return false;
+  // 🖼️ الصورة المرفوعة من الجهاز لها أولوية على الرابط
+  const deviceImage = getAutoReplyImageBuffer(cfg);
+  if (!text && !deviceImage && !imageUrl) return false;
 
   // 🛡️ تجاهل الإداريين (اختياري — مفعّل افتراضياً)
   if (cfg.ignoreStaff !== false && message.member) {
@@ -53,9 +56,17 @@ export async function handleAutoReply(message: Message): Promise<boolean> {
     pruneCooldowns(now);
   }
 
-  // 🖼️ بناء الرد — صورة + نص أو نص فقط
+  // 🖼️ بناء الرد — صورة من الجهاز + نص، أو رابط صورة، أو نص فقط
   let payload: any;
-  if (imageUrl) {
+  if (deviceImage) {
+    const attachmentName = autoReplyAttachmentName(String(cfg.imageMimeType || 'image/jpeg'));
+    const embed = new EmbedBuilder().setImage(`attachment://${attachmentName}`).setColor(0x2b2d31);
+    if (text) embed.setDescription(text);
+    payload = {
+      embeds: [embed],
+      files: [new AttachmentBuilder(deviceImage, { name: attachmentName })],
+    };
+  } else if (imageUrl) {
     const embed = new EmbedBuilder().setImage(imageUrl).setColor(0x2b2d31);
     if (text) embed.setDescription(text);
     payload = { embeds: [embed] };

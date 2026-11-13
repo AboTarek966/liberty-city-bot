@@ -148,7 +148,8 @@ class OmniClient extends discord_js_1.Client {
             origin: process.env.DASHBOARD_URL || 'http://localhost:3001',
             credentials: true,
         }));
-        this.expressApp.use(express_1.default.json());
+        // صور الرد التلقائي تُحفظ base64 — الحد الافتراضي 100kb صغير جداً
+        this.expressApp.use(express_1.default.json({ limit: '12mb' }));
         // Health check
         this.expressApp.get('/health', (req, res) => {
             res.json({ status: 'ok', timestamp: new Date().toISOString() });

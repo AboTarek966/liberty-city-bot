@@ -2204,6 +2204,12 @@ function buildAutoReply(guild: Guild, s: any): BuiltPanel {
     : '🔴 لا توجد قنوات محددة';
   const text = String(a.text || '').trim();
   const imageUrl = String(a.imageUrl || '').trim();
+  const hasDeviceImage = Boolean(String(a.imageData || '').trim());
+  const imageLine = hasDeviceImage
+    ? `✅ من الجهاز${a.imageName ? ` (${String(a.imageName).slice(0, 80)})` : ''}`
+    : imageUrl
+      ? `[عرض الصورة](${imageUrl})`
+      : '— لا توجد —';
 
   const embed = categoryEmbed(
     'autoreply',
@@ -2212,7 +2218,8 @@ function buildAutoReply(guild: Guild, s: any): BuiltPanel {
       `> ⚡ **الحالة:** ${on(!!a.enabled)} ${a.enabled ? 'مفعّل' : 'معطّل'}\n` +
       `> 📍 **القنوات (${channelIds.length}):** ${channelsText}\n` +
       `> 💬 **النص:** ${text ? text.slice(0, 300) : '— لا يوجد —'}\n` +
-      `> 🖼️ **الصورة:** ${imageUrl ? `[عرض الصورة](${imageUrl})` : '— لا توجد —'}\n` +
+      `> 🖼️ **الصورة:** ${imageLine}\n` +
+      `> 📱 **من الجهاز:** زر «من الجهاز» تحت، أو لوحة التحكم ← الرد التلقائي\n` +
       `> 🗑️ **حذف رسالة العضو:** ${on(!!a.deleteTrigger)} ${a.deleteTrigger ? 'نعم' : 'لا'}\n` +
       `> ↩️ **الرد كـ Reply:** ${on(a.replyToMessage !== false)} ${a.replyToMessage !== false ? 'نعم' : 'لا'}\n` +
       `> 🛡️ **تجاهل الإداريين:** ${on(a.ignoreStaff !== false)} ${a.ignoreStaff !== false ? 'نعم' : 'لا'}\n` +
@@ -2222,12 +2229,13 @@ function buildAutoReply(guild: Guild, s: any): BuiltPanel {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     toggleBtn('autoreply', 'enabled', 'الرد التلقائي', '⚡', !!a.enabled),
     btn('settings_btn:autoreply:text', 'تعديل النص', ButtonStyle.Primary, '💬'),
-    btn('settings_btn:autoreply:image', 'تعديل الصورة', ButtonStyle.Primary, '🖼️'),
+    btn('settings_btn:autoreply:image', 'رابط صورة', ButtonStyle.Primary, '🔗'),
     btn('settings_btn:autoreply:cooldown', 'الفاصل الزمني', ButtonStyle.Secondary, '⏱️'),
     toggleBtn('autoreply', 'delete', 'حذف الرسالة', '🗑️', !!a.deleteTrigger)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:autoreply:imageupload', 'من الجهاز', ButtonStyle.Success, '📱'),
     toggleBtn('autoreply', 'reply', 'رد Reply', '↩️', a.replyToMessage !== false),
     toggleBtn('autoreply', 'ignorestaff', 'تجاهل الإداريين', '🛡️', a.ignoreStaff !== false),
     btn('settings_btn:autoreply:preview', 'معاينة', ButtonStyle.Success, '👀'),

@@ -1498,17 +1498,24 @@ function buildAutoReply(guild, s) {
         : '🔴 لا توجد قنوات محددة';
     const text = String(a.text || '').trim();
     const imageUrl = String(a.imageUrl || '').trim();
+    const hasDeviceImage = Boolean(String(a.imageData || '').trim());
+    const imageLine = hasDeviceImage
+        ? `✅ من الجهاز${a.imageName ? ` (${String(a.imageName).slice(0, 80)})` : ''}`
+        : imageUrl
+            ? `[عرض الصورة](${imageUrl})`
+            : '— لا توجد —';
     const embed = categoryEmbed('autoreply', guild, `رد تلقائي على أي رسالة في القنوات المحددة — كلمة، صورة، أو الاثنين معاً\n\n` +
         `> ⚡ **الحالة:** ${on(!!a.enabled)} ${a.enabled ? 'مفعّل' : 'معطّل'}\n` +
         `> 📍 **القنوات (${channelIds.length}):** ${channelsText}\n` +
         `> 💬 **النص:** ${text ? text.slice(0, 300) : '— لا يوجد —'}\n` +
-        `> 🖼️ **الصورة:** ${imageUrl ? `[عرض الصورة](${imageUrl})` : '— لا توجد —'}\n` +
+        `> 🖼️ **الصورة:** ${imageLine}\n` +
+        `> 📱 **من الجهاز:** زر «من الجهاز» تحت، أو لوحة التحكم ← الرد التلقائي\n` +
         `> 🗑️ **حذف رسالة العضو:** ${on(!!a.deleteTrigger)} ${a.deleteTrigger ? 'نعم' : 'لا'}\n` +
         `> ↩️ **الرد كـ Reply:** ${on(a.replyToMessage !== false)} ${a.replyToMessage !== false ? 'نعم' : 'لا'}\n` +
         `> 🛡️ **تجاهل الإداريين:** ${on(a.ignoreStaff !== false)} ${a.ignoreStaff !== false ? 'نعم' : 'لا'}\n` +
         `> ⏱️ **الفاصل لكل عضو:** ${Number(a.cooldownSeconds ?? 30)} ثانية`);
-    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('autoreply', 'enabled', 'الرد التلقائي', '⚡', !!a.enabled), btn('settings_btn:autoreply:text', 'تعديل النص', discord_js_1.ButtonStyle.Primary, '💬'), btn('settings_btn:autoreply:image', 'تعديل الصورة', discord_js_1.ButtonStyle.Primary, '🖼️'), btn('settings_btn:autoreply:cooldown', 'الفاصل الزمني', discord_js_1.ButtonStyle.Secondary, '⏱️'), toggleBtn('autoreply', 'delete', 'حذف الرسالة', '🗑️', !!a.deleteTrigger));
-    const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('autoreply', 'reply', 'رد Reply', '↩️', a.replyToMessage !== false), toggleBtn('autoreply', 'ignorestaff', 'تجاهل الإداريين', '🛡️', a.ignoreStaff !== false), btn('settings_btn:autoreply:preview', 'معاينة', discord_js_1.ButtonStyle.Success, '👀'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('autoreply', 'enabled', 'الرد التلقائي', '⚡', !!a.enabled), btn('settings_btn:autoreply:text', 'تعديل النص', discord_js_1.ButtonStyle.Primary, '💬'), btn('settings_btn:autoreply:image', 'رابط صورة', discord_js_1.ButtonStyle.Primary, '🔗'), btn('settings_btn:autoreply:cooldown', 'الفاصل الزمني', discord_js_1.ButtonStyle.Secondary, '⏱️'), toggleBtn('autoreply', 'delete', 'حذف الرسالة', '🗑️', !!a.deleteTrigger));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:autoreply:imageupload', 'من الجهاز', discord_js_1.ButtonStyle.Success, '📱'), toggleBtn('autoreply', 'reply', 'رد Reply', '↩️', a.replyToMessage !== false), toggleBtn('autoreply', 'ignorestaff', 'تجاهل الإداريين', '🛡️', a.ignoreStaff !== false), btn('settings_btn:autoreply:preview', 'معاينة', discord_js_1.ButtonStyle.Success, '👀'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const channelRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:autoreply:channels')
         .setPlaceholder('📍 اختر قنوات الرد التلقائي (حتى 10)')

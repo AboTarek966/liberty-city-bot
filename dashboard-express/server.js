@@ -135,8 +135,9 @@ if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
   console.warn('⚠️ DISCORD_CLIENT_ID/SECRET not set - OAuth will not work');
 }
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// صور الرد التلقائي تُرسل base64 من المتصفح بعد الضغط — نحتاج حداً أعلى من 100kb الافتراضي
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));

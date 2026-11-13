@@ -31,6 +31,7 @@ import { handleCustomCommand, touchTicketActivity, earnCreditsRandom, handleAppl
 import { addGiveawayWinners, findDefaultGiveawayForWinner, parseUserMentions } from '../utils/giveaway';
 import { resolveEmojiShortcodes } from '../utils/emoji';
 import { hasPendingImageUpload, consumePendingImageUpload } from '../utils/pendingUploads';
+import { downloadAutoReplyAttachment, prepareAutoReplyImage } from '../utils/autoReplyImage';
 import { detectImagePrompt, generateImageWithRetry, translateForImage } from '../utils/imageGen';
 import {
   createRolePickerState,
@@ -167,8 +168,56 @@ const event: Event = {
         const upload = consumePendingImageUpload(message.author.id);
         if (upload && upload.guildId === message.guild.id) {
           const attachment = message.attachments.first();
-          if (attachment && /\.(png|jpe?g|gif|webp)$/i.test(attachment.name || attachment.url)) {
+          if (
+            attachment &&
+            (/\.(png|jpe?g|gif|webp)$/i.test(attachment.name || attachment.url) ||
+              String(attachment.contentType || '').toLowerCase().startsWith('image/'))
+          ) {
             const settings = await getGuildSettings(message.guild.id);
+            
+            // 💬 صورة الرد التلقائي — من جهاز المستخدم إلى قاعدة البيانات
+            if (upload.kind === 'autoReply') {
+              try {
+                const buffer = await downloadAutoReplyAttachment(attachment.url);
+                const prepared = await prepareAutoReplyImage(
+                  buffer,
+                  attachment.contentType || '',
+                  attachment.name || ''
+                );
+                if (!settings.autoReply) {
+                  settings.autoReply = {
+                    enabled: false,
+                    channelIds: [],
+                    text: '',
+                    deleteTrigger: false,
+                    replyToMessage: true,
+                    ignoreStaff: true,
+                    cooldownSeconds: 30,
+                  };
+                }
+                settings.autoReply.imageData = prepared.base64;
+                settings.autoReply.imageMimeType = prepared.mimeType;
+                settings.autoReply.imageName = prepared.name;
+                settings.autoReply.imageUrl = '';
+                settings.markModified('autoReply');
+                await settings.save();
+                await message
+                  .reply(
+                    `✅ **تم حفظ صورة الرد التلقائي من جهازك**\n` +
+                      `> 📦 الحجم بعد الضغط: ${Math.round(prepared.bytes / 1024)} KB\n` +
+                      `> 🖼️ الاسم: ${prepared.name}\n` +
+                      (settings.autoReply.channelIds?.length
+                        ? '> افتح `/settings` ← 💬 الرد التلقائي للمعاينة'
+                        : '> ⚠️ لا توجد قنوات بعد — أضف قناة من `/settings` أو `/autoreply add`')
+                  )
+                  .catch(() => {});
+              } catch (err: any) {
+                await message
+                  .reply(`❌ تعذّر حفظ الصورة: ${err?.message || 'صيغة غير مدعومة'}`)
+                  .catch(() => {});
+              }
+              return;
+            }
 
             // 🎴 خلفية بطاقة الترحيب
             if (upload.kind === 'welcomeCard') {

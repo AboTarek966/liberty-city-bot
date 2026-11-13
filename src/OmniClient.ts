@@ -152,7 +152,8 @@ export class OmniClient extends Client {
       origin: process.env.DASHBOARD_URL || 'http://localhost:3001',
       credentials: true,
     }));
-    this.expressApp.use(express.json());
+    // صور الرد التلقائي تُحفظ base64 — الحد الافتراضي 100kb صغير جداً
+    this.expressApp.use(express.json({ limit: '12mb' }));
 
     // Health check
     this.expressApp.get('/health', (req: Request, res: Response) => {

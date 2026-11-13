@@ -443,7 +443,14 @@ export interface IGuildSettings extends Document {
         enabled: boolean;
         channelIds: string[];
         text: string;
+        /** 🔗 رابط صورة خارجي (اختياري) */
         imageUrl?: string;
+        /** 🖼️ صورة مرفوعة من الجهاز — base64 (لها أولوية على الرابط) */
+        imageData?: string;
+        /** نوع الصورة المحفوظة مثل image/jpeg */
+        imageMimeType?: string;
+        /** اسم الصورة الأصلي للعرض في اللوحة */
+        imageName?: string;
         /** 🗑️ حذف رسالة العضو بعد الرد */
         deleteTrigger: boolean;
         /** ↩️ الرد كـ Reply على رسالة العضو */

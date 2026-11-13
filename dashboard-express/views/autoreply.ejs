@@ -1,6 +1,10 @@
 <%- include('layout-top', { title: 'الرد التلقائي', activePage: 'autoreply' }) %>
 
-<% const A = settings?.autoReply || {}; const GID = guild.id; %>
+<% const A = settings?.autoReply || {}; const GID = guild.id;
+   const deviceDataUrl = A.imageData ? `data:${A.imageMimeType || 'image/jpeg'};base64,${A.imageData}` : '';
+   const previewSrc = deviceDataUrl || A.imageUrl || '';
+   const deviceKb = A.imageData ? Math.round((A.imageData.length * 3 / 4) / 1024) : 0;
+%>
 
 <div class="hero">
   <div class="h-logo" style="background:linear-gradient(135deg,#1abc9c,#00d4ff);display:grid;place-items:center;font-size:26px;"><i class="bi bi-chat-dots-fill"></i></div>
@@ -61,19 +65,24 @@
       <textarea class="inp" data-text="autoReply.text" rows="4" maxlength="2000" placeholder="مثال: أهلاً بك! اكتب سؤالك وفريق الدعم هيساعدك 💙"><%= A.text || '' %></textarea>
     </div>
     <div class="field mt-3">
-      <label>🖼️ رابط الصورة (اختياري) <span class="hint">رابط مباشر يبدأ بـ https://</span></label>
-      <input class="inp" data-text="autoReply.imageUrl" value="<%= A.imageUrl || '' %>" maxlength="500" placeholder="https://example.com/image.png">
+      <label>🖼️ صورة من جهازك <span class="hint">اختر صورة — تُضغط تلقائياً وتُحفظ داخل قاعدة البيانات</span></label>
+      <div class="btn-group" style="align-items:center;flex-wrap:wrap;gap:8px;">
+        <input type="file" id="arImageFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
+        <button class="btn primary sm" id="arPickImage" type="button"><i class="bi bi-upload"></i> اختيار صورة من الجهاز</button>
+        <button class="btn danger sm" id="arRemoveImage" type="button" <%= (A.imageData || A.imageUrl) ? '' : 'disabled' %>><i class="bi bi-trash"></i> إزالة الصورة</button>
+        <span id="arImageInfo" class="text-dim" style="font-size:11px;"><%= A.imageData ? `✅ ${A.imageName || 'صورة محفوظة'} — ${deviceKb} KB` : (A.imageUrl ? 'صورة من رابط خارجي' : 'لا توجد صورة') %></span>
+      </div>
+      <div class="text-dim" style="font-size:11px;margin-top:6px;">JPG / PNG / WebP / GIF — الحد الأقصى 12MB قبل الضغط، وتُحفظ نسخة مضغوطة صغيرة.</div>
+    </div>
+    <div class="field mt-3">
+      <label>🔗 أو رابط صورة خارجي <span class="hint">اختياري — يُستخدم لو ما في صورة من الجهاز</span></label>
+      <input class="inp" id="arImageUrl" value="<%= A.imageUrl || '' %>" maxlength="500" placeholder="https://example.com/image.png">
     </div>
     <div class="sec-title"><i class="bi bi-eye"></i> معاينة الرد</div>
     <div id="arPreview" style="background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px 16px;min-height:64px;">
-      <% if (A.imageUrl) { %>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;"><%= A.text || '' %></div>
-        <img src="<%= A.imageUrl %>" alt="preview" style="max-width:100%;max-height:260px;border-radius:10px;" onerror="this.style.display='none'">
-      <% } else if (A.text) { %>
-        <div style="font-size:13px;font-weight:700;"><%= A.text %></div>
-      <% } else { %>
-        <span class="text-dim" style="font-size:12px;">لا يوجد نص أو صورة بعد — أضف ما تريده أعلاه.</span>
-      <% } %>
+      <div id="arPreviewText" style="font-size:13px;font-weight:700;margin-bottom:8px;<%= A.text ? '' : 'display:none;' %>"><%= A.text || '' %></div>
+      <img id="arPreviewImg" src="<%= previewSrc || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' %>" data-device="<%= deviceDataUrl ? '1' : '0' %>" alt="preview" style="<%= previewSrc ? '' : 'display:none;' %>max-width:100%;max-height:260px;border-radius:10px;" onerror="this.style.display='none'">
+      <span id="arPreviewEmpty" class="text-dim" style="font-size:12px;<%= (A.text || previewSrc) ? 'display:none;' : '' %>">لا يوجد نص أو صورة بعد — أضف ما تريده أعلاه.</span>
     </div>
   </div>
 </div>
@@ -91,21 +100,149 @@
     });
 
     const textEl = document.querySelector('[data-text="autoReply.text"]');
-    const imgEl = document.querySelector('[data-text="autoReply.imageUrl"]');
-    const preview = document.getElementById('arPreview');
+    const urlEl = document.getElementById('arImageUrl');
+    const fileEl = document.getElementById('arImageFile');
+    const pickBtn = document.getElementById('arPickImage');
+    const removeBtn = document.getElementById('arRemoveImage');
+    const infoEl = document.getElementById('arImageInfo');
+    const previewText = document.getElementById('arPreviewText');
+    const previewImg = document.getElementById('arPreviewImg');
+    const previewEmpty = document.getElementById('arPreviewEmpty');
+
+    // 🖼️ الصورة المرفوعة من الجهاز لها أولوية، ثم الرابط الخارجي
+    const EMPTY_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    let deviceSrc = previewImg.dataset.device === '1' ? (previewImg.getAttribute('src') || '') : '';
+
     const renderPreview = () => {
       const text = (textEl?.value || '').trim();
-      const img = (imgEl?.value || '').trim();
-      if (!text && !img) {
-        preview.innerHTML = '<span class="text-dim" style="font-size:12px;">لا يوجد نص أو صورة بعد — أضف ما تريده أعلاه.</span>';
-        return;
+      const url = (urlEl?.value || '').trim();
+      const img = deviceSrc || url;
+      previewText.textContent = text;
+      previewText.style.display = text ? '' : 'none';
+      if (img) {
+        previewImg.src = img;
+        previewImg.style.display = '';
+      } else {
+        previewImg.src = EMPTY_IMG;
+        previewImg.style.display = 'none';
       }
-      const safeText = LC.esc(text);
-      const imgHtml = img ? `<img src="${LC.esc(img)}" alt="preview" style="max-width:100%;max-height:260px;border-radius:10px;margin-top:8px;" onerror="this.style.display='none'">` : '';
-      preview.innerHTML = (text ? `<div style="font-size:13px;font-weight:700;">${safeText}</div>` : '') + imgHtml;
+      previewEmpty.style.display = text || img ? 'none' : '';
     };
     textEl?.addEventListener('input', renderPreview);
-    imgEl?.addEventListener('input', renderPreview);
+    urlEl?.addEventListener('input', renderPreview);
+
+    const loadImageFile = (file) => new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => { URL.revokeObjectURL(objectUrl); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('تعذّر قراءة الصورة')); };
+      img.src = objectUrl;
+    });
+
+    // ضغط داخل المتصفح — يقلل الحجم قبل إرساله للبوت/قاعدة البيانات
+    const compressImage = async (file) => {
+      if (!file.type || !file.type.startsWith('image/')) throw new Error('اختر ملف صورة صالح');
+      if (file.size > 12 * 1024 * 1024) throw new Error('حجم الصورة أكبر من 12MB');
+      const img = await loadImageFile(file);
+      const attempts = [[1280, 0.85], [1100, 0.72], [900, 0.6], [720, 0.52]];
+      let best = null;
+      for (const [maxDim, quality] of attempts) {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+        if (!blob) continue;
+        best = blob;
+        if (blob.size <= 1_200_000) break;
+      }
+      if (!best) throw new Error('تعذّر ضغط الصورة');
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('تعذّر قراءة الصورة'));
+        reader.readAsDataURL(best);
+      });
+      return { base64: dataUrl.split(',')[1] || '', dataUrl, bytes: best.size };
+    };
+
+    pickBtn?.addEventListener('click', () => fileEl?.click());
+
+    fileEl?.addEventListener('change', async () => {
+      const file = fileEl.files?.[0];
+      if (!file) return;
+      const oldHtml = pickBtn?.innerHTML || 'اختيار صورة من الجهاز';
+      if (pickBtn) {
+        pickBtn.disabled = true;
+        pickBtn.innerHTML = '<span class="spinner"></span> جاري الضغط...';
+      }
+      infoEl.textContent = '⏳ جاري ضغط الصورة ورفعها...';
+      try {
+        const out = await compressImage(file);
+        if (!out.base64) throw new Error('تعذّر تجهيز الصورة');
+        const displayName = (file.name || 'auto-reply.jpg').slice(0, 120);
+        const ok = await LC.saveSetting(AR_GID, {
+          autoReply: {
+            imageData: out.base64,
+            imageMimeType: 'image/jpeg',
+            imageName: displayName.replace(/\.[^.]+$/, '') + '.jpg',
+            imageUrl: '',
+          },
+        }, null);
+        if (!ok) throw new Error('فشل الحفظ');
+        deviceSrc = out.dataUrl;
+        urlEl.value = '';
+        infoEl.textContent = `✅ ${displayName} — ${Math.round(out.bytes / 1024)} KB`;
+        removeBtn.disabled = false;
+        renderPreview();
+      } catch (err) {
+        infoEl.textContent = '❌ ' + (err?.message || 'فشل رفع الصورة');
+        LC.toast('فشل رفع الصورة: ' + (err?.message || ''), 'error');
+      } finally {
+        if (pickBtn) {
+          pickBtn.disabled = false;
+          pickBtn.innerHTML = oldHtml;
+        }
+        fileEl.value = '';
+      }
+    });
+
+    urlEl?.addEventListener('change', async () => {
+      const value = urlEl.value.trim();
+      if (value && !/^https?:\/\/\S+$/i.test(value)) {
+        LC.toast('الرابط يجب أن يبدأ بـ http:// أو https://', 'error');
+        return;
+      }
+      const ok = await LC.saveSetting(AR_GID, {
+        autoReply: { imageUrl: value, imageData: '', imageMimeType: '', imageName: '' },
+      }, null);
+      if (!ok) return;
+      deviceSrc = '';
+      infoEl.textContent = value ? 'صورة من رابط خارجي' : 'لا توجد صورة';
+      removeBtn.disabled = !value;
+      renderPreview();
+    });
+
+    removeBtn?.addEventListener('click', async () => {
+      removeBtn.disabled = true;
+      const ok = await LC.saveSetting(AR_GID, {
+        autoReply: { imageUrl: '', imageData: '', imageMimeType: '', imageName: '' },
+      }, null);
+      if (!ok) {
+        removeBtn.disabled = false;
+        return;
+      }
+      deviceSrc = '';
+      urlEl.value = '';
+      infoEl.textContent = 'لا توجد صورة';
+      renderPreview();
+    });
   });
 </script>
 

@@ -552,6 +552,10 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         channelIds: [{ type: String }],
         text: { type: String, default: '' },
         imageUrl: { type: String },
+        // 🖼️ صورة مرفوعة من الجهاز — تُحفظ base64 حتى تعمل اللوحة والبوت كعمليتين منفصلتين
+        imageData: { type: String, maxlength: 4_500_000 },
+        imageMimeType: { type: String, maxlength: 100 },
+        imageName: { type: String, maxlength: 200 },
         deleteTrigger: { type: Boolean, default: false },
         replyToMessage: { type: Boolean, default: true },
         ignoreStaff: { type: Boolean, default: true },

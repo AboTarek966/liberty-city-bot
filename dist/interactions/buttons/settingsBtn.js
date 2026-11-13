@@ -11,6 +11,7 @@ const ticketMessages_1 = require("../../utils/ticketMessages");
 const guildMemberAdd_1 = require("../../events/guildMemberAdd");
 const guildMemberRemove_1 = require("../../events/guildMemberRemove");
 const pendingUploads_1 = require("../../utils/pendingUploads");
+const autoReplyImage_1 = require("../../utils/autoReplyImage");
 const pendingWarnRoles_1 = require("../../utils/pendingWarnRoles");
 const welcomeCard_1 = require("../../utils/welcomeCard");
 const helpers_1 = require("../../utils/helpers");
@@ -303,7 +304,7 @@ const handler = {
                 }
                 case 'autoreply:image': {
                     const ai = String(settings.autoReply?.imageUrl || '');
-                    return openModal('🖼️ صورة الرد التلقائي', 'رابط مباشر يبدأ بـ https:// — فارغ لإزالة الصورة', discord_js_1.TextInputStyle.Short, 500, ai, false);
+                    return openModal('🔗 رابط صورة الرد التلقائي (اختياري)', 'رابط https:// — أو استخدم زر «من الجهاز» / لوحة التحكم لرفع صورة', discord_js_1.TextInputStyle.Short, 500, ai, false);
                 }
                 case 'autoreply:cooldown': {
                     const ac = settings.autoReply?.cooldownSeconds ?? 30;
@@ -497,19 +498,43 @@ const handler = {
         }
         // ---------- إجراءات تحدث اللوحة (تم تأكيدها deferUpdate في الأعلى) ----------
         switch (`${section}:${action}`) {
+            case 'autoreply:imageupload': {
+                // 📱 أول صورة يرسلها المستخدم في نفس القناة خلال 60 ثانية تُحفظ كصورة الرد التلقائي
+                (0, pendingUploads_1.setPendingImageUpload)(interaction.user.id, interaction.guild.id, interaction.channelId, 'autoReply');
+                await interaction.followUp({
+                    content: '📱 **أرسل الصورة الآن في هذه القناة** خلال 60 ثانية — تُضغط وتُحفظ تلقائياً.\n' +
+                        '> تقدر أيضاً ترفعها من لوحة التحكم ← الرد التلقائي، أو بالأمر `/autoreply image`',
+                    ephemeral: true,
+                });
+                return;
+            }
             case 'autoreply:preview': {
                 // 👀 معاينة الرد كما سيظهر في القناة
                 const a = settings.autoReply || {};
                 const text = String(a.text || '').trim();
                 const imageUrl = String(a.imageUrl || '').trim();
-                if (!text && !imageUrl) {
+                const deviceImage = (0, autoReplyImage_1.getAutoReplyImageBuffer)(a);
+                if (!text && !imageUrl && !deviceImage) {
                     await interaction.followUp({
                         content: '⚠️ لا يوجد نص ولا صورة — عدّل النص أو الصورة أولاً',
                         ephemeral: true,
                     });
                     return;
                 }
-                if (imageUrl) {
+                if (deviceImage) {
+                    const attachmentName = (0, autoReplyImage_1.autoReplyAttachmentName)(String(a.imageMimeType || 'image/jpeg'));
+                    const embed = new discord_js_1.EmbedBuilder()
+                        .setImage(`attachment://${attachmentName}`)
+                        .setColor(0x1abc9c);
+                    if (text)
+                        embed.setDescription(text);
+                    await interaction.followUp({
+                        embeds: [embed],
+                        files: [new discord_js_1.AttachmentBuilder(deviceImage, { name: attachmentName })],
+                        ephemeral: true,
+                    });
+                }
+                else if (imageUrl) {
                     const embed = new discord_js_1.EmbedBuilder().setImage(imageUrl).setColor(0x1abc9c);
                     if (text)
                         embed.setDescription(text);

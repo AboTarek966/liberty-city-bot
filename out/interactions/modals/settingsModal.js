@@ -127,6 +127,10 @@ const handler = {
                     };
                 }
                 settings.autoReply.imageUrl = value;
+                // اختيار رابط خارجي يلغي الصورة المرفوعة من الجهاز حتى لا يتجاهل الرابط الجديد
+                settings.autoReply.imageData = '';
+                settings.autoReply.imageMimeType = '';
+                settings.autoReply.imageName = '';
                 break;
             }
             case 'autoreply:cooldown': {

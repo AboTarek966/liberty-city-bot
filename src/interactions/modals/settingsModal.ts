@@ -138,6 +138,10 @@ const handler: ModalHandler = {
           };
         }
         (settings as any).autoReply.imageUrl = value;
+        // اختيار رابط خارجي يلغي الصورة المرفوعة من الجهاز حتى لا يتجاهل الرابط الجديد
+        (settings as any).autoReply.imageData = '';
+        (settings as any).autoReply.imageMimeType = '';
+        (settings as any).autoReply.imageName = '';
         break;
       }
       case 'autoreply:cooldown': {

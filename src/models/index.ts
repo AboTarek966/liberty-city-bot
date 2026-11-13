@@ -485,7 +485,14 @@ export interface IGuildSettings extends Document {
     enabled: boolean;
     channelIds: string[];
     text: string;
+    /** 🔗 رابط صورة خارجي (اختياري) */
     imageUrl?: string;
+    /** 🖼️ صورة مرفوعة من الجهاز — base64 (لها أولوية على الرابط) */
+    imageData?: string;
+    /** نوع الصورة المحفوظة مثل image/jpeg */
+    imageMimeType?: string;
+    /** اسم الصورة الأصلي للعرض في اللوحة */
+    imageName?: string;
     /** 🗑️ حذف رسالة العضو بعد الرد */
     deleteTrigger: boolean;
     /** ↩️ الرد كـ Reply على رسالة العضو */
@@ -1365,6 +1372,10 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     channelIds: [{ type: String }],
     text: { type: String, default: '' },
     imageUrl: { type: String },
+    // 🖼️ صورة مرفوعة من الجهاز — تُحفظ base64 حتى تعمل اللوحة والبوت كعمليتين منفصلتين
+    imageData: { type: String, maxlength: 4_500_000 },
+    imageMimeType: { type: String, maxlength: 100 },
+    imageName: { type: String, maxlength: 200 },
     deleteTrigger: { type: Boolean, default: false },
     replyToMessage: { type: Boolean, default: true },
     ignoreStaff: { type: Boolean, default: true },
