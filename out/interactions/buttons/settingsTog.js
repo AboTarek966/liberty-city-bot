@@ -266,9 +266,11 @@ const handler = {
                 break;
             }
             case 'ai': {
-                settings.ai.enabled = !settings.ai.enabled;
-                // مزامنة مع AIConfig (يستخدمه مسار المنشن)
-                await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { enabled: settings.ai.enabled }, { upsert: true }).catch(() => { });
+                // 🧠 الاعتماد على AIConfig (مصدر الحقيقة) في تحديد الحالة الحالية
+                const aiDoc = await models_1.AIConfig.findOne({ guildId: interaction.guild.id }).catch(() => null);
+                const currentEnabled = typeof aiDoc?.enabled === 'boolean' ? aiDoc.enabled : settings.ai.enabled;
+                settings.ai.enabled = !currentEnabled;
+                await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { enabled: settings.ai.enabled }, { upsert: true, setDefaultsOnInsert: true }).catch(() => { });
                 break;
             }
             case 'shop': {

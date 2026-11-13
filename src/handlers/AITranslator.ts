@@ -146,7 +146,7 @@ export class AITranslator {
         [],
         false,
         false,
-        { fromCommand: true }
+        { fromCommand: true, ignoreGlobalToggle: true }
       );
 
       if (!response?.content) return null;

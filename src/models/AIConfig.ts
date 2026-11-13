@@ -20,11 +20,13 @@ export interface IAIResponseRule extends Document {
 export interface IAIConfig extends Document {
   guildId: string;
   enabled: boolean;
-  provider?: 'openai' | 'anthropic' | 'groq' | 'both' | 'auto';
+  provider?: 'openai' | 'anthropic' | 'groq' | 'gemini' | 'openrouter' | 'requesty' | 'custom' | 'both' | 'auto';
   aiModel?: string;
   systemPrompt?: string;
   autoReplyOnMention: boolean;      // رد تلقائي عند المنشن
   mentionChannels: string[];        // قنوات محددة (فارغ = جميع القنوات)
+  allowedChannels: string[];        // قنوات مسموح بها (فارغ = الكل)
+  allowedRoles: string[];           // رولات مسموح لها (فارغ = الكل)
   ignoredChannels: string[];        // قنوات متجاهلة
   ignoredRoles: string[];           // رولات متجاهلة
   sensitiveKeywords: string[];      // كلمات حساسة لا يرد عليها
@@ -61,11 +63,13 @@ const AIResponseRuleSchema = new Schema<IAIResponseRule>({
 const AIConfigSchema = new Schema<IAIConfig>({
   guildId: { type: String, required: true, unique: true, index: true },
   enabled: { type: Boolean, default: true },
-  provider: { type: String, enum: ['openai', 'anthropic', 'groq', 'both', 'auto'], default: 'auto' },
+  provider: { type: String, enum: ['openai', 'anthropic', 'groq', 'gemini', 'openrouter', 'requesty', 'custom', 'both', 'auto'], default: 'auto' },
   aiModel: { type: String, default: '' },
   systemPrompt: { type: String, default: '' },
   autoReplyOnMention: { type: Boolean, default: true },
   mentionChannels: [{ type: String }],
+  allowedChannels: [{ type: String }],
+  allowedRoles: [{ type: String }],
   ignoredChannels: [{ type: String }],
   ignoredRoles: [{ type: String }],
   sensitiveKeywords: [{ type: String }],
@@ -82,7 +86,7 @@ const AIConfigSchema = new Schema<IAIConfig>({
     }, { _id: false }),
     default: null,
   },
-  maxTokens: { type: Number, default: 500 },
+  maxTokens: { type: Number, default: 1600, min: 100, max: 8000 },
   temperature: { type: Number, default: 0.7 },
   cooldown: { type: Number, default: 3 },
   language: { type: String, enum: ['ar', 'en', 'both'], default: 'ar' },

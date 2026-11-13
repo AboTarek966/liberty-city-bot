@@ -54,6 +54,7 @@ const helpers_1 = require("../utils/helpers");
 const securityAlerts_1 = require("../utils/securityAlerts");
 const knowledge_1 = require("../utils/knowledge");
 const embeds_1 = require("../utils/embeds");
+const aiJson_1 = require("../utils/aiJson");
 const aiTicketActions_1 = require("../utils/aiTicketActions");
 const logger = (0, helpers_1.createLogger)('AITicketAssistant');
 const APPROVAL_TTL_MS = 15 * 60 * 1000;
@@ -487,10 +488,9 @@ ${this.personaBlock(aiConfig)}
             if (!response?.content) {
                 return this.getDefaultAnalysis();
             }
-            const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-            if (!jsonMatch)
+            const parsed = (0, aiJson_1.extractJsonObject)(response.content);
+            if (!parsed)
                 return this.getDefaultAnalysis();
-            const parsed = JSON.parse(jsonMatch[0]);
             const rawActions = Array.isArray(parsed.requiredActions) ? parsed.requiredActions : [];
             const requiredActions = rawActions
                 .filter((item) => item && typeof item === 'object' && item.type)

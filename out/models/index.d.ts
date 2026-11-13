@@ -401,7 +401,7 @@ export interface IGuildSettings extends Document {
     };
     ai: {
         enabled: boolean;
-        provider: 'openai' | 'anthropic' | 'both';
+        provider: 'openai' | 'anthropic' | 'groq' | 'gemini' | 'openrouter' | 'requesty' | 'custom' | 'both' | 'auto';
         model: string;
         systemPrompt: string;
         temperature: number;

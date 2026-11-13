@@ -44,6 +44,14 @@ export declare class AIHandler {
     private fallbackResponses;
     constructor(client: Client);
     private initializeProviders;
+    /**
+     * فحص مفتاح كل مزوّد فعلياً عند الإقلاع.
+     * المفتاح الميت (401/403) يُعطَّل فوراً حتى لا يضيّع أول رسالة لكل عضو ثواني فشل.
+     * فشل الشبكة لا يُعتبر مفتاحاً ميتاً — المزوّد يبقى متاحاً.
+     */
+    private validateProviderKeys;
+    /** تعطيل مزوّد ميت نهائياً لهذه الجلسة (حتى إعادة التشغيل) */
+    private markProviderDead;
     private loadFallbackResponses;
     generateResponse(userId: string, guildId: string | undefined, channelId: string, message: string, userRoles?: string[], isMention?: boolean, repliedToBot?: boolean, opts?: {
         fromCommand?: boolean;

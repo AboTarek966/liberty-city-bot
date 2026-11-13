@@ -54,7 +54,16 @@ const command = {
         .setName('temperature')
         .setDescription('درجة الإبداع (0.0 - 2.0)')
         .setMinValue(0)
-        .setMaxValue(2)))
+        .setMaxValue(2))
+        .addStringOption(opt => opt
+        .setName('provider')
+        .setDescription('المزوّد المفضل للردود')
+        .addChoices({ name: 'تلقائي (الأفضل المتاح)', value: 'auto' }, { name: 'Groq (سريع ومجاني)', value: 'groq' }, { name: 'OpenRouter (موديلات مجانية)', value: 'openrouter' }, { name: 'Requesty (مجاني)', value: 'requesty' }, { name: 'Gemini', value: 'gemini' }, { name: 'OpenAI', value: 'openai' }, { name: 'Anthropic', value: 'anthropic' }))
+        .addIntegerOption(opt => opt
+        .setName('max_tokens')
+        .setDescription('أقصى طول للرد بالتوكنز (100 - 8000)')
+        .setMinValue(100)
+        .setMaxValue(8000)))
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.SendMessages)
         .setDMPermission(true),
     cooldown: 5,
@@ -226,19 +235,40 @@ async function handleConfig(interaction, client) {
     const enabled = interaction.options.getBoolean('enabled');
     const systemPrompt = interaction.options.getString('system_prompt');
     const temperature = interaction.options.getNumber('temperature');
+    const provider = interaction.options.getString('provider');
+    const maxTokens = interaction.options.getInteger('max_tokens');
+    // 🔄 أي حقل يتغيّر يُزامَن فوراً مع AIConfig — لأنها الوثيقة التي يقرأها محرك الردود فعلياً
+    const aiUpdate = {};
     if (enabled !== null) {
         settings.ai.enabled = enabled;
-        // 🔄 مزامنة فورية مع AIConfig (هي التي يقرأها مسار الرد فعلياً)
-        //    بدون هذا السطر يبقى البوت يرد حتى بعد "تعطيل" الذكاء — ثغرة قديمة
-        await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guildId }, { enabled }, { upsert: true }).catch(() => { });
+        aiUpdate.enabled = enabled;
     }
-    if (systemPrompt)
+    if (systemPrompt) {
         settings.ai.systemPrompt = systemPrompt;
-    if (temperature !== null)
+        aiUpdate.systemPrompt = systemPrompt;
+    }
+    if (temperature !== null) {
         settings.ai.temperature = temperature;
+        aiUpdate.temperature = temperature;
+    }
+    if (provider) {
+        settings.ai.provider = provider;
+        aiUpdate.provider = provider;
+    }
+    if (maxTokens !== null) {
+        settings.ai.maxTokens = maxTokens;
+        aiUpdate.maxTokens = maxTokens;
+    }
     await settings.save();
+    if (Object.keys(aiUpdate).length > 0) {
+        await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guildId }, { $set: aiUpdate }, { upsert: true, setDefaultsOnInsert: true }).catch(() => {
+            /* المزامنة اختيارية — لا تفشل الأمر بسببها */
+        });
+    }
     await interaction.editReply({
-        content: `✅ تم تحديث إعدادات AI — الحالة: ${settings.ai.enabled ? '✅ مفعل' : '❌ معطل'} • الإبداع: ${settings.ai.temperature}`,
+        content: `✅ تم تحديث إعدادات AI\n` +
+            `> الحالة: ${settings.ai.enabled ? '✅ مفعّل' : '❌ معطّل'}\n` +
+            `> المزوّد: \`${settings.ai.provider || 'auto'}\` • الإبداع: \`${settings.ai.temperature}\` • الحد الأقصى: \`${settings.ai.maxTokens}\` توكن`,
     });
 }
 // --------------------------------------------

@@ -1020,18 +1020,29 @@ async function buildAI(guild, s) {
     const tEnabled = translator?.enabled ?? false;
     const tDefault = translator?.defaultTargetLang ?? 'ar';
     const insights = s.aiInsights || {};
+    // 🧠 اعرض القيم التشغيلية الفعلية من AIConfig (مصدر الحقيقة) بدل قيم GuildSettings القديمة
+    const aiEnabled = typeof aiConfig?.enabled === 'boolean' ? aiConfig.enabled : ai.enabled;
+    const providerLabel = cpEnabled
+        ? (cp.label || 'مزوّد خاص')
+        : (aiConfig?.provider || ai.provider || 'auto');
+    const modelLabel = cpEnabled
+        ? cp.model
+        : (aiConfig?.aiModel || ai.model || 'افتراضي');
+    const maxTokensLabel = aiConfig?.maxTokens ?? ai.maxTokens ?? 1600;
+    const temperatureLabel = aiConfig?.temperature ?? ai.temperature ?? 0.7;
     const embed = categoryEmbed('ai', guild, `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +
-        `> ⚡ **الذكاء الاصطناعي:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> ⚡ **الذكاء الاصطناعي:** ${on(aiEnabled)} ${aiEnabled ? 'مفعّل' : 'معطّل'}\n` +
         `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
         `> 🔌 **API مخصص:** ${cpEnabled ? `✅ ${cp.label || 'مخصص'} — \`${cp.model}\`` : 'معطّل — استخدم أي API (OpenAI/Groq/Together/محلي/...) من زر «API مخصص»'}\n` +
-        `> 🧠 **المزود:** ${cpEnabled ? (cp.label || 'مزوّد خاص') : 'Groq (مجاني — gpt-oss-120b)'}\n\n` +
+        `> 🧠 **المزود:** ${providerLabel} • **الموديل:** \`${modelLabel}\`\n` +
+        `> 🎛️ **الحد الأقصى:** ${maxTokensLabel} توكن • **الإبداع:** ${temperatureLabel}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${AITranslator_1.SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n` +
         `> 📊 **تحليل المزاج:** ${on(insights.moodEnabled)} ${insights.moodEnabled ? 'مفعّل — /mood' : 'معطّل'}\n` +
         `> 🔗 **تلخيص الروابط:** ${on(insights.summarizeEnabled)} ${insights.summarizeEnabled ? 'مفعّل — /summarize' : 'معطّل'}\n\n` +
         `🔒 **الأمان:** المعلومات الحساسة في السيرفر (الإعدادات، السجلات، التذاكر) **لا تظهر إلا للإداريين** — الأعضاء العاديين يحصلون على معلومات عامة فقط (عدد الأعضاء، القنوات، الرتب...)\n\n` +
         `🎭 استخدم زر **الشخصية** لتعريف شخصية الذكاء العامة (كل الأعضاء) — وميزة **التكتات** لها شخصية مستقلة من: الإعدادات ← التذاكر ← 🤖 AI`);
-    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('ai', 'enabled', 'الذكاء', '⚡', ai.enabled), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(discord_js_1.ButtonStyle.Danger).setEmoji('⏪'), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(discord_js_1.ButtonStyle.Success).setEmoji('⏩'), btn('settings_btn:ai:personality', 'الشخصية', discord_js_1.ButtonStyle.Primary, '🎭'));
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('ai', 'enabled', 'الذكاء', '⚡', aiEnabled), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(discord_js_1.ButtonStyle.Danger).setEmoji('⏪'), new discord_js_1.ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(discord_js_1.ButtonStyle.Success).setEmoji('⏩'), btn('settings_btn:ai:personality', 'الشخصية', discord_js_1.ButtonStyle.Primary, '🎭'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('aiTranslator', 'enabled', '🌐 Translator', '🌐', tEnabled), btn('settings_btn:translator:settings', 'إعدادات الترجمة', discord_js_1.ButtonStyle.Primary, '⚙️'), btn('settings_btn:ai:custom', 'API مخصص', cpEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Primary, '🔌'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const langSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()
         .setCustomId('settings_sel:ai:lang')

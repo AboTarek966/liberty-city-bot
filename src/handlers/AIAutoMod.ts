@@ -17,6 +17,7 @@ import { OmniClient } from '../OmniClient';
 import { getGuildSettings, ModerationCase } from '../models';
 import { createLogger } from '../utils/helpers';
 import { Colors } from '../utils/embeds';
+import { extractJsonObject } from '../utils/aiJson';
 
 const logger = createLogger('AIAutoMod');
 
@@ -268,6 +269,8 @@ ${context}
         false,
         {
           fromCommand: true,
+          // 🛡️ AI AutoMod ميزة مستقلة — تعمل حتى لو الذكاء العام معطّل (لها مفتاحها)
+          ignoreGlobalToggle: true,
           userContext: undefined,
         }
       );
@@ -276,14 +279,12 @@ ${context}
         return { flagged: false, categories: [], severity: 'low', action: 'none', reason: 'لا يوجد رد من الـ AI', confidence: 0 };
       }
 
-      // محاولة استخراج JSON
-      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        logger.warn(`AI AutoMod: لم يتم العثور على JSON في الرد: ${response.content.substring(0, 100)}`);
+      // محاولة استخراج JSON — آمنة حتى لو أضاف النموذج كلاماً أو ```json
+      const parsed = extractJsonObject(response.content);
+      if (!parsed) {
+        logger.warn(`AI AutoMod: رد غير صالح (لا JSON): ${response.content.substring(0, 120)}`);
         return { flagged: false, categories: [], severity: 'low', action: 'none', reason: 'فشل تحليل الرد', confidence: 0 };
       }
-
-      const parsed = JSON.parse(jsonMatch[0]);
       
       // تطبيق الحساسية
       if (parsed.confidence < cfg.sensitivity * 10) {

@@ -35,7 +35,7 @@
         <div class="field">
           <label>المزوّد</label>
           <select class="inp" data-text="ai.provider">
-            <% [['openai', 'OpenAI (GPT)'], ['anthropic', 'Anthropic (Claude)'], ['both', 'تحكيم بالاثنين']].forEach(o => { %><option value="<%= o[0] %>" <%= A.provider === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
+            <% [['auto', 'تلقائي (الأفضل المتاح)'], ['groq', 'Groq (سريع ومجاني)'], ['openrouter', 'OpenRouter (موديلات مجانية)'], ['requesty', 'Requesty (مجاني)'], ['gemini', 'Gemini'], ['openai', 'OpenAI (GPT)'], ['anthropic', 'Anthropic (Claude)'], ['both', 'تحكيم بين المزوّدين']].forEach(o => { %><option value="<%= o[0] %>" <%= (A.provider || 'auto') === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %>
           </select>
         </div>
         <div class="field">
@@ -50,12 +50,16 @@
           <input type="range" class="range" min="0" max="10" value="<%= Math.round((A.temperature ?? 0.7) * 10) %>" oninput="this.nextElementSibling.textContent=(this.value/10).toFixed(1)" onchange="LC.saveSetting('<%= GID %>', { ai: { temperature: this.value/10 } })">
           <span class="chip cyan num"><%= (A.temperature ?? 0.7).toFixed(1) %></span>
         </div>
-        <div class="field"><label>أقصى طول الرد (توكنز)</label><input type="number" class="inp num" data-num="ai.maxTokens" value="<%= A.maxTokens || 800 %>" min="100" max="4000"></div>
+        <div class="field"><label>أقصى طول الرد (توكنز)</label><input type="number" class="inp num" data-num="ai.maxTokens" value="<%= A.maxTokens || 1600 %>" min="100" max="8000"></div>
         <div class="field"><label>الانتظار بين الردود (ثواني)</label><input type="number" class="inp num" data-num="ai.cooldown" value="<%= Math.round((A.cooldown || 3)) %>" min="0" max="600"></div>
       </div>
       <div class="field mt-3">
         <label>شخصية البوت (System Prompt) <span class="hint">تحدد سلوك رده</span></label>
         <textarea class="inp" data-text="ai.systemPrompt" placeholder="أنت مساعد ذكي ودود في هذا السيرفر..."><%= A.systemPrompt || '' %></textarea>
+      </div>
+      <div class="field mt-3">
+        <label>الموديل <span class="hint">فارغ = الافتراضي للمزوّد المختار</span></label>
+        <input class="inp" data-text="ai.model" value="<%= A.model || '' %>" placeholder="مثال: openai/gpt-oss-120b أو google/gemma-4-31b-it:free">
       </div>
       <div class="form-row mt-3">
         <div class="field"><label>قنوات مسموحة <span class="hint">فارغ = الكل</span></label><input class="inp" data-array="ai.allowedChannels" value="<%= (A.allowedChannels || []).join(',') %>" placeholder="ID, ID"></div>

@@ -29,6 +29,7 @@ import { createLogger } from '../utils/helpers';
 import { securityAlertsSilent } from '../utils/securityAlerts';
 import { tokenize, invalidateKnowledgeCache } from '../utils/knowledge';
 import { Colors } from '../utils/embeds';
+import { extractJsonObject } from '../utils/aiJson';
 import {
   TicketAction,
   ActionContext,
@@ -597,10 +598,8 @@ ${this.personaBlock(aiConfig)}
         return this.getDefaultAnalysis();
       }
 
-      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return this.getDefaultAnalysis();
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = extractJsonObject(response.content);
+      if (!parsed) return this.getDefaultAnalysis();
       const rawActions = Array.isArray(parsed.requiredActions) ? parsed.requiredActions : [];
 
       const requiredActions: RequiredAction[] = rawActions

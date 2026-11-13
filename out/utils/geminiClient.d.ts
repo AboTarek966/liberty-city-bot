@@ -5,6 +5,7 @@
 export declare const GEMINI_TEXT_MODELS: string[];
 /** موديلات Gemini للرؤية — نفس الموديلات تدعم الصور */
 export declare const GEMINI_VISION_MODELS: string[];
+export declare function refreshGeminiModels(apiKey: string): Promise<string[]>;
 export interface GeminiImage {
     data: string;
     mimeType: string;

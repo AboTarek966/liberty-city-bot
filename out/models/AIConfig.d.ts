@@ -14,11 +14,13 @@ export interface IAIResponseRule extends Document {
 export interface IAIConfig extends Document {
     guildId: string;
     enabled: boolean;
-    provider?: 'openai' | 'anthropic' | 'groq' | 'both' | 'auto';
+    provider?: 'openai' | 'anthropic' | 'groq' | 'gemini' | 'openrouter' | 'requesty' | 'custom' | 'both' | 'auto';
     aiModel?: string;
     systemPrompt?: string;
     autoReplyOnMention: boolean;
     mentionChannels: string[];
+    allowedChannels: string[];
+    allowedRoles: string[];
     ignoredChannels: string[];
     ignoredRoles: string[];
     sensitiveKeywords: string[];

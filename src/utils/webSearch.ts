@@ -322,7 +322,8 @@ export function formatSearchResultsBrief(results: SearchResult[]): string {
 }
 
 export async function searchTrend(query: string): Promise<string> {
-  const r = await webSearch(`${query} ترند 2024 2025`, 3);
+  const year = new Date().getFullYear();
+  const r = await webSearch(`${query} ترند ${year}`, 3);
   return formatSearchResults(r);
 }
 
@@ -359,7 +360,8 @@ export async function webSearchEnhanced(query: string, maxResults = 5): Promise<
   if (!results.length || results.length >= maxResults) return results.slice(0, maxResults);
 
   // المصدر أرجع شيئاً → نُوسّع ببديل واحد فقط (لا نُبطئ الرد)
-  const alternativeQueries = [`${query} شرح`, `${query} 2025 2026`];
+  const year = new Date().getFullYear();
+  const alternativeQueries = [`${query} شرح`, `${query} ${year}`];
 
   for (const altQuery of alternativeQueries) {
     const more = await webSearch(altQuery, maxResults - results.length);

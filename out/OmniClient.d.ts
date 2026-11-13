@@ -43,6 +43,11 @@ export declare class OmniClient extends Client {
     private settingsUpdateQueue;
     private updateGuildSettings;
     private applyGuildSettingsUpdate;
+    /**
+     * مزامنة حقول `ai.*` القادمة من اللوحة/الأمر إلى AIConfig.
+     * بدونها كانت اللوحة تكتب في GuildSettings بينما الردود تقرأ AIConfig — تعارض صامت.
+     */
+    private syncAIConfig;
     private getGuildStats;
     private getDashboardStats;
     initialize(): Promise<void>;

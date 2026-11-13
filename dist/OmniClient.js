@@ -171,6 +171,33 @@ class OmniClient extends discord_js_1.Client {
                 const guildId = req.params.guildId;
                 // fresh=1: قراءة مباشرة من قاعدة البيانات — تستخدمها اللوحة للمزامنة مع ديسكورد
                 const settings = await this.getGuildSettings(guildId, String(req.query.fresh) === '1');
+                // 🧠 AIConfig هي وثيقة التشغيل الفعلية — نعرض قيمها للوحة حتى لا تختلف عن السلوك
+                try {
+                    const { AIConfig } = await Promise.resolve().then(() => __importStar(require('./models')));
+                    const aiDoc = await AIConfig.findOne({ guildId }).lean();
+                    if (aiDoc) {
+                        const current = settings.ai || {};
+                        const preferArr = (a, b) => (Array.isArray(a) ? a : Array.isArray(b) ? b : []);
+                        settings.ai = {
+                            ...current,
+                            enabled: typeof aiDoc.enabled === 'boolean' ? aiDoc.enabled : current.enabled,
+                            provider: aiDoc.provider || current.provider || 'auto',
+                            model: aiDoc.aiModel || current.model || '',
+                            systemPrompt: aiDoc.systemPrompt || current.systemPrompt || '',
+                            temperature: typeof aiDoc.temperature === 'number' ? aiDoc.temperature : current.temperature,
+                            maxTokens: typeof aiDoc.maxTokens === 'number' ? aiDoc.maxTokens : current.maxTokens,
+                            cooldown: typeof aiDoc.cooldown === 'number' ? aiDoc.cooldown : current.cooldown,
+                            allowedChannels: preferArr(aiDoc.allowedChannels, current.allowedChannels),
+                            allowedRoles: preferArr(aiDoc.allowedRoles, current.allowedRoles),
+                            ignoredChannels: preferArr(aiDoc.ignoredChannels, current.ignoredChannels),
+                            ignoredRoles: preferArr(aiDoc.ignoredRoles, current.ignoredRoles),
+                            responseLanguage: aiDoc.language || current.responseLanguage || 'ar',
+                        };
+                    }
+                }
+                catch {
+                    /* تعذّر دمج AIConfig — نرجع إعدادات السيرفر كما هي */
+                }
                 res.json(settings);
             }
             catch (error) {
@@ -884,6 +911,8 @@ class OmniClient extends discord_js_1.Client {
             }
             await settings.save();
             invalidateGuildSettings(guildId);
+            // 🧠 مزامنة حقول AI مع وثيقة التشغيل AIConfig — اللوحة والأمر يكتبان في GuildSettings
+            await this.syncAIConfig(guildId, updates).catch(() => { });
             return settings.toObject();
         }
         catch (error) {
@@ -900,8 +929,42 @@ class OmniClient extends discord_js_1.Client {
             }
             await fresh.save();
             invalidateGuildSettings(guildId);
+            await this.syncAIConfig(guildId, updates).catch(() => { });
             return fresh.toObject();
         }
+    }
+    /**
+     * مزامنة حقول `ai.*` القادمة من اللوحة/الأمر إلى AIConfig.
+     * بدونها كانت اللوحة تكتب في GuildSettings بينما الردود تقرأ AIConfig — تعارض صامت.
+     */
+    async syncAIConfig(guildId, updates) {
+        const ai = updates?.ai;
+        if (!ai || typeof ai !== 'object' || Array.isArray(ai))
+            return;
+        const map = {
+            enabled: 'enabled',
+            provider: 'provider',
+            model: 'aiModel',
+            systemPrompt: 'systemPrompt',
+            temperature: 'temperature',
+            maxTokens: 'maxTokens',
+            cooldown: 'cooldown',
+            allowedChannels: 'allowedChannels',
+            allowedRoles: 'allowedRoles',
+            ignoredChannels: 'ignoredChannels',
+            ignoredRoles: 'ignoredRoles',
+            responseLanguage: 'language',
+        };
+        const set = {};
+        for (const [key, value] of Object.entries(ai)) {
+            const target = map[key];
+            if (target && value !== undefined)
+                set[target] = value;
+        }
+        if (Object.keys(set).length === 0)
+            return;
+        const { AIConfig } = await Promise.resolve().then(() => __importStar(require('./models')));
+        await AIConfig.findOneAndUpdate({ guildId }, { $set: set }, { upsert: true, setDefaultsOnInsert: true });
     }
     async getGuildStats(guildId) {
         const guild = this.guilds.cache.get(guildId);

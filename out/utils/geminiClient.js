@@ -9,6 +9,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GEMINI_VISION_MODELS = exports.GEMINI_TEXT_MODELS = void 0;
+exports.refreshGeminiModels = refreshGeminiModels;
 exports.geminiGenerate = geminiGenerate;
 exports.geminiStream = geminiStream;
 const axios_1 = __importDefault(require("axios"));
@@ -27,6 +28,44 @@ exports.GEMINI_TEXT_MODELS = [
 ];
 /** موديلات Gemini للرؤية — نفس الموديلات تدعم الصور */
 exports.GEMINI_VISION_MODELS = exports.GEMINI_TEXT_MODELS;
+// 🔎 اكتشاف ديناميكي للموديلات المتاحة فعلاً على المفتاح الحالي (يتجدد كل 10 دقائق)
+let discoveredGeminiModels = [];
+let geminiDiscoveryAt = 0;
+let geminiDiscoveryKey = '';
+let geminiDiscoveryFailedAt = 0;
+async function refreshGeminiModels(apiKey) {
+    if (!apiKey)
+        return [];
+    if (geminiDiscoveryKey === apiKey && Date.now() - geminiDiscoveryAt < 10 * 60_000) {
+        return discoveredGeminiModels;
+    }
+    // لا نعيد محاولة فاشلة قبل 10 دقائق (المفتاح الميت لا يجب أن يبطئ كل طلب)
+    if (Date.now() - geminiDiscoveryFailedAt < 10 * 60_000 && geminiDiscoveryKey !== apiKey) {
+        return discoveredGeminiModels;
+    }
+    try {
+        const r = await axios_1.default.get(`${BASE}/models`, {
+            headers: { 'x-goog-api-key': apiKey },
+            params: { pageSize: 100 },
+            timeout: 8000,
+        });
+        const names = (r.data?.models || [])
+            .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+            .map((m) => String(m.name || '').replace(/^models\//, ''))
+            .filter((n) => /gemini/i.test(n) && !/embedding|aqa|imagen/i.test(n));
+        if (names.length) {
+            discoveredGeminiModels = names;
+            geminiDiscoveryKey = apiKey;
+            geminiDiscoveryAt = Date.now();
+            logger.info(`Gemini models discovered: ${names.slice(0, 6).join(', ')}${names.length > 6 ? '…' : ''}`);
+        }
+    }
+    catch (e) {
+        geminiDiscoveryFailedAt = Date.now();
+        logger.warn(`Gemini model discovery failed: ${e?.message || e}`);
+    }
+    return discoveredGeminiModels;
+}
 /** تحويل ذاكرة المحادثة + الرسالة (+صور) إلى صيغة Gemini */
 function buildContents(history, message, images = []) {
     const contents = [];
@@ -84,9 +123,9 @@ function buildBody(opts) {
     }
     return body;
 }
-function pickModels(useVision, preferred) {
-    const list = useVision ? exports.GEMINI_VISION_MODELS : exports.GEMINI_TEXT_MODELS;
-    const ordered = preferred && !list.includes(preferred) ? [preferred, ...list] : list;
+function pickModels(useVision, preferred, discovered = []) {
+    const tested = useVision ? exports.GEMINI_VISION_MODELS : exports.GEMINI_TEXT_MODELS;
+    const ordered = preferred ? [preferred, ...tested, ...discovered] : [...tested, ...discovered];
     return [...new Set(ordered)];
 }
 function extractText(data) {
@@ -105,7 +144,8 @@ function statusOf(e) {
 async function geminiGenerate(opts) {
     const body = buildBody(opts);
     let lastErr = null;
-    for (const model of pickModels(!!opts.images?.length, opts.preferredModel)) {
+    const discovered = await refreshGeminiModels(opts.apiKey);
+    for (const model of pickModels(!!opts.images?.length, opts.preferredModel, discovered)) {
         // 503 "high demand" و429 حصة مؤقتة → نجرّب نفس الموديل مرة أخرى قبل الانتقال
         for (let attempt = 1; attempt <= 2; attempt++) {
             try {
@@ -151,7 +191,8 @@ async function geminiGenerate(opts) {
 async function geminiStream(opts) {
     const body = buildBody(opts);
     let lastErr = null;
-    for (const model of pickModels(!!opts.images?.length, opts.preferredModel)) {
+    const discovered = await refreshGeminiModels(opts.apiKey);
+    for (const model of pickModels(!!opts.images?.length, opts.preferredModel, discovered)) {
         const url = `${BASE}/models/${model}:streamGenerateContent?alt=sse`;
         try {
             // 503 "high demand" و429 مؤقتان → نجرّب الطلب مرة أخرى قبل الانتقال

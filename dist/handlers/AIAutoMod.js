@@ -10,6 +10,7 @@ const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const helpers_1 = require("../utils/helpers");
 const embeds_1 = require("../utils/embeds");
+const aiJson_1 = require("../utils/aiJson");
 const logger = (0, helpers_1.createLogger)('AIAutoMod');
 const DEFAULT_CONFIG = {
     enabled: false,
@@ -186,18 +187,19 @@ ${context}
         try {
             const response = await this.aiHandler.generateResponse('system-automod', message.guild.id, message.channel.id, prompt, [], false, false, {
                 fromCommand: true,
+                // 🛡️ AI AutoMod ميزة مستقلة — تعمل حتى لو الذكاء العام معطّل (لها مفتاحها)
+                ignoreGlobalToggle: true,
                 userContext: undefined,
             });
             if (!response?.content) {
                 return { flagged: false, categories: [], severity: 'low', action: 'none', reason: 'لا يوجد رد من الـ AI', confidence: 0 };
             }
-            // محاولة استخراج JSON
-            const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                logger.warn(`AI AutoMod: لم يتم العثور على JSON في الرد: ${response.content.substring(0, 100)}`);
+            // محاولة استخراج JSON — آمنة حتى لو أضاف النموذج كلاماً أو ```json
+            const parsed = (0, aiJson_1.extractJsonObject)(response.content);
+            if (!parsed) {
+                logger.warn(`AI AutoMod: رد غير صالح (لا JSON): ${response.content.substring(0, 120)}`);
                 return { flagged: false, categories: [], severity: 'low', action: 'none', reason: 'فشل تحليل الرد', confidence: 0 };
             }
-            const parsed = JSON.parse(jsonMatch[0]);
             // تطبيق الحساسية
             if (parsed.confidence < cfg.sensitivity * 10) {
                 return { flagged: false, categories: [], severity: 'low', action: 'none', reason: 'ثقة منخفضة', confidence: parsed.confidence };

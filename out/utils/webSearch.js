@@ -321,7 +321,8 @@ function formatSearchResultsBrief(results) {
     return results.slice(0, 3).map((r, i) => `${i + 1}. **${r.title}** — ${r.snippet ? r.snippet.slice(0, 200) + '...' : 'بدون ملخص'}\n   🔗 ${r.url}`).join('\n\n');
 }
 async function searchTrend(query) {
-    const r = await webSearch(`${query} ترند 2024 2025`, 3);
+    const year = new Date().getFullYear();
+    const r = await webSearch(`${query} ترند ${year}`, 3);
     return formatSearchResults(r);
 }
 async function searchNews(query) {
@@ -354,7 +355,8 @@ async function webSearchEnhanced(query, maxResults = 5) {
     if (!results.length || results.length >= maxResults)
         return results.slice(0, maxResults);
     // المصدر أرجع شيئاً → نُوسّع ببديل واحد فقط (لا نُبطئ الرد)
-    const alternativeQueries = [`${query} شرح`, `${query} 2025 2026`];
+    const year = new Date().getFullYear();
+    const alternativeQueries = [`${query} شرح`, `${query} ${year}`];
     for (const altQuery of alternativeQueries) {
         const more = await webSearch(altQuery, maxResults - results.length);
         for (const r of more) {

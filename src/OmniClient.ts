@@ -179,6 +179,34 @@ export class OmniClient extends Client {
         const guildId = req.params.guildId;
         // fresh=1: قراءة مباشرة من قاعدة البيانات — تستخدمها اللوحة للمزامنة مع ديسكورد
         const settings = await this.getGuildSettings(guildId, String(req.query.fresh) === '1');
+
+        // 🧠 AIConfig هي وثيقة التشغيل الفعلية — نعرض قيمها للوحة حتى لا تختلف عن السلوك
+        try {
+          const { AIConfig } = await import('./models');
+          const aiDoc: any = await AIConfig.findOne({ guildId }).lean();
+          if (aiDoc) {
+            const current: any = (settings as any).ai || {};
+            const preferArr = (a: any, b: any) => (Array.isArray(a) ? a : Array.isArray(b) ? b : []);
+            (settings as any).ai = {
+              ...current,
+              enabled: typeof aiDoc.enabled === 'boolean' ? aiDoc.enabled : current.enabled,
+              provider: aiDoc.provider || current.provider || 'auto',
+              model: aiDoc.aiModel || current.model || '',
+              systemPrompt: aiDoc.systemPrompt || current.systemPrompt || '',
+              temperature: typeof aiDoc.temperature === 'number' ? aiDoc.temperature : current.temperature,
+              maxTokens: typeof aiDoc.maxTokens === 'number' ? aiDoc.maxTokens : current.maxTokens,
+              cooldown: typeof aiDoc.cooldown === 'number' ? aiDoc.cooldown : current.cooldown,
+              allowedChannels: preferArr(aiDoc.allowedChannels, current.allowedChannels),
+              allowedRoles: preferArr(aiDoc.allowedRoles, current.allowedRoles),
+              ignoredChannels: preferArr(aiDoc.ignoredChannels, current.ignoredChannels),
+              ignoredRoles: preferArr(aiDoc.ignoredRoles, current.ignoredRoles),
+              responseLanguage: aiDoc.language || current.responseLanguage || 'ar',
+            };
+          }
+        } catch {
+          /* تعذّر دمج AIConfig — نرجع إعدادات السيرفر كما هي */
+        }
+
         res.json(settings);
       } catch (error) {
         logger.error('Failed to get guild settings:', error);
@@ -906,6 +934,8 @@ export class OmniClient extends Client {
       }
       await settings.save();
       invalidateGuildSettings(guildId);
+      // 🧠 مزامنة حقول AI مع وثيقة التشغيل AIConfig — اللوحة والأمر يكتبان في GuildSettings
+      await this.syncAIConfig(guildId, updates).catch(() => {});
       return settings.toObject();
     } catch (error: any) {
       // إعادة محاولة واحدة بوثيقة نظيفة (تغطي أي تعارض خارجي على نفس الوثيقة)
@@ -919,8 +949,47 @@ export class OmniClient extends Client {
       }
       await fresh.save();
       invalidateGuildSettings(guildId);
+      await this.syncAIConfig(guildId, updates).catch(() => {});
       return fresh.toObject();
     }
+  }
+
+  /**
+   * مزامنة حقول `ai.*` القادمة من اللوحة/الأمر إلى AIConfig.
+   * بدونها كانت اللوحة تكتب في GuildSettings بينما الردود تقرأ AIConfig — تعارض صامت.
+   */
+  private async syncAIConfig(guildId: string, updates: any): Promise<void> {
+    const ai = updates?.ai;
+    if (!ai || typeof ai !== 'object' || Array.isArray(ai)) return;
+
+    const map: Record<string, string> = {
+      enabled: 'enabled',
+      provider: 'provider',
+      model: 'aiModel',
+      systemPrompt: 'systemPrompt',
+      temperature: 'temperature',
+      maxTokens: 'maxTokens',
+      cooldown: 'cooldown',
+      allowedChannels: 'allowedChannels',
+      allowedRoles: 'allowedRoles',
+      ignoredChannels: 'ignoredChannels',
+      ignoredRoles: 'ignoredRoles',
+      responseLanguage: 'language',
+    };
+
+    const set: Record<string, any> = {};
+    for (const [key, value] of Object.entries(ai)) {
+      const target = map[key];
+      if (target && value !== undefined) set[target] = value;
+    }
+    if (Object.keys(set).length === 0) return;
+
+    const { AIConfig } = await import('./models');
+    await AIConfig.findOneAndUpdate(
+      { guildId },
+      { $set: set },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
   }
 
   private async getGuildStats(guildId: string): Promise<any> {

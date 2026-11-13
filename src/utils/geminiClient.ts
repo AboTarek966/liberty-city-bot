@@ -25,6 +25,44 @@ export const GEMINI_TEXT_MODELS = [
 /** موديلات Gemini للرؤية — نفس الموديلات تدعم الصور */
 export const GEMINI_VISION_MODELS = GEMINI_TEXT_MODELS;
 
+// 🔎 اكتشاف ديناميكي للموديلات المتاحة فعلاً على المفتاح الحالي (يتجدد كل 10 دقائق)
+let discoveredGeminiModels: string[] = [];
+let geminiDiscoveryAt = 0;
+let geminiDiscoveryKey = '';
+let geminiDiscoveryFailedAt = 0;
+
+export async function refreshGeminiModels(apiKey: string): Promise<string[]> {
+  if (!apiKey) return [];
+  if (geminiDiscoveryKey === apiKey && Date.now() - geminiDiscoveryAt < 10 * 60_000) {
+    return discoveredGeminiModels;
+  }
+  // لا نعيد محاولة فاشلة قبل 10 دقائق (المفتاح الميت لا يجب أن يبطئ كل طلب)
+  if (Date.now() - geminiDiscoveryFailedAt < 10 * 60_000 && geminiDiscoveryKey !== apiKey) {
+    return discoveredGeminiModels;
+  }
+  try {
+    const r = await axios.get(`${BASE}/models`, {
+      headers: { 'x-goog-api-key': apiKey },
+      params: { pageSize: 100 },
+      timeout: 8000,
+    });
+    const names: string[] = (r.data?.models || [])
+      .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+      .filter((n: string) => /gemini/i.test(n) && !/embedding|aqa|imagen/i.test(n));
+    if (names.length) {
+      discoveredGeminiModels = names;
+      geminiDiscoveryKey = apiKey;
+      geminiDiscoveryAt = Date.now();
+      logger.info(`Gemini models discovered: ${names.slice(0, 6).join(', ')}${names.length > 6 ? '…' : ''}`);
+    }
+  } catch (e: any) {
+    geminiDiscoveryFailedAt = Date.now();
+    logger.warn(`Gemini model discovery failed: ${e?.message || e}`);
+  }
+  return discoveredGeminiModels;
+}
+
 export interface GeminiImage {
   data: string; // base64
   mimeType: string;
@@ -107,9 +145,9 @@ function buildBody(opts: {
   return body;
 }
 
-function pickModels(useVision: boolean, preferred?: string): string[] {
-  const list = useVision ? GEMINI_VISION_MODELS : GEMINI_TEXT_MODELS;
-  const ordered = preferred && !list.includes(preferred) ? [preferred, ...list] : list;
+function pickModels(useVision: boolean, preferred?: string, discovered: string[] = []): string[] {
+  const tested = useVision ? GEMINI_VISION_MODELS : GEMINI_TEXT_MODELS;
+  const ordered = preferred ? [preferred, ...tested, ...discovered] : [...tested, ...discovered];
   return [...new Set(ordered)];
 }
 
@@ -139,8 +177,9 @@ export async function geminiGenerate(opts: {
 }): Promise<GeminiResult> {
   const body = buildBody(opts);
   let lastErr: any = null;
+  const discovered = await refreshGeminiModels(opts.apiKey);
 
-  for (const model of pickModels(!!opts.images?.length, opts.preferredModel)) {
+  for (const model of pickModels(!!opts.images?.length, opts.preferredModel, discovered)) {
     // 503 "high demand" و429 حصة مؤقتة → نجرّب نفس الموديل مرة أخرى قبل الانتقال
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
@@ -196,8 +235,9 @@ export async function geminiStream(opts: {
 }): Promise<GeminiResult> {
   const body = buildBody(opts);
   let lastErr: any = null;
+  const discovered = await refreshGeminiModels(opts.apiKey);
 
-  for (const model of pickModels(!!opts.images?.length, opts.preferredModel)) {
+  for (const model of pickModels(!!opts.images?.length, opts.preferredModel, discovered)) {
     const url = `${BASE}/models/${model}:streamGenerateContent?alt=sse`;
     try {
       // 503 "high demand" و429 مؤقتان → نجرّب الطلب مرة أخرى قبل الانتقال

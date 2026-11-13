@@ -89,12 +89,86 @@ const DashboardCommandSchema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 }, { strict: false, minimize: false });
 
+const AIConfigSchema = new Schema({
+  guildId: { type: String, required: true, index: true },
+}, { strict: false, minimize: false });
+
 // Use the SAME collection names as the bot (mongoose default pluralization)
 const GuildSettings = mongoose.models.GuildSettings || mongoose.model('GuildSettings', GuildSettingsSchema);
 const Ticket = mongoose.models.Ticket || mongoose.model('Ticket', TicketSchema);
 const ModerationCase = mongoose.models.ModerationCase || mongoose.model('ModerationCase', ModerationCaseSchema);
 const UserProfile = mongoose.models.UserProfile || mongoose.model('UserProfile', UserProfileSchema);
 const DashboardCommand = mongoose.models.DashboardCommand || mongoose.model('DashboardCommand', DashboardCommandSchema);
+const AIConfig = mongoose.models.AIConfig || mongoose.model('AIConfig', AIConfigSchema);
+
+/**
+ * دمج وثيقة AIConfig (مصدر الحقيقة وقت التشغيل) داخل settings.ai.
+ * ضروري لأن اللوحة قد تقرأ Mongo مباشرة بدون API البوت.
+ */
+async function mergeAIConfig(guildId, settings) {
+  const out = settings || { guildId: String(guildId) };
+  try {
+    if (!(await ensureConnected())) return out;
+    const ai = await AIConfig.findOne({ guildId: String(guildId) }).lean();
+    if (!ai) return out;
+    const cur = out.ai && typeof out.ai === 'object' ? out.ai : {};
+    const arr = (primary, fallback) => (Array.isArray(primary) ? primary : Array.isArray(fallback) ? fallback : []);
+    out.ai = {
+      ...cur,
+      enabled: typeof ai.enabled === 'boolean' ? ai.enabled : cur.enabled,
+      provider: ai.provider || cur.provider || 'auto',
+      model: ai.aiModel || cur.model || '',
+      systemPrompt: ai.systemPrompt || cur.systemPrompt || '',
+      temperature: typeof ai.temperature === 'number' ? ai.temperature : cur.temperature,
+      maxTokens: typeof ai.maxTokens === 'number' ? ai.maxTokens : cur.maxTokens,
+      cooldown: typeof ai.cooldown === 'number' ? ai.cooldown : cur.cooldown,
+      allowedChannels: arr(ai.allowedChannels, cur.allowedChannels),
+      allowedRoles: arr(ai.allowedRoles, cur.allowedRoles),
+      ignoredChannels: arr(ai.ignoredChannels, cur.ignoredChannels),
+      ignoredRoles: arr(ai.ignoredRoles, cur.ignoredRoles),
+      responseLanguage: ai.language || cur.responseLanguage || 'ar',
+    };
+  } catch (err) {
+    console.warn('mergeAIConfig failed:', err.message);
+  }
+  return out;
+}
+
+/** مزامنة update.ai → AIConfig حتى يرى محرك الردود تغييرات اللوحة فوراً */
+async function syncAIConfigFromUpdate(guildId, update) {
+  const ai = update && typeof update.ai === 'object' && !Array.isArray(update.ai) ? update.ai : null;
+  if (!ai) return;
+  const map = {
+    enabled: 'enabled',
+    provider: 'provider',
+    model: 'aiModel',
+    systemPrompt: 'systemPrompt',
+    temperature: 'temperature',
+    maxTokens: 'maxTokens',
+    cooldown: 'cooldown',
+    allowedChannels: 'allowedChannels',
+    allowedRoles: 'allowedRoles',
+    ignoredChannels: 'ignoredChannels',
+    ignoredRoles: 'ignoredRoles',
+    responseLanguage: 'language',
+  };
+  const set = {};
+  for (const [key, value] of Object.entries(ai)) {
+    const target = map[key];
+    if (target && value !== undefined) set[target] = value;
+  }
+  if (Object.keys(set).length === 0) return;
+  try {
+    await ensureConnected();
+    await AIConfig.findOneAndUpdate(
+      { guildId: String(guildId) },
+      { $set: set },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
+  } catch (err) {
+    console.warn('syncAIConfigFromUpdate failed:', err.message);
+  }
+}
 
 // ---- Settings access: bot API first, DB fallback (with health caching) ----
 const BOT_API_URL = process.env.BOT_API_URL || '';
@@ -116,20 +190,24 @@ async function botApiHealthy() {
 }
 
 async function getSettings(guildId) {
+  let settings = null;
   try {
     if (await botApiHealthy()) {
       const r = await fetch(`${BOT_API_URL}/api/guilds/${guildId}/settings`, { timeout: 4000 });
-      if (r.ok) return await r.json();
+      if (r.ok) settings = await r.json();
     }
   } catch {}
-  try {
-    if (!(await ensureConnected())) return {};
-    const doc = await GuildSettings.findOne({ guildId }).lean();
-    return doc || { guildId };
-  } catch (err) {
-    console.warn('getSettings DB fallback failed:', err.message);
-    return { guildId };
+  if (!settings) {
+    try {
+      if (await ensureConnected()) {
+        settings = await GuildSettings.findOne({ guildId }).lean();
+      }
+    } catch (err) {
+      console.warn('getSettings DB fallback failed:', err.message);
+    }
   }
+  // 🧠 ادمج AIConfig دائماً (حتى لو جاءت الإعدادات من API إصدار أقدم)
+  return mergeAIConfig(guildId, settings || { guildId });
 }
 
 // Deep-merge update on top of the stored settings document — RAW collection ops
@@ -191,6 +269,9 @@ async function saveSettings(guildId, update = {}) {
     }
     doc.updatedAt = new Date();
     await col.replaceOne({ guildId: String(guildId) }, doc, { upsert: true });
+
+    // 🧠 مزامنة حقول الذكاء مع وثيقة التشغيل AIConfig
+    await syncAIConfigFromUpdate(guildId, update);
 
     // 🔄 إبلاغ البوت فوراً (وإلا يظل يقرأ الكاش حتى 30 ثانية)
     await pushSyncCommand(guildId);

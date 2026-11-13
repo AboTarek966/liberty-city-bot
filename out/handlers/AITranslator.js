@@ -126,7 +126,7 @@ class AITranslator {
             }
             // بناء البرومبت
             const prompt = this.buildTranslationPrompt(text, targetLang, sourceLang);
-            const response = await this.aiHandler.generateResponse('system-translator', guildId || 'dm', 'dm', prompt, [], false, false, { fromCommand: true });
+            const response = await this.aiHandler.generateResponse('system-translator', guildId || 'dm', 'dm', prompt, [], false, false, { fromCommand: true, ignoreGlobalToggle: true });
             if (!response?.content)
                 return null;
             // استخراج الترجمة من الرد

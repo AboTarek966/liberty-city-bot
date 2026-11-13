@@ -435,7 +435,7 @@ export interface IGuildSettings extends Document {
   // AI
   ai: {
     enabled: boolean;
-    provider: 'openai' | 'anthropic' | 'both';
+    provider: 'openai' | 'anthropic' | 'groq' | 'gemini' | 'openrouter' | 'requesty' | 'custom' | 'both' | 'auto';
     model: string;
     systemPrompt: string;
     temperature: number;
@@ -1314,11 +1314,11 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   
   ai: {
     enabled: { type: Boolean, default: true },
-    provider: { type: String, enum: ['openai', 'anthropic', 'both'], default: 'openai' },
-    model: { type: String, default: 'gpt-4-turbo-preview' },
+    provider: { type: String, enum: ['openai', 'anthropic', 'groq', 'gemini', 'openrouter', 'requesty', 'custom', 'both', 'auto'], default: 'auto' },
+    model: { type: String, default: '' },
     systemPrompt: { type: String, default: 'أنت مساعد ذكي لبوت Omni. أنت ودود، مفيد، وتتكلم العربية بطلاقة.' },
     temperature: { type: Number, default: 0.7 },
-    maxTokens: { type: Number, default: 2000 },
+    maxTokens: { type: Number, default: 1600, min: 100, max: 8000 },
     cooldown: { type: Number, default: 3000 },
     allowedChannels: [{ type: String }],
     allowedRoles: [{ type: String }],

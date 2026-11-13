@@ -1488,15 +1488,26 @@ async function buildAI(guild: Guild, s: any): Promise<BuiltPanel> {
   const tEnabled = translator?.enabled ?? false;
   const tDefault = translator?.defaultTargetLang ?? 'ar';
   const insights = s.aiInsights || {};
+  // 🧠 اعرض القيم التشغيلية الفعلية من AIConfig (مصدر الحقيقة) بدل قيم GuildSettings القديمة
+  const aiEnabled = typeof aiConfig?.enabled === 'boolean' ? aiConfig.enabled : ai.enabled;
+  const providerLabel = cpEnabled
+    ? (cp.label || 'مزوّد خاص')
+    : (aiConfig?.provider || ai.provider || 'auto');
+  const modelLabel = cpEnabled
+    ? cp.model
+    : (aiConfig?.aiModel || ai.model || 'افتراضي');
+  const maxTokensLabel = aiConfig?.maxTokens ?? ai.maxTokens ?? 1600;
+  const temperatureLabel = aiConfig?.temperature ?? ai.temperature ?? 0.7;
 
   const embed = categoryEmbed(
     'ai',
     guild,
     `ذكاء اصطناعي يرد على أعضائك عند المنشن أو الرد على رسائله\n\n` +
-    `> ⚡ **الذكاء الاصطناعي:** ${on(ai.enabled)} ${ai.enabled ? 'مفعّل' : 'معطّل'}\n` +
+    `> ⚡ **الذكاء الاصطناعي:** ${on(aiEnabled)} ${aiEnabled ? 'مفعّل' : 'معطّل'}\n` +
     `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
     `> 🔌 **API مخصص:** ${cpEnabled ? `✅ ${cp.label || 'مخصص'} — \`${cp.model}\`` : 'معطّل — استخدم أي API (OpenAI/Groq/Together/محلي/...) من زر «API مخصص»'}\n` +
-    `> 🧠 **المزود:** ${cpEnabled ? (cp.label || 'مزوّد خاص') : 'Groq (مجاني — gpt-oss-120b)'}\n\n` +
+    `> 🧠 **المزود:** ${providerLabel} • **الموديل:** \`${modelLabel}\`\n` +
+    `> 🎛️ **الحد الأقصى:** ${maxTokensLabel} توكن • **الإبداع:** ${temperatureLabel}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n` +
     `> 📊 **تحليل المزاج:** ${on(insights.moodEnabled)} ${insights.moodEnabled ? 'مفعّل — /mood' : 'معطّل'}\n` +
@@ -1506,7 +1517,7 @@ async function buildAI(guild: Guild, s: any): Promise<BuiltPanel> {
   );
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    toggleBtn('ai', 'enabled', 'الذكاء', '⚡', ai.enabled),
+    toggleBtn('ai', 'enabled', 'الذكاء', '⚡', aiEnabled),
     new ButtonBuilder().setCustomId('settings_btn:ai:dec').setLabel('كولداون −').setStyle(ButtonStyle.Danger).setEmoji('⏪'),
     new ButtonBuilder().setCustomId('settings_btn:ai:inc').setLabel('كولداون +').setStyle(ButtonStyle.Success).setEmoji('⏩'),
     btn('settings_btn:ai:personality', 'الشخصية', ButtonStyle.Primary, '🎭'),

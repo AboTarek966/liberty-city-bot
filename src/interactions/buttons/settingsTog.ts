@@ -260,12 +260,14 @@ const handler: ButtonHandler = {
         break;
       }
       case 'ai': {
-        settings.ai.enabled = !settings.ai.enabled;
-        // مزامنة مع AIConfig (يستخدمه مسار المنشن)
+        // 🧠 الاعتماد على AIConfig (مصدر الحقيقة) في تحديد الحالة الحالية
+        const aiDoc = await AIConfig.findOne({ guildId: interaction.guild.id }).catch(() => null);
+        const currentEnabled = typeof aiDoc?.enabled === 'boolean' ? aiDoc.enabled : settings.ai.enabled;
+        settings.ai.enabled = !currentEnabled;
         await AIConfig.findOneAndUpdate(
           { guildId: interaction.guild.id },
           { enabled: settings.ai.enabled },
-          { upsert: true }
+          { upsert: true, setDefaultsOnInsert: true }
         ).catch(() => {});
         break;
       }
