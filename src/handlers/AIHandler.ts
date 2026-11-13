@@ -352,7 +352,7 @@ export class AIHandler {
           responseRules: [],
           language: 'ar',
           temperature: 0.7,
-          maxTokens: 500,
+          maxTokens: 1600,
           customPersonality: '',
           rolePersonalities: {},
         };
@@ -386,20 +386,6 @@ export class AIHandler {
         }
       }
 
-      // Check cooldown — الميزات المستقلة (تذاكر/أوتومود/مترجم) لا تخضع لكولداون الذكاء العام
-      const cooldownKey = `${userId}-${guildId || 'dm'}`;
-      const now = Date.now();
-      if (!ignoreGlobalToggle) {
-        const lastUsed = this.cooldowns.get(cooldownKey) || 0;
-        const cooldownMs = (aiConfig.cooldown || 3) * 1000;
-
-        if (now - lastUsed < cooldownMs) {
-          return null;
-        }
-        // ✋ حجز فوري قبل أي await — يمنع رسالتين متزامنتين من توليد ردّين متوازيين
-        this.cooldowns.set(cooldownKey, now);
-      }
-
       // Check ignored/allowed channels/roles
       // 🔌 الميزات المستقلة (تذاكر/أوتومود/مترجم) لها فلاترها الخاصة — لا نطبّق عليها فلاتر الذكاء العام
       if (!ignoreGlobalToggle) {
@@ -415,6 +401,21 @@ export class AIHandler {
       // في DMs: يرد على أي رسالة مباشرة (بدون حاجة لمنشن/رد)
       const shouldRespond = fromCommand || isMention || repliedToBot || !guildId || (guildId && await this.shouldAutoReply(guildId, channelId, message));
       if (!shouldRespond) return null;
+
+      // ⏱️ الكولداون بعد التأكد أن الرد مطلوب فعلاً — لا تستهلكه رسائل عادية في الشات
+      //    الميزات المستقلة (تذاكر/أوتومود/مترجم) لا تخضع لكولداون الذكاء العام
+      const cooldownKey = `${userId}-${guildId || 'dm'}`;
+      const now = Date.now();
+      if (!ignoreGlobalToggle) {
+        const lastUsed = this.cooldowns.get(cooldownKey) || 0;
+        const cooldownMs = (aiConfig.cooldown || 3) * 1000;
+
+        if (now - lastUsed < cooldownMs) {
+          return null;
+        }
+        // ✋ حجز فوري قبل أي await — يمنع رسالتين متزامنتين من توليد ردّين متوازيين
+        this.cooldowns.set(cooldownKey, now);
+      }
 
       // 👋 رد فوري للتحيات البسيطة — بدون استدعاء مزوّد AI (0 ثوانٍ)
       //    لا نستخدمه لو فيه مرفقات، لأن التحية قد تكون مصاحبة لصورة/ملف يحتاج تحليلاً
