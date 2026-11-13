@@ -187,6 +187,9 @@ class ProtectionHandler {
         // Skip if channel is ignored
         if (this.isIgnoredChannel(message.channel.id, settings))
             return null;
+        // 🎯 استثناءات القناة — كل حماية يمكن تعطيلها في قناة محددة
+        const disabledInChannel = new Set((settings.protection?.channelOverrides || [])
+            .find((o) => o.channelId === message.channel.id)?.disabled || []);
         const hasAdministrator = message.member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
         const isAdmin = hasAdministrator ||
             message.member.permissions.has(discord_js_1.PermissionFlagsBits.ManageMessages);
@@ -204,6 +207,9 @@ class ProtectionHandler {
             { name: 'zalgo', check: this.checkZalgo.bind(this), adminBypass: false }, // للكل
         ];
         for (const { name, check, adminBypass, requiresAdministrator } of checks) {
+            // 🎯 حماية معطّلة في هذه القناة تحديداً؟
+            if (disabledInChannel.has(name) || disabledInChannel.has('all'))
+                continue;
             // ⚡ يتجاوز هذا الفحص؟ (الأمراء فقط للسب، وبقية الإدارين لبقية الحمايات)
             if (adminBypass && (requiresAdministrator ? hasAdministrator : isAdmin))
                 continue;
@@ -738,10 +744,16 @@ class ProtectionHandler {
     }
     isIgnoredChannel(channelId, settings) {
         const ignoredChannels = [
+            ...(settings.protection?.ignoredChannels || []),
             ...(settings.automod?.ignoredChannels || []),
             ...(settings.logging?.ignoredChannels || []),
         ];
         return ignoredChannels.includes(channelId);
+    }
+    /** 🎯 الحمايات المعطّلة في قناة معينة */
+    static disabledChecksInChannel(settings, channelId) {
+        const override = (settings?.protection?.channelOverrides || []).find((o) => String(o.channelId) === String(channelId));
+        return override?.disabled || [];
     }
     getProtectionKey(reason) {
         if (reason.includes('Anti-Spam'))

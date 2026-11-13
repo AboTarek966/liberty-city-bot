@@ -212,6 +212,12 @@ export class ProtectionHandler {
     // Skip if channel is ignored
     if (this.isIgnoredChannel(message.channel.id, settings)) return null;
 
+    // 🎯 استثناءات القناة — كل حماية يمكن تعطيلها في قناة محددة
+    const disabledInChannel = new Set<string>(
+      (settings.protection?.channelOverrides || [])
+        .find((o: any) => o.channelId === message.channel.id)?.disabled || []
+    );
+
     const hasAdministrator = message.member.permissions.has(PermissionFlagsBits.Administrator);
     const isAdmin = hasAdministrator ||
                     message.member.permissions.has(PermissionFlagsBits.ManageMessages);
@@ -231,6 +237,9 @@ export class ProtectionHandler {
     ];
 
     for (const { name, check, adminBypass, requiresAdministrator } of checks) {
+      // 🎯 حماية معطّلة في هذه القناة تحديداً؟
+      if (disabledInChannel.has(name) || disabledInChannel.has('all')) continue;
+
       // ⚡ يتجاوز هذا الفحص؟ (الأمراء فقط للسب، وبقية الإدارين لبقية الحمايات)
       if (adminBypass && (requiresAdministrator ? hasAdministrator : isAdmin)) continue;
       
@@ -829,11 +838,20 @@ export class ProtectionHandler {
 
   private isIgnoredChannel(channelId: string, settings: any): boolean {
     const ignoredChannels = [
+      ...(settings.protection?.ignoredChannels || []),
       ...(settings.automod?.ignoredChannels || []),
       ...(settings.logging?.ignoredChannels || []),
     ];
 
     return ignoredChannels.includes(channelId);
+  }
+
+  /** 🎯 الحمايات المعطّلة في قناة معينة */
+  static disabledChecksInChannel(settings: any, channelId: string): string[] {
+    const override = (settings?.protection?.channelOverrides || []).find(
+      (o: any) => String(o.channelId) === String(channelId)
+    );
+    return override?.disabled || [];
   }
 
   private getProtectionKey(reason: string): string {

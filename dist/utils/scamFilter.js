@@ -69,6 +69,12 @@ async function handleScamFilter(message, client) {
     const settings = await (0, models_1.getGuildSettings)(message.guild.id);
     if (!settings.protection?.scamFilter?.enabled)
         return false;
+    // 🙈 قناة مستثناة من كل الحماية أو فلتر الاحتيال معطّل فيها تحديداً
+    const ignoredChannel = (settings.protection?.ignoredChannels || []).includes(message.channel.id);
+    const override = (settings.protection?.channelOverrides || []).find((o) => String(o.channelId) === String(message.channel.id));
+    if (ignoredChannel || override?.disabled?.includes('scamFilter') || override?.disabled?.includes('all')) {
+        return false;
+    }
     // ⚠️ لا يوجد أي تجاوز: الروابط الاحتيالية تُحذف للجميع
     // (حتى الإدارة وأصحاب الرتب الخاصة — الاحتيال يهدد الجميع)
     const result = checkScamContent(message.content);

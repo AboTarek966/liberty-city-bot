@@ -58,6 +58,50 @@
         <input class="inp" data-live="protection.whitelist.userIds" value="<%= (P.whitelist?.userIds || []).join(',') %>" placeholder="1234567890, 2345678901">
       </div>
     </div>
+
+    <div class="sec-title"><i class="bi bi-shield-plus"></i> إضافات أمنية</div>
+    <div class="form-row-3">
+      <label class="field-check"><input type="checkbox" data-toggle="protection.silentSecurityAlerts" <%= P.silentSecurityAlerts ? 'checked' : '' %>><span>🤫 وضع الصمت الأمني — الحماية تعمل بدون تنبيهات تخريب</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="protection.blockMaliciousNames" <%= P.blockMaliciousNames !== false ? 'checked' : '' %>><span>☢️ حذف/إرجاع القنوات والرولات ذات الاسم المشبوه (nuke/nuker...)</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="protection.antiBotAbuse.enabled" <%= P.antiBotAbuse?.enabled !== false ? 'checked' : '' %>><span>🤖 مكافحة الإساءة للبوت — تحذير ← سحب الرولات ← حظر</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="protection.antiExplicit.enabled" <%= P.antiExplicit?.enabled ? 'checked' : '' %>><span>🔞 مكافحة المحتوى الإباحي — حذف فوري وحظر المرسل</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="protection.punishmentTracker.enabled" <%= P.punishmentTracker?.enabled !== false ? 'checked' : '' %>><span>🔄 تتبع العقوبات — يمنع الهروب من العقوبة بإعادة الدخول</span></label>
+    </div>
+  </div>
+</div>
+
+<!-- 🎯 استثناءات الحماية لكل قناة -->
+<% const OV = Array.isArray(P.channelOverrides) ? P.channelOverrides : []; %>
+<div class="card mb-4" id="card-prot-channels">
+  <div class="card-head">
+    <div class="f-ico" style="width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#2dd4a7,#1f8fff);display:grid;place-items:center;color:#fff;font-size:17px;"><i class="bi bi-hash"></i></div>
+    <div style="flex:1;min-width:0;">
+      <div class="fw800" style="font-size:14px;">قنوات الحماية والاستثناءات</div>
+      <div class="text-dim" style="font-size:11.5px;">استثنِ قناة من كل الحماية، أو عطّل حماية معينة داخل قناة فقط — باقي السيرفر يظل محمياً</div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="field">
+      <div class="spread">
+        <label>🙈 قنوات مستثناة من كل فحوصات الحماية <span class="hint">سبام/روابط/دعوات/كابس... كلها</span></label>
+        <button class="btn sm" data-addfor="prot_ignored"><i class="bi bi-plus-lg"></i> اختر قنوات</button>
+      </div>
+      <div id="chips_prot_ignored" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;"></div>
+      <input type="hidden" id="prot_ignored" value="<%= (P.ignoredChannels || []).join(',') %>">
+    </div>
+
+    <div class="sec-title"><i class="bi bi-sliders"></i> تعطيل حماية معينة داخل قناة</div>
+    <div class="form-row">
+      <div class="field">
+        <label>➕ اختر قناة للتحكم</label>
+        <select class="inp" id="pcSelect"><option value="">— اختر قناة —</option></select>
+      </div>
+      <div class="field" style="display:flex;align-items:end;">
+        <button class="btn primary" id="pcAdd"><i class="bi bi-plus-lg"></i> إضافة / تعديل القناة</button>
+      </div>
+    </div>
+    <div class="text-dim" style="font-size:11.5px;margin-top:6px;">✅ علّم الحمايات اللي عايز <b>تعطّلها</b> في القناة دي فقط. أي تغيير يُحفظ فوراً.</div>
+    <div id="pcList" style="margin-top:12px;display:flex;flex-direction:column;gap:10px;"></div>
   </div>
 </div>
 
@@ -232,6 +276,67 @@
 
 <script>
   const GID = '<%= GID %>';
+  const PC_CHECKS = [
+    ['antiSpam', 'سبام', '🚫'], ['antiLink', 'روابط', '🔗'], ['antiInvite', 'دعوات', '📨'],
+    ['antiMention', 'منشنز', '📣'], ['antiCaps', 'كابس', '🔠'], ['antiEmoji', 'إيموجي', '😀'],
+    ['antiExplicit', 'إباحي', '🔞'], ['autoMod', 'أوتو مود', '🔇'], ['zalgo', 'Zalgo', '🌀'],
+    ['scamFilter', 'احتيال', '🕵️'], ['messageScanner', 'فحص رسائل', '🔎'], ['aiAutoMod', 'أوتو مود ذكي', '🤖'],
+  ];
+  let PROT_OVERRIDES = <%- JSON.stringify(OV).replace(/</g, '\\u003c') %>;
+  const PC_CHANNEL_NAMES = {};
+  function pcName(id) { return PC_CHANNEL_NAMES[id] ? '#' + PC_CHANNEL_NAMES[id] : '#' + id; }
+
+  async function pcPersist() {
+    const clean = PROT_OVERRIDES
+      .filter(o => o && o.channelId && Array.isArray(o.disabled) && o.disabled.length)
+      .map(o => ({ channelId: o.channelId, disabled: [...o.disabled] }));
+    await LC.saveSetting(GID, { protection: { channelOverrides: clean } }, null);
+  }
+
+  function pcRender() {
+    const list = document.getElementById('pcList');
+    if (!list) return;
+    const entries = PROT_OVERRIDES.filter(o => o && o.channelId);
+    if (!entries.length) {
+      list.innerHTML = '<div class="empty" style="padding:18px;"><i class="bi bi-hash"></i><h4>لا استثناءات لقنوات</h4><p>اختر قناة فوق وعلّم الحمايات اللي عايز تعطّلها فيها فقط</p></div>';
+      return;
+    }
+    list.innerHTML = entries.map(o => {
+      const boxes = PC_CHECKS.map(([k, l, e]) =>
+        `<label class="field-check"><input type="checkbox" data-pc-c="${k}" ${(o.disabled || []).includes(k) ? 'checked' : ''}><span>${e} ${l} <span class="hint">معطّلة هنا</span></span></label>`
+      ).join('');
+      return `<div data-pc-id="${LC.esc(o.channelId)}" style="background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;">
+        <div class="spread" style="margin-bottom:8px;">
+          <strong style="font-size:12.5px;">${LC.esc(pcName(o.channelId))}</strong>
+          <button class="btn sm danger" data-pc-remove="${LC.esc(o.channelId)}"><i class="bi bi-trash"></i> مسح الاستثناءات</button>
+        </div>
+        <div class="form-row-3">${boxes}</div>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-pc-c]').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        const id = cb.closest('[data-pc-id]')?.dataset.pcId;
+        const entry = PROT_OVERRIDES.find(o => o.channelId === id);
+        if (!entry) return;
+        if (!Array.isArray(entry.disabled)) entry.disabled = [];
+        if (cb.checked) {
+          if (!entry.disabled.includes(cb.dataset.pcC)) entry.disabled.push(cb.dataset.pcC);
+        } else {
+          entry.disabled = entry.disabled.filter(k => k !== cb.dataset.pcC);
+        }
+        await pcPersist();
+      });
+    });
+    list.querySelectorAll('[data-pc-remove]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        PROT_OVERRIDES = PROT_OVERRIDES.filter(o => o.channelId !== btn.dataset.pcRemove);
+        pcRender();
+        await pcPersist();
+      });
+    });
+  }
+
   function broadcastModal() {
     LC.modal({
       title: 'إعلان جماعي جديد',
@@ -264,6 +369,42 @@
     const okChan = await LC.loadChannels(GID, $$('.chan-sel'));
     if (!okChan) LC.toast('تعذر جلب القنوات من البوت حالياً — عدّل لاحقاً', 'warn', 5500);
     await LC.loadRoles(GID, $$('.role-sel'));
+
+    // 🙈 قنوات مستثناة من كل الحماية
+    LC.multiEditor({
+      inputId: 'prot_ignored',
+      listEl: 'chips_prot_ignored',
+      guildId: GID,
+      kind: 'channels',
+      path: 'protection.ignoredChannels',
+      placeholder: 'لا قنوات مستثناة — اضغط ＋',
+    });
+
+    // 🎯 استثناءات حماية لكل قناة
+    try {
+      const channels = await LC.api(`/api/guilds/${GID}/channels`);
+      const sel = document.getElementById('pcSelect');
+      channels.filter(c => c.type === 0 || c.type === 5).forEach(c => {
+        PC_CHANNEL_NAMES[c.id] = c.name;
+        if (sel) {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = '#' + c.name;
+          sel.appendChild(opt);
+        }
+      });
+    } catch {}
+    document.getElementById('pcAdd')?.addEventListener('click', () => {
+      const id = document.getElementById('pcSelect')?.value;
+      if (!id) { LC.toast('اختر قناة أولاً', 'warn'); return; }
+      if (!PROT_OVERRIDES.some(o => o.channelId === id)) {
+        PROT_OVERRIDES.push({ channelId: id, disabled: [] });
+      }
+      pcRender();
+      document.getElementById('pcSelect').value = '';
+      document.getElementById('pcList')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    pcRender();
 
     $$('.inp[data-live]').forEach(el => {
       el.addEventListener('change', async () => {

@@ -32,6 +32,53 @@ const handler = {
         switch (parts[1]) {
             case 'protection': {
                 const prot = settings.protection;
+                // 🎯 استثناءات القناة — تعطيل/تفعيل حماية واحدة داخل قناة محددة
+                // customId: settings_tog:protection:chan:<channelId>:<check>
+                if (field === 'chan') {
+                    const channelId = parts[3];
+                    const check = parts[4];
+                    if (!channelId || !check) {
+                        await interaction.editReply({ content: '❌ قناة أو نوع حماية غير صالح' });
+                        return;
+                    }
+                    if (!Array.isArray(prot.channelOverrides))
+                        prot.channelOverrides = [];
+                    let entry = prot.channelOverrides.find((o) => String(o.channelId) === String(channelId));
+                    if (!entry) {
+                        entry = { channelId, disabled: [] };
+                        prot.channelOverrides.push(entry);
+                    }
+                    if (!Array.isArray(entry.disabled))
+                        entry.disabled = [];
+                    const idx = entry.disabled.indexOf(check);
+                    if (idx >= 0) {
+                        // ✅ إعادة التفعيل — لا تحتاج موافقة
+                        entry.disabled.splice(idx, 1);
+                    }
+                    else {
+                        // ⛔ إطفاء حماية داخل القناة → بوابة موافقة المالك (إن كانت مفعّلة)
+                        const gateMsg = await (0, ownerApproval_1.gateProtectionOff)({
+                            settings,
+                            guild: interaction.guild,
+                            user: interaction.user,
+                            channel: interaction.channel,
+                            field: `chan:${channelId}:${check}`,
+                        });
+                        if (gateMsg) {
+                            await interaction.followUp({ content: gateMsg, ephemeral: true });
+                            return;
+                        }
+                        entry.disabled.push(check);
+                    }
+                    await settings.save();
+                    (0, models_1.invalidateGuildSettings)(interaction.guild.id);
+                    const panel = (0, settingsPanel_1.buildProtectionChannelOverridePanel)(interaction.guild, settings, channelId);
+                    await interaction.editReply({
+                        embeds: panel.embeds,
+                        components: panel.components,
+                    });
+                    return;
+                }
                 // 🔒 وضع الطوارئ: يقفل/يفتح القنوات فعلياً (وليس مجرد مفتاح)
                 if (field === 'lockdown') {
                     const newState = !prot.lockdown;
@@ -174,6 +221,35 @@ const handler = {
                     settings.automod.enabled = !settings.automod.enabled;
                 }
                 break;
+            case 'autoreply': {
+                // 💬 الرد التلقائي — الإعدادات مستقلة (بوليان مباشر)
+                const a = settings.autoReply;
+                if (!a) {
+                    settings.autoReply = {
+                        enabled: false,
+                        channelIds: [],
+                        text: '',
+                        deleteTrigger: false,
+                        replyToMessage: true,
+                        ignoreStaff: true,
+                        cooldownSeconds: 30,
+                    };
+                }
+                const cfg = settings.autoReply;
+                if (field === 'enabled')
+                    cfg.enabled = !cfg.enabled;
+                else if (field === 'delete')
+                    cfg.deleteTrigger = !cfg.deleteTrigger;
+                else if (field === 'reply')
+                    cfg.replyToMessage = !(cfg.replyToMessage !== false);
+                else if (field === 'ignorestaff')
+                    cfg.ignoreStaff = !(cfg.ignoreStaff !== false);
+                else {
+                    await interaction.editReply({ content: '❌ إعداد غير معروف' });
+                    return;
+                }
+                break;
+            }
             case 'aiInsights': {
                 if (!settings.aiInsights) {
                     settings.aiInsights = { moodEnabled: false, summarizeEnabled: false };

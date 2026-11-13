@@ -59,6 +59,7 @@
 
       <div class="nav-label">الأنظمة والتخصيص</div>
       <a href="/dashboard/<%= __guild.id %>/welcome" class="<%= activePage === 'welcome' ? 'active' : '' %>"><i class="bi bi-door-open"></i><span> الترحيب والمغادرة</span><span class="pill <%= settings?.welcome?.enabled ? 'on' : '' %>"><%= settings?.welcome?.enabled ? 'ON' : 'OFF' %></span></a>
+      <a href="/dashboard/<%= __guild.id %>/autoreply" class="<%= activePage === 'autoreply' ? 'active' : '' %>"><i class="bi bi-chat-dots"></i><span> الرد التلقائي</span><span class="pill <%= settings?.autoReply?.enabled ? 'on' : '' %>"><%= settings?.autoReply?.enabled ? 'ON' : 'OFF' %></span></a>
       <a href="/dashboard/<%= __guild.id %>/economy" class="<%= activePage === 'economy' ? 'active' : '' %>"><i class="bi bi-coin"></i><span> الاقتصاد والمستويات</span></a>
       <a href="/dashboard/<%= __guild.id %>/settings" class="<%= activePage === 'settings' ? 'active' : '' %>"><i class="bi bi-sliders"></i><span> الإعدادات العامة</span></a>
     </nav>

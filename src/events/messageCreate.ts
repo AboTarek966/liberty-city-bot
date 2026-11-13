@@ -49,6 +49,7 @@ import {
 } from '../utils/mediaGen';
 import { runHoneypot } from '../utils/honeypot';
 import { handleBotAbuse } from '../utils/botAbuse';
+import { handleAutoReply } from '../utils/autoReply';
 
 const logger = createLogger('Event:MessageCreate');
 
@@ -265,6 +266,14 @@ const event: Event = {
         if (customHandled) return;
       } catch (error) {
         logger.error('Error in custom command:', error);
+      }
+
+      // 💬 الرد التلقائي — صورة/كلمة محددة في قنوات مختارة (أي رسالة)
+      try {
+        const autoReplied = await handleAutoReply(message);
+        if (autoReplied) return;
+      } catch (error) {
+        logger.error('Error in auto reply:', error);
       }
 
       // رصيد عشوائي أثناء التحدث (25% = +5 عملات) — بدون انتظار حتى لا يبطئ الرد

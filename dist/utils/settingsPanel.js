@@ -37,7 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LOG_SPLIT_GROUPS = exports.CARD_ELEMENTS = exports.CATEGORY_COLORS = exports.TITLES = exports.ICONS = void 0;
+exports.PROTECTION_CHANNEL_TYPES = exports.LOG_SPLIT_GROUPS = exports.CARD_ELEMENTS = exports.CATEGORY_COLORS = exports.TITLES = exports.ICONS = void 0;
 exports.isPasswordVerified = isPasswordVerified;
 exports.setPasswordVerified = setPasswordVerified;
 exports.clearPasswordVerified = clearPasswordVerified;
@@ -67,6 +67,8 @@ exports.sendWelcomeCardPanel = sendWelcomeCardPanel;
 exports.buildLoggingSplitPanel = buildLoggingSplitPanel;
 exports.buildLevelIgnorePanel = buildLevelIgnorePanel;
 exports.buildLevelRewardsPanel = buildLevelRewardsPanel;
+exports.buildProtectionChannelsPanel = buildProtectionChannelsPanel;
+exports.buildProtectionChannelOverridePanel = buildProtectionChannelOverridePanel;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const pendingWarnRoles_1 = require("./pendingWarnRoles");
@@ -181,6 +183,7 @@ exports.ICONS = {
     logging: '📋',
     levels: '📈',
     automod: '🔇',
+    autoreply: '💬',
     verification: '✅',
     giveaways: '🎁',
     honeypot: '🍯',
@@ -200,6 +203,7 @@ exports.TITLES = {
     logging: 'نظام السجلات',
     levels: 'نظام المستويات',
     automod: 'الأوتو مود',
+    autoreply: 'الرد التلقائي',
     verification: 'توثيق الأعضاء',
     giveaways: 'نظام السحوبات',
     honeypot: 'قناة الطعم',
@@ -219,6 +223,7 @@ exports.CATEGORY_COLORS = {
     logging: 0x3498db,
     levels: 0xe67e22,
     automod: 0xe74c3c,
+    autoreply: 0x1abc9c,
     verification: 0x57f287,
     giveaways: 0xf1c40f,
     honeypot: 0xe67e22,
@@ -268,6 +273,8 @@ async function buildPanel(category, guild, userId) {
             return buildLevels(guild, settings);
         case 'automod':
             return buildAutoMod(guild, settings);
+        case 'autoreply':
+            return buildAutoReply(guild, settings);
         case 'verification':
             return buildVerificationPanel(guild, settings);
         case 'giveaways':
@@ -320,7 +327,7 @@ function buildHome(guild, userId, s) {
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:general', 'عام', discord_js_1.ButtonStyle.Primary, '🌐'), btn('settings_cat:protection', 'الحماية', discord_js_1.ButtonStyle.Success, '🛡️'), btn('settings_cat:tickets', 'التذاكر', discord_js_1.ButtonStyle.Secondary, '🎫'), btn('settings_cat:ai', 'الذكاء', discord_js_1.ButtonStyle.Danger, '🤖'), btn('settings_cat:welcome', 'الترحيب', discord_js_1.ButtonStyle.Success, '👋'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:leave', 'المغادرة', discord_js_1.ButtonStyle.Danger, '📤'), btn('settings_cat:logging', 'السجلات', discord_js_1.ButtonStyle.Primary, '📋'), btn('settings_cat:levels', 'المستويات', discord_js_1.ButtonStyle.Secondary, '📈'), btn('settings_cat:automod', 'الأوتو مود', discord_js_1.ButtonStyle.Danger, '🔇'), btn('settings_back', '🔄 تحديث', discord_js_1.ButtonStyle.Secondary, '🔄'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:commands', 'أوامر مخصصة', discord_js_1.ButtonStyle.Primary, '📝'), btn('settings_cat:announcements', '📢 إعلانات', discord_js_1.ButtonStyle.Success, '📢'), btn('settings_cat:music', '🎵 الموسيقى', discord_js_1.ButtonStyle.Success, '🎵'), btn('settings_btn:general:shop', '🛍️ المتجر', discord_js_1.ButtonStyle.Success, '🛍️'), btn('settings_btn:general:warnroles', '🎭 رولات التحذير', discord_js_1.ButtonStyle.Secondary, '🎭'));
-    const row4 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:giveaways', 'السحوبات', discord_js_1.ButtonStyle.Success, '🎁'), btn('settings_cat:honeypot', 'قناة الطعم', discord_js_1.ButtonStyle.Secondary, '🍯'));
+    const row4 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_cat:giveaways', 'السحوبات', discord_js_1.ButtonStyle.Success, '🎁'), btn('settings_cat:autoreply', 'الرد التلقائي', discord_js_1.ButtonStyle.Primary, '💬'), btn('settings_cat:honeypot', 'قناة الطعم', discord_js_1.ButtonStyle.Secondary, '🍯'), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'));
     return { embeds: [embed], components: [row1, row2, row3, row4] };
 }
 // --------------------------------------------
@@ -384,7 +391,7 @@ function buildProtection(guild, s) {
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled), toggleBtn('protection', 'antiExplicit', 'إباحي', '🔞', !!p.antiExplicit?.enabled));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiMention', 'منشنز', '📣', p.antiMention.enabled), toggleBtn('protection', 'antiCaps', 'كابس', '🔠', p.antiCaps.enabled), toggleBtn('protection', 'antiEmoji', 'إيموجي', '😀', p.antiEmoji.enabled), toggleBtn('protection', 'punishmentTracker', 'تتبع العقوبات', '🔄', !!p.punishmentTracker?.enabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled), toggleBtn('protection', 'antiBotAbuse', 'مكافحة الإساءة للبوت', '🚫', !!p.antiBotAbuse?.enabled));
-    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true), btn('settings_btn:verification:open', 'توثيق الأعضاء', discord_js_1.ButtonStyle.Success, '✅'), toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false));
+    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true), btn('settings_btn:protection:channels', 'قنوات الحماية', discord_js_1.ButtonStyle.Primary, '🎯'), toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false));
     // Row 5: Protection log channel selection
     const protectionLogChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:protection:logChannel')
@@ -1465,5 +1472,140 @@ function buildAutoMod(guild, s) {
     ]));
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('automod', 'enabled', 'الأوتو مود', '⚡', a.enabled), btn('settings_btn:automod:words', 'الكلمات', discord_js_1.ButtonStyle.Primary, '🚫'), toggleBtn('automod', 'zalgo', 'Zalgo', '😀', a.zalgoEnabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     return { embeds: [embed], components: [actionSelect, row1] };
+}
+// --------------------------------------------
+// 💬 الرد التلقائي — صورة/كلمة في قنوات محددة
+// --------------------------------------------
+function buildAutoReply(guild, s) {
+    const a = s.autoReply || {};
+    const channelIds = Array.isArray(a.channelIds) ? a.channelIds : [];
+    const channelsText = channelIds.length
+        ? channelIds.map((id) => {
+            const ch = guild.channels.cache.get(id);
+            return ch ? `<#${id}>` : `\`${id}\``;
+        }).join('، ')
+        : '🔴 لا توجد قنوات محددة';
+    const text = String(a.text || '').trim();
+    const imageUrl = String(a.imageUrl || '').trim();
+    const embed = categoryEmbed('autoreply', guild, `رد تلقائي على أي رسالة في القنوات المحددة — كلمة، صورة، أو الاثنين معاً\n\n` +
+        `> ⚡ **الحالة:** ${on(!!a.enabled)} ${a.enabled ? 'مفعّل' : 'معطّل'}\n` +
+        `> 📍 **القنوات (${channelIds.length}):** ${channelsText}\n` +
+        `> 💬 **النص:** ${text ? text.slice(0, 300) : '— لا يوجد —'}\n` +
+        `> 🖼️ **الصورة:** ${imageUrl ? `[عرض الصورة](${imageUrl})` : '— لا توجد —'}\n` +
+        `> 🗑️ **حذف رسالة العضو:** ${on(!!a.deleteTrigger)} ${a.deleteTrigger ? 'نعم' : 'لا'}\n` +
+        `> ↩️ **الرد كـ Reply:** ${on(a.replyToMessage !== false)} ${a.replyToMessage !== false ? 'نعم' : 'لا'}\n` +
+        `> 🛡️ **تجاهل الإداريين:** ${on(a.ignoreStaff !== false)} ${a.ignoreStaff !== false ? 'نعم' : 'لا'}\n` +
+        `> ⏱️ **الفاصل لكل عضو:** ${Number(a.cooldownSeconds ?? 30)} ثانية`);
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('autoreply', 'enabled', 'الرد التلقائي', '⚡', !!a.enabled), btn('settings_btn:autoreply:text', 'تعديل النص', discord_js_1.ButtonStyle.Primary, '💬'), btn('settings_btn:autoreply:image', 'تعديل الصورة', discord_js_1.ButtonStyle.Primary, '🖼️'), btn('settings_btn:autoreply:cooldown', 'الفاصل الزمني', discord_js_1.ButtonStyle.Secondary, '⏱️'), toggleBtn('autoreply', 'delete', 'حذف الرسالة', '🗑️', !!a.deleteTrigger));
+    const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('autoreply', 'reply', 'رد Reply', '↩️', a.replyToMessage !== false), toggleBtn('autoreply', 'ignorestaff', 'تجاهل الإداريين', '🛡️', a.ignoreStaff !== false), btn('settings_btn:autoreply:preview', 'معاينة', discord_js_1.ButtonStyle.Success, '👀'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
+    const channelRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:autoreply:channels')
+        .setPlaceholder('📍 اختر قنوات الرد التلقائي (حتى 10)')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
+        .setMinValues(0)
+        .setMaxValues(10)
+        .setDefaultChannels(channelIds.filter((id) => {
+        const t = guild.channels.cache.get(id)?.type;
+        return t === discord_js_1.ChannelType.GuildText || t === discord_js_1.ChannelType.GuildAnnouncement;
+    })));
+    return { embeds: [embed], components: [row1, row2, channelRow] };
+}
+// --------------------------------------------
+// 🎯 استثناءات الحماية لكل قناة
+// --------------------------------------------
+exports.PROTECTION_CHANNEL_TYPES = [
+    { key: 'antiSpam', label: 'سبام', emoji: '🚫' },
+    { key: 'antiLink', label: 'روابط', emoji: '🔗' },
+    { key: 'antiInvite', label: 'دعوات', emoji: '📨' },
+    { key: 'antiMention', label: 'منشنز', emoji: '📣' },
+    { key: 'antiCaps', label: 'كابس', emoji: '🔠' },
+    { key: 'antiEmoji', label: 'إيموجي', emoji: '😀' },
+    { key: 'antiExplicit', label: 'إباحي', emoji: '🔞' },
+    { key: 'autoMod', label: 'أوتو مود', emoji: '🔇' },
+    { key: 'zalgo', label: 'Zalgo', emoji: '🌀' },
+    { key: 'scamFilter', label: 'احتيال', emoji: '🕵️' },
+    { key: 'messageScanner', label: 'فحص الرسائل', emoji: '🔎' },
+    { key: 'aiAutoMod', label: 'أوتو مود ذكي', emoji: '🤖' },
+];
+function channelOverrideEntry(s, channelId) {
+    const list = Array.isArray(s.protection?.channelOverrides) ? s.protection.channelOverrides : [];
+    let entry = list.find((o) => String(o.channelId) === String(channelId));
+    if (!entry) {
+        entry = { channelId, disabled: [] };
+        list.push(entry);
+        s.protection.channelOverrides = list;
+    }
+    if (!Array.isArray(entry.disabled))
+        entry.disabled = [];
+    return entry;
+}
+function buildProtectionChannelsPanel(guild, s) {
+    const ignored = Array.isArray(s.protection?.ignoredChannels) ? s.protection.ignoredChannels : [];
+    const overrides = Array.isArray(s.protection?.channelOverrides)
+        ? s.protection.channelOverrides
+        : [];
+    const ignoredText = ignored.length
+        ? ignored.map((id) => (guild.channels.cache.get(id) ? `<#${id}>` : `\`${id}\``)).join('، ')
+        : 'لا توجد';
+    const overrideLines = overrides.length
+        ? overrides
+            .filter((o) => o.disabled?.length)
+            .map((o) => {
+            const labels = o.disabled
+                .map((k) => {
+                if (k === 'all')
+                    return 'كل الحماية';
+                const t = exports.PROTECTION_CHANNEL_TYPES.find((x) => x.key === k);
+                return t ? `${t.emoji} ${t.label}` : k;
+            })
+                .join('، ');
+            return `> ${guild.channels.cache.get(o.channelId) ? `<#${o.channelId}>` : `\`${o.channelId}\``} — ${labels}`;
+        })
+            .join('\n')
+        : '> لا توجد استثناءات خاصة — الحماية مفعّلة في كل القنوات';
+    const embed = categoryEmbed('protection', guild, `تحكّم دقيق في الحماية لكل قناة على حدة\n\n` +
+        `**🙈 قنوات مستثناة من كل الحماية:**\n> ${ignoredText}\n\n` +
+        `**🎯 استثناءات لكل قناة:**\n${overrideLines}\n\n` +
+        `اختر قناة من القائمة لإدارة الحمايات المعطّلة داخلها فقط.`);
+    const ignoredRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:protection:ignored_channels')
+        .setPlaceholder('🙈 قنوات بدون أي حماية (اتركها فارغة للإلغاء)')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
+        .setMinValues(0)
+        .setMaxValues(25)
+        .setDefaultChannels(ignored.filter((id) => {
+        const t = guild.channels.cache.get(id)?.type;
+        return t === discord_js_1.ChannelType.GuildText || t === discord_js_1.ChannelType.GuildAnnouncement;
+    })));
+    const overrideRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:protection:override_channels')
+        .setPlaceholder('🎯 اختر قناة لتعديل حماياتها')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
+        .setMinValues(1)
+        .setMaxValues(1));
+    const buttons = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:protection:clear_overrides', 'مسح كل الاستثناءات', discord_js_1.ButtonStyle.Danger, '🧹'), btn('settings_btn:protection:channels_back', 'رجوع للحماية', discord_js_1.ButtonStyle.Secondary, '↩️'));
+    return { embeds: [embed], components: [ignoredRow, overrideRow, buttons] };
+}
+function buildProtectionChannelOverridePanel(guild, s, channelId) {
+    const entry = channelOverrideEntry(s, channelId);
+    const disabled = new Set(entry.disabled);
+    const channel = guild.channels.cache.get(channelId);
+    const lines = exports.PROTECTION_CHANNEL_TYPES.map((t) => disabled.has(t.key)
+        ? `> ${t.emoji} **${t.label}:** 🔴 معطّلة في هذه القناة`
+        : `> ${t.emoji} **${t.label}:** 🟢 تعمل عادةً`).join('\n');
+    const embed = categoryEmbed('protection', guild, `إعداد حمايات القناة ${channel ? `<#${channelId}>` : `\`${channelId}\``}\n\n` +
+        `${lines}\n\n` +
+        `اضغط على أي زر لتعطيل/تفعيل الحماية **داخل هذه القناة فقط** — باقي السيرفر يظل محمياً.`);
+    const buttons = exports.PROTECTION_CHANNEL_TYPES.map((t) => new discord_js_1.ButtonBuilder()
+        .setCustomId(`settings_tog:protection:chan:${channelId}:${t.key}`)
+        .setLabel(`${t.label} ${disabled.has(t.key) ? 'معطّل' : 'مفعّل'}`)
+        .setEmoji(disabled.has(t.key) ? '❌' : '✅')
+        .setStyle(disabled.has(t.key) ? discord_js_1.ButtonStyle.Danger : discord_js_1.ButtonStyle.Success));
+    const rows = [];
+    for (let i = 0; i < buttons.length; i += 5) {
+        rows.push(new discord_js_1.ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+    }
+    rows.push(new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:protection:channels', 'رجوع لقنوات الحماية', discord_js_1.ButtonStyle.Secondary, '↩️'), btn('settings_btn:protection:clear_channel', 'مسح استثناءات هذه القناة', discord_js_1.ButtonStyle.Danger, '🧹')));
+    return { embeds: [embed], components: rows };
 }
 //# sourceMappingURL=settingsPanel.js.map

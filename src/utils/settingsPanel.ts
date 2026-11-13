@@ -39,6 +39,7 @@ export type SettingsCategory =
   | 'logging'
   | 'levels'
   | 'automod'
+  | 'autoreply'
   | 'verification'
   | 'giveaways'
   | 'honeypot'
@@ -181,6 +182,7 @@ export const ICONS: Record<SettingsCategory, string> = {
   logging: '📋',
   levels: '📈',
   automod: '🔇',
+  autoreply: '💬',
   verification: '✅',
   giveaways: '🎁',
   honeypot: '🍯',
@@ -201,6 +203,7 @@ export const TITLES: Record<SettingsCategory, string> = {
   logging: 'نظام السجلات',
   levels: 'نظام المستويات',
   automod: 'الأوتو مود',
+  autoreply: 'الرد التلقائي',
   verification: 'توثيق الأعضاء',
   giveaways: 'نظام السحوبات',
   honeypot: 'قناة الطعم',
@@ -221,6 +224,7 @@ export const CATEGORY_COLORS: Record<SettingsCategory, number> = {
   logging: 0x3498db,
   levels: 0xe67e22,
   automod: 0xe74c3c,
+  autoreply: 0x1abc9c,
   verification: 0x57f287,
   giveaways: 0xf1c40f,
   honeypot: 0xe67e22,
@@ -283,6 +287,8 @@ export async function buildPanel(
       return buildLevels(guild, settings);
     case 'automod':
       return buildAutoMod(guild, settings);
+    case 'autoreply':
+      return buildAutoReply(guild, settings);
     case 'verification':
       return buildVerificationPanel(guild, settings);
     case 'giveaways':
@@ -379,7 +385,9 @@ function buildHome(guild: Guild, userId: string, s: any): BuiltPanel {
 
   const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     btn('settings_cat:giveaways', 'السحوبات', ButtonStyle.Success, '🎁'),
+    btn('settings_cat:autoreply', 'الرد التلقائي', ButtonStyle.Primary, '💬'),
     btn('settings_cat:honeypot', 'قناة الطعم', ButtonStyle.Secondary, '🍯'),
+    btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
   );
 
   return { embeds: [embed], components: [row1, row2, row3, row4] };
@@ -495,7 +503,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     ),
     toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false),
     toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true),
-    btn('settings_btn:verification:open', 'توثيق الأعضاء', ButtonStyle.Success, '✅'),
+    btn('settings_btn:protection:channels', 'قنوات الحماية', ButtonStyle.Primary, '🎯'),
     toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false),
   );
 
@@ -2169,4 +2177,210 @@ function buildAutoMod(guild: Guild, s: any): BuiltPanel {
   );
 
   return { embeds: [embed], components: [actionSelect, row1] };
+}
+
+// --------------------------------------------
+// 💬 الرد التلقائي — صورة/كلمة في قنوات محددة
+// --------------------------------------------
+function buildAutoReply(guild: Guild, s: any): BuiltPanel {
+  const a = s.autoReply || {};
+  const channelIds: string[] = Array.isArray(a.channelIds) ? a.channelIds : [];
+  const channelsText = channelIds.length
+    ? channelIds.map((id) => {
+        const ch = guild.channels.cache.get(id);
+        return ch ? `<#${id}>` : `\`${id}\``;
+      }).join('، ')
+    : '🔴 لا توجد قنوات محددة';
+  const text = String(a.text || '').trim();
+  const imageUrl = String(a.imageUrl || '').trim();
+
+  const embed = categoryEmbed(
+    'autoreply',
+    guild,
+    `رد تلقائي على أي رسالة في القنوات المحددة — كلمة، صورة، أو الاثنين معاً\n\n` +
+      `> ⚡ **الحالة:** ${on(!!a.enabled)} ${a.enabled ? 'مفعّل' : 'معطّل'}\n` +
+      `> 📍 **القنوات (${channelIds.length}):** ${channelsText}\n` +
+      `> 💬 **النص:** ${text ? text.slice(0, 300) : '— لا يوجد —'}\n` +
+      `> 🖼️ **الصورة:** ${imageUrl ? `[عرض الصورة](${imageUrl})` : '— لا توجد —'}\n` +
+      `> 🗑️ **حذف رسالة العضو:** ${on(!!a.deleteTrigger)} ${a.deleteTrigger ? 'نعم' : 'لا'}\n` +
+      `> ↩️ **الرد كـ Reply:** ${on(a.replyToMessage !== false)} ${a.replyToMessage !== false ? 'نعم' : 'لا'}\n` +
+      `> 🛡️ **تجاهل الإداريين:** ${on(a.ignoreStaff !== false)} ${a.ignoreStaff !== false ? 'نعم' : 'لا'}\n` +
+      `> ⏱️ **الفاصل لكل عضو:** ${Number(a.cooldownSeconds ?? 30)} ثانية`
+  );
+
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('autoreply', 'enabled', 'الرد التلقائي', '⚡', !!a.enabled),
+    btn('settings_btn:autoreply:text', 'تعديل النص', ButtonStyle.Primary, '💬'),
+    btn('settings_btn:autoreply:image', 'تعديل الصورة', ButtonStyle.Primary, '🖼️'),
+    btn('settings_btn:autoreply:cooldown', 'الفاصل الزمني', ButtonStyle.Secondary, '⏱️'),
+    toggleBtn('autoreply', 'delete', 'حذف الرسالة', '🗑️', !!a.deleteTrigger)
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('autoreply', 'reply', 'رد Reply', '↩️', a.replyToMessage !== false),
+    toggleBtn('autoreply', 'ignorestaff', 'تجاهل الإداريين', '🛡️', a.ignoreStaff !== false),
+    btn('settings_btn:autoreply:preview', 'معاينة', ButtonStyle.Success, '👀'),
+    btn('settings_cat:home', 'رجوع', ButtonStyle.Secondary, '🏠')
+  );
+
+  const channelRow = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:autoreply:channels')
+      .setPlaceholder('📍 اختر قنوات الرد التلقائي (حتى 10)')
+      .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setMinValues(0)
+      .setMaxValues(10)
+      .setDefaultChannels(
+        channelIds.filter((id) => {
+          const t = guild.channels.cache.get(id)?.type;
+          return t === ChannelType.GuildText || t === ChannelType.GuildAnnouncement;
+        })
+      )
+  );
+
+  return { embeds: [embed], components: [row1, row2, channelRow] };
+}
+
+// --------------------------------------------
+// 🎯 استثناءات الحماية لكل قناة
+// --------------------------------------------
+export const PROTECTION_CHANNEL_TYPES: Array<{ key: string; label: string; emoji: string }> = [
+  { key: 'antiSpam', label: 'سبام', emoji: '🚫' },
+  { key: 'antiLink', label: 'روابط', emoji: '🔗' },
+  { key: 'antiInvite', label: 'دعوات', emoji: '📨' },
+  { key: 'antiMention', label: 'منشنز', emoji: '📣' },
+  { key: 'antiCaps', label: 'كابس', emoji: '🔠' },
+  { key: 'antiEmoji', label: 'إيموجي', emoji: '😀' },
+  { key: 'antiExplicit', label: 'إباحي', emoji: '🔞' },
+  { key: 'autoMod', label: 'أوتو مود', emoji: '🔇' },
+  { key: 'zalgo', label: 'Zalgo', emoji: '🌀' },
+  { key: 'scamFilter', label: 'احتيال', emoji: '🕵️' },
+  { key: 'messageScanner', label: 'فحص الرسائل', emoji: '🔎' },
+  { key: 'aiAutoMod', label: 'أوتو مود ذكي', emoji: '🤖' },
+];
+
+function channelOverrideEntry(s: any, channelId: string): { channelId: string; disabled: string[] } {
+  const list = Array.isArray(s.protection?.channelOverrides) ? s.protection.channelOverrides : [];
+  let entry = list.find((o: any) => String(o.channelId) === String(channelId));
+  if (!entry) {
+    entry = { channelId, disabled: [] };
+    list.push(entry);
+    s.protection.channelOverrides = list;
+  }
+  if (!Array.isArray(entry.disabled)) entry.disabled = [];
+  return entry;
+}
+
+export function buildProtectionChannelsPanel(guild: Guild, s: any): BuiltPanel {
+  const ignored: string[] = Array.isArray(s.protection?.ignoredChannels) ? s.protection.ignoredChannels : [];
+  const overrides: Array<{ channelId: string; disabled: string[] }> = Array.isArray(
+    s.protection?.channelOverrides
+  )
+    ? s.protection.channelOverrides
+    : [];
+
+  const ignoredText = ignored.length
+    ? ignored.map((id) => (guild.channels.cache.get(id) ? `<#${id}>` : `\`${id}\``)).join('، ')
+    : 'لا توجد';
+
+  const overrideLines = overrides.length
+    ? overrides
+        .filter((o) => o.disabled?.length)
+        .map((o) => {
+          const labels = o.disabled
+            .map((k) => {
+              if (k === 'all') return 'كل الحماية';
+              const t = PROTECTION_CHANNEL_TYPES.find((x) => x.key === k);
+              return t ? `${t.emoji} ${t.label}` : k;
+            })
+            .join('، ');
+          return `> ${guild.channels.cache.get(o.channelId) ? `<#${o.channelId}>` : `\`${o.channelId}\``} — ${labels}`;
+        })
+        .join('\n')
+    : '> لا توجد استثناءات خاصة — الحماية مفعّلة في كل القنوات';
+
+  const embed = categoryEmbed(
+    'protection',
+    guild,
+    `تحكّم دقيق في الحماية لكل قناة على حدة\n\n` +
+      `**🙈 قنوات مستثناة من كل الحماية:**\n> ${ignoredText}\n\n` +
+      `**🎯 استثناءات لكل قناة:**\n${overrideLines}\n\n` +
+      `اختر قناة من القائمة لإدارة الحمايات المعطّلة داخلها فقط.`
+  );
+
+  const ignoredRow = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:protection:ignored_channels')
+      .setPlaceholder('🙈 قنوات بدون أي حماية (اتركها فارغة للإلغاء)')
+      .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setMinValues(0)
+      .setMaxValues(25)
+      .setDefaultChannels(
+        ignored.filter((id) => {
+          const t = guild.channels.cache.get(id)?.type;
+          return t === ChannelType.GuildText || t === ChannelType.GuildAnnouncement;
+        })
+      )
+  );
+
+  const overrideRow = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('settings_sel:protection:override_channels')
+      .setPlaceholder('🎯 اختر قناة لتعديل حماياتها')
+      .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    btn('settings_btn:protection:clear_overrides', 'مسح كل الاستثناءات', ButtonStyle.Danger, '🧹'),
+    btn('settings_btn:protection:channels_back', 'رجوع للحماية', ButtonStyle.Secondary, '↩️')
+  );
+
+  return { embeds: [embed], components: [ignoredRow, overrideRow, buttons] };
+}
+
+export function buildProtectionChannelOverridePanel(
+  guild: Guild,
+  s: any,
+  channelId: string
+): BuiltPanel {
+  const entry = channelOverrideEntry(s, channelId);
+  const disabled = new Set(entry.disabled);
+  const channel = guild.channels.cache.get(channelId);
+
+  const lines = PROTECTION_CHANNEL_TYPES.map((t) =>
+    disabled.has(t.key)
+      ? `> ${t.emoji} **${t.label}:** 🔴 معطّلة في هذه القناة`
+      : `> ${t.emoji} **${t.label}:** 🟢 تعمل عادةً`
+  ).join('\n');
+
+  const embed = categoryEmbed(
+    'protection',
+    guild,
+    `إعداد حمايات القناة ${channel ? `<#${channelId}>` : `\`${channelId}\``}\n\n` +
+      `${lines}\n\n` +
+      `اضغط على أي زر لتعطيل/تفعيل الحماية **داخل هذه القناة فقط** — باقي السيرفر يظل محمياً.`
+  );
+
+  const buttons = PROTECTION_CHANNEL_TYPES.map((t) =>
+    new ButtonBuilder()
+      .setCustomId(`settings_tog:protection:chan:${channelId}:${t.key}`)
+      .setLabel(`${t.label} ${disabled.has(t.key) ? 'معطّل' : 'مفعّل'}`)
+      .setEmoji(disabled.has(t.key) ? '❌' : '✅')
+      .setStyle(disabled.has(t.key) ? ButtonStyle.Danger : ButtonStyle.Success)
+  );
+
+  const rows: PanelComponent[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+  }
+  rows.push(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      btn('settings_btn:protection:channels', 'رجوع لقنوات الحماية', ButtonStyle.Secondary, '↩️'),
+      btn('settings_btn:protection:clear_channel', 'مسح استثناءات هذه القناة', ButtonStyle.Danger, '🧹')
+    )
+  );
+
+  return { embeds: [embed], components: rows };
 }

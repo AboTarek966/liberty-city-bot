@@ -27,6 +27,17 @@ class MessageScannerHandler {
             const cfg = settings.protection?.messageScanner;
             if (!cfg?.enabled)
                 return;
+            // 🙈 قناة مستثناة من كل الحماية أو فحص الرسائل معطّل فيها تحديداً
+            const prot = settings.protection || {};
+            if (Array.isArray(prot.ignoredChannels) && prot.ignoredChannels.includes(message.channel.id)) {
+                return;
+            }
+            const override = Array.isArray(prot.channelOverrides)
+                ? prot.channelOverrides.find((o) => String(o.channelId) === String(message.channel.id))
+                : null;
+            if (override?.disabled?.includes('messageScanner') || override?.disabled?.includes('all')) {
+                return;
+            }
             // تجاهل رسائل البوتات والإدارة
             if (message.author.bot)
                 return;

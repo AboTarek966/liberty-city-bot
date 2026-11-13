@@ -1,6 +1,8 @@
 import { Guild, User } from 'discord.js';
 /** أسماء الميزات للعرض في رسائل الطلب والموافقة */
 export declare const PROTECTION_LABELS: Record<string, string>;
+/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> */
+export declare function protectionFieldLabel(field: string): string;
 interface PendingApproval {
     field: string;
     requestedBy: string;

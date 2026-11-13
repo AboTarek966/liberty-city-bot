@@ -473,6 +473,7 @@ async function guildPageData(req, res, guildId, page) {
 }
 
 app.get('/dashboard/:guildId/protection', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'protection'));
+app.get('/dashboard/:guildId/autoreply', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'autoreply'));
 app.get('/dashboard/:guildId/ai', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'ai'));
 app.get('/dashboard/:guildId/tickets', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'tickets'));
 app.get('/dashboard/:guildId/members', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'members'));

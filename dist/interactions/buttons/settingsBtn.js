@@ -47,6 +47,7 @@ const handler = {
             'giveaways:duration', 'giveaways:winners', 'giveaways:requirements', 'honeypot:timeout',
             'commands:add', 'commands:addadmin', 'commands:emojipick', 'welcome:cardnum', 'shop:add',
             'translator:settings',
+            'autoreply:text', 'autoreply:image', 'autoreply:cooldown',
             'music:volume', 'music:queue_limit',
             'announce:dm', 'announce:channel', 'announce:preview',
         ]);
@@ -282,6 +283,7 @@ const handler = {
             'welcome:title', 'welcome:color', 'welcome:imgurl', 'welcome:cardurl',
             'tickets:autotext', 'tickets:pimg', 'tickets:types', 'tickets:max', 'tickets:welcomeMsg',
             'translator:settings',
+            'autoreply:text', 'autoreply:image', 'autoreply:cooldown',
             'music:volume', 'music:queue_limit',
             'announce:dm', 'announce:channel',
         ];
@@ -294,6 +296,18 @@ const handler = {
                 case 'music:queue_limit': {
                     const mq = settings.music?.maxQueueSize ?? 50;
                     return openModal('📋 حد القائمة', 'أقصى عدد أغاني في قائمة الانتظار', discord_js_1.TextInputStyle.Short, 5, String(mq));
+                }
+                case 'autoreply:text': {
+                    const at = String(settings.autoReply?.text || '');
+                    return openModal('💬 نص الرد التلقائي', 'اكتب الكلمة أو النص — اتركه فارغاً لحذف النص', discord_js_1.TextInputStyle.Paragraph, 2000, at, false);
+                }
+                case 'autoreply:image': {
+                    const ai = String(settings.autoReply?.imageUrl || '');
+                    return openModal('🖼️ صورة الرد التلقائي', 'رابط مباشر يبدأ بـ https:// — فارغ لإزالة الصورة', discord_js_1.TextInputStyle.Short, 500, ai, false);
+                }
+                case 'autoreply:cooldown': {
+                    const ac = settings.autoReply?.cooldownSeconds ?? 30;
+                    return openModal('⏱️ الفاصل الزمني بالثواني', '0 = بدون فاصل — يُحسب لكل عضو في نفس القناة', discord_js_1.TextInputStyle.Short, 4, String(ac), true);
                 }
                 case 'general:prefix':
                     return openModal('تغيير بادئة الأوامر', 'مثال: omni! أو ! أو ?', discord_js_1.TextInputStyle.Short, 5);
@@ -483,6 +497,85 @@ const handler = {
         }
         // ---------- إجراءات تحدث اللوحة (تم تأكيدها deferUpdate في الأعلى) ----------
         switch (`${section}:${action}`) {
+            case 'autoreply:preview': {
+                // 👀 معاينة الرد كما سيظهر في القناة
+                const a = settings.autoReply || {};
+                const text = String(a.text || '').trim();
+                const imageUrl = String(a.imageUrl || '').trim();
+                if (!text && !imageUrl) {
+                    await interaction.followUp({
+                        content: '⚠️ لا يوجد نص ولا صورة — عدّل النص أو الصورة أولاً',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                if (imageUrl) {
+                    const embed = new discord_js_1.EmbedBuilder().setImage(imageUrl).setColor(0x1abc9c);
+                    if (text)
+                        embed.setDescription(text);
+                    await interaction.followUp({ embeds: [embed], ephemeral: true });
+                }
+                else {
+                    await interaction.followUp({ content: text, ephemeral: true });
+                }
+                return;
+            }
+            case 'autoreply:text':
+            case 'autoreply:image':
+            case 'autoreply:cooldown':
+                // تُعالج كمودالات قبل الوصول هنا
+                return;
+            case 'protection:channels': {
+                const chPanel = (0, settingsPanel_1.buildProtectionChannelsPanel)(interaction.guild, settings);
+                await interaction.editReply({
+                    embeds: chPanel.embeds,
+                    components: chPanel.components,
+                });
+                return;
+            }
+            case 'protection:channels_back': {
+                const pPanel = await (0, settingsPanel_1.buildPanel)('protection', interaction.guild, interaction.user.id);
+                await interaction.editReply({
+                    embeds: pPanel.embeds,
+                    components: pPanel.components,
+                });
+                return;
+            }
+            case 'protection:clear_overrides': {
+                settings.protection.channelOverrides = [];
+                await settings.save();
+                (0, models_1.invalidateGuildSettings)(interaction.guild.id);
+                const chPanel = (0, settingsPanel_1.buildProtectionChannelsPanel)(interaction.guild, settings);
+                await interaction.editReply({
+                    embeds: chPanel.embeds,
+                    components: chPanel.components,
+                });
+                await interaction.followUp({
+                    content: '🧹 تم مسح كل استثناءات القنوات — الحماية مفعّلة في كل القنوات',
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'protection:clear_channel': {
+                const channelId = parts[3];
+                if (!channelId) {
+                    await interaction.followUp({ content: '❌ قناة غير صالحة', ephemeral: true });
+                    return;
+                }
+                settings.protection.channelOverrides = (settings.protection.channelOverrides || []).filter((o) => String(o.channelId) !== String(channelId));
+                await settings.save();
+                (0, models_1.invalidateGuildSettings)(interaction.guild.id);
+                const chPanel = (0, settingsPanel_1.buildProtectionChannelsPanel)(interaction.guild, settings);
+                await interaction.editReply({
+                    embeds: chPanel.embeds,
+                    components: chPanel.components,
+                });
+                await interaction.followUp({
+                    content: `🧹 تم مسح استثناءات <#${channelId}> — عادت الحماية كاملة فيها`,
+                    ephemeral: true,
+                });
+                return;
+            }
             case 'general:lang': {
                 settings.language = settings.language === 'ar' ? 'en' : 'ar';
                 await settings.save();

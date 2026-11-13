@@ -1,0 +1,112 @@
+<%- include('layout-top', { title: 'الرد التلقائي', activePage: 'autoreply' }) %>
+
+<% const A = settings?.autoReply || {}; const GID = guild.id; %>
+
+<div class="hero">
+  <div class="h-logo" style="background:linear-gradient(135deg,#1abc9c,#00d4ff);display:grid;place-items:center;font-size:26px;"><i class="bi bi-chat-dots-fill"></i></div>
+  <div>
+    <div class="h-title">الرد التلقائي
+      <span class="chip <%= A.enabled ? 'green' : '' %>"><%= A.enabled ? 'مفعّل' : 'معطّل' %></span>
+    </div>
+    <div class="h-desc">أي رسالة في القنوات المختارة ← البوت يرد بكلمة و/أو صورة محددة. كل تعديل يُحفظ لحظياً.</div>
+    <div class="h-chips">
+      <span class="chip cyan"><i class="bi bi-hash"></i> القنوات: <%= (A.channelIds || []).length %></span>
+      <span class="chip purple"><i class="bi bi-hourglass-split"></i> الفاصل: <%= A.cooldownSeconds ?? 30 %> ثانية</span>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-head">
+    <h3><i class="bi bi-power"></i> التشغيل والسلوك</h3>
+    <div class="head-side">
+      <label class="switch lg"><input type="checkbox" data-toggle="autoReply.enabled" <%= A.enabled ? 'checked' : '' %>><span class="track"></span></label>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="form-row-3">
+      <label class="field-check"><input type="checkbox" data-toggle="autoReply.deleteTrigger" <%= A.deleteTrigger ? 'checked' : '' %>><span>🗑️ حذف رسالة العضو بعد الرد</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="autoReply.replyToMessage" <%= A.replyToMessage !== false ? 'checked' : '' %>><span>↩️ الرد كـ Reply على رسالة العضو</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="autoReply.ignoreStaff" <%= A.ignoreStaff !== false ? 'checked' : '' %>><span>🛡️ تجاهل رسائل الإداريين</span></label>
+    </div>
+    <div class="form-row mt-3">
+      <div class="field" style="max-width:260px;">
+        <label>⏱️ الفاصل الزمني بالثواني <span class="hint">لكل عضو في نفس القناة</span></label>
+        <input type="number" class="inp num" data-num="autoReply.cooldownSeconds" value="<%= A.cooldownSeconds ?? 30 %>" min="0" max="3600">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-head"><h3><i class="bi bi-hash"></i> قنوات الرد التلقائي</h3></div>
+  <div class="card-body">
+    <div class="field">
+      <div class="spread">
+        <label>📍 القنوات المفعّلة <span class="hint">أي رسالة فيها يرد البوت — حتى 10 قنوات</span></label>
+        <button class="btn sm" data-addfor="ar_channels"><i class="bi bi-plus-lg"></i> اختر قنوات</button>
+      </div>
+      <div id="chips_ar_channels" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;"></div>
+      <input type="hidden" id="ar_channels" value="<%= (A.channelIds || []).join(',') %>">
+      <div class="text-dim" style="font-size:11px;margin-top:6px;">اتركها فارغة وراح يتوقف الرد التلقائي حتى تختار قناة.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-head"><h3><i class="bi bi-chat-square-text"></i> النص والصورة</h3></div>
+  <div class="card-body">
+    <div class="field">
+      <label>💬 النص أو الكلمة</label>
+      <textarea class="inp" data-text="autoReply.text" rows="4" maxlength="2000" placeholder="مثال: أهلاً بك! اكتب سؤالك وفريق الدعم هيساعدك 💙"><%= A.text || '' %></textarea>
+    </div>
+    <div class="field mt-3">
+      <label>🖼️ رابط الصورة (اختياري) <span class="hint">رابط مباشر يبدأ بـ https://</span></label>
+      <input class="inp" data-text="autoReply.imageUrl" value="<%= A.imageUrl || '' %>" maxlength="500" placeholder="https://example.com/image.png">
+    </div>
+    <div class="sec-title"><i class="bi bi-eye"></i> معاينة الرد</div>
+    <div id="arPreview" style="background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px 16px;min-height:64px;">
+      <% if (A.imageUrl) { %>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;"><%= A.text || '' %></div>
+        <img src="<%= A.imageUrl %>" alt="preview" style="max-width:100%;max-height:260px;border-radius:10px;" onerror="this.style.display='none'">
+      <% } else if (A.text) { %>
+        <div style="font-size:13px;font-weight:700;"><%= A.text %></div>
+      <% } else { %>
+        <span class="text-dim" style="font-size:12px;">لا يوجد نص أو صورة بعد — أضف ما تريده أعلاه.</span>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script>
+  const AR_GID = '<%= GID %>';
+  document.addEventListener('DOMContentLoaded', () => {
+    LC.multiEditor({
+      inputId: 'ar_channels',
+      listEl: 'chips_ar_channels',
+      guildId: AR_GID,
+      kind: 'channels',
+      path: 'autoReply.channelIds',
+      placeholder: 'لا قنوات — اضغط ＋',
+    });
+
+    const textEl = document.querySelector('[data-text="autoReply.text"]');
+    const imgEl = document.querySelector('[data-text="autoReply.imageUrl"]');
+    const preview = document.getElementById('arPreview');
+    const renderPreview = () => {
+      const text = (textEl?.value || '').trim();
+      const img = (imgEl?.value || '').trim();
+      if (!text && !img) {
+        preview.innerHTML = '<span class="text-dim" style="font-size:12px;">لا يوجد نص أو صورة بعد — أضف ما تريده أعلاه.</span>';
+        return;
+      }
+      const safeText = LC.esc(text);
+      const imgHtml = img ? `<img src="${LC.esc(img)}" alt="preview" style="max-width:100%;max-height:260px;border-radius:10px;margin-top:8px;" onerror="this.style.display='none'">` : '';
+      preview.innerHTML = (text ? `<div style="font-size:13px;font-weight:700;">${safeText}</div>` : '') + imgHtml;
+    };
+    textEl?.addEventListener('input', renderPreview);
+    imgEl?.addEventListener('input', renderPreview);
+  });
+</script>
+
+<%- include('layout-bottom') %>

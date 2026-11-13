@@ -1,5 +1,5 @@
 import { ActionRowBuilder, EmbedBuilder, Guild, ChatInputCommandInteraction, ModalBuilder } from 'discord.js';
-export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'verification' | 'giveaways' | 'honeypot' | 'commands' | 'announcements' | 'music';
+export type SettingsCategory = 'home' | 'general' | 'protection' | 'tickets' | 'ai' | 'aiTranslator' | 'welcome' | 'leave' | 'logging' | 'levels' | 'automod' | 'autoreply' | 'verification' | 'giveaways' | 'honeypot' | 'commands' | 'announcements' | 'music';
 type PanelComponent = ActionRowBuilder<any>;
 export interface BuiltPanel {
     embeds: EmbedBuilder[];
@@ -101,5 +101,12 @@ export declare const LOG_SPLIT_GROUPS: Array<{
 export declare function buildLoggingSplitPanel(guild: Guild, s: any): BuiltPanel;
 export declare function buildLevelIgnorePanel(guild: Guild, s: any): BuiltPanel;
 export declare function buildLevelRewardsPanel(guild: Guild, s: any): BuiltPanel;
+export declare const PROTECTION_CHANNEL_TYPES: Array<{
+    key: string;
+    label: string;
+    emoji: string;
+}>;
+export declare function buildProtectionChannelsPanel(guild: Guild, s: any): BuiltPanel;
+export declare function buildProtectionChannelOverridePanel(guild: Guild, s: any, channelId: string): BuiltPanel;
 export {};
 //# sourceMappingURL=settingsPanel.d.ts.map

@@ -58,6 +58,7 @@ const rolePicker_1 = require("../utils/rolePicker");
 const mediaGen_1 = require("../utils/mediaGen");
 const honeypot_1 = require("../utils/honeypot");
 const botAbuse_1 = require("../utils/botAbuse");
+const autoReply_1 = require("../utils/autoReply");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
@@ -265,6 +266,15 @@ const event = {
             }
             catch (error) {
                 logger.error('Error in custom command:', error);
+            }
+            // 💬 الرد التلقائي — صورة/كلمة محددة في قنوات مختارة (أي رسالة)
+            try {
+                const autoReplied = await (0, autoReply_1.handleAutoReply)(message);
+                if (autoReplied)
+                    return;
+            }
+            catch (error) {
+                logger.error('Error in auto reply:', error);
             }
             // رصيد عشوائي أثناء التحدث (25% = +5 عملات) — بدون انتظار حتى لا يبطئ الرد
             try {

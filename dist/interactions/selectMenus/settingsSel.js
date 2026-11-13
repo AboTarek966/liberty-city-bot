@@ -289,6 +289,67 @@ const handler = {
             case 'protection:logChannel':
                 settings.protection.logChannel = values[0] || null;
                 break;
+            case 'autoreply:channels': {
+                // 📍 قنوات الرد التلقائي — أي رسالة فيها يرد البوت
+                if (!settings.autoReply) {
+                    settings.autoReply = {
+                        enabled: false,
+                        channelIds: [],
+                        text: '',
+                        deleteTrigger: false,
+                        replyToMessage: true,
+                        ignoreStaff: true,
+                        cooldownSeconds: 30,
+                    };
+                }
+                settings.autoReply.channelIds = values.slice(0, 10);
+                await settings.save();
+                (0, models_1.invalidateGuildSettings)(guildId);
+                const arPanel = await (0, settingsPanel_1.buildPanel)('autoreply', interaction.guild, interaction.user.id);
+                await interaction.editReply({
+                    embeds: arPanel.embeds,
+                    components: arPanel.components,
+                });
+                await interaction.followUp({
+                    content: values.length
+                        ? `✅ الرد التلقائي سيعمل في: ${values.map((v) => `<#${v}>`).join('، ')}`
+                        : '↩️ تم مسح القنوات — الرد التلقائي متوقف حتى تختار قناة',
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'protection:ignored_channels': {
+                // 🙈 قنوات مستثناة من كل فحوصات الحماية
+                settings.protection.ignoredChannels = [...values];
+                await settings.save();
+                (0, models_1.invalidateGuildSettings)(guildId);
+                const chPanel = (0, settingsPanel_1.buildProtectionChannelsPanel)(interaction.guild, settings);
+                await interaction.editReply({
+                    embeds: chPanel.embeds,
+                    components: chPanel.components,
+                });
+                await interaction.followUp({
+                    content: values.length
+                        ? `✅ قنوات بدون أي حماية: ${values.map((v) => `<#${v}>`).join('، ')}`
+                        : '↩️ تم مسح القنوات المستثناة — الحماية مفعّلة في كل القنوات',
+                    ephemeral: true,
+                });
+                return;
+            }
+            case 'protection:override_channels': {
+                // 🎯 فتح إعدادات حماية قناة محددة
+                const channelId = values[0];
+                if (!channelId) {
+                    await interaction.editReply({ content: '❌ اختر قناة صالحة' });
+                    return;
+                }
+                const ovPanel = (0, settingsPanel_1.buildProtectionChannelOverridePanel)(interaction.guild, settings, channelId);
+                await interaction.editReply({
+                    embeds: ovPanel.embeds,
+                    components: ovPanel.components,
+                });
+                return;
+            }
             case 'music:channels': {
                 // 🔒 قنوات مسموح فيها بالموسيقى (فارغة = الكل مسموح)
                 if (!settings.music)

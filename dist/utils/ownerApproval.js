@@ -15,6 +15,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PROTECTION_LABELS = void 0;
+exports.protectionFieldLabel = protectionFieldLabel;
 exports.approvalEnabled = approvalEnabled;
 exports.canRequestProtectionOff = canRequestProtectionOff;
 exports.gateProtectionOff = gateProtectionOff;
@@ -43,7 +44,20 @@ exports.PROTECTION_LABELS = {
     aiAutoMod: 'الأوتو مود الذكي 🤖',
     lockdown: 'وضع الطوارئ 🔒',
     blocknames: 'مسح الاسم المشبوه ☢️',
+    autoMod: 'الأوتو مود 🔇',
+    zalgo: 'مكافحة Zalgo 🌀',
+    scamFilter: 'فلتر الاحتيال 🕵️',
+    all: 'كل الحماية 🛡️',
 };
+/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> */
+function protectionFieldLabel(field) {
+    if (field.startsWith('chan:')) {
+        const [, channelId, check] = field.split(':');
+        const checkLabel = exports.PROTECTION_LABELS[check] || check || 'حماية';
+        return `${checkLabel} في القناة <#${channelId}>`;
+    }
+    return exports.PROTECTION_LABELS[field] || field;
+}
 /** الطلبات المعلّقة — في الذاكرة (إعادة التشغيل تلغيها = الحماية تبقى مفعّلة = آمن) */
 const PENDING = new Map();
 const TTL_MS = 5 * 60 * 1000; // 5 دقائق
@@ -80,7 +94,7 @@ async function gateProtectionOff(opts) {
     if (!canRequestProtectionOff(opts.settings, opts.guild, opts.user.id)) {
         return '⛔ إطفاء الحماية محصور بمالك السيرفر 👑 والمطوّر فقط';
     }
-    const label = exports.PROTECTION_LABELS[opts.field] || opts.field;
+    const label = protectionFieldLabel(opts.field);
     const sent = await requestOwnerApproval({
         guild: opts.guild,
         channel: opts.channel,
@@ -94,7 +108,7 @@ async function gateProtectionOff(opts) {
 /** إرسال رسالة الطلب للمالك (منشن + أزرار موافقة/رفض) */
 async function requestOwnerApproval(opts) {
     const key = `${opts.guild.id}:${opts.field}`;
-    const label = exports.PROTECTION_LABELS[opts.field] || opts.field;
+    const label = protectionFieldLabel(opts.field);
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('👑 طلب إطفاء الحماية')
         .setDescription(`**${opts.requestedBy.tag}** يطلب إيقاف **${label}**.\n\n` +

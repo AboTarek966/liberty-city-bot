@@ -8,7 +8,7 @@ import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { OmniClient } from '../../OmniClient';
-import { takePending, PROTECTION_LABELS } from '../../utils/ownerApproval';
+import { takePending, protectionFieldLabel } from '../../utils/ownerApproval';
 import { isBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
@@ -34,7 +34,7 @@ const handler: ButtonHandler = {
     const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
     const verdict = parts[1];
     const field = parts[2];
-    const label = PROTECTION_LABELS[field] || field;
+    const label = protectionFieldLabel(field);
 
     const pending = takePending(interaction.guild.id, field);
     if (!pending) {
@@ -60,7 +60,20 @@ const handler: ButtonHandler = {
       const settings = await getGuildSettings(interaction.guild.id);
       const prot = settings.protection as any;
 
-      if (field === 'ownerApproval') {
+      if (field.startsWith('chan:')) {
+        // 🎯 استثناء داخل قناة محددة (وليس إطفاءً عاماً)
+        const [, channelId, check] = field.split(':');
+        if (!Array.isArray(prot.channelOverrides)) prot.channelOverrides = [];
+        let entry = prot.channelOverrides.find(
+          (o: any) => String(o.channelId) === String(channelId)
+        );
+        if (!entry) {
+          entry = { channelId, disabled: [] };
+          prot.channelOverrides.push(entry);
+        }
+        if (!Array.isArray(entry.disabled)) entry.disabled = [];
+        if (!entry.disabled.includes(check)) entry.disabled.push(check);
+      } else if (field === 'ownerApproval') {
         prot.ownerApproval = false; // خيار الموافقة نفسه — بوليان مستقل
       } else if (field === 'blocknames') {
         prot.blockMaliciousNames = false; // بوليان مستقل

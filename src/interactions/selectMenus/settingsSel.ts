@@ -19,7 +19,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, SettingsCategory } from '../../utils/settingsPanel';
+import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildLevelIgnorePanel, buildVerificationPanel, buildTicketAdvancedPanel, buildCommands, buildShop, buildLoggingSplitPanel, LOG_SPLIT_GROUPS, getActivePanel, buildWarnRolesPanel, buildProtectionChannelsPanel, buildProtectionChannelOverridePanel, SettingsCategory } from '../../utils/settingsPanel';
 import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../models';
 import { setPendingWarnRoles } from '../../utils/pendingWarnRoles';
 import { flipEmojiPage, resolveEmojiChoice, buildCommandAddModal } from '../../utils/emojiPicker';
@@ -326,6 +326,71 @@ const handler: SelectMenuHandler = {
       case 'protection:logChannel':
         (settings.protection as any).logChannel = values[0] || null;
         break;
+      case 'autoreply:channels': {
+        // 📍 قنوات الرد التلقائي — أي رسالة فيها يرد البوت
+        if (!(settings as any).autoReply) {
+          (settings as any).autoReply = {
+            enabled: false,
+            channelIds: [],
+            text: '',
+            deleteTrigger: false,
+            replyToMessage: true,
+            ignoreStaff: true,
+            cooldownSeconds: 30,
+          };
+        }
+        (settings as any).autoReply.channelIds = values.slice(0, 10);
+        await settings.save();
+        invalidateGuildSettings(guildId);
+        const arPanel = await buildPanel('autoreply', interaction.guild!, interaction.user.id);
+        await interaction.editReply({
+          embeds: arPanel.embeds,
+          components: arPanel.components as any,
+        });
+        await interaction.followUp({
+          content: values.length
+            ? `✅ الرد التلقائي سيعمل في: ${values.map((v: string) => `<#${v}>`).join('، ')}`
+            : '↩️ تم مسح القنوات — الرد التلقائي متوقف حتى تختار قناة',
+          ephemeral: true,
+        });
+        return;
+      }
+      case 'protection:ignored_channels': {
+        // 🙈 قنوات مستثناة من كل فحوصات الحماية
+        (settings.protection as any).ignoredChannels = [...values];
+        await settings.save();
+        invalidateGuildSettings(guildId);
+        const chPanel = buildProtectionChannelsPanel(interaction.guild!, settings);
+        await interaction.editReply({
+          embeds: chPanel.embeds,
+          components: chPanel.components as any,
+        });
+        await interaction.followUp({
+          content: values.length
+            ? `✅ قنوات بدون أي حماية: ${values.map((v: string) => `<#${v}>`).join('، ')}`
+            : '↩️ تم مسح القنوات المستثناة — الحماية مفعّلة في كل القنوات',
+          ephemeral: true,
+        });
+        return;
+      }
+      case 'protection:override_channels': {
+        // 🎯 فتح إعدادات حماية قناة محددة
+        const channelId = values[0];
+        if (!channelId) {
+          await interaction.editReply({ content: '❌ اختر قناة صالحة' });
+          return;
+        }
+        const ovPanel = buildProtectionChannelOverridePanel(
+          interaction.guild!,
+          settings,
+          channelId
+        );
+        await interaction.editReply({
+          embeds: ovPanel.embeds,
+          components: ovPanel.components as any,
+        });
+        return;
+      }
       case 'music:channels': {
         // 🔒 قنوات مسموح فيها بالموسيقى (فارغة = الكل مسموح)
         if (!settings.music) (settings as any).music = { enabled: true, defaultVolume: 100, maxQueueSize: 50, allowDJ: false, autoplay: false, restrictToChannels: [] };

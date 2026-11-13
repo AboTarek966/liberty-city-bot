@@ -27,6 +27,10 @@ export interface IGuildSettings extends Document {
   protection: {
     /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
     logChannel?: string;
+    /** 🙈 قنوات مستثناة من كل فحوصات الحماية */
+    ignoredChannels?: string[];
+    /** 🎯 استثناءات لكل قناة — كل نوع حماية يُعطَّل في قناة محددة */
+    channelOverrides?: Array<{ channelId: string; disabled: string[] }>;
     /** 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن لا تُرسل تنبيهات تخريب/رايد/اختراق */
     silentSecurityAlerts?: boolean;
     /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
@@ -476,6 +480,22 @@ export interface IGuildSettings extends Document {
   tags: ITag[];
   reactionRoles: IReactionRole[];
 
+  // 💬 الرد التلقائي — صورة/كلمة في قنوات محددة
+  autoReply: {
+    enabled: boolean;
+    channelIds: string[];
+    text: string;
+    imageUrl?: string;
+    /** 🗑️ حذف رسالة العضو بعد الرد */
+    deleteTrigger: boolean;
+    /** ↩️ الرد كـ Reply على رسالة العضو */
+    replyToMessage: boolean;
+    /** 🛡️ تجاهل الإداريين */
+    ignoreStaff: boolean;
+    /** ⏱️ أقل فاصل زمني لكل عضو/قناة بالثواني */
+    cooldownSeconds: number;
+  };
+
   // Auto-Role (رول تلقائي عند الانضمام)
   autorole: {
     enabled: boolean;
@@ -910,6 +930,14 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   
   protection: {
     logChannel: { type: String },
+    // 🙈 قنوات مستثناة من كل فحوصات الحماية
+    ignoredChannels: [{ type: String }],
+    // 🎯 استثناءات لكل قناة — disabled تحمل أسماء الحمايات: antiSpam, antiLink...
+    channelOverrides: [{
+      _id: false,
+      channelId: { type: String, required: true },
+      disabled: [{ type: String }],
+    }],
     // 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن بدون إشعارات تخريب
     silentSecurityAlerts: { type: Boolean, default: false },
     // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
@@ -1330,6 +1358,18 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   customCommands: [CustomCommandSchema],
   tags: [TagSchema],
   reactionRoles: [ReactionRoleSchema],
+
+  // 💬 الرد التلقائي — صورة/كلمة في قنوات محددة
+  autoReply: {
+    enabled: { type: Boolean, default: false },
+    channelIds: [{ type: String }],
+    text: { type: String, default: '' },
+    imageUrl: { type: String },
+    deleteTrigger: { type: Boolean, default: false },
+    replyToMessage: { type: Boolean, default: true },
+    ignoreStaff: { type: Boolean, default: true },
+    cooldownSeconds: { type: Number, default: 30, min: 0, max: 3600 },
+  },
 
   autorole: {
     enabled: { type: Boolean, default: false },

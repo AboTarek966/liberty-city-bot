@@ -132,6 +132,14 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
     protection: {
         logChannel: { type: String },
+        // 🙈 قنوات مستثناة من كل فحوصات الحماية
+        ignoredChannels: [{ type: String }],
+        // 🎯 استثناءات لكل قناة — disabled تحمل أسماء الحمايات: antiSpam, antiLink...
+        channelOverrides: [{
+                _id: false,
+                channelId: { type: String, required: true },
+                disabled: [{ type: String }],
+            }],
         // 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن بدون إشعارات تخريب
         silentSecurityAlerts: { type: Boolean, default: false },
         // 👑 موافقة المالك: أي "إطفاء" لحماية يحتاج نقرة مالك السيرفر (التاج) — مفعّل افتراضياً
@@ -538,6 +546,17 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     customCommands: [CustomCommandSchema],
     tags: [TagSchema],
     reactionRoles: [ReactionRoleSchema],
+    // 💬 الرد التلقائي — صورة/كلمة في قنوات محددة
+    autoReply: {
+        enabled: { type: Boolean, default: false },
+        channelIds: [{ type: String }],
+        text: { type: String, default: '' },
+        imageUrl: { type: String },
+        deleteTrigger: { type: Boolean, default: false },
+        replyToMessage: { type: Boolean, default: true },
+        ignoreStaff: { type: Boolean, default: true },
+        cooldownSeconds: { type: Number, default: 30, min: 0, max: 3600 },
+    },
     autorole: {
         enabled: { type: Boolean, default: false },
         roleId: { type: String },

@@ -29,7 +29,7 @@ const handler = {
         const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
         const verdict = parts[1];
         const field = parts[2];
-        const label = ownerApproval_1.PROTECTION_LABELS[field] || field;
+        const label = (0, ownerApproval_1.protectionFieldLabel)(field);
         const pending = (0, ownerApproval_1.takePending)(interaction.guild.id, field);
         if (!pending) {
             await interaction.update({
@@ -51,7 +51,22 @@ const handler = {
         try {
             const settings = await (0, models_1.getGuildSettings)(interaction.guild.id);
             const prot = settings.protection;
-            if (field === 'ownerApproval') {
+            if (field.startsWith('chan:')) {
+                // 🎯 استثناء داخل قناة محددة (وليس إطفاءً عاماً)
+                const [, channelId, check] = field.split(':');
+                if (!Array.isArray(prot.channelOverrides))
+                    prot.channelOverrides = [];
+                let entry = prot.channelOverrides.find((o) => String(o.channelId) === String(channelId));
+                if (!entry) {
+                    entry = { channelId, disabled: [] };
+                    prot.channelOverrides.push(entry);
+                }
+                if (!Array.isArray(entry.disabled))
+                    entry.disabled = [];
+                if (!entry.disabled.includes(check))
+                    entry.disabled.push(check);
+            }
+            else if (field === 'ownerApproval') {
                 prot.ownerApproval = false; // خيار الموافقة نفسه — بوليان مستقل
             }
             else if (field === 'blocknames') {

@@ -37,7 +37,21 @@ export const PROTECTION_LABELS: Record<string, string> = {
   aiAutoMod: 'الأوتو مود الذكي 🤖',
   lockdown: 'وضع الطوارئ 🔒',
   blocknames: 'مسح الاسم المشبوه ☢️',
+  autoMod: 'الأوتو مود 🔇',
+  zalgo: 'مكافحة Zalgo 🌀',
+  scamFilter: 'فلتر الاحتيال 🕵️',
+  all: 'كل الحماية 🛡️',
 };
+
+/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> */
+export function protectionFieldLabel(field: string): string {
+  if (field.startsWith('chan:')) {
+    const [, channelId, check] = field.split(':');
+    const checkLabel = PROTECTION_LABELS[check] || check || 'حماية';
+    return `${checkLabel} في القناة <#${channelId}>`;
+  }
+  return PROTECTION_LABELS[field] || field;
+}
 
 interface PendingApproval {
   field: string;
@@ -87,7 +101,7 @@ export async function gateProtectionOff(opts: {
     return '⛔ إطفاء الحماية محصور بمالك السيرفر 👑 والمطوّر فقط';
   }
 
-  const label = PROTECTION_LABELS[opts.field] || opts.field;
+  const label = protectionFieldLabel(opts.field);
   const sent = await requestOwnerApproval({
     guild: opts.guild,
     channel: opts.channel,
@@ -108,7 +122,7 @@ export async function requestOwnerApproval(opts: {
   requestedBy: User;
 }): Promise<'sent' | 'nochannel'> {
   const key = `${opts.guild.id}:${opts.field}`;
-  const label = PROTECTION_LABELS[opts.field] || opts.field;
+  const label = protectionFieldLabel(opts.field);
 
   const embed = new EmbedBuilder()
     .setTitle('👑 طلب إطفاء الحماية')

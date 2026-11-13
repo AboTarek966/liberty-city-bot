@@ -8,6 +8,13 @@ export interface IGuildSettings extends Document {
     protection: {
         /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
         logChannel?: string;
+        /** 🙈 قنوات مستثناة من كل فحوصات الحماية */
+        ignoredChannels?: string[];
+        /** 🎯 استثناءات لكل قناة — كل نوع حماية يُعطَّل في قناة محددة */
+        channelOverrides?: Array<{
+            channelId: string;
+            disabled: string[];
+        }>;
         /** 🤫 وضع الصمت الأمني: الحماية والعقوبات تعمل، لكن لا تُرسل تنبيهات تخريب/رايد/اختراق */
         silentSecurityAlerts?: boolean;
         /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
@@ -432,6 +439,20 @@ export interface IGuildSettings extends Document {
     customCommands: ICustomCommand[];
     tags: ITag[];
     reactionRoles: IReactionRole[];
+    autoReply: {
+        enabled: boolean;
+        channelIds: string[];
+        text: string;
+        imageUrl?: string;
+        /** 🗑️ حذف رسالة العضو بعد الرد */
+        deleteTrigger: boolean;
+        /** ↩️ الرد كـ Reply على رسالة العضو */
+        replyToMessage: boolean;
+        /** 🛡️ تجاهل الإداريين */
+        ignoreStaff: boolean;
+        /** ⏱️ أقل فاصل زمني لكل عضو/قناة بالثواني */
+        cooldownSeconds: number;
+    };
     autorole: {
         enabled: boolean;
         roleId?: string;

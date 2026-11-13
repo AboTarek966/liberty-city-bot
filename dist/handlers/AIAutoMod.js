@@ -63,6 +63,17 @@ class AIAutoModHandler {
             const cfg = this.getConfig(settings);
             if (!cfg.enabled)
                 return null;
+            // 🙈 قناة مستثناة من كل الحماية أو الفحص الذكي معطّل فيها تحديداً
+            const prot = settings.protection || {};
+            if (Array.isArray(prot.ignoredChannels) && prot.ignoredChannels.includes(message.channel.id)) {
+                return null;
+            }
+            const override = Array.isArray(prot.channelOverrides)
+                ? prot.channelOverrides.find((o) => String(o.channelId) === String(message.channel.id))
+                : null;
+            if (override?.disabled?.includes('aiAutoMod') || override?.disabled?.includes('all')) {
+                return null;
+            }
             // تجاهل القنوات المستثناة
             if (cfg.ignoredChannels?.includes(message.channel.id))
                 return null;

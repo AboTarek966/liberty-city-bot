@@ -95,6 +95,60 @@ const handler = {
             case 'general:tz':
                 settings.timezone = value.substring(0, 50);
                 break;
+            case 'autoreply:text': {
+                if (!settings.autoReply) {
+                    settings.autoReply = {
+                        enabled: false,
+                        channelIds: [],
+                        text: '',
+                        deleteTrigger: false,
+                        replyToMessage: true,
+                        ignoreStaff: true,
+                        cooldownSeconds: 30,
+                    };
+                }
+                settings.autoReply.text = value.substring(0, 2000);
+                break;
+            }
+            case 'autoreply:image': {
+                if (value && !/^https?:\/\/\S+$/i.test(value)) {
+                    await interaction.editReply({ content: '❌ رابط الصورة يجب أن يبدأ بـ http:// أو https://' });
+                    return;
+                }
+                if (!settings.autoReply) {
+                    settings.autoReply = {
+                        enabled: false,
+                        channelIds: [],
+                        text: '',
+                        deleteTrigger: false,
+                        replyToMessage: true,
+                        ignoreStaff: true,
+                        cooldownSeconds: 30,
+                    };
+                }
+                settings.autoReply.imageUrl = value;
+                break;
+            }
+            case 'autoreply:cooldown': {
+                const seconds = Number.parseInt(value, 10);
+                if (!Number.isInteger(seconds) || seconds < 0 || seconds > 3600) {
+                    await interaction.editReply({ content: '❌ الفاصل الزمني غير صالح — من 0 إلى 3600 ثانية' });
+                    return;
+                }
+                if (!settings.autoReply) {
+                    settings.autoReply = {
+                        enabled: false,
+                        channelIds: [],
+                        text: '',
+                        deleteTrigger: false,
+                        replyToMessage: true,
+                        ignoreStaff: true,
+                        cooldownSeconds: 30,
+                    };
+                }
+                settings.autoReply.cooldownSeconds = seconds;
+                break;
+            }
             case 'welcome:msg':
                 settings.welcome.message = value;
                 break;

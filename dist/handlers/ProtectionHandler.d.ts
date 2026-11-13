@@ -43,6 +43,8 @@ export declare class ProtectionHandler {
     private lockdown;
     private hasIgnoredRole;
     private isIgnoredChannel;
+    /** 🎯 الحمايات المعطّلة في قناة معينة */
+    static disabledChecksInChannel(settings: any, channelId: string): string[];
     private getProtectionKey;
     private sendAIRaidSummary;
     cleanup(): void;
