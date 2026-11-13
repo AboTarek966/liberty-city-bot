@@ -145,33 +145,104 @@
         throw new Error('اختر ملف صورة صالح (JPG/PNG/WebP/GIF)');
       }
       if (file.size > 12 * 1024 * 1024) throw new Error('حجم الصورة أكبر من 12MB');
+
+      // GIF الصغير يُحفظ كما هو حتى لا تضيع الحركة
+      const isGif = (file.type === 'image/gif') || /\.gif$/i.test(file.name || '');
+      if (isGif && file.size <= 1_400_000) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(new Error('تعذّر قراءة الصورة'));
+          reader.readAsDataURL(file);
+        });
+        return { base64: dataUrl.split(',')[1] || '', dataUrl, bytes: file.size, mimeType: 'image/gif', ext: 'gif' };
+      }
+
       const img = await loadImageFile(file);
-      const attempts = [[1280, 0.85], [1100, 0.72], [900, 0.6], [720, 0.52]];
+      const natW = img.naturalWidth;
+      const natH = img.naturalHeight;
+
+      // ارسم بالحجم الأصلي لتحليل المحتوى
+      const nat = document.createElement('canvas');
+      nat.width = natW;
+      nat.height = natH;
+      const nctx = nat.getContext('2d', { willReadFrequently: true });
+      nctx.drawImage(img, 0, 0);
+      const { data } = nctx.getImageData(0, 0, natW, natH);
+
+      let hasTransparency = false;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 250) { hasTransparency = true; break; }
+      }
+      const cornerIdx = [0, (natW - 1) * 4, (natH - 1) * natW * 4, ((natH - 1) * natW + (natW - 1)) * 4];
+      const bg = [0, 0, 0].map((_, ch) => Math.round(cornerIdx.reduce((s, i) => s + data[i + ch], 0) / 4));
+      const dist = (i) => Math.max(
+        Math.abs(data[i] - bg[0]),
+        Math.abs(data[i + 1] - bg[1]),
+        Math.abs(data[i + 2] - bg[2])
+      );
+      const cornersClose = cornerIdx.every((i) => dist(i) <= 48);
+
+      // حدود المحتوى الفعلي (بدون هوامش شفافة/موحدة)
+      let minX = natW, minY = natH, maxX = -1, maxY = -1;
+      const step = natW * natH > 3_000_000 ? 2 : 1;
+      for (let y = 0; y < natH; y += step) {
+        for (let x = 0; x < natW; x += step) {
+          const i = (y * natW + x) * 4;
+          let content;
+          if (hasTransparency) content = data[i + 3] > 24;
+          else if (cornersClose) content = dist(i) > 32;
+          else content = true; // صورة صاخبة — بلا قص
+          if (content) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      let box = { x: 0, y: 0, w: natW, h: natH };
+      if (maxX >= 0) {
+        const tw = maxX - minX + 1, th = maxY - minY + 1;
+        if (!(tw >= natW - 2 && th >= natH - 2) && tw >= 8 && th >= 8) {
+          box = { x: minX, y: minY, w: tw, h: th };
+        }
+      }
+
+      const attempts = hasTransparency
+        ? [[1600, 'image/webp', 0.95], [1600, 'image/webp', 0.9], [1200, 'image/webp', 0.9], [1600, 'image/png', 1], [1000, 'image/webp', 0.85]]
+        : [[1600, 'image/jpeg', 0.92], [1600, 'image/jpeg', 0.85], [1600, 'image/jpeg', 0.75], [1200, 'image/jpeg', 0.85], [1000, 'image/jpeg', 0.72]];
+
       let best = null;
-      for (const [maxDim, quality] of attempts) {
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
+      let bestType = null;
+      for (const [maxDim, type, quality] of attempts) {
+        const scale = Math.min(1, maxDim / Math.max(box.w, box.h));
+        const w = Math.max(1, Math.round(box.w * scale));
+        const h = Math.max(1, Math.round(box.h * scale));
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+        if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, w, h);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, quality));
         if (!blob) continue;
         best = blob;
-        if (blob.size <= 1_200_000) break;
+        bestType = type;
+        if (blob.size <= 1_400_000) break;
       }
       if (!best) throw new Error('تعذّر ضغط الصورة');
+
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
         reader.onerror = () => reject(new Error('تعذّر قراءة الصورة'));
         reader.readAsDataURL(best);
       });
-      return { base64: dataUrl.split(',')[1] || '', dataUrl, bytes: best.size };
+      const ext = bestType === 'image/png' ? 'png' : bestType === 'image/webp' ? 'webp' : 'jpg';
+      return { base64: dataUrl.split(',')[1] || '', dataUrl, bytes: best.size, mimeType: bestType, ext };
     };
 
     pickBtn?.addEventListener('click', () => fileEl?.click());
@@ -188,12 +259,12 @@
       try {
         const out = await compressImage(file);
         if (!out.base64) throw new Error('تعذّر تجهيز الصورة');
-        const displayName = (file.name || 'auto-reply.jpg').slice(0, 120);
+        const displayName = (file.name || 'auto-reply').slice(0, 120);
         const ok = await LC.saveSetting(AR_GID, {
           autoReply: {
             imageData: out.base64,
-            imageMimeType: 'image/jpeg',
-            imageName: displayName.replace(/\.[^.]+$/, '') + '.jpg',
+            imageMimeType: out.mimeType,
+            imageName: displayName.replace(/\.[^.]+$/, '') + '.' + (out.ext || 'jpg'),
             imageUrl: '',
           },
         }, null);

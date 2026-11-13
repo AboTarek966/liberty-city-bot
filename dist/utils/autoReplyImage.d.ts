@@ -20,7 +20,9 @@ export declare function getAutoReplyImageBuffer(cfg: any): Buffer | null;
 export declare function downloadAutoReplyAttachment(url: string): Promise<Buffer>;
 /**
  * ضغط الصورة وتجهيزها للتخزين.
- * الصور الصغيرة تبقى بصيغتها، والكبيرة تُحوّل JPEG بأبعاد مناسبة.
+ * - الهوامش الشفافة/الموحدة تُقص تلقائياً.
+ * - الصور فيها شفافية تبقى شفافة (PNG/WebP) بدل تحويلها لأبيض.
+ * - جودة JPEG تبدأ عالية (0.92) وتنخفض تدريجياً فقط لو لزم.
  */
 export declare function prepareAutoReplyImage(buffer: Buffer, mimeType: string, originalName?: string): Promise<PreparedAutoReplyImage>;
 //# sourceMappingURL=autoReplyImage.d.ts.map

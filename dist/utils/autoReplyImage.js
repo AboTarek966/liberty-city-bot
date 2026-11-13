@@ -20,8 +20,8 @@ const logger = (0, helpers_1.createLogger)('AutoReplyImage');
 exports.AUTO_REPLY_IMAGE_MAX_INPUT = 12 * 1024 * 1024; // 12MB
 /** أقصى حجم للصورة بعد الضغط — base64 يزيد الحجم ~33% لكنه يبقى ضمن حدود Mongo */
 exports.AUTO_REPLY_IMAGE_MAX_STORED = 1_500_000; // 1.5MB
-/** أقصى أبعاد بعد الضغط */
-const MAX_DIMENSION = 1280;
+/** أقصى أبعاد بعد الضغط — نرفعها للحفاظ على جودة اللافتات/البانرات */
+const MAX_DIMENSION = 1600;
 const MIME_EXT = {
     'image/jpeg': 'jpg',
     'image/jpg': 'jpg',
@@ -79,9 +79,97 @@ async function downloadAutoReplyAttachment(url) {
     });
     return Buffer.from(res.data);
 }
+function channelDist(data, i, bg) {
+    return Math.max(Math.abs(data[i] - bg[0]), Math.abs(data[i + 1] - bg[1]), Math.abs(data[i + 2] - bg[2]));
+}
+/**
+ * تحليل الصورة المطلوبة وتحديد حدود المحتوى الفعلي (بدون الهوامش الشفافة/الموحدة).
+ * - لو فيها شفافية: المحتوى = أي بكسل alpha > 24.
+ * - لو بدون شفافية: المحتوى = أي بكسل يختلف عن لون الخلفية (المُستنتج من الزوايا) بأكثر من 32.
+ * ترجع null لو الصورة "صاخبة" (لا توجد هوامش موحدة واضحة) — يعني بلا قص.
+ */
+function analyzeTrimBox(data, w, h) {
+    let hasTransparency = false;
+    for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 250) {
+            hasTransparency = true;
+            break;
+        }
+    }
+    const corners = [
+        0,
+        (w - 1) * 4,
+        (h - 1) * w * 4,
+        ((h - 1) * w + (w - 1)) * 4,
+    ];
+    const r = Math.round(corners.reduce((s, i) => s + data[i], 0) / 4);
+    const g = Math.round(corners.reduce((s, i) => s + data[i + 1], 0) / 4);
+    const b = Math.round(corners.reduce((s, i) => s + data[i + 2], 0) / 4);
+    const bg = [r, g, b];
+    // تأكد أن الزوايا متقاربة — وإلا فالصورة ليست "لافتة على خلفية موحدة"
+    const cornersClose = corners.every((i) => channelDist(data, i, bg) <= 48);
+    let minX = w;
+    let minY = h;
+    let maxX = -1;
+    let maxY = -1;
+    const step = w * h > 3_000_000 ? 2 : 1; // صور ضخمة جداً: عيّنة كل بكسلين لتسريع المسح
+    for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+            const i = (y * w + x) * 4;
+            let content;
+            if (hasTransparency) {
+                content = data[i + 3] > 24;
+            }
+            else if (cornersClose) {
+                content = channelDist(data, i, bg) > 32;
+            }
+            else {
+                content = true; // صورة صاخبة — لا قص
+            }
+            if (content) {
+                if (x < minX)
+                    minX = x;
+                if (y < minY)
+                    minY = y;
+                if (x > maxX)
+                    maxX = x;
+                if (y > maxY)
+                    maxY = y;
+            }
+        }
+    }
+    if (maxX < 0)
+        return null; // الصورة فارغة بالكامل
+    // لو القص أصغر من 5% من المساحة أو أقل من 8px من كل ناحية — لا فائدة
+    const trimmedW = maxX - minX + 1;
+    const trimmedH = maxY - minY + 1;
+    if (trimmedW >= w - 2 && trimmedH >= h - 2)
+        return { x: 0, y: 0, w, h, hasTransparency, bg };
+    if (trimmedW < 8 || trimmedH < 8)
+        return { x: 0, y: 0, w, h, hasTransparency, bg };
+    return { x: minX, y: minY, w: trimmedW, h: trimmedH, hasTransparency, bg };
+}
+/** قص الصورة إلى حدود المحتوى ثم تصغيرها إن لزم — بجودة عالية */
+async function cropAndScale(img, box, maxDim) {
+    const { createCanvas } = require('@napi-rs/canvas');
+    const cropped = createCanvas(box.w, box.h);
+    const cctx = cropped.getContext('2d');
+    cctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    const scale = Math.min(1, maxDim / Math.max(box.w, box.h));
+    if (scale >= 1)
+        return cropped;
+    const out = createCanvas(Math.max(1, Math.round(box.w * scale)), Math.max(1, Math.round(box.h * scale)));
+    const octx = out.getContext('2d');
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = 'high';
+    octx.drawImage(cropped, 0, 0, out.width, out.height);
+    return out;
+}
 /**
  * ضغط الصورة وتجهيزها للتخزين.
- * الصور الصغيرة تبقى بصيغتها، والكبيرة تُحوّل JPEG بأبعاد مناسبة.
+ * - الهوامش الشفافة/الموحدة تُقص تلقائياً.
+ * - الصور فيها شفافية تبقى شفافة (PNG/WebP) بدل تحويلها لأبيض.
+ * - جودة JPEG تبدأ عالية (0.92) وتنخفض تدريجياً فقط لو لزم.
  */
 async function prepareAutoReplyImage(buffer, mimeType, originalName = '') {
     if (!buffer.length)
@@ -106,39 +194,85 @@ async function prepareAutoReplyImage(buffer, mimeType, originalName = '') {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { loadImage, createCanvas } = require('@napi-rs/canvas');
         const img = await loadImage(buffer);
-        let maxDim = MAX_DIMENSION;
-        let quality = 0.85;
-        let lastSize = buffer.length;
-        // جرّب جودة/أبعاد أقل تدريجياً حتى يدخل تحت الحد
-        for (let attempt = 0; attempt < 10; attempt++) {
-            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-            const w = Math.max(1, Math.round(img.width * scale));
-            const h = Math.max(1, Math.round(img.height * scale));
-            const canvas = createCanvas(w, h);
-            const ctx = canvas.getContext('2d');
-            // خلفية بيضاء للصور الشفافة قبل تحويلها JPEG
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, w, h);
-            ctx.drawImage(img, 0, 0, w, h);
-            const out = canvas.toBuffer('image/jpeg', quality);
-            lastSize = out.length;
-            if (out.length <= exports.AUTO_REPLY_IMAGE_MAX_STORED) {
-                logger.info(`Auto-reply image compressed: ${buffer.length} → ${out.length} bytes (${w}x${h})`);
-                return {
-                    base64: out.toString('base64'),
-                    mimeType: 'image/jpeg',
-                    name: displayName.replace(/\.[^.]+$/, '') + '.jpg',
-                    bytes: out.length,
-                    width: w,
-                    height: h,
-                };
-            }
-            if (quality > 0.6)
-                quality = Math.max(0.6, quality - 0.1);
-            else
-                maxDim = Math.max(640, Math.floor(maxDim * 0.75));
+        // ارسم بالحجم الأصلي لتحليل المحتوى
+        const nat = createCanvas(img.width, img.height);
+        const nctx = nat.getContext('2d');
+        nctx.drawImage(img, 0, 0);
+        const { data } = nctx.getImageData(0, 0, img.width, img.height);
+        const box = analyzeTrimBox(data, img.width, img.height);
+        const effectiveBox = box || {
+            x: 0,
+            y: 0,
+            w: img.width,
+            h: img.height,
+            hasTransparency: false,
+            bg: [255, 255, 255],
+        };
+        // قرار الترميز: شفاف → WebP/PNG، وإلا JPEG عالي الجودة
+        const attempts = [];
+        if (effectiveBox.hasTransparency) {
+            attempts.push({ maxDim: MAX_DIMENSION, quality: 0.95, type: 'image/webp' }, { maxDim: MAX_DIMENSION, quality: 0.9, type: 'image/webp' }, { maxDim: 1200, quality: 0.9, type: 'image/webp' }, { maxDim: MAX_DIMENSION, quality: 1, type: 'image/png' }, { maxDim: 1000, quality: 0.85, type: 'image/webp' });
         }
-        throw new Error(`تعذّر ضغط الصورة لحجم مناسب (آخر حجم: ${lastSize} بايت)`);
+        else {
+            attempts.push({ maxDim: MAX_DIMENSION, quality: 0.92, type: 'image/jpeg' }, { maxDim: MAX_DIMENSION, quality: 0.85, type: 'image/jpeg' }, { maxDim: MAX_DIMENSION, quality: 0.75, type: 'image/jpeg' }, { maxDim: 1200, quality: 0.85, type: 'image/jpeg' }, { maxDim: 1000, quality: 0.72, type: 'image/jpeg' });
+        }
+        const fillWhite = (src) => {
+            const filled = createCanvas(src.width, src.height);
+            const fctx = filled.getContext('2d');
+            fctx.fillStyle = '#ffffff';
+            fctx.fillRect(0, 0, filled.width, filled.height);
+            fctx.drawImage(src, 0, 0);
+            return filled;
+        };
+        let lastSize = 0;
+        for (const attempt of attempts) {
+            const canvas = await cropAndScale(img, effectiveBox, attempt.maxDim);
+            const target = attempt.type === 'image/jpeg' ? fillWhite(canvas) : canvas;
+            let out = null;
+            try {
+                out = target.toBuffer(attempt.type, attempt.quality);
+            }
+            catch {
+                out = null; // نوع غير مدعوم (مثل webp في نسخة canvas قديمة) — جرّب التالي
+            }
+            if (!out || !out.length)
+                continue;
+            lastSize = out.length;
+            if (out.length > exports.AUTO_REPLY_IMAGE_MAX_STORED)
+                continue;
+            const ext = extensionForMime(attempt.type);
+            const nameOut = displayName.replace(/\.[^.]+$/, '') + '.' + ext;
+            logger.info(`Auto-reply image ready: ${buffer.length} → ${out.length} bytes (${canvas.width}x${canvas.height}, ${attempt.type})`);
+            return {
+                base64: out.toString('base64'),
+                mimeType: attempt.type,
+                name: nameOut,
+                bytes: out.length,
+                width: canvas.width,
+                height: canvas.height,
+            };
+        }
+        // آخر ملاذ: JPEG على 1000px بأبعاد أصغر حتى يدخل الحد
+        const fallbackDim = 800;
+        const canvas = await cropAndScale(img, effectiveBox, fallbackDim);
+        const filled = createCanvas(canvas.width, canvas.height);
+        const fctx = filled.getContext('2d');
+        fctx.fillStyle = '#ffffff';
+        fctx.fillRect(0, 0, filled.width, filled.height);
+        fctx.drawImage(canvas, 0, 0);
+        const out = filled.toBuffer('image/jpeg', 0.65);
+        lastSize = out.length;
+        if (out.length > exports.AUTO_REPLY_IMAGE_MAX_STORED) {
+            throw new Error(`تعذّر ضغط الصورة لحجم مناسب (آخر حجم: ${lastSize} بايت)`);
+        }
+        return {
+            base64: out.toString('base64'),
+            mimeType: 'image/jpeg',
+            name: displayName.replace(/\.[^.]+$/, '') + '.jpg',
+            bytes: out.length,
+            width: filled.width,
+            height: filled.height,
+        };
     }
     catch (err) {
         // لو الصورة أصلها صغيرة ومدعومة، احفظها كما هي بدل الفشل
