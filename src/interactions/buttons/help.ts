@@ -8,13 +8,15 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 const categoryInfo: Record<string, { name: string; emoji: string }> = {
-  moderation: { name: '🛡️ الموديريشن', emoji: '🛡️' },
-  protection: { name: '🔒 الحماية', emoji: '🔒' },
-  tickets: { name: '🎫 التذاكر', emoji: '🎫' },
-  settings: { name: '⚙️ الإعدادات', emoji: '⚙️' },
-  ai: { name: '🤖 الذكاء الاصطناعي', emoji: '🤖' },
-  utility: { name: '🔧 الأدوات', emoji: '🔧' },
-  info: { name: 'ℹ️ المعلومات', emoji: 'ℹ️' },
+  moderation: { name: 'أوامر الادارة', emoji: '🛡️' },
+  protection: { name: 'أوامر الحماية', emoji: '🔒' },
+  tickets: { name: 'أوامر التذاكر', emoji: '🎫' },
+  settings: { name: 'أوامر الاعدادات', emoji: '⚙️' },
+  ai: { name: 'الذكاء الاصطناعي', emoji: '🤖' },
+  roles: { name: 'أوامر الرتب', emoji: '📛' },
+  fun: { name: 'أوامر الترفيه والألعاب', emoji: '🎮' },
+  utility: { name: 'أوامر الأدوات', emoji: '🔧' },
+  info: { name: 'أوامر المعلومات', emoji: 'ℹ️' },
 };
 
 const handler: ButtonHandler = {
@@ -28,7 +30,7 @@ const handler: ButtonHandler = {
     const commands = client.commandHandler.getCommandsByCategory(category);
 
     const embed = new EmbedBuilder()
-      .setTitle(`${info.emoji} أوامر ${info.name}`)
+      .setTitle(`${info.emoji} ${info.name}`)
       .setDescription(
         commands.length > 0
           ? commands

@@ -9,10 +9,37 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  Guild,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
+
+/**
+ * 🎨 إيجاد إيموجي السيرفر بالاسم وإرجاعه بشكل يصلح لأزرار ديسكورد.
+ * يدعم الأسماء المكررة بصيغة `name~2` (ثاني إيموجي بنفس الاسم).
+ * لو الإيموجي مش موجود في السيرفر يرجع الإيموجي الاحتياطي (يونيكود).
+ */
+function guildEmoji(guild: Guild | null, name: string, fallback: string): any {
+  if (!guild) return fallback;
+  const all = [...guild.emojis.cache.values()];
+  if (!all.length) return fallback;
+
+  const lower = name.toLowerCase();
+  let found = all.find(e => e.name?.toLowerCase() === lower);
+
+  if (!found) {
+    const m = /^(.+?)~(\d+)$/.exec(name);
+    if (m) {
+      const base = m[1].toLowerCase();
+      const index = Math.max(1, parseInt(m[2], 10)) - 1;
+      found = all.filter(e => e.name?.toLowerCase() === base)[index];
+    }
+  }
+
+  if (!found) return fallback;
+  return { id: found.id, name: found.name, animated: found.animated };
+}
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -49,15 +76,15 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
   const categories = client.commandHandler.getCategories();
 
   const categoryInfo: Record<string, { name: string; emoji: string }> = {
-    moderation: { name: '🛡️ الموديريشن', emoji: '🛡️' },
-    protection: { name: '🔒 الحماية', emoji: '🔒' },
-    tickets: { name: '🎫 التذاكر', emoji: '🎫' },
-    settings: { name: '⚙️ الإعدادات', emoji: '⚙️' },
-    ai: { name: '🤖 الذكاء الاصطناعي', emoji: '🤖' },
-    utility: { name: '🔧 الأدوات', emoji: '🔧' },
-    info: { name: 'ℹ️ المعلومات', emoji: 'ℹ️' },
-    fun: { name: '🎮 الترفيه والألعاب', emoji: '🎮' },
-    roles: { name: '📛 الرتب', emoji: '📛' },
+    moderation: { name: 'أوامر الادارة', emoji: '🛡️' },
+    protection: { name: 'أوامر الحماية', emoji: '🔒' },
+    tickets: { name: 'أوامر التذاكر', emoji: '🎫' },
+    settings: { name: 'أوامر الاعدادات', emoji: '⚙️' },
+    ai: { name: 'الذكاء الاصطناعي', emoji: '🤖' },
+    utility: { name: 'أوامر الأدوات', emoji: '🔧' },
+    info: { name: 'أوامر المعلومات', emoji: 'ℹ️' },
+    fun: { name: 'أوامر الترفيه والألعاب', emoji: '🎮' },
+    roles: { name: 'أوامر الرتب', emoji: '📛' },
   };
 
   const embed = new EmbedBuilder()
@@ -92,24 +119,24 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('help_moderation')
-      .setLabel('الموديريشن')
+      .setLabel('أوامر الادارة')
       .setStyle(ButtonStyle.Primary)
-      .setEmoji('🛡️'),
+      .setEmoji(guildEmoji(interaction.guild, 'staff~2', '🛡️')),
     new ButtonBuilder()
       .setCustomId('help_protection')
-      .setLabel('الحماية')
+      .setLabel('أوامر الحماية')
       .setStyle(ButtonStyle.Success)
-      .setEmoji('🔒'),
+      .setEmoji(guildEmoji(interaction.guild, 'consideration', '🔒')),
     new ButtonBuilder()
       .setCustomId('help_tickets')
-      .setLabel('التذاكر')
+      .setLabel('أوامر التذاكر')
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji('🎫'),
+      .setEmoji(guildEmoji(interaction.guild, 'ticket~2', '🎫')),
     new ButtonBuilder()
       .setCustomId('help_ai')
-      .setLabel('AI')
+      .setLabel('الذكاء الاصطناعي')
       .setStyle(ButtonStyle.Danger)
-      .setEmoji('🤖'),
+      .setEmoji(guildEmoji(interaction.guild, 'chat~1', '🤖')),
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -120,14 +147,14 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
       .setEmoji('🎮'),
     new ButtonBuilder()
       .setCustomId('help_roles')
-      .setLabel('الرتب')
+      .setLabel('أوامر الرتب')
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji('📛'),
+      .setEmoji(guildEmoji(interaction.guild, 'notebook~1', '📛')),
     new ButtonBuilder()
       .setCustomId('help_settings')
-      .setLabel('الإعدادات')
+      .setLabel('أوامر الاعدادات')
       .setStyle(ButtonStyle.Success)
-      .setEmoji('⚙️'),
+      .setEmoji(guildEmoji(interaction.guild, 'correct', '⚙️')),
     new ButtonBuilder()
       .setCustomId('help_utility')
       .setLabel('الأدوات')

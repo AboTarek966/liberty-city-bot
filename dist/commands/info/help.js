@@ -5,6 +5,31 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
+/**
+ * 🎨 إيجاد إيموجي السيرفر بالاسم وإرجاعه بشكل يصلح لأزرار ديسكورد.
+ * يدعم الأسماء المكررة بصيغة `name~2` (ثاني إيموجي بنفس الاسم).
+ * لو الإيموجي مش موجود في السيرفر يرجع الإيموجي الاحتياطي (يونيكود).
+ */
+function guildEmoji(guild, name, fallback) {
+    if (!guild)
+        return fallback;
+    const all = [...guild.emojis.cache.values()];
+    if (!all.length)
+        return fallback;
+    const lower = name.toLowerCase();
+    let found = all.find(e => e.name?.toLowerCase() === lower);
+    if (!found) {
+        const m = /^(.+?)~(\d+)$/.exec(name);
+        if (m) {
+            const base = m[1].toLowerCase();
+            const index = Math.max(1, parseInt(m[2], 10)) - 1;
+            found = all.filter(e => e.name?.toLowerCase() === base)[index];
+        }
+    }
+    if (!found)
+        return fallback;
+    return { id: found.id, name: found.name, animated: found.animated };
+}
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('help')
@@ -32,15 +57,15 @@ async function showHelpMenu(interaction, client) {
     const commands = client.commandHandler.getCommands();
     const categories = client.commandHandler.getCategories();
     const categoryInfo = {
-        moderation: { name: '🛡️ الموديريشن', emoji: '🛡️' },
-        protection: { name: '🔒 الحماية', emoji: '🔒' },
-        tickets: { name: '🎫 التذاكر', emoji: '🎫' },
-        settings: { name: '⚙️ الإعدادات', emoji: '⚙️' },
-        ai: { name: '🤖 الذكاء الاصطناعي', emoji: '🤖' },
-        utility: { name: '🔧 الأدوات', emoji: '🔧' },
-        info: { name: 'ℹ️ المعلومات', emoji: 'ℹ️' },
-        fun: { name: '🎮 الترفيه والألعاب', emoji: '🎮' },
-        roles: { name: '📛 الرتب', emoji: '📛' },
+        moderation: { name: 'أوامر الادارة', emoji: '🛡️' },
+        protection: { name: 'أوامر الحماية', emoji: '🔒' },
+        tickets: { name: 'أوامر التذاكر', emoji: '🎫' },
+        settings: { name: 'أوامر الاعدادات', emoji: '⚙️' },
+        ai: { name: 'الذكاء الاصطناعي', emoji: '🤖' },
+        utility: { name: 'أوامر الأدوات', emoji: '🔧' },
+        info: { name: 'أوامر المعلومات', emoji: 'ℹ️' },
+        fun: { name: 'أوامر الترفيه والألعاب', emoji: '🎮' },
+        roles: { name: 'أوامر الرتب', emoji: '📛' },
     };
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle(`📚 أوامر ${interaction.guild.name}`)
@@ -64,34 +89,34 @@ async function showHelpMenu(interaction, client) {
     // Create buttons for navigation
     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
         .setCustomId('help_moderation')
-        .setLabel('الموديريشن')
+        .setLabel('أوامر الادارة')
         .setStyle(discord_js_1.ButtonStyle.Primary)
-        .setEmoji('🛡️'), new discord_js_1.ButtonBuilder()
+        .setEmoji(guildEmoji(interaction.guild, 'staff~2', '🛡️')), new discord_js_1.ButtonBuilder()
         .setCustomId('help_protection')
-        .setLabel('الحماية')
+        .setLabel('أوامر الحماية')
         .setStyle(discord_js_1.ButtonStyle.Success)
-        .setEmoji('🔒'), new discord_js_1.ButtonBuilder()
+        .setEmoji(guildEmoji(interaction.guild, 'consideration', '🔒')), new discord_js_1.ButtonBuilder()
         .setCustomId('help_tickets')
-        .setLabel('التذاكر')
+        .setLabel('أوامر التذاكر')
         .setStyle(discord_js_1.ButtonStyle.Secondary)
-        .setEmoji('🎫'), new discord_js_1.ButtonBuilder()
+        .setEmoji(guildEmoji(interaction.guild, 'ticket~2', '🎫')), new discord_js_1.ButtonBuilder()
         .setCustomId('help_ai')
-        .setLabel('AI')
+        .setLabel('الذكاء الاصطناعي')
         .setStyle(discord_js_1.ButtonStyle.Danger)
-        .setEmoji('🤖'));
+        .setEmoji(guildEmoji(interaction.guild, 'chat~1', '🤖')));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
         .setCustomId('help_fun')
         .setLabel('الترفيه')
         .setStyle(discord_js_1.ButtonStyle.Primary)
         .setEmoji('🎮'), new discord_js_1.ButtonBuilder()
         .setCustomId('help_roles')
-        .setLabel('الرتب')
+        .setLabel('أوامر الرتب')
         .setStyle(discord_js_1.ButtonStyle.Secondary)
-        .setEmoji('📛'), new discord_js_1.ButtonBuilder()
+        .setEmoji(guildEmoji(interaction.guild, 'notebook~1', '📛')), new discord_js_1.ButtonBuilder()
         .setCustomId('help_settings')
-        .setLabel('الإعدادات')
+        .setLabel('أوامر الاعدادات')
         .setStyle(discord_js_1.ButtonStyle.Success)
-        .setEmoji('⚙️'), new discord_js_1.ButtonBuilder()
+        .setEmoji(guildEmoji(interaction.guild, 'correct', '⚙️')), new discord_js_1.ButtonBuilder()
         .setCustomId('help_utility')
         .setLabel('الأدوات')
         .setStyle(discord_js_1.ButtonStyle.Secondary)

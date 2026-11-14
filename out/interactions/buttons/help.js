@@ -6,13 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const categoryInfo = {
-    moderation: { name: '🛡️ الموديريشن', emoji: '🛡️' },
-    protection: { name: '🔒 الحماية', emoji: '🔒' },
-    tickets: { name: '🎫 التذاكر', emoji: '🎫' },
-    settings: { name: '⚙️ الإعدادات', emoji: '⚙️' },
-    ai: { name: '🤖 الذكاء الاصطناعي', emoji: '🤖' },
-    utility: { name: '🔧 الأدوات', emoji: '🔧' },
-    info: { name: 'ℹ️ المعلومات', emoji: 'ℹ️' },
+    moderation: { name: 'أوامر الادارة', emoji: '🛡️' },
+    protection: { name: 'أوامر الحماية', emoji: '🔒' },
+    tickets: { name: 'أوامر التذاكر', emoji: '🎫' },
+    settings: { name: 'أوامر الاعدادات', emoji: '⚙️' },
+    ai: { name: 'الذكاء الاصطناعي', emoji: '🤖' },
+    roles: { name: 'أوامر الرتب', emoji: '📛' },
+    fun: { name: 'أوامر الترفيه والألعاب', emoji: '🎮' },
+    utility: { name: 'أوامر الأدوات', emoji: '🔧' },
+    info: { name: 'أوامر المعلومات', emoji: 'ℹ️' },
 };
 const handler = {
     id: 'help',
@@ -23,7 +25,7 @@ const handler = {
         const info = categoryInfo[category] || { name: category, emoji: '📂' };
         const commands = client.commandHandler.getCommandsByCategory(category);
         const embed = new discord_js_1.EmbedBuilder()
-            .setTitle(`${info.emoji} أوامر ${info.name}`)
+            .setTitle(`${info.emoji} ${info.name}`)
             .setDescription(commands.length > 0
             ? commands
                 .map(cmd => `> \`/${cmd.data.name}\` — ${cmd.data.description}`)
