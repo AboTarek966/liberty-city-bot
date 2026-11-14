@@ -658,30 +658,21 @@ registerTool('purge_messages', {
     },
 });
 registerTool('send_announcement', {
-    description: 'إرسال إعلان لجميع الأعضاء (DM أو قناة)',
+    description: 'إرسال إعلان في قناة (الإرسال الجماعي في الخاص DM متوقف لحماية البوت)',
     adminOnly: true,
     dangerous: true,
     params: {
         message: { type: 'string', description: 'نص الإعلان', required: true },
-        viaDM: { type: 'boolean', description: 'إرسال في الخاص (true) أو في قناة الإعلانات (false)', required: false },
+        viaDM: { type: 'boolean', description: 'غير مدعوم — الإرسال الجماعي في الخاص متوقف نهائياً', required: false },
         channelId: { type: 'string', description: 'آيدي القناة (إذا ليس DM)', required: false },
     },
     async func({ guild, executor }, { message, viaDM = false, channelId }) {
         if (viaDM) {
-            let sent = 0, failed = 0;
-            for (const [, member] of guild.members.cache) {
-                if (member.user.bot)
-                    continue;
-                try {
-                    await member.send(message);
-                    sent++;
-                }
-                catch {
-                    failed++;
-                }
-                await new Promise(r => setTimeout(r, 100)); // تجنب rate limit
-            }
-            return { success: true, message: `📢 **تم الإرسال في الخاص:** نجح ${sent}، فشل ${failed}`, data: { sent, failed } };
+            // 🚫 منع الإرسال الجماعي في الخاص — ديسكورد تعتبره سبام وقد تحظر البوت
+            return {
+                success: false,
+                message: '🚫 الإرسال الجماعي في الخاص (DM) متوقف نهائياً لحماية البوت من الحظر. استخدم إعلان قناة بدلاً منه.',
+            };
         }
         const channel = channelId ? guild.channels.cache.get(channelId) : guild.systemChannel;
         if (!channel || !channel.isTextBased())

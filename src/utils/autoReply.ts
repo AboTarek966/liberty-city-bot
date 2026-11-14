@@ -9,10 +9,24 @@ import { autoReplyAttachmentName, getAutoReplyImageBuffer } from './autoReplyIma
 /** ⏱️ آخر رد لكل (سيرفر/قناة/عضو) — يمنع السبام عند الرسائل السريعة */
 const lastSent = new Map<string, number>();
 
+/**
+ * 🛡️ سقف أمان لكل قناة: مهما كان عدد الأعضاء النشطين أو إعداد الفاصل لكل عضو،
+ * لا يرسل البوت أكثر من رد تلقائي واحد كل 30 ثانية في نفس القناة.
+ * (منع تدفق الصور/الردود الذي قد يُحسب سباماً من ديسكورد)
+ */
+const lastChannelSent = new Map<string, number>();
+const HARD_CHANNEL_COOLDOWN_MS = 30_000;
+
 function pruneCooldowns(now: number): void {
-  if (lastSent.size < 4000) return;
-  for (const [key, at] of lastSent) {
-    if (now - at > 6 * 60 * 60 * 1000) lastSent.delete(key);
+  if (lastSent.size >= 4000) {
+    for (const [key, at] of lastSent) {
+      if (now - at > 6 * 60 * 60 * 1000) lastSent.delete(key);
+    }
+  }
+  if (lastChannelSent.size >= 2000) {
+    for (const [key, at] of lastChannelSent) {
+      if (now - at > 6 * 60 * 60 * 1000) lastChannelSent.delete(key);
+    }
   }
 }
 
@@ -46,15 +60,21 @@ export async function handleAutoReply(message: Message): Promise<boolean> {
   }
 
   // ⏱️ فاصل زمني لكل عضو في نفس القناة
+  const now = Date.now();
+  const memberKey = `${message.guild.id}:${message.channel.id}:${message.author.id}`;
+  const channelKey = `${message.guild.id}:${message.channel.id}`;
   const cooldownMs = Math.max(0, Number(cfg.cooldownSeconds ?? 30)) * 1000;
   if (cooldownMs > 0) {
-    const key = `${message.guild.id}:${message.channel.id}:${message.author.id}`;
-    const now = Date.now();
-    const last = lastSent.get(key) || 0;
+    const last = lastSent.get(memberKey) || 0;
     if (now - last < cooldownMs) return false;
-    lastSent.set(key, now);
-    pruneCooldowns(now);
   }
+
+  // 🛡️ سقف أمان لكل قناة (ثابت) — يمنع تدفق الردود/الصور حتى لو كل عضو له فاصل قصير
+  if (now - (lastChannelSent.get(channelKey) || 0) < HARD_CHANNEL_COOLDOWN_MS) return false;
+
+  if (cooldownMs > 0) lastSent.set(memberKey, now);
+  lastChannelSent.set(channelKey, now);
+  pruneCooldowns(now);
 
   // 🖼️ بناء الرد — صورة من الجهاز + نص، أو رابط صورة، أو نص فقط
   let payload: any;

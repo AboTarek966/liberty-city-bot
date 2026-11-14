@@ -688,49 +688,13 @@ const handler: ModalHandler = {
         break;
       }
       case 'announce:dm': {
-        const content = value.trim();
-        if (!content) {
-          await interaction.editReply({ content: '❌ الرسالة مطلوبة' });
-          return;
-        }
-        if (!settings.protection) (settings as any).protection = {};
-        const ann = (settings.protection as any).announcements || ((settings.protection as any).announcements = { history: [] });
-        ann.history.push({
-          type: 'dm',
-          content,
-          at: new Date(),
-          sentBy: interaction.user.id,
+        // 🚫 الإرسال الجماعي في الخاص متوقف — سبب مباشر لحظر البوت (سبام)
+        await interaction.editReply({
+          content:
+            '🚫 **الإرسال الجماعي في الخاص (DM) متوقف نهائياً**\n' +
+            'ديسكورد تعتبر مراسلة كل الأعضاء في الخاص «سلوكاً مزعجاً» وقد تحظر البوت.\n' +
+            '✅ استخدم **📢 إرسال لقناة** بدلاً منه.',
         });
-        await settings.save();
-
-        // إرسال للجميع
-        const client = interaction.client as OmniClient;
-        const guild = interaction.guild!;
-        const members = await guild.members.fetch().catch(() => null);
-        if (!members) {
-          await interaction.editReply({ content: '❌ فشل جلب الأعضاء' });
-          return;
-        }
-
-        await interaction.editReply({ content: `⏳ جاري الإرسال لـ ${members.size} عضو...` });
-
-        let sent = 0, failed = 0;
-        for (const [, member] of members) {
-          if (member.user.bot) continue;
-          try {
-            const msg = content
-              .replace(/\{user\}/g, member.toString())
-              .replace(/\{server\}/g, guild.name)
-              .replace(/\{count\}/g, guild.memberCount.toString());
-            await member.send(msg).catch(() => {});
-            sent++;
-            await sleep(50); // تجنب rate limit
-          } catch {
-            failed++;
-          }
-        }
-
-        await interaction.editReply({ content: `✅ تم الإرسال: ${sent} ✅ | ${failed} ❌` });
         return;
       }
       case 'announce:channel': {

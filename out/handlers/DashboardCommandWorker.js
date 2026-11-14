@@ -420,18 +420,8 @@ class DashboardCommandWorker {
                 };
                 const at = new Date(), sentBy = payload.actor || 'لوحة التحكم';
                 if (type === 'dm') {
-                    const members = await guild.members.fetch();
-                    const targets = Array.from(members.filter((m) => !m.user?.bot).values());
-                    for (const m of targets) {
-                        try {
-                            await m.send({ content });
-                            sent++;
-                        }
-                        catch {
-                            failed++;
-                        }
-                        await new Promise((r) => setTimeout(r, 250)); // rate-limit آمن
-                    }
+                    // 🚫 الإرسال الجماعي في الخاص متوقف — ديسكورد تعتبره سبام وقد تحظر البوت
+                    throw new Error('الإرسال الجماعي في الخاص (DM) متوقف نهائياً لحماية البوت من الحظر. استخدم إعلان قناة بدلاً منه.');
                 }
                 else {
                     if (payload.channelId) {

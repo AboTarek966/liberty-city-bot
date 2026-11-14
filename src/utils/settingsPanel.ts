@@ -1071,13 +1071,12 @@ export function buildAnnouncements(guild: Guild, s: any): BuiltPanel {
   const embed = categoryEmbed(
     'announcements',
     guild,
-    `إرسال رسالة جماعية لجميع أعضاء السيرفر — في الخاص (DM) أو في قناة محددة\n\n` +
+    `إرسال رسالة جماعية لأعضاء السيرفر في قناة محددة\n\n` +
       `> **آخر الإعلانات:** ${recent.length ? recent.map((a: any, i: number) => `\n> ${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 50)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('') : 'لا يوجد إعلانات سابقة'}\n\n` +
-      `⚠️ **تنبيه:** الإرسال للخاص (DM) قد يفشل مع أعضاء أغلقوا الخاص — البوت يتجاهل الفشل ويكمل الباقي`
+      `🚫 **الإرسال الجماعي في الخاص (DM) متوقف نهائياً** — ديسكورد تعتبره سبام وقد تحظر البوت. استخدم الإرسال لقناة.`
   );
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    btn('settings_btn:announce:dm', '📩 إرسال للخاص (DM)', ButtonStyle.Success, '📩'),
     btn('settings_btn:announce:channel', '📢 إرسال لقناة', ButtonStyle.Primary, '📢'),
     btn('settings_btn:announce:preview', '👁️ معاينة', ButtonStyle.Secondary, '👁️'),
   );

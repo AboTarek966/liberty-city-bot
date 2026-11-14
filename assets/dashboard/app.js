@@ -1117,7 +1117,6 @@ const PAGES = {
         ${card('إرسال إعلان', `
           <div class="radio-row">
             <label class="radio"><input type="radio" name="ann-type" value="channel" checked><span>📢 قناة</span></label>
-            <label class="radio"><input type="radio" name="ann-type" value="dm"><span>✉️ خاص للجميع</span></label>
           </div>
           <div id="ann-channel-holder">
             <div class="field"><label>القناة (اتركها بدون لبث في كل القنوات العامة)</label>
@@ -1129,7 +1128,7 @@ const PAGES = {
           </div>
           <textarea class="inp" id="ann-content" placeholder="نص الإعلان…" style="min-height:120px"></textarea>
           <button class="btn primary mt" data-act="ann-send">🚀 إرسال الآن</button>
-          <div class="banner info mt">✉️ الإرسال للخاص يرسل لكل الأعضاء — استخدمه بحكمة.</div>`, '📢')}
+          <div class="banner info mt">🚫 الإرسال الجماعي في الخاص (DM) متوقف نهائياً — ديسكورد تعتبره سبام وقد تحظر البوت. استخدم إعلان القناة.</div>`, '📢')}
         ${card('آخر الإعلانات', histRows ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>النوع</th><th>النص</th><th>بواسطة</th><th>التاريخ</th></tr></thead><tbody>${histRows}</tbody></table></div>` : '<div class="empty">لا إعلانات سابقة</div>', '🕘')}
       </div>`;
   },
@@ -1556,14 +1555,14 @@ async function economyAction(btn) {
 
 async function announcementsAction(btn) {
   if (btn.dataset.act !== 'ann-send') return;
-  const type = document.querySelector('input[name="ann-type"]:checked')?.value || 'channel';
+  const type = 'channel'; // 🚫 الإرسال الجماعي في الخاص متوقف نهائياً (سبام)
   const content = $('#ann-content').value.trim();
   const channelId = $('#ann-channel') ? $('#ann-channel').value : '';
   if (!content) return toast('اكتب نص الإعلان', 'err');
-  const ok = await confirmModal('تأكيد الإرسال', type === 'dm' ? 'سيتم إرسال رسالة خاصة لجميع الأعضاء — متأكد؟' : channelId ? 'سيتم الإرسال للقناة المحددة — متأكد؟' : 'سيتم الإرسال لكل القنوات العامة — متأكد؟');
+  const ok = await confirmModal('تأكيد الإرسال', channelId ? 'سيتم الإرسال للقناة المحددة — متأكد؟' : 'سيتم الإرسال لكل القنوات العامة — متأكد؟');
   if (!ok) return;
   toast('جارٍ الإرسال…');
-  const res = await runCommand('broadcast', { type: type === 'dm' ? 'dm' : 'channel', content, channelId: channelId || undefined });
+  const res = await runCommand('broadcast', { type, content, channelId: channelId || undefined });
   toast(`تم الإرسال ✓ (نجح: ${fmtNum(res?.sent ?? '?')}${res?.failed ? ' • فشل: ' + fmtNum(res.failed) : ''})`, 'ok');
   render('announcements');
 }

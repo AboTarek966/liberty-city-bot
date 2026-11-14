@@ -375,7 +375,16 @@ const handler = {
                     return openModal('⚙️ إعدادات AI Translator', 'عدّل JSON وأرسل — مثال: {"enabled":true,"defaultTargetLang":"ar","showOriginal":true}', discord_js_1.TextInputStyle.Paragraph, 2000, JSON.stringify(t, null, 2));
                 }
                 case 'announce:dm': {
-                    return openModal('📩 إعلان للخاص (DM) — اكتب الرسالة', 'الرسالة ستُرسل في خاص لجميع الأعضاء\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\nمرحباً {user}! أهلاً بك في {server} 🎉', discord_js_1.TextInputStyle.Paragraph, 2000, '');
+                    // 🚫 أُوقف الإرسال الجماعي في الخاص نهائياً — ديسكورد تعتبره سبام وقد تحظر البوت
+                    await interaction
+                        .reply({
+                        content: '🚫 **الإرسال الجماعي في الخاص (DM) متوقف نهائياً**\n' +
+                            'ديسكورد تعتبر مراسلة كل الأعضاء في الخاص «سلوكاً مزعجاً» — وهذا هو السبب المباشر لحجر البوت حالياً.\n\n' +
+                            '✅ استخدم **📢 إرسال لقناة** بدلاً منه، أو راسل الأعضاء يدوياً عند الحاجة.',
+                        ephemeral: true,
+                    })
+                        .catch(() => { });
+                    return;
                 }
                 case 'announce:channel': {
                     return openModal('📢 إعلان لقناة — اكتب الرسالة واختر القناة', 'الرسالة ستُرسل في قناة محددة\n\n{user} = منشن العضو\n{server} = اسم السيرفر\n{count} = عدد الأعضاء\n\nمثال:\n📢 تنبيه هام لـ {user} في {server}!\n\n[ستظهر قائمة قنوات بعد الإرسال]', discord_js_1.TextInputStyle.Paragraph, 2000, '');

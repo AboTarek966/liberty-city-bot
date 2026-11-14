@@ -787,10 +787,10 @@ function buildCommands(guild, s) {
 function buildAnnouncements(guild, s) {
     const announcements = (s.protection?.announcements ?? s.announcements) || { history: [] };
     const recent = announcements.history?.slice(-5).reverse() || [];
-    const embed = categoryEmbed('announcements', guild, `إرسال رسالة جماعية لجميع أعضاء السيرفر — في الخاص (DM) أو في قناة محددة\n\n` +
+    const embed = categoryEmbed('announcements', guild, `إرسال رسالة جماعية لأعضاء السيرفر في قناة محددة\n\n` +
         `> **آخر الإعلانات:** ${recent.length ? recent.map((a, i) => `\n> ${i + 1}. ${a.type === 'dm' ? '📩 خاص' : '📢 قناة'} — ${String(a.content).substring(0, 50)}... (${new Date(a.at).toLocaleString('ar-SA')})`).join('') : 'لا يوجد إعلانات سابقة'}\n\n` +
-        `⚠️ **تنبيه:** الإرسال للخاص (DM) قد يفشل مع أعضاء أغلقوا الخاص — البوت يتجاهل الفشل ويكمل الباقي`);
-    const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:dm', '📩 إرسال للخاص (DM)', discord_js_1.ButtonStyle.Success, '📩'), btn('settings_btn:announce:channel', '📢 إرسال لقناة', discord_js_1.ButtonStyle.Primary, '📢'), btn('settings_btn:announce:preview', '👁️ معاينة', discord_js_1.ButtonStyle.Secondary, '👁️'));
+        `🚫 **الإرسال الجماعي في الخاص (DM) متوقف نهائياً** — ديسكورد تعتبره سبام وقد تحظر البوت. استخدم الإرسال لقناة.`);
+    const row1 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:channel', '📢 إرسال لقناة', discord_js_1.ButtonStyle.Primary, '📢'), btn('settings_btn:announce:preview', '👁️ معاينة', discord_js_1.ButtonStyle.Secondary, '👁️'));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:announce:history', '📜 السجل', discord_js_1.ButtonStyle.Secondary, '📜'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     return { embeds: [embed], components: [row1, row2] };
 }
