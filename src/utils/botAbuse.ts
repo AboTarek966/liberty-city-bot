@@ -18,6 +18,9 @@ const INSULT_WORDS = [
   // عربي — شتائم وإساءات شائعة (صريحة فقط)
   'كلب', 'حيوان', 'حمار', 'عاهر', 'عاهرة', 'قحبة', 'خول', 'عرص', 'حقير', 'قذر', 'تافه', 'غبي', 'فاشل',
   'نصاب', 'احتيال', 'نصب', 'شرموطة', 'شرموط', 'خرا', 'عاهة', 'عاهات', 'خسيس', 'قبيح', 'زق',
+  'معفن', 'معفنة', 'خراي', 'خراوان', 'متناك', 'متناكه', 'نيك', 'انيك', 'منيك', 'منايك', 'منيكه',
+  'خائب', 'خسيس', 'دنيء', 'حقير', 'قنضه', 'طريد', 'حقير', 'عكود', 'ديل', 'عجاج',
+  'كس امك', 'كس اختك', 'يابن الكلب', 'يابن العاهرة', 'يابن الحرام',
   'scam', 'scammer', 'fraud', 'fake', 'rip off',
   // إنجليزي
   'fuck', 'fucking', 'shit', 'bitch', 'asshole', 'dick', 'stupid', 'idiot', 'dumb', 'worst', 'terrible',
@@ -30,6 +33,8 @@ function normalize(s: string): string {
 }
 
 const BOT_NAME_PATTERN = /(^|\s)(بوت|البوت|يا\s?بوت|bot|the\s?bot|omni|ليبرتي|liber(ty|ti))(\s|$)/iu;
+// كابسة شاملة: يابوت / بوتك / بوتات / كل حرف ما بوت — رسالة عن البوت بست قروض بغض النظر عن كتابة الحدود
+const BOT_SUBSTRING_PATTERN = /بوت|omni|bot|liber(ty|ti)/i;
 
 function targetsBot(message: Message, client: OmniClient): boolean {
   const meId = client.user?.id;
@@ -40,16 +45,20 @@ function targetsBot(message: Message, client: OmniClient): boolean {
     const replied = message.mentions?.repliedUser;
     if (replied?.id === meId) return true;
   }
-  // إشارة/اسم البوت داخل الرسالة (بحدود كلمة — لا يطابق "both" أو "robot")
+  // إشارة/اسم البوت داخل الرسالة — تحرير: متسامح أوسع (الكتابة بلا حدود صريحة)
   const content = normalize(message.content || '');
-  return BOT_NAME_PATTERN.test(content);
+  if (BOT_NAME_PATTERN.test(content)) return true;
+  return BOT_SUBSTRING_PATTERN.test(content);
 }
 
 /** مقارنة على مستوى الكلمة — تتجنّب مطابقة "نصب" داخل "نصبر" أو "bot" داخل "both" */
-function hasAbuse(text: string): boolean {
+function hasAbuse(text: string, guildBadWords?: string[]): boolean {
   const t = normalize(text);
   const tokens = t.split(' ').filter(Boolean);
-  return INSULT_WORDS.some((w) => {
+  const all = Array.isArray(guildBadWords) && guildBadWords.length
+    ? INSULT_WORDS.concat(guildBadWords.map((w) => normalize(w)))
+    : INSULT_WORDS;
+  return all.some((w) => {
     if (w.includes(' ')) return t.includes(w);
     if (/^[a-z ]+$/i.test(w)) {
       return tokens.some((tok) => tok === w || tok === `${w}s`);
@@ -90,7 +99,7 @@ export async function handleBotAbuse(
 
     // هل الرسالة تستهدف البوت فعلاً؟
     if (!targetsBot(message, client)) return false;
-    if (!hasAbuse(message.content || '')) return false;
+    if (!hasAbuse(message.content || '', (settings as any)?.automod?.badWords)) return false;
 
     // حذف الرسالة (إن أمكن)
     if (message.deletable) {
