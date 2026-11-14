@@ -21,22 +21,27 @@ import {
   createOAuthState,
   createSession,
   destroySession,
+  discordClientSecret,
   getAllActiveSessions,
   getSession,
   issueLoginCode,
   listPersistedSessions,
   logAuth,
   markOAuthVerified,
+  oauthConfigured,
   oauthRedirect,
   oauthRequired,
   passwordLoginEnabled,
   passwordMatches,
   rateLimit,
+  requireOwnerSession,
   requireSession,
   requireVerifiedSession,
+  resolveGuildAccess,
   revokeActiveSession,
   tokenHash,
   setSessionCookie,
+  type GuildAccess,
 } from '../utils/webAuth';
 
 const logger = createLogger('WebDashboard');
@@ -92,14 +97,25 @@ export class WebDashboard {
       res.json({
         authenticated: Boolean(session),
         user: session
-          ? { username: session.username || 'المالك', authMethod: session.authMethod, oauthVerified: Boolean(session.oauthVerified), sessionId: session.id }
+          ? {
+              id: session.userId || null,
+              username: session.username || (session.mode === 'owner' ? 'المالك' : 'مستخدم ديسكورد'),
+              avatar: session.avatar || null,
+              mode: session.mode,
+              isBotOwner: Boolean(session.isBotOwner),
+              authMethod: session.authMethod,
+              oauthVerified: Boolean(session.oauthVerified),
+              sessionId: session.id,
+            }
           : null,
         oauthRequired: oauthRequired(),
         login: {
           password: passwordLoginEnabled(),
           code: this.client.isReady(),
-          oauth: Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
+          oauth: oauthConfigured(),
           requireOAuth: oauthRequired(),
+          // الرابط المتوقع للتسجيل في Discord Developer Portal (يساعد في الإعداد)
+          oauthRedirectUri: oauthRedirect(req),
         },
       });
     });
@@ -128,25 +144,23 @@ export class WebDashboard {
     });
 
     // ---------- OAuth (Discord) ----------
+    // 🌍 دخول عام: أي شخص يقدر يسجّل بديسكورد — من غير كلمة مرور أو كود مسبق.
     app.get('/dashboard/auth/oauth/start', (req: Request, res: Response) => {
       const redirect = oauthRedirect(req);
       if (!redirect) {
         res.status(500).json({ error: 'تعذّر تحديد رابط العودة' });
         return;
       }
-      const session = getSession(req);
-      if (!session) {
-        res.status(401).json({ error: 'سجّل دخولك بكلمة المرور أو الكود أولاً' });
-        return;
-      }
-      const state = createOAuthState(session.id);
       const clientId = process.env.DISCORD_CLIENT_ID || '';
-      const clientSecret = process.env.DISCORD_CLIENT_SECRET || '';
+      const clientSecret = discordClientSecret();
       // ❌ الإعدادات غير مكتملة — إرشاد واضح بدل التبويب الفارغ
       if (!clientId || !clientSecret) {
-        res.status(503).json({ error: 'OAuth غير مُعدّ بعد: ضع DISCORD_CLIENT_SECRET في البيئة وأضف Redirect URI في Discord Developer Portal' });
+        res.status(503).json({ error: 'OAuth غير مُعدّ بعد: ضع DISCORD_CLIENT_SECRET (أو DASHBOARD_OAUTH2_SECRET) في البيئة وأضف Redirect URI في Discord Developer Portal' });
         return;
       }
+      // لو فيه جلسة موجودة نربط التوثيق بها، وإلا ننشئ جلسة جديدة بعد الرجوع
+      const session = getSession(req);
+      const state = createOAuthState(session?.id);
       const url = new URL('https://discord.com/oauth2/authorize');
       url.searchParams.set('client_id', clientId);
       url.searchParams.set('response_type', 'code');
@@ -166,7 +180,7 @@ export class WebDashboard {
         return;
       }
       const clientId = process.env.DISCORD_CLIENT_ID || '';
-      const clientSecret = process.env.DISCORD_CLIENT_SECRET || '';
+      const clientSecret = discordClientSecret();
       const redirect = oauthRedirect(req);
       if (!clientId || !clientSecret || !redirect) {
         res.redirect('/dashboard?error=oauth_config');
@@ -191,17 +205,38 @@ export class WebDashboard {
         });
         if (!meRes.ok) throw new Error(`me ${meRes.status}`);
         const me: any = await meRes.json();
+
         const owners = await getBotOwnerIds(this.client);
-        if (!owners.includes(me.id)) {
-          res.redirect('/dashboard?error=oauth_owner');
-          return;
+        const isBotOwner = owners.includes(String(me.id));
+        const displayName = me.global_name || me.username || 'مستخدم ديسكورد';
+        const avatar = me.avatar
+          ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=128`
+          : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(me.id) >> 22n) % 6n)}.png`;
+
+        // 🔗 جلسة قديمة (مالك وثّق دخوله) → نربطها بالحساب
+        let linked = flow.sessionId
+          ? markOAuthVerified(flow.sessionId, String(me.id), displayName, { avatar, isBotOwner })
+          : null;
+
+        // 🌍 مستخدم جديد → جلسة OAuth مستقلة
+        if (!linked) {
+          const { token } = createSession({
+            mode: 'user',
+            userId: String(me.id),
+            username: displayName,
+            avatar,
+            isBotOwner,
+            authMethod: 'oauth',
+            oauthVerified: true,
+            req,
+          });
+          setSessionCookie(res, token);
         }
-        const updated = markOAuthVerified(flow.sessionId, me.id, me.username || 'مالك ديسكورد');
-        if (!updated) {
-          res.redirect('/dashboard?error=session_expired');
-          return;
-        }
-        logAuth('oauth-ok', `user=${me.id} session=${flow.sessionId}`);
+
+        logAuth(
+          'oauth-ok',
+          `user=${me.id}${isBotOwner ? ' bot-owner' : ''}${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`
+        );
         res.redirect('/dashboard?oauth=1');
       } catch (e: any) {
         logger.warn(`Dashboard OAuth failed: ${e?.message || e}`);
@@ -287,8 +322,11 @@ export class WebDashboard {
     app.get('/dashboard/api/me', requireSession, (req: Request, res: Response) => {
       const session = getSession(req)!;
       res.json({
-        username: session.username || 'المالك',
+        username: session.username || (session.mode === 'owner' ? 'المالك' : 'مستخدم ديسكورد'),
         userId: session.userId || null,
+        avatar: session.avatar || null,
+        mode: session.mode,
+        isBotOwner: Boolean(session.isBotOwner),
         authMethod: session.authMethod,
         oauthVerified: Boolean(session.oauthVerified),
         sessionId: session.id,
@@ -296,7 +334,7 @@ export class WebDashboard {
       });
     });
 
-    app.get('/dashboard/api/sessions', requireSession, async (req: Request, res: Response) => {
+    app.get('/dashboard/api/sessions', requireOwnerSession, async (req: Request, res: Response) => {
       try {
         const current = getSession(req)!;
         const active = getAllActiveSessions();
@@ -356,7 +394,7 @@ export class WebDashboard {
       }
     });
 
-    app.delete('/dashboard/api/sessions/:sessionId', requireSession, async (req: Request, res: Response) => {
+    app.delete('/dashboard/api/sessions/:sessionId', requireOwnerSession, async (req: Request, res: Response) => {
       const current = getSession(req)!;
       const targetId = String(req.params.sessionId || '');
       if (!targetId) {
@@ -373,7 +411,7 @@ export class WebDashboard {
       res.json({ ok: true, revoked: true, currentRevoked: targetId === current.id });
     });
 
-    app.delete('/dashboard/api/sessions', requireSession, async (req: Request, res: Response) => {
+    app.delete('/dashboard/api/sessions', requireOwnerSession, async (req: Request, res: Response) => {
       const current = getSession(req)!;
       const keepCurrent = String(req.query.keepCurrent || 'true') !== 'false';
       const active = getAllActiveSessions().filter((s) => !keepCurrent || s.sessionId !== current.id);
@@ -382,7 +420,7 @@ export class WebDashboard {
       res.json({ ok: true, revoked: active.length, keptCurrent: keepCurrent });
     });
 
-    app.post('/dashboard/api/sessions/logout-all', requireSession, async (req: Request, res: Response) => {
+    app.post('/dashboard/api/sessions/logout-all', requireOwnerSession, async (req: Request, res: Response) => {
       const current = getSession(req)!;
       const active = getAllActiveSessions();
       for (const session of active) revokeActiveSession(session.sessionId);
@@ -392,16 +430,60 @@ export class WebDashboard {
       res.json({ ok: true, revoked: active.length });
     });
 
-    app.get('/dashboard/api/guilds', requireVerifiedSession, (_req: Request, res: Response) => {
-      const guilds = this.client.guilds.cache
-        .map((g: any) => ({
-          id: g.id,
-          name: g.name,
-          icon: typeof g.iconURL === 'function' ? g.iconURL({ size: 128 }) : null,
-          memberCount: g.memberCount ?? null,
-        }))
-        .sort((a: any, b: any) => (b.memberCount || 0) - (a.memberCount || 0));
-      res.json({ guilds });
+    // ---------- قائمة السيرفرات: كل سيرفر البوت فيه + حالة العضو فيه ----------
+    app.get('/dashboard/api/guilds', requireVerifiedSession, async (req: Request, res: Response) => {
+      const session = getSession(req)!;
+      const fullAccess = session.mode === 'owner' || Boolean(session.isBotOwner);
+      const userId = session.userId || '';
+      const guilds: any[] = [];
+
+      await Promise.all(
+        [...this.client.guilds.cache.values()].map(async (g: any) => {
+          try {
+            let access: GuildAccess | null = null;
+            if (fullAccess && !userId) {
+              // جلسة مالك البوت القديمة (كلمة مرور/كود) — وصول كامل
+              access = { level: 'owner', isOwner: true, isAdmin: true, isStaff: true, roleNames: [] };
+            } else if (userId) {
+              access = await resolveGuildAccess(this.client, userId, g.id);
+              if (fullAccess) {
+                // مالك البوت (حتى لو مش عضو) — وصول كامل مع إظهار دوره الحقيقي إن وجد
+                access = {
+                  level: 'owner',
+                  isOwner: Boolean(access?.isOwner),
+                  isAdmin: true,
+                  isStaff: true,
+                  roleNames: access?.roleNames || [],
+                  viaBotOwner: !access,
+                };
+              }
+            }
+            if (!access) return; // مش عضو → السيرفر مايظهرش له
+
+            guilds.push({
+              id: g.id,
+              name: g.name,
+              icon: typeof g.iconURL === 'function' ? g.iconURL({ size: 128 }) : null,
+              memberCount: g.memberCount ?? null,
+              access,
+            });
+          } catch {
+            /* سيرفر تعذّر فحصه — نتخطاه */
+          }
+        })
+      );
+
+      guilds.sort((a: any, b: any) => (b.memberCount || 0) - (a.memberCount || 0));
+      res.json({
+        guilds,
+        user: {
+          id: userId || null,
+          username: session.username || (session.mode === 'owner' ? 'المالك' : 'مستخدم ديسكورد'),
+          avatar: session.avatar || null,
+          mode: session.mode,
+          isBotOwner: Boolean(session.isBotOwner),
+        },
+      });
     });
 
     logger.info(`Web dashboard attached at /dashboard (assets: ${this.assetsDir})`);

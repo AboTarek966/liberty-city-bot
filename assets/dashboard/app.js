@@ -21,6 +21,8 @@ const fmtDur = (sec) => {
 const S = {
   guildId: null,
   guilds: [],
+  me: null,
+  access: null,
   settings: null,
   channels: [],
   page: 'overview',
@@ -29,6 +31,7 @@ const S = {
   logsType: '',
 };
 const cache = { members: null, roles: null };
+let LOGIN_INFO = {};
 
 // ===== API =====
 const api = {
@@ -39,7 +42,7 @@ const api = {
       headers: { 'Content-Type': 'application/json', 'x-omni-csrf': '1', ...(opts.headers || {}) },
     });
     if (res.status === 401) {
-      showLogin({ password: true, code: true });
+      showLogin();
       throw new Error('انتهت الجلسة — سجّل الدخول من جديد');
     }
     let data = null;
@@ -58,12 +61,12 @@ const api = {
 
 // ===== Toast & Modal =====
 let toastTimer = null;
-function toast(msg, type = '') {
+function toast(msg, type = '', ms = 2800) {
   const el = $('#toast');
   el.textContent = msg;
   el.className = 'toast show ' + type;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 let modalOk = null;
@@ -123,10 +126,20 @@ function save(path, value) {
     try {
       const patch = {};
       setDeep(patch, path, value);
-      await api.patch(`/api/guilds/${S.guildId}/settings`, patch);
+      const res = await api.patch(`/api/guilds/${S.guildId}/settings`, patch);
+      // 👑 إطفاء حماية من اللوحة → البوت بيطلب موافقة مالك السيرفر الأول
+      if (res && res.approvalRequired) {
+        const fresh = await api.get(`/api/guilds/${S.guildId}/settings?fresh=1`).catch(() => null);
+        if (fresh) S.settings = fresh;
+        lastLocalSaveAt = Date.now();
+        toast(res.message || '👑 الطلب اتبعت لمالك السيرفر — مستني موافقته', 'warn', 9000);
+        if (S.page === 'protection') render('protection');
+        return { approvalRequired: true };
+      }
       setDeep(S.settings, path, value);
       lastLocalSaveAt = Date.now();
       toast('تم الحفظ ✓', 'ok');
+      return null;
     } finally {
       pendingLocalSaves--;
     }
@@ -273,20 +286,27 @@ function card(title, body, icon = '', extra = '') {
 const FIELD = { title: 'الفصل', body: '', icon: '' };
 
 // ===== Screen switching =====
-function showLogin(login = {}) {
+function showLogin(login = null) {
+  if (login) LOGIN_INFO = login;
+  const info = LOGIN_INFO;
   $('#app').classList.add('hidden');
   $('#oauth-guard').classList.add('hidden');
   $('#login').classList.remove('hidden');
   const codeBlock = $('#login-code-block');
   const passBlock = $('#login-pass-block');
+  const oauthBlock = $('#login-oauth-block');
+  const ownerDivider = $('#login-owner-divider');
   const noneBlock = $('#login-none');
   const err = $('#login-error');
   err.classList.add('hidden');
-  const codeOn = login.code !== false;
-  const passOn = !!login.password;
+  const oauthOn = info.oauth === true;
+  const codeOn = info.code !== false;
+  const passOn = info.password === true;
+  oauthBlock.classList.toggle('hidden', !oauthOn);
   codeBlock.classList.toggle('hidden', !codeOn);
   passBlock.classList.toggle('hidden', !passOn);
-  noneBlock.classList.toggle('hidden', codeOn || passOn);
+  ownerDivider.classList.toggle('hidden', !(codeOn || passOn));
+  noneBlock.classList.toggle('hidden', oauthOn || codeOn || passOn);
 }
 
 function showOAuthGuard() {
@@ -296,15 +316,54 @@ function showOAuthGuard() {
   $('#oauth-guard').classList.add('open');
 }
 
+const ROLE_LABELS = {
+  owner: '👑 مالك السيرفر',
+  admin: '🛡️ أدمن',
+  staff: '🎫 ستاف',
+  member: '👤 عضو',
+};
+function roleLabel(access) {
+  if (!access) return '👤 عضو';
+  if (access.viaBotOwner) return '🤖 مالك البوت';
+  return ROLE_LABELS[access.level] || '👤 عضو';
+}
+function renderUserChip() {
+  const chip = $('#user-chip');
+  const me = S.me;
+  if (!chip) return;
+  if (!me) {
+    chip.classList.add('hidden');
+    return;
+  }
+  chip.classList.remove('hidden');
+  const avatar = me.avatar || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+  const role = S.access ? `<span class="u-role ${esc(S.access.level)}">${esc(roleLabel(S.access))}</span>` : '';
+  chip.innerHTML = `<img src="${esc(avatar)}" alt=""><span>${esc(me.username || 'مستخدم ديسكورد')}</span>${role}`;
+}
+
 async function startApp() {
   $('#login').classList.add('hidden');
   $('#app').classList.remove('hidden');
-  const data = await api.get('/dashboard/api/guilds');
+  const [me, data] = await Promise.all([
+    api.get('/dashboard/api/me').catch(() => null),
+    api.get('/dashboard/api/guilds'),
+  ]);
+  S.me = { ...(me || {}), ...((data && data.user) || {}) };
   S.guilds = data.guilds || [];
   const select = $('#guild-select');
-  select.innerHTML = S.guilds.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  select.innerHTML = S.guilds
+    .map((g) => `<option value="${g.id}">${esc(g.name)} — ${esc(roleLabel(g.access))}</option>`)
+    .join('');
   if (!S.guilds.length) {
-    $('#view').innerHTML = '<div class="empty">البوت ليس عضواً في أي سيرفر بعد.</div>';
+    S.access = null;
+    renderUserChip();
+    $('#bot-status').textContent = '—';
+    $('#bot-status').className = 'chip';
+    $('#view').innerHTML = `
+      <div class="empty">
+        <p>أنت مش عضو في أي سيرفر البوت موجود فيه.</p>
+        <p class="dim mt-sm">لو البوت لسه ما دخلش سيرفرك، ضيفه الأول وبعدها سجّل دخولك تاني.</p>
+      </div>`;
     return;
   }
   const saved = localStorage.getItem('omni_guild');
@@ -313,7 +372,6 @@ async function startApp() {
   select.onchange = () => selectGuild(select.value);
   const page = (location.hash || '#/overview').slice(2) || 'overview';
   S.ready = true;
-  renderNav();
   await selectGuild(initial, page);
   ensureSettingsSync();
   setInterval(async () => {
@@ -334,7 +392,19 @@ async function selectGuild(id, page) {
   S.logsType = '';
   localStorage.setItem('omni_guild', id);
   const g = S.guilds.find((x) => x.id === id);
+  S.access = g ? g.access : null;
+  renderUserChip();
   $('#guild-icon').src = g && g.icon ? g.icon : 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+
+  // 👤 عضو عادي — صفحة حالة فقط، بدون أي إعدادات
+  if (!S.access || !S.access.isStaff) {
+    $('#bot-status').textContent = '👤 عضو';
+    $('#bot-status').className = 'chip';
+    renderNav();
+    navigate('status');
+    return;
+  }
+
   $('#bot-status').textContent = '…';
   $('#bot-status').className = 'chip';
   $('#view').innerHTML = '<div class="empty">…جارٍ التحميل</div>';
@@ -353,7 +423,8 @@ async function selectGuild(id, page) {
     $('#view').innerHTML = `<div class="empty">تعذّر تحميل الإعدادات: ${esc(e.message)}</div>`;
     return;
   }
-  navigate(page || S.page);
+  renderNav();
+  navigate(page || 'overview');
 }
 
 const NAV = [
@@ -366,17 +437,29 @@ const NAV = [
 const ALL_PAGES = NAV.flatMap((g) => g.items.map((i) => i[0]));
 
 function renderNav() {
-  $('#nav').innerHTML = NAV.map(
-    (group) => `<div class="nav-group"><div class="nav-title">${group.title}</div>${group.items
-      .map(([id, icon, label]) => `<button type="button" data-page="${id}"><span class="nav-ic">${icon}</span><span>${label}</span></button>`)
-      .join('')}</div>`
-  ).join('');
+  // 👤 العضو العادي: صفحة حالة واحدة فقط
+  if (S.access && !S.access.isStaff) {
+    $('#nav').innerHTML = `<div class="nav-group"><div class="nav-title">حسابي</div>
+      <button type="button" data-page="status"><span class="nav-ic">👤</span><span>حالتي في السيرفر</span></button></div>`;
+  } else {
+    // 🔒 إدارة الجلسات/الأجهزة لمالك البوت فقط
+    const isOwnerSession = Boolean(S.me && (S.me.mode === 'owner' || S.me.isBotOwner));
+    $('#nav').innerHTML = NAV.map((group) => {
+      const items = group.items.filter(([id]) => id !== 'sessions' || isOwnerSession);
+      if (!items.length) return '';
+      return `<div class="nav-group"><div class="nav-title">${group.title}</div>${items
+        .map(([id, icon, label]) => `<button type="button" data-page="${id}"><span class="nav-ic">${icon}</span><span>${label}</span></button>`)
+        .join('')}</div>`;
+    }).join('');
+  }
   $$('#nav button').forEach((b) => { b.onclick = () => navigate(b.dataset.page); });
+  $$('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.page === S.page));
 }
 
 function navigate(page) {
-  S.page = ALL_PAGES.includes(page) ? page : 'overview';
-  location.hash = '#/' + page;
+  if (S.access && !S.access.isStaff) page = 'status';
+  S.page = page === 'status' || ALL_PAGES.includes(page) ? page : 'overview';
+  location.hash = '#/' + S.page;
   $$('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.page === S.page));
   render(S.page);
 }
@@ -418,7 +501,8 @@ document.addEventListener('change', async (e) => {
   else v = el.value;
   el.style.borderColor = '';
   try {
-    await save(el.dataset.set, v);
+    const saved = await save(el.dataset.set, v);
+    if (saved && saved.approvalRequired) return;
     el.style.borderColor = '#22c55e';
     if (el.dataset.set === 'protection.silentSecurityAlerts') {
       const box = $('#silent-alert-status');
@@ -530,6 +614,38 @@ async function openPicker(path, kind) {
 // Pages
 // ============================================
 const PAGES = {
+  // ---------------- My status (public member view) ----------------
+  async status() {
+    const g = S.guilds.find((x) => x.id === S.guildId) || {};
+    const a = S.access || { level: 'member', roleNames: [] };
+    const me = S.me || {};
+    const avatar = me.avatar || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+    const roleNames = Array.isArray(a.roleNames) && a.roleNames.length
+      ? a.roleNames.map((r) => `<span class="chip-item">${esc(r)}</span>`).join('')
+      : '<span class="chip-empty">لا توجد رولات ظاهرة</span>';
+    const isStaff = Boolean(a.isStaff);
+    const headline = a.viaBotOwner
+      ? 'أنت مالك البوت — عندك وصول كامل للوحة'
+      : isStaff
+        ? 'حسابك ضمن الإدارة/الستاف — تقدر تدير السيرفر من اللوحة ✅'
+        : 'حسابك عضو عادي — اللوحة للعرض فقط 👤';
+    return `
+      <div class="banner ${isStaff ? 'info' : 'info'}">${esc(headline)}</div>
+      <div class="grid-2">
+        ${card('حسابك في السيرفر', `
+          <div class="kv">
+            <b>الحساب</b><span><img src="${esc(avatar)}" alt="" style="width:28px;height:28px;border-radius:50%;vertical-align:middle;margin-inline-end:8px">${esc(me.username || 'مستخدم ديسكورد')}</span>
+            <b>المعرف</b><span><code>${esc(me.id || '—')}</code></span>
+            <b>السيرفر</b><span>${esc(g.name || '—')}</span>
+            <b>حالتك</b><span><span class="u-role ${esc(a.level || 'member')}">${esc(roleLabel(a))}</span></span>
+            <b>الصلاحية</b><span>${isStaff ? '✅ تقدر تدخل لوحة الإعدادات' : '🚫 عرض فقط — مفيش صلاحية تعديل'}</span>
+          </div>`, '👤')}
+        ${card('رولاتك في السيرفر', `<div class="chip-box">${roleNames}</div>`, '🏷️')}
+      </div>
+      ${isStaff ? '' : `<div class="banner info">لو محتاج صلاحية إدارة، كلّم مالك السيرفر أو الإدارة يضيفوا رولك ضمن رولات الستاف/الإدارة.</div>`}
+    `;
+  },
+
   // ---------------- Overview ----------------
   async overview() {
     const [info, stats] = await Promise.all([
@@ -1762,13 +1878,33 @@ $('#modal-ok').onclick = async () => {
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
 
 // ===== Boot =====
+function handleAuthQuery() {
+  const params = new URLSearchParams(location.search);
+  const err = params.get('error');
+  const messages = {
+    oauth_state: '⏰ انتهت صلاحية طلب الدخول — جرّب تسجيل الدخول تاني',
+    oauth_config: '⚙️ الدخول بديسكورد غير مضبوط على السيرفر (Client Secret أو Redirect URI ناقص)',
+    oauth_failed: '❌ فشل الدخول بديسكورد — جرّب تاني',
+    oauth_owner: '❌ الدخول بديسكورد فشل',
+    session_expired: '⏰ الجلسة انتهت — سجّل دخولك تاني',
+    access_denied: '🚫 لغيت إذن الدخول بديسكورد',
+  };
+  if (err) setTimeout(() => toast(messages[err] || '❌ فشل الدخول', 'err', 7000), 300);
+  if (params.get('oauth') === '1') setTimeout(() => toast('تم الدخول بحساب ديسكورد ✓', 'ok'), 300);
+  if (err || params.has('oauth')) {
+    const clean = location.pathname + (location.hash || '');
+    history.replaceState({}, '', clean);
+  }
+}
+
 (async function boot() {
+  handleAuthQuery();
   try {
     const st = await api.get('/dashboard/auth/status');
     if (st.oauthRequired && st.user && !st.user.oauthVerified) showOAuthGuard();
     else if (st.authenticated) await startApp();
     else showLogin(st.login);
   } catch (e) {
-    showLogin({ password: false, code: false });
+    showLogin();
   }
 })();

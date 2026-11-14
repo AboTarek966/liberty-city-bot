@@ -11,6 +11,7 @@ import {
 } from 'discord.js';
 import { config, validateConfig } from './config';
 import { createLogger } from './utils/helpers';
+import { detectProtectionOffField, gateDashboardProtectionOff } from './utils/ownerApproval';
 import {
   CommandHandler,
   EventHandler,
@@ -219,6 +220,13 @@ export class OmniClient extends Client {
       try {
         const guildId = req.params.guildId;
         const updates = req.body;
+
+        // 👑 إطفاء أي حماية من لوحة التحكم لازم موافقة مالك السيرفر أولاً
+        const gateMsg = await this.dashboardProtectionGate(guildId, updates, req);
+        if (gateMsg) {
+          return res.status(202).json({ approvalRequired: true, message: gateMsg });
+        }
+
         const settings = await this.updateGuildSettings(guildId, updates);
         res.json(settings);
       } catch (error) {
@@ -534,8 +542,19 @@ export class OmniClient extends Client {
     router.post('/guilds/:guildId/protection/:feature', async (req: Request, res: Response) => {
       try {
         const { getGuildSettings } = await import('./models');
-        const settings = await getGuildSettings(req.params.guildId);
         const feature = req.params.feature as any;
+        // 👑 إطفاء حماية من اللوحة → موافقة مالك السيرفر أولاً
+        if (req.body?.enabled === false) {
+          const gateMsg = await this.dashboardProtectionGate(
+            req.params.guildId,
+            { protection: { [feature]: { enabled: false } } },
+            req
+          );
+          if (gateMsg) {
+            return res.status(202).json({ approvalRequired: true, message: gateMsg });
+          }
+        }
+        const settings = await getGuildSettings(req.params.guildId);
         const prot = (settings as any).protection;
         if (prot[feature]) {
           prot[feature].enabled = req.body.enabled;
@@ -554,10 +573,21 @@ export class OmniClient extends Client {
     router.post('/guilds/:guildId/ai/:feature', async (req: Request, res: Response) => {
       try {
         const { getGuildSettings } = await import('./models');
-        const settings = await getGuildSettings(req.params.guildId);
         const feature = req.params.feature as any;
+        const settings = await getGuildSettings(req.params.guildId);
         const prot = (settings as any).protection;
         if (prot[feature]) {
+          // 👑 إطفاء أي ميزة حماية (مثل aiAutoMod) من اللوحة → موافقة المالك أولاً
+          if (req.body?.enabled === false) {
+            const gateMsg = await this.dashboardProtectionGate(
+              req.params.guildId,
+              { protection: { [feature]: { enabled: false } } },
+              req
+            );
+            if (gateMsg) {
+              return res.status(202).json({ approvalRequired: true, message: gateMsg });
+            }
+          }
           prot[feature].enabled = req.body.enabled;
           Object.assign(prot[feature], req.body.config || {});
           await settings.save();
@@ -883,6 +913,41 @@ export class OmniClient extends Client {
     const { getGuildSettings, getGuildSettingsFresh } = await import('./models');
     const settings = fresh ? await getGuildSettingsFresh(guildId) : await getGuildSettings(guildId);
     return settings.toObject();
+  }
+
+  /**
+   * 👑 بوابة لوحة التحكم: أي محاولة إطفاء حماية من جلسة ديسكورد عادية
+   * تُحوَّل لطلب موافقة مالك السيرفر. جلسات المالك القديمة ومفتاح الخدمة
+   * لا تتأثر (وصول كامل)، والمطوّر يُستثنى داخل البوابة نفسها.
+   */
+  private async dashboardProtectionGate(
+    guildId: string,
+    updates: any,
+    req: Request
+  ): Promise<string | null> {
+    const field = detectProtectionOffField(updates);
+    if (!field) return null;
+
+    const context: any = (req as any).webAuth;
+    if (!context || context.kind !== 'session') return null;
+    if (!context.userId) return null; // جلسة مالك البوت (كلمة مرور/كود)
+
+    const guild = this.guilds.cache.get(guildId);
+    if (!guild) return null;
+
+    try {
+      const { getGuildSettings } = await import('./models');
+      const settings = await getGuildSettings(guildId);
+      return await gateDashboardProtectionOff({
+        settings,
+        guild,
+        userId: context.userId,
+        field,
+      });
+    } catch (error: any) {
+      logger.warn(`Dashboard protection gate failed: ${error?.message || error}`);
+      return '⚠️ تعذّر التحقق من موافقة مالك السيرفر — لم يتم إطفاء الحماية';
+    }
   }
 
   /**

@@ -50,7 +50,10 @@ exports.getAllActiveSessions = getAllActiveSessions;
 exports.listPersistedSessions = listPersistedSessions;
 exports.markOAuthVerified = markOAuthVerified;
 exports.oauthRequired = oauthRequired;
+exports.discordClientSecret = discordClientSecret;
+exports.oauthConfigured = oauthConfigured;
 exports.oauthRedirect = oauthRedirect;
+exports.resolveGuildAccess = resolveGuildAccess;
 exports.createOAuthState = createOAuthState;
 exports.consumeOAuthState = consumeOAuthState;
 exports.parseCookies = parseCookies;
@@ -68,6 +71,7 @@ exports.passwordMatches = passwordMatches;
 exports.apiGuard = apiGuard;
 exports.requireSession = requireSession;
 exports.requireVerifiedSession = requireVerifiedSession;
+exports.requireOwnerSession = requireOwnerSession;
 exports.logAuth = logAuth;
 const crypto_1 = __importDefault(require("crypto"));
 const helpers_1 = require("./helpers");
@@ -181,8 +185,10 @@ async function revokeAudit(sessionId) {
 async function markAuditVerified(sessionId, userId, username, authMethod = 'password+oauth') {
     try {
         const { DashboardSession } = await Promise.resolve().then(() => __importStar(require('../models/DashboardSession')));
+        // الموديل يقبل oauth فقط — لا نخزّن القيم المركبة password+oauth/code+oauth
+        const auditMethod = String(authMethod).includes('oauth') ? 'oauth' : authMethod;
         await DashboardSession.updateOne({ tokenHash: tokenHash(sessionId) }, {
-            $set: { oauthVerified: true, userId, username, authMethod, lastSeenAt: new Date() },
+            $set: { oauthVerified: true, userId, username, authMethod: auditMethod, lastSeenAt: new Date() },
         });
     }
     catch { /* تجاهل */ }
@@ -213,14 +219,23 @@ async function listPersistedSessions() {
         return [];
     }
 }
-function markOAuthVerified(sessionId, userId, username) {
+function markOAuthVerified(sessionId, userId, username, extra = {}) {
     const session = sessions.get(sessionId);
     if (!session || Date.now() - session.lastSeen > SESSION_TTL_MS)
         return null;
     session.userId = userId;
     session.username = username;
+    if (extra.avatar)
+        session.avatar = extra.avatar;
+    if (typeof extra.isBotOwner === 'boolean')
+        session.isBotOwner = extra.isBotOwner;
     session.oauthVerified = true;
-    session.authMethod = session.authMethod === 'code' ? 'code+oauth' : 'password+oauth';
+    session.authMethod =
+        session.authMethod === 'code'
+            ? 'code+oauth'
+            : session.authMethod === 'password'
+                ? 'password+oauth'
+                : 'oauth';
     session.lastSeen = Date.now();
     void markAuditVerified(sessionId, userId, username, session.authMethod);
     return session;
@@ -229,15 +244,136 @@ function oauthRequired() {
     const v = String(process.env.DASHBOARD_REQUIRE_OAUTH || '').toLowerCase();
     return v === '1' || v === 'true' || v === 'yes';
 }
+/** سر عميل Discord — يدعم الاسم القديم المستخدم في الاستضافة */
+function discordClientSecret() {
+    return process.env.DISCORD_CLIENT_SECRET || process.env.DASHBOARD_OAUTH2_SECRET || '';
+}
+function oauthConfigured() {
+    return Boolean(process.env.DISCORD_CLIENT_ID && discordClientSecret());
+}
 function oauthRedirect(req) {
-    const forced = String(process.env.DISCORD_REDIRECT_URI || process.env.DISCORD_OAUTH_REDIRECT_URI || '');
+    const forced = String(process.env.DISCORD_REDIRECT_URI ||
+        process.env.DISCORD_OAUTH_REDIRECT_URI ||
+        process.env.DASHBOARD_OAUTH_REDIRECT_URI ||
+        '').trim();
     if (forced)
         return forced;
-    const host = String(req.get('host') || '').trim();
+    // خلف بروكسي الاستضافة: نعتمد على الترويسات forwarded حتى يطلع https صح
+    const host = String(req.headers['x-forwarded-host'] || req.get('host') || '')
+        .split(',')[0]
+        .trim();
     if (!host)
         return '';
-    const proto = req.protocol || 'http';
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '')
+        .split(',')[0]
+        .trim()
+        .toLowerCase();
+    const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host);
+    // Discord يطلب HTTPS لأي دومين غير localhost — حتى لو البروكسي مش بيبعت forwarded-proto
+    const proto = forwardedProto === 'https' || forwardedProto === 'http'
+        ? forwardedProto
+        : isLocal
+            ? 'http'
+            : 'https';
     return `${proto}://${host}/dashboard/auth/oauth/callback`;
+}
+// --------------------------------------------
+// صلاحيات المستخدم داخل كل سيرفر — للوحة العامة
+// --------------------------------------------
+const ACCESS_TTL_MS = 60 * 1000;
+const accessCache = new Map();
+const accessPending = new Map();
+/**
+ * 🔍 مستوى وصول عضو ديسكورد في سيرفر:
+ *  - owner: صاحب السيرفر (التاج)
+ *  - admin: Administrator / ManageGuild / رولات إدارة التذاكر
+ *  - staff: رولات الدعم / صلاحيات إشراف (ManageMessages, Kick, Ban, Timeout)
+ *  - member: عضو عادي
+ * null = ليس عضواً في السيرفر
+ */
+async function resolveGuildAccess(client, userId, guildId) {
+    if (!userId || !guildId)
+        return null;
+    const cacheKey = `${guildId}:${userId}`;
+    const cached = accessCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now())
+        return cached.access;
+    const pending = accessPending.get(cacheKey);
+    if (pending)
+        return pending;
+    const load = (async () => {
+        try {
+            const guild = client?.guilds?.cache?.get(guildId);
+            if (!guild)
+                return null;
+            let member = guild.members?.cache?.get(userId) || null;
+            if (!member && typeof guild.members?.fetch === 'function') {
+                member = await guild.members.fetch(userId).catch(() => null);
+            }
+            if (!member)
+                return null;
+            const isOwner = String(guild.ownerId) === String(userId);
+            let ticketAdminIds = [];
+            let ticketSupportIds = [];
+            try {
+                const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('../models')));
+                const settings = await getGuildSettings(guildId);
+                ticketAdminIds = Array.isArray(settings?.tickets?.adminRoleIds)
+                    ? settings.tickets.adminRoleIds
+                    : [];
+                ticketSupportIds = Array.isArray(settings?.tickets?.supportRoleIds)
+                    ? settings.tickets.supportRoleIds
+                    : [];
+            }
+            catch {
+                /* تعذّر قراءة الإعدادات — نعتمد على صلاحيات ديسكورد فقط */
+            }
+            const hasAnyRole = (ids) => ids.some((id) => member.roles?.cache?.has?.(id));
+            const perms = member.permissions;
+            const hasPerm = (name) => {
+                try {
+                    return Boolean(perms?.has?.(name));
+                }
+                catch {
+                    return false;
+                }
+            };
+            const hasTicketAdmin = hasAnyRole(ticketAdminIds);
+            const isAdmin = isOwner || hasPerm('Administrator') || hasPerm('ManageGuild') || hasTicketAdmin;
+            const isStaff = isAdmin ||
+                hasAnyRole(ticketSupportIds) ||
+                hasPerm('ManageMessages') ||
+                hasPerm('KickMembers') ||
+                hasPerm('BanMembers') ||
+                hasPerm('ModerateMembers');
+            const level = isOwner
+                ? 'owner'
+                : isAdmin
+                    ? 'admin'
+                    : isStaff
+                        ? 'staff'
+                        : 'member';
+            const roleNames = [...(member.roles?.cache?.values?.() || [])]
+                .filter((r) => String(r.id) !== String(guild.id))
+                .sort((a, b) => (b.position || 0) - (a.position || 0))
+                .map((r) => r.name)
+                .filter(Boolean)
+                .slice(0, 12);
+            return { level, isOwner, isAdmin, isStaff, roleNames };
+        }
+        catch {
+            return null;
+        }
+    })();
+    accessPending.set(cacheKey, load);
+    try {
+        const access = await load;
+        accessCache.set(cacheKey, { access, expiresAt: Date.now() + ACCESS_TTL_MS });
+        return access;
+    }
+    finally {
+        accessPending.delete(cacheKey);
+    }
 }
 exports.oauthFlows = new Map();
 function createOAuthState(sessionId) {
@@ -308,9 +444,11 @@ function createSession(init = {}) {
     const id = crypto_1.default.randomBytes(24).toString('hex');
     const session = {
         id,
-        mode: 'owner',
+        mode: init.mode === 'user' ? 'user' : 'owner',
         userId: init.userId,
         username: init.username,
+        avatar: init.avatar,
+        isBotOwner: Boolean(init.isBotOwner),
         authMethod: init.authMethod || 'password',
         oauthVerified: Boolean(init.oauthVerified),
         createdAt: Date.now(),
@@ -403,55 +541,86 @@ function passwordMatches(input) {
  * Guard يُركّب على /api قبل الراوتر:
  *  1) مفتاح خدمة عبر X-Dashboard-Key (للوحة الخارجية/الأتمتة)
  *  2) جلسة داشبورد صالحة + ترويسة CSRF للطلبات المُعدِّلة
- * كذلك يتحقق أن البوت عضو فعلاً في السيرفر المطلوب (يمنع إنشاء وثائق وهمية).
+ * كذلك يتحقق أن البوت عضو فعلاً في السيرفر المطلوب، وأن المستخدم
+ * عضو/ستاف/أدمن فيه قبل السماح بأي وصول لإعداداته.
  */
 function apiGuard(client) {
-    return (req, res, next) => {
-        if (req.method === 'OPTIONS') {
-            next();
-            return;
-        }
-        // 1) مفتاح الخدمة
-        const expectedKey = process.env.DASHBOARD_API_KEY || '';
-        const givenKey = String(req.headers['x-dashboard-key'] || '');
-        if (expectedKey && givenKey && safeEqual(expectedKey, givenKey)) {
-            req.webAuth = { mode: 'key' };
-            // فحص عضوية البوت بالسيرفر المطلوب
+    return async (req, res, next) => {
+        try {
+            if (req.method === 'OPTIONS') {
+                next();
+                return;
+            }
+            // 1) مفتاح الخدمة
+            const expectedKey = process.env.DASHBOARD_API_KEY || '';
+            const givenKey = String(req.headers['x-dashboard-key'] || '');
+            if (expectedKey && givenKey && safeEqual(expectedKey, givenKey)) {
+                req.webAuth = { kind: 'key', mode: 'owner' };
+                // فحص عضوية البوت بالسيرفر المطلوب
+                const match = req.path.match(/^\/guilds\/([^/]+)/);
+                if (match && !client.guilds.cache.has(match[1])) {
+                    res.status(404).json({ error: 'البوت غير موجود في هذا السيرفر' });
+                    return;
+                }
+                next();
+                return;
+            }
+            // 2) جلسة الداشبورد
+            const session = getSession(req);
+            if (!session) {
+                res.status(401).json({ error: 'unauthorized' });
+                return;
+            }
+            // CSRF: الطلبات المُعدِّلة من المتصفح يجب أن تحمل ترويسة مخصصة
+            const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+            if (mutating && req.headers[exports.CSRF_HEADER] !== '1') {
+                res.status(403).json({ error: 'csrf' });
+                return;
+            }
             const match = req.path.match(/^\/guilds\/([^/]+)/);
             if (match && !client.guilds.cache.has(match[1])) {
                 res.status(404).json({ error: 'البوت غير موجود في هذا السيرفر' });
                 return;
             }
+            const ctx = {
+                kind: 'session',
+                mode: session.mode,
+                sessionId: session.id,
+                userId: session.userId,
+                username: session.username,
+                isBotOwner: Boolean(session.isBotOwner),
+            };
+            // 🔐 جلسة مالك البوت (كلمة مرور/كود) أو مالك البوت نفسه → وصول كامل
+            const fullAccess = session.mode === 'owner' || Boolean(session.isBotOwner);
+            if (match && !fullAccess) {
+                const guildId = match[1];
+                const access = await resolveGuildAccess(client, session.userId || '', guildId);
+                if (!access) {
+                    res.status(403).json({
+                        error: 'not_member',
+                        message: 'أنت لست عضواً في هذا السيرفر',
+                    });
+                    return;
+                }
+                if (access.level === 'member') {
+                    res.status(403).json({
+                        error: 'staff_only',
+                        message: 'لوحة الإعدادات متاحة للإدارة والستاف فقط — حسابك عضو عادي',
+                    });
+                    return;
+                }
+                ctx.guildAccess = access;
+            }
+            req.webAuth = ctx;
+            if (oauthRequired() && !session.oauthVerified) {
+                res.status(403).json({ error: 'oauth_required', message: 'وثّق تسجيل دخولك بـ Discord قبل استخدام اللوحة' });
+                return;
+            }
             next();
-            return;
         }
-        // 2) جلسة الداشبورد
-        const session = getSession(req);
-        if (!session) {
-            res.status(401).json({ error: 'unauthorized' });
-            return;
+        catch {
+            res.status(500).json({ error: 'auth_check_failed' });
         }
-        // CSRF: الطلبات المُعدِّلة من المتصفح يجب أن تحمل ترويسة مخصصة
-        const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-        if (mutating && req.headers[exports.CSRF_HEADER] !== '1') {
-            res.status(403).json({ error: 'csrf' });
-            return;
-        }
-        const match = req.path.match(/^\/guilds\/([^/]+)/);
-        if (match && !client.guilds.cache.has(match[1])) {
-            res.status(404).json({ error: 'البوت غير موجود في هذا السيرفر' });
-            return;
-        }
-        req.webAuth = {
-            mode: 'owner',
-            userId: session.userId,
-            username: session.username,
-        };
-        if (oauthRequired() && !session.oauthVerified) {
-            res.status(403).json({ error: 'oauth_required', message: 'وثّق تسجيل دخولك بـ Discord قبل استخدام اللوحة' });
-            return;
-        }
-        next();
     };
 }
 /**
@@ -474,6 +643,20 @@ function requireVerifiedSession(req, res, next) {
     }
     if (oauthRequired() && !session.oauthVerified) {
         res.status(403).json({ error: 'oauth_required', message: 'وثّق تسجيل دخولك بـ Discord قبل استخدام اللوحة' });
+        return;
+    }
+    req.webSession = session;
+    next();
+}
+/** جلسات إدارة الأجهزة/الجلسات — لمالك البوت فقط */
+function requireOwnerSession(req, res, next) {
+    const session = getSession(req);
+    if (!session) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+    }
+    if (session.mode !== 'owner' && !session.isBotOwner) {
+        res.status(403).json({ error: 'owner_only', message: 'هذه الصفحة متاحة لمالك البوت فقط' });
         return;
     }
     req.webSession = session;

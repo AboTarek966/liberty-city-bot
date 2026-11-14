@@ -36,6 +36,12 @@ export declare class OmniClient extends Client {
     private setupApiRoutes;
     private getGuildSettings;
     /**
+     * 👑 بوابة لوحة التحكم: أي محاولة إطفاء حماية من جلسة ديسكورد عادية
+     * تُحوَّل لطلب موافقة مالك السيرفر. جلسات المالك القديمة ومفتاح الخدمة
+     * لا تتأثر (وصول كامل)، والمطوّر يُستثنى داخل البوابة نفسها.
+     */
+    private dashboardProtectionGate;
+    /**
      * طابور حفظ متسلسل لكل سيرفر — يمنع تشغيل save() متوازي على نفس وثيقة
      * Mongoose (الذي يرمي "Can't save() the same doc multiple times in parallel"
      * عند ضغط مفاتيح متعددة بسرعة من اللوحة).

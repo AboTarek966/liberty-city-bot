@@ -6,7 +6,7 @@ export declare class WebDashboard {
     private assetsDir;
     constructor(client: OmniClient);
     /** Guard يُركّب على /api قبل الراوتر في OmniClient */
-    apiGuard(): (req: Request, res: Response, next: express.NextFunction) => void;
+    apiGuard(): (req: Request, res: Response, next: express.NextFunction) => Promise<void>;
     /** يُركّب مسارات اللوحة (صفحة + أصول + مصادقة + واجهات جلسة) */
     attach(app: Express): void;
 }

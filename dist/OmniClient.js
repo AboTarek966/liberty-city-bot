@@ -43,6 +43,7 @@ exports.OmniClient = void 0;
 const discord_js_1 = require("discord.js");
 const config_1 = require("./config");
 const helpers_1 = require("./utils/helpers");
+const ownerApproval_1 = require("./utils/ownerApproval");
 const handlers_1 = require("./handlers");
 const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
@@ -210,6 +211,11 @@ class OmniClient extends discord_js_1.Client {
             try {
                 const guildId = req.params.guildId;
                 const updates = req.body;
+                // 👑 إطفاء أي حماية من لوحة التحكم لازم موافقة مالك السيرفر أولاً
+                const gateMsg = await this.dashboardProtectionGate(guildId, updates, req);
+                if (gateMsg) {
+                    return res.status(202).json({ approvalRequired: true, message: gateMsg });
+                }
                 const settings = await this.updateGuildSettings(guildId, updates);
                 res.json(settings);
             }
@@ -518,8 +524,15 @@ class OmniClient extends discord_js_1.Client {
         router.post('/guilds/:guildId/protection/:feature', async (req, res) => {
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
-                const settings = await getGuildSettings(req.params.guildId);
                 const feature = req.params.feature;
+                // 👑 إطفاء حماية من اللوحة → موافقة مالك السيرفر أولاً
+                if (req.body?.enabled === false) {
+                    const gateMsg = await this.dashboardProtectionGate(req.params.guildId, { protection: { [feature]: { enabled: false } } }, req);
+                    if (gateMsg) {
+                        return res.status(202).json({ approvalRequired: true, message: gateMsg });
+                    }
+                }
+                const settings = await getGuildSettings(req.params.guildId);
                 const prot = settings.protection;
                 if (prot[feature]) {
                     prot[feature].enabled = req.body.enabled;
@@ -539,10 +552,17 @@ class OmniClient extends discord_js_1.Client {
         router.post('/guilds/:guildId/ai/:feature', async (req, res) => {
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
-                const settings = await getGuildSettings(req.params.guildId);
                 const feature = req.params.feature;
+                const settings = await getGuildSettings(req.params.guildId);
                 const prot = settings.protection;
                 if (prot[feature]) {
+                    // 👑 إطفاء أي ميزة حماية (مثل aiAutoMod) من اللوحة → موافقة المالك أولاً
+                    if (req.body?.enabled === false) {
+                        const gateMsg = await this.dashboardProtectionGate(req.params.guildId, { protection: { [feature]: { enabled: false } } }, req);
+                        if (gateMsg) {
+                            return res.status(202).json({ approvalRequired: true, message: gateMsg });
+                        }
+                    }
                     prot[feature].enabled = req.body.enabled;
                     Object.assign(prot[feature], req.body.config || {});
                     await settings.save();
@@ -863,6 +883,38 @@ class OmniClient extends discord_js_1.Client {
         const { getGuildSettings, getGuildSettingsFresh } = await Promise.resolve().then(() => __importStar(require('./models')));
         const settings = fresh ? await getGuildSettingsFresh(guildId) : await getGuildSettings(guildId);
         return settings.toObject();
+    }
+    /**
+     * 👑 بوابة لوحة التحكم: أي محاولة إطفاء حماية من جلسة ديسكورد عادية
+     * تُحوَّل لطلب موافقة مالك السيرفر. جلسات المالك القديمة ومفتاح الخدمة
+     * لا تتأثر (وصول كامل)، والمطوّر يُستثنى داخل البوابة نفسها.
+     */
+    async dashboardProtectionGate(guildId, updates, req) {
+        const field = (0, ownerApproval_1.detectProtectionOffField)(updates);
+        if (!field)
+            return null;
+        const context = req.webAuth;
+        if (!context || context.kind !== 'session')
+            return null;
+        if (!context.userId)
+            return null; // جلسة مالك البوت (كلمة مرور/كود)
+        const guild = this.guilds.cache.get(guildId);
+        if (!guild)
+            return null;
+        try {
+            const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
+            const settings = await getGuildSettings(guildId);
+            return await (0, ownerApproval_1.gateDashboardProtectionOff)({
+                settings,
+                guild,
+                userId: context.userId,
+                field,
+            });
+        }
+        catch (error) {
+            logger.warn(`Dashboard protection gate failed: ${error?.message || error}`);
+            return '⚠️ تعذّر التحقق من موافقة مالك السيرفر — لم يتم إطفاء الحماية';
+        }
     }
     /**
      * طابور حفظ متسلسل لكل سيرفر — يمنع تشغيل save() متوازي على نفس وثيقة

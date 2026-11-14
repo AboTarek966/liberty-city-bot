@@ -21,6 +21,9 @@ exports.canRequestProtectionOff = canRequestProtectionOff;
 exports.gateProtectionOff = gateProtectionOff;
 exports.requestOwnerApproval = requestOwnerApproval;
 exports.takePending = takePending;
+exports.detectProtectionOffField = detectProtectionOffField;
+exports.findApprovalChannel = findApprovalChannel;
+exports.gateDashboardProtectionOff = gateDashboardProtectionOff;
 const discord_js_1 = require("discord.js");
 /** أسماء الميزات للعرض في رسائل الطلب والموافقة */
 exports.PROTECTION_LABELS = {
@@ -109,11 +112,12 @@ async function gateProtectionOff(opts) {
 async function requestOwnerApproval(opts) {
     const key = `${opts.guild.id}:${opts.field}`;
     const label = protectionFieldLabel(opts.field);
+    const sourceLine = opts.source ? `\n📍 المصدر: **${opts.source}**` : '';
     const embed = new discord_js_1.EmbedBuilder()
         .setTitle('👑 طلب إطفاء الحماية')
-        .setDescription(`**${opts.requestedBy.tag}** يطلب إيقاف **${label}**.\n\n` +
+        .setDescription(`**${opts.requestedBy.tag}** يطلب إيقاف **${label}**.${sourceLine}\n\n` +
         `اضغط ✅ **موافقة** لتطبيق الإيقاف فوراً، أو ❌ **رفض** لإبقاء الحماية.\n` +
-        `⏰ صالح لمدة5 دقائق — بعدها يُلغى الطلب تلقائياً.`)
+        `⏰ صالح لمدة 5 دقائق — بعدها يُلغى الطلب تلقائياً.`)
         .setColor(0xf1c40f);
     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
         .setCustomId(`ownappr:yes:${opts.field}`)
@@ -158,5 +162,97 @@ function takePending(guildId, field) {
     if (p.expires < Date.now())
         return null; // منتهي → يُعتبر غير موجود
     return p;
+}
+/**
+ * 🔎 استخراج أول حماية مطلوب إطفاؤها من تعديل إعدادات قادم من اللوحة.
+ * يدعم المسارات: protection.<feature>.enabled=false
+ * وخصائص بوليان مستقلة: ownerApproval / blockMaliciousNames.
+ */
+function detectProtectionOffField(updates) {
+    const patch = updates?.protection;
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch))
+        return null;
+    const independentFields = ['ownerApproval', 'blockMaliciousNames'];
+    for (const key of independentFields) {
+        if (patch[key] === false)
+            return key === 'blockMaliciousNames' ? 'blocknames' : 'ownerApproval';
+    }
+    for (const [key, value] of Object.entries(patch)) {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+            continue;
+        if (value.enabled === false)
+            return key;
+    }
+    return null;
+}
+/** اختيار قناة يرسل فيها البوت طلب موافقة المالك (سجل الحماية ← قناة النظام ← أول قناة نصية) */
+function findApprovalChannel(guild, settings) {
+    const me = guild.members?.me;
+    const canSend = (channel) => {
+        if (!channel || typeof channel.send !== 'function')
+            return false;
+        try {
+            if (me && typeof channel.permissionsFor === 'function') {
+                const perms = channel.permissionsFor(me);
+                if (perms && typeof perms.has === 'function' && !perms.has('SendMessages'))
+                    return false;
+            }
+        }
+        catch {
+            /* تعذّر حساب الصلاحيات — نجرّب الإرسال */
+        }
+        return true;
+    };
+    const configuredId = settings?.protection?.logChannel;
+    if (configuredId) {
+        const configured = guild.channels?.cache?.get(String(configuredId));
+        if (canSend(configured))
+            return configured;
+    }
+    if (canSend(guild.systemChannel))
+        return guild.systemChannel;
+    const channels = [...(guild.channels?.cache?.values?.() || [])];
+    return (channels.find((channel) => canSend(channel) &&
+        (channel.type === 0 || channel.type === 5) &&
+        typeof channel.isThread === 'function' &&
+        !channel.isThread()) || null);
+}
+/**
+ * 👑 بوابة إطفاء الحماية من **لوحة التحكم** تحديداً.
+ * تختلف عن بوابة ديسكورد في أنها تطلب موافقة المالك دائماً (حتى لو خيار
+ * ownerApproval نفسه مطفأ) لأن تعديل اللوحة يجب ألا يتجاوز مالك السيرفر.
+ * الاستثناء الوحيد: مالك السيرفر نفسه أو مطوّر البوت.
+ *
+ * @returns null = مسموح فوراً · نص = تم إرسال الطلب/مُنع (لا يُطبَّق شيء)
+ */
+async function gateDashboardProtectionOff(opts) {
+    if (!opts.userId)
+        return null; // جلسة مالك البوت القديمة (كلمة مرور/كود)
+    if (String(opts.guild.ownerId) === String(opts.userId))
+        return null; // 👑 صاحب السيرفر
+    const devId = process.env.DEVELOPER_USER_ID;
+    if (devId && String(opts.userId) === String(devId))
+        return null; // 🛠️ مطوّر البوت
+    const member = await opts.guild.members
+        .fetch(String(opts.userId))
+        .catch(() => null);
+    if (!member) {
+        return '⛔ لازم تكون عضواً في السيرفر عشان تطلب إيقاف الحماية';
+    }
+    const channel = findApprovalChannel(opts.guild, opts.settings);
+    if (!channel) {
+        return '❌ مفيش قناة أقدر أبعت فيها طلب الموافقة — حدد قناة سجل للحماية أو اسمح للبوت بالإرسال في قناة';
+    }
+    const label = protectionFieldLabel(opts.field);
+    const sent = await requestOwnerApproval({
+        guild: opts.guild,
+        channel,
+        field: opts.field,
+        requestedBy: member.user,
+        source: 'لوحة التحكم',
+    });
+    return sent === 'sent'
+        ? `👑 أُرسل طلب إيقاف **${label}** إلى مالك السيرفر — **لن يُطفأ شيء قبل ما يضغط ✅ موافقة** (صلاحية الأزرار 5 دقائق)`
+        : '❌ تعذّر إرسال طلب الموافقة للمالك — تأكد أن البوت يقدر يرسل في قناة سجل الحماية';
 }
 //# sourceMappingURL=ownerApproval.js.map

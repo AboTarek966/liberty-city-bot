@@ -16,9 +16,17 @@
     <div class="login-card">
       <div class="login-logo">🤖</div>
       <h1>لوحة تحكم Omni</h1>
-      <p class="dim">دخول آمن — للمالك فقط</p>
+      <p class="dim">سجّل دخولك بحساب ديسكورد — أي شخص يقدر يشوف حالته في السيرفر</p>
 
       <div id="login-error" class="login-error hidden"></div>
+
+      <!-- 🌍 الدخول العام بديسكورد -->
+      <div id="login-oauth-block" class="mt">
+        <a id="btn-login-oauth" class="btn primary block" href="/dashboard/auth/oauth/start">🎮 الدخول بحساب ديسكورد</a>
+        <p class="dim mt-sm">مش محتاج كلمة مرور — هتشوف إذا حسابك أدمن/ستاف في السيرفرات اللي البوت فيها.</p>
+      </div>
+
+      <div id="login-owner-divider" class="or">دخول المالك (اختياري)</div>
 
       <div id="login-code-block" class="hidden">
         <button id="btn-request-code" class="btn primary block">🔑 أرسل كود الدخول على الخاص</button>
@@ -29,7 +37,6 @@
       </div>
 
       <div id="login-pass-block" class="hidden mt">
-        <div class="or">أو</div>
         <input id="pass-input" class="inp" type="password" placeholder="كلمة مرور اللوحة">
         <button id="btn-login-pass" class="btn primary block mt-sm">دخول بكلمة المرور</button>
       </div>
@@ -57,6 +64,7 @@
           <select id="guild-select" class="inp"></select>
         </div>
         <div class="top-actions">
+          <span id="user-chip" class="user-chip hidden"></span>
           <span id="bot-status" class="chip">…</span>
           <button id="btn-refresh" class="btn ghost" title="تحديث">🔄</button>
         </div>
@@ -68,12 +76,12 @@
   <!-- ═══════ تحقق Discord OAuth قبل استخدام اللوحة ═══════ -->
   <div id="oauth-guard" class="modal-wrap hidden">
     <div class="modal">
-      <div class="modal-head"><h3>🛡️ تحقق إضافي بـ Discord OAuth</h3></div>
+      <div class="modal-head"><h3>🛡️ تسجيل الدخول بـ Discord</h3></div>
       <div class="modal-body">
-        <p>دخلت بالفعل بكلمة المرور أو الكود، وخطوة التحقق الإضافية مطلوبة قبل فتح الإعدادات. أكمل تسجيل الدخول بـ Discord لتأكيد أنك مالك البوت على هذا الجهاز.</p>
-        <p class="dim mt-sm">لن تتغير إعداداتك أثناء التوثيق، وستُسجّل الجلسة فوراً بعد نجاح التحقق.</p>
+        <p>اللوحة تحتاج توثيق حسابك بديسكورد قبل فتح الإعدادات. اضغط الزر وسجّل دخولك — هنتأكد من حسابك وصلاحياتك في السيرفر.</p>
+        <p class="dim mt-sm">أي شخص يقدر يدخل ويشوف حالته، لكن تعديل الإعدادات متاح للإدارة والستاف فقط.</p>
         <div class="btn-row mt">
-          <a class="btn primary" href="/dashboard/auth/oauth/start">✅ وثّق بـ Discord OAuth</a>
+          <a class="btn primary" href="/dashboard/auth/oauth/start">✅ الدخول بحساب ديسكورد</a>
           <button id="btn-oauth-logout" class="btn ghost">خروج</button>
         </div>
       </div>
