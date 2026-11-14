@@ -16,14 +16,29 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 
 /**
- * 🎨 إيجاد إيموجي السيرفر بالاسم وإرجاعه بشكل يصلح لأزرار ديسكورد.
- * يدعم الأسماء المكررة بصيغة `name~2` (ثاني إيموجي بنفس الاسم).
- * لو الإيموجي مش موجود في السيرفر يرجع الإيموجي الاحتياطي (يونيكود).
+ * 📂 أسماء وأيقونات تصنيفات /help
+ * emoji = اسم إيموجي السيرفر، fallback = إيموجي يونيكود لو مش موجود
  */
-function guildEmoji(guild: Guild | null, name: string, fallback: string): any {
-  if (!guild) return fallback;
+const CATEGORY_INFO: Record<string, { name: string; emoji: string; fallback: string }> = {
+  moderation: { name: 'أوامر الادارة', emoji: 'staff~2', fallback: '🛡️' },
+  protection: { name: 'أوامر الحماية', emoji: 'consideration', fallback: '🔒' },
+  tickets: { name: 'أوامر التذاكر', emoji: 'ticket~2', fallback: '🎫' },
+  settings: { name: 'أوامر الاعدادات', emoji: 'correct', fallback: '⚙️' },
+  ai: { name: 'الذكاء الاصطناعي', emoji: 'chat~1', fallback: '🤖' },
+  roles: { name: 'أوامر الرتب', emoji: 'notebook~1', fallback: '📛' },
+  fun: { name: 'أوامر الترفيه والألعاب', emoji: '🎮', fallback: '🎮' },
+  utility: { name: 'أوامر الأدوات', emoji: '🔧', fallback: '🔧' },
+  info: { name: 'أوامر المعلومات', emoji: 'ℹ️', fallback: 'ℹ️' },
+};
+
+/**
+ * 🔎 إيجاد إيموجي السيرفر بالاسم.
+ * يدعم الأسماء المكررة بصيغة `name~2` (ثاني إيموجي بنفس الاسم).
+ */
+function findGuildEmoji(guild: Guild | null, name: string) {
+  if (!guild) return null;
   const all = [...guild.emojis.cache.values()];
-  if (!all.length) return fallback;
+  if (!all.length) return null;
 
   const lower = name.toLowerCase();
   let found = all.find(e => e.name?.toLowerCase() === lower);
@@ -37,8 +52,21 @@ function guildEmoji(guild: Guild | null, name: string, fallback: string): any {
     }
   }
 
+  return found || null;
+}
+
+/** 🎨 إيموجي جاهز لأزرار ديسكورد (كائن)، أو الاحتياطي */
+function guildEmoji(guild: Guild | null, name: string, fallback: string): any {
+  const found = findGuildEmoji(guild, name);
   if (!found) return fallback;
   return { id: found.id, name: found.name, animated: found.animated };
+}
+
+/** 🎨 إيموجي جاهز للنصوص/الإمبد `<:name:id>`، أو الاحتياطي */
+function guildEmojiText(guild: Guild | null, name: string, fallback: string): string {
+  const found = findGuildEmoji(guild, name);
+  if (!found) return fallback;
+  return `<${found.animated ? 'a' : ''}:${found.name}:${found.id}>`;
 }
 
 const command: Command = {
@@ -72,20 +100,7 @@ const command: Command = {
 // Show Help Menu
 // --------------------------------------------
 async function showHelpMenu(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
-  const commands = client.commandHandler.getCommands();
   const categories = client.commandHandler.getCategories();
-
-  const categoryInfo: Record<string, { name: string; emoji: string }> = {
-    moderation: { name: 'أوامر الادارة', emoji: '🛡️' },
-    protection: { name: 'أوامر الحماية', emoji: '🔒' },
-    tickets: { name: 'أوامر التذاكر', emoji: '🎫' },
-    settings: { name: 'أوامر الاعدادات', emoji: '⚙️' },
-    ai: { name: 'الذكاء الاصطناعي', emoji: '🤖' },
-    utility: { name: 'أوامر الأدوات', emoji: '🔧' },
-    info: { name: 'أوامر المعلومات', emoji: 'ℹ️' },
-    fun: { name: 'أوامر الترفيه والألعاب', emoji: '🎮' },
-    roles: { name: 'أوامر الرتب', emoji: '📛' },
-  };
 
   const embed = new EmbedBuilder()
     .setTitle(`📚 أوامر ${interaction.guild!.name}`)
@@ -95,7 +110,7 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
   // قائمة مختصرة بالتصنيفات والأوامر
   const lines: string[] = [];
   for (const category of categories) {
-    const info = categoryInfo[category] || { name: category, emoji: '📂' };
+    const info = CATEGORY_INFO[category] || { name: category, emoji: '📂', fallback: '📂' };
     const catCommands = client.commandHandler.getCommandsByCategory(category);
 
     if (catCommands.length > 0) {
@@ -104,7 +119,9 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
           .slice(0, 12)
           .map(cmd => `\`/${cmd.data.name}\``)
           .join('، ') + (catCommands.length > 12 ? ` … +${catCommands.length - 12}` : '');
-      lines.push(`${info.emoji} **${info.name}** [${catCommands.length}]: ${names}`);
+      lines.push(
+        `${guildEmojiText(interaction.guild, info.emoji, info.fallback)} **${info.name}** [${catCommands.length}]: ${names}`
+      );
     }
   }
 
@@ -116,27 +133,32 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
   );
 
   // Create buttons for navigation
+  const emojiOf = (key: string) => {
+    const info = CATEGORY_INFO[key];
+    return info ? guildEmoji(interaction.guild, info.emoji, info.fallback) : '📂';
+  };
+
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('help_moderation')
-      .setLabel('أوامر الادارة')
+      .setLabel(CATEGORY_INFO.moderation.name)
       .setStyle(ButtonStyle.Primary)
-      .setEmoji(guildEmoji(interaction.guild, 'staff~2', '🛡️')),
+      .setEmoji(emojiOf('moderation')),
     new ButtonBuilder()
       .setCustomId('help_protection')
-      .setLabel('أوامر الحماية')
+      .setLabel(CATEGORY_INFO.protection.name)
       .setStyle(ButtonStyle.Success)
-      .setEmoji(guildEmoji(interaction.guild, 'consideration', '🔒')),
+      .setEmoji(emojiOf('protection')),
     new ButtonBuilder()
       .setCustomId('help_tickets')
-      .setLabel('أوامر التذاكر')
+      .setLabel(CATEGORY_INFO.tickets.name)
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji(guildEmoji(interaction.guild, 'ticket~2', '🎫')),
+      .setEmoji(emojiOf('tickets')),
     new ButtonBuilder()
       .setCustomId('help_ai')
-      .setLabel('الذكاء الاصطناعي')
+      .setLabel(CATEGORY_INFO.ai.name)
       .setStyle(ButtonStyle.Danger)
-      .setEmoji(guildEmoji(interaction.guild, 'chat~1', '🤖')),
+      .setEmoji(emojiOf('ai')),
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -147,14 +169,14 @@ async function showHelpMenu(interaction: ChatInputCommandInteraction, client: Om
       .setEmoji('🎮'),
     new ButtonBuilder()
       .setCustomId('help_roles')
-      .setLabel('أوامر الرتب')
+      .setLabel(CATEGORY_INFO.roles.name)
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji(guildEmoji(interaction.guild, 'notebook~1', '📛')),
+      .setEmoji(emojiOf('roles')),
     new ButtonBuilder()
       .setCustomId('help_settings')
-      .setLabel('أوامر الاعدادات')
+      .setLabel(CATEGORY_INFO.settings.name)
       .setStyle(ButtonStyle.Success)
-      .setEmoji(guildEmoji(interaction.guild, 'correct', '⚙️')),
+      .setEmoji(emojiOf('settings')),
     new ButtonBuilder()
       .setCustomId('help_utility')
       .setLabel('الأدوات')
