@@ -44,6 +44,7 @@ const discord_js_1 = require("discord.js");
 const config_1 = require("./config");
 const helpers_1 = require("./utils/helpers");
 const ownerApproval_1 = require("./utils/ownerApproval");
+const webAuth_1 = require("./utils/webAuth");
 const handlers_1 = require("./handlers");
 const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
@@ -207,7 +208,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to get settings' });
             }
         });
-        router.patch('/guilds/:guildId/settings', async (req, res) => {
+        router.patch('/guilds/:guildId/settings', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const guildId = req.params.guildId;
                 const updates = req.body;
@@ -444,7 +445,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to get economy' });
             }
         });
-        router.post('/guilds/:guildId/economy/give', async (req, res) => {
+        router.post('/guilds/:guildId/economy/give', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { UserProfile, getOrCreateUserProfile } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const { userId, amount, type = 'balance' } = req.body;
@@ -458,7 +459,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to give economy' });
             }
         });
-        router.post('/guilds/:guildId/economy/reset', async (req, res) => {
+        router.post('/guilds/:guildId/economy/reset', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { UserProfile } = await Promise.resolve().then(() => __importStar(require('./models')));
                 await UserProfile.deleteMany({ guildId: req.params.guildId });
@@ -481,7 +482,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to get shop' });
             }
         });
-        router.post('/guilds/:guildId/shop', async (req, res) => {
+        router.post('/guilds/:guildId/shop', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const settings = await getGuildSettings(req.params.guildId);
@@ -495,7 +496,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to add shop item' });
             }
         });
-        router.delete('/guilds/:guildId/shop/:itemId', async (req, res) => {
+        router.delete('/guilds/:guildId/shop/:itemId', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const settings = await getGuildSettings(req.params.guildId);
@@ -521,7 +522,7 @@ class OmniClient extends discord_js_1.Client {
             }
         });
         // Protection features
-        router.post('/guilds/:guildId/protection/:feature', async (req, res) => {
+        router.post('/guilds/:guildId/protection/:feature', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const feature = req.params.feature;
@@ -549,7 +550,7 @@ class OmniClient extends discord_js_1.Client {
             }
         });
         // AI features
-        router.post('/guilds/:guildId/ai/:feature', async (req, res) => {
+        router.post('/guilds/:guildId/ai/:feature', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { getGuildSettings } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const feature = req.params.feature;
@@ -578,7 +579,7 @@ class OmniClient extends discord_js_1.Client {
             }
         });
         // Bot leave guild
-        router.post('/guilds/:guildId/leave', async (req, res) => {
+        router.post('/guilds/:guildId/leave', webAuth_1.requireGuildOwner, async (req, res) => {
             try {
                 const guild = this.guilds.cache.get(req.params.guildId);
                 if (!guild)
@@ -661,7 +662,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to get command aliases' });
             }
         });
-        router.post('/guilds/:guildId/aliases', async (req, res) => {
+        router.post('/guilds/:guildId/aliases', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const { invalidateAliasCache } = await Promise.resolve().then(() => __importStar(require('./utils/aliasCache')));
@@ -719,7 +720,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to create command alias' });
             }
         });
-        router.delete('/guilds/:guildId/aliases/:aliasId', async (req, res) => {
+        router.delete('/guilds/:guildId/aliases/:aliasId', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const { invalidateAliasCache } = await Promise.resolve().then(() => __importStar(require('./utils/aliasCache')));
@@ -737,7 +738,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to delete command alias' });
             }
         });
-        router.delete('/guilds/:guildId/aliases', async (req, res) => {
+        router.delete('/guilds/:guildId/aliases', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { CommandAlias } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const { invalidateAliasCache } = await Promise.resolve().then(() => __importStar(require('./utils/aliasCache')));
@@ -765,7 +766,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to get knowledge' });
             }
         });
-        router.post('/guilds/:guildId/knowledge', async (req, res) => {
+        router.post('/guilds/:guildId/knowledge', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { KnowledgeEntry } = await Promise.resolve().then(() => __importStar(require('./models')));
                 const { title, content, tags, category } = req.body || {};
@@ -796,7 +797,7 @@ class OmniClient extends discord_js_1.Client {
                 res.status(500).json({ error: 'Failed to create knowledge' });
             }
         });
-        router.delete('/guilds/:guildId/knowledge/:entryId', async (req, res) => {
+        router.delete('/guilds/:guildId/knowledge/:entryId', webAuth_1.requireGuildAdmin, async (req, res) => {
             try {
                 const { KnowledgeEntry } = await Promise.resolve().then(() => __importStar(require('./models')));
                 await KnowledgeEntry.deleteOne({ _id: req.params.entryId, guildId: req.params.guildId });
@@ -861,11 +862,29 @@ class OmniClient extends discord_js_1.Client {
             'ping', 'guild_stats', 'channels_list', 'welcome_test', 'broadcast', 'settings_sync',
             'investigator_run',
         ]);
+        // 🛡️ أوامر إدارية فقط: بث للقناة / إنشاء وترتيب قنوات / مزامنة إعدادات — للإدارة حصراً
+        const DASHBOARD_ADMIN_ONLY_COMMANDS = new Set([
+            'broadcast', 'channel_create', 'organize', 'organize_preview', 'settings_sync', 'investigator_run',
+        ]);
         router.post('/guilds/:guildId/command', async (req, res) => {
             try {
                 const { command, payload } = req.body || {};
                 if (!command || !DASHBOARD_ALLOWED_COMMANDS.has(String(command))) {
                     return res.status(400).json({ error: 'أمر غير مسموح' });
+                }
+                if (DASHBOARD_ADMIN_ONLY_COMMANDS.has(String(command))) {
+                    const ctx = req.webAuth;
+                    const isAdminCtx = ctx &&
+                        (ctx.kind === 'key' ||
+                            ctx.mode === 'owner' ||
+                            ctx.isBotOwner ||
+                            ctx.guildAccess?.isAdmin);
+                    if (!isAdminCtx) {
+                        return res.status(403).json({
+                            error: 'admin_only',
+                            message: 'هذا الأمر متاح لإدارة السيرفر فقط (بث/ترتيب قنوات/مزامنة إعدادات)',
+                        });
+                    }
                 }
                 const actor = req.webAuth?.username || req.webAuth?.userId || 'لوحة التحكم';
                 const result = await this.dashboardCommandWorker.executeNow(String(command), req.params.guildId, { ...(payload || {}), actor: payload?.actor || actor });

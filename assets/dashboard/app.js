@@ -307,6 +307,13 @@ function showLogin(login = null) {
   passBlock.classList.toggle('hidden', !passOn);
   ownerDivider.classList.toggle('hidden', !(codeOn || passOn));
   noneBlock.classList.toggle('hidden', oauthOn || codeOn || passOn);
+  // ➕ زر إضافة البوت لسيرفر جديد (بييجي من إعدادات السيرفر)
+  const inviteBtn = $('#btn-invite-bot');
+  const invite = (info && info.inviteUrl) || '';
+  if (inviteBtn) {
+    inviteBtn.classList.toggle('hidden', !invite);
+    if (invite) inviteBtn.href = invite;
+  }
 }
 
 function showOAuthGuard() {
@@ -359,10 +366,12 @@ async function startApp() {
     renderUserChip();
     $('#bot-status').textContent = '—';
     $('#bot-status').className = 'chip';
+    const invite = (LOGIN_INFO && LOGIN_INFO.inviteUrl) || '';
     $('#view').innerHTML = `
       <div class="empty">
-        <p>أنت مش عضو في أي سيرفر البوت موجود فيه.</p>
-        <p class="dim mt-sm">لو البوت لسه ما دخلش سيرفرك، ضيفه الأول وبعدها سجّل دخولك تاني.</p>
+        <p>أنت مش عضو في أي سيرفر البوت موجود فيه — أو ماعندكش فيه صلاحيات إدارة.</p>
+        <p class="dim mt-sm">لو البوت لسه ما دخلش سيرفرك، ضيفه وبعدها سجّل دخولك تاني — هتشوف سيرفرك في القائمة 👑</p>
+        ${invite ? `<p class="mt"><a class="btn primary" href="${esc(invite)}" target="_blank" rel="noopener noreferrer">➕ أضف البوت لسيرفرك الآن</a></p>` : ''}
       </div>`;
     return;
   }
@@ -1836,6 +1845,7 @@ $('#btn-request-code').onclick = async () => {
 };
 async function enterAfterLogin() {
   const st = await api.get('/dashboard/auth/status');
+  LOGIN_INFO = st.login || {};
   if (st.oauthRequired && st.user && !st.user.oauthVerified) {
     showOAuthGuard();
     return;
@@ -1901,6 +1911,7 @@ function handleAuthQuery() {
   handleAuthQuery();
   try {
     const st = await api.get('/dashboard/auth/status');
+    LOGIN_INFO = st.login || {};
     if (st.oauthRequired && st.user && !st.user.oauthVerified) showOAuthGuard();
     else if (st.authenticated) await startApp();
     else showLogin(st.login);

@@ -12,6 +12,7 @@ import {
 import { config, validateConfig } from './config';
 import { createLogger } from './utils/helpers';
 import { detectProtectionOffField, gateDashboardProtectionOff } from './utils/ownerApproval';
+import { requireGuildAdmin, requireGuildOwner } from './utils/webAuth';
 import {
   CommandHandler,
   EventHandler,
@@ -216,7 +217,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.patch('/guilds/:guildId/settings', async (req: Request, res: Response) => {
+    router.patch('/guilds/:guildId/settings', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const guildId = req.params.guildId;
         const updates = req.body;
@@ -462,7 +463,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.post('/guilds/:guildId/economy/give', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/economy/give', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { UserProfile, getOrCreateUserProfile } = await import('./models');
         const { userId, amount, type = 'balance' } = req.body;
@@ -476,7 +477,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.post('/guilds/:guildId/economy/reset', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/economy/reset', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { UserProfile } = await import('./models');
         await UserProfile.deleteMany({ guildId: req.params.guildId });
@@ -499,7 +500,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.post('/guilds/:guildId/shop', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/shop', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { getGuildSettings } = await import('./models');
         const settings = await getGuildSettings(req.params.guildId);
@@ -513,7 +514,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.delete('/guilds/:guildId/shop/:itemId', async (req: Request, res: Response) => {
+    router.delete('/guilds/:guildId/shop/:itemId', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { getGuildSettings } = await import('./models');
         const settings = await getGuildSettings(req.params.guildId);
@@ -539,7 +540,7 @@ export class OmniClient extends Client {
     });
 
     // Protection features
-    router.post('/guilds/:guildId/protection/:feature', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/protection/:feature', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { getGuildSettings } = await import('./models');
         const feature = req.params.feature as any;
@@ -570,7 +571,7 @@ export class OmniClient extends Client {
     });
 
     // AI features
-    router.post('/guilds/:guildId/ai/:feature', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/ai/:feature', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { getGuildSettings } = await import('./models');
         const feature = req.params.feature as any;
@@ -602,7 +603,7 @@ export class OmniClient extends Client {
     });
 
     // Bot leave guild
-    router.post('/guilds/:guildId/leave', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/leave', requireGuildOwner, async (req: Request, res: Response) => {
       try {
         const guild = this.guilds.cache.get(req.params.guildId);
         if (!guild) return res.status(404).json({ error: 'Guild not found' });
@@ -684,7 +685,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.post('/guilds/:guildId/aliases', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/aliases', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { CommandAlias } = await import('./models');
         const { invalidateAliasCache } = await import('./utils/aliasCache');
@@ -745,7 +746,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.delete('/guilds/:guildId/aliases/:aliasId', async (req: Request, res: Response) => {
+    router.delete('/guilds/:guildId/aliases/:aliasId', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { CommandAlias } = await import('./models');
         const { invalidateAliasCache } = await import('./utils/aliasCache');
@@ -762,7 +763,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.delete('/guilds/:guildId/aliases', async (req: Request, res: Response) => {
+    router.delete('/guilds/:guildId/aliases', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { CommandAlias } = await import('./models');
         const { invalidateAliasCache } = await import('./utils/aliasCache');
@@ -790,7 +791,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.post('/guilds/:guildId/knowledge', async (req: Request, res: Response) => {
+    router.post('/guilds/:guildId/knowledge', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { KnowledgeEntry } = await import('./models');
         const { title, content, tags, category } = req.body || {};
@@ -822,7 +823,7 @@ export class OmniClient extends Client {
       }
     });
 
-    router.delete('/guilds/:guildId/knowledge/:entryId', async (req: Request, res: Response) => {
+    router.delete('/guilds/:guildId/knowledge/:entryId', requireGuildAdmin, async (req: Request, res: Response) => {
       try {
         const { KnowledgeEntry } = await import('./models');
         await KnowledgeEntry.deleteOne({ _id: req.params.entryId, guildId: req.params.guildId });
@@ -885,11 +886,30 @@ export class OmniClient extends Client {
       'ping', 'guild_stats', 'channels_list', 'welcome_test', 'broadcast', 'settings_sync',
       'investigator_run',
     ]);
+    // 🛡️ أوامر إدارية فقط: بث للقناة / إنشاء وترتيب قنوات / مزامنة إعدادات — للإدارة حصراً
+    const DASHBOARD_ADMIN_ONLY_COMMANDS = new Set([
+      'broadcast', 'channel_create', 'organize', 'organize_preview', 'settings_sync', 'investigator_run',
+    ]);
     router.post('/guilds/:guildId/command', async (req: Request, res: Response) => {
       try {
         const { command, payload } = req.body || {};
         if (!command || !DASHBOARD_ALLOWED_COMMANDS.has(String(command))) {
           return res.status(400).json({ error: 'أمر غير مسموح' });
+        }
+        if (DASHBOARD_ADMIN_ONLY_COMMANDS.has(String(command))) {
+          const ctx = (req as any).webAuth;
+          const isAdminCtx =
+            ctx &&
+            (ctx.kind === 'key' ||
+              ctx.mode === 'owner' ||
+              ctx.isBotOwner ||
+              ctx.guildAccess?.isAdmin);
+          if (!isAdminCtx) {
+            return res.status(403).json({
+              error: 'admin_only',
+              message: 'هذا الأمر متاح لإدارة السيرفر فقط (بث/ترتيب قنوات/مزامنة إعدادات)',
+            });
+          }
         }
         const actor =
           (req as any).webAuth?.username || (req as any).webAuth?.userId || 'لوحة التحكم';

@@ -34,6 +34,7 @@ import {
   passwordLoginEnabled,
   passwordMatches,
   rateLimit,
+  rememberOAuthGuilds,
   requireOwnerSession,
   requireSession,
   requireVerifiedSession,
@@ -120,7 +121,8 @@ export class WebDashboard {
     req: Request,
     res: Response,
     flow: { sessionId?: string },
-    me: any
+    me: any,
+    accessToken?: string
   ): Promise<void> {
     const owners = await getBotOwnerIds(this.client);
     const isBotOwner = owners.includes(String(me.id));
@@ -128,6 +130,22 @@ export class WebDashboard {
     const avatar = me.avatar
       ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=128`
       : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(me.id) >> 22n) % 6n)}.png`;
+
+    // 💡 نجيب سيرفرات المستخدم وصلاحياته من ديسكورد مباشرة ونحفظها كتلميحات
+    // (تخلي قائمة السيرفرات فورية وتشتغل مع أي عدد سيرفرات — زي برو بوت)
+    if (accessToken) {
+      try {
+        const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (guildsRes.ok) {
+          const list = (await guildsRes.json()) as any[];
+          rememberOAuthGuilds(String(me.id), Array.isArray(list) ? list : []);
+        }
+      } catch {
+        /* تعذّر جلب القائمة — resolveGuildAccess هيرجع لكاش الأعضاء */
+      }
+    }
 
     // 🔗 جلسة قديمة (مالك وثّق دخوله) → نربطها بالحساب
     const linked = flow.sessionId
@@ -172,6 +190,11 @@ export class WebDashboard {
     // ---------- حالة المصادقة ----------
     app.get('/dashboard/auth/status', (req: Request, res: Response) => {
       const session = getSession(req);
+      const clientId = process.env.DISCORD_CLIENT_ID || '';
+      // رابط إضافة البوت لأي سيرفر جديد (زي برو بوت) — صلاحية Administrator للتبسيط
+      const inviteUrl = clientId
+        ? `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`
+        : null;
       res.json({
         authenticated: Boolean(session),
         user: session
@@ -192,6 +215,7 @@ export class WebDashboard {
           code: this.client.isReady(),
           oauth: oauthConfigured(),
           requireOAuth: oauthRequired(),
+          inviteUrl,
           // الرابط المتوقع للتسجيل في Discord Developer Portal (يساعد في الإعداد)
           oauthRedirectUri: oauthRedirect(req),
         },
@@ -244,7 +268,8 @@ export class WebDashboard {
       url.searchParams.set('client_id', clientId);
       url.searchParams.set('response_type', hasSecret ? 'code' : 'token');
       url.searchParams.set('redirect_uri', redirect);
-      url.searchParams.set('scope', 'identify');
+      // identify = بروفايل المستخدم · guilds = معرفة السيرفرات اللي يقدر يديرها (زي برو بوت)
+      url.searchParams.set('scope', 'identify guilds');
       url.searchParams.set('state', state);
       url.searchParams.set('prompt', 'consent');
       res.redirect(url.toString());
@@ -297,7 +322,7 @@ export class WebDashboard {
         const me: any = await meRes.json();
         if (!me?.id) throw new Error('me empty');
 
-        await this.finalizeOAuthLogin(req, res, flow, me);
+        await this.finalizeOAuthLogin(req, res, flow, me, tokenData.access_token);
         logAuth(
           'oauth-ok',
           `user=${me.id} code${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`
@@ -338,7 +363,7 @@ export class WebDashboard {
         const me = info?.user;
         if (!me?.id) throw new Error('no_user');
 
-        await this.finalizeOAuthLogin(req, res, flow, me);
+        await this.finalizeOAuthLogin(req, res, flow, me, accessToken);
         logAuth(
           'oauth-ok',
           `user=${me.id} implicit${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`

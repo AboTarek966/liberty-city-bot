@@ -276,6 +276,54 @@ const accessCache = new Map<string, { access: GuildAccess | null; expiresAt: num
 const accessPending = new Map<string, Promise<GuildAccess | null>>();
 
 /**
+ * 💡 تلميح من OAuth: قائمة السيرفرات اللي المستخدم عضو فيها وصلاحياته فيها
+ * (تأتي من GET /users/@me/guilds لحظة تسجيل الدخول — أسرع من كاش الأعضاء
+ * وبتشتغل حتى لو العضو مش محمّل في الكاش، وده اللي يخلي اللوحة تتوسّع لأي عدد سيرفرات).
+ */
+interface OAuthGuildHint {
+  owner: boolean;
+  admin: boolean;
+}
+
+const OAUTH_HINTS_TTL_MS = 15 * 60 * 1000;
+const oauthGuildHints = new Map<string, { guilds: Map<string, OAuthGuildHint>; expiresAt: number }>();
+
+/** يخزّن سيرفرات المستخدم من رد ديسكورد (owner/admin عبر ManageGuild أو Administrator) */
+export function rememberOAuthGuilds(
+  userId: string,
+  guilds: Array<{ id: string; owner?: boolean; permissions?: string | number }>
+): void {
+  if (!userId || !Array.isArray(guilds)) return;
+  const map = new Map<string, OAuthGuildHint>();
+  for (const g of guilds) {
+    if (!g?.id) continue;
+    let perms = 0n;
+    try {
+      perms = BigInt(String(g.permissions ?? '0'));
+    } catch {
+      perms = 0n;
+    }
+    const admin = Boolean(g.owner) || (perms & 0x8n) !== 0n || (perms & 0x20n) !== 0n;
+    map.set(String(g.id), { owner: Boolean(g.owner), admin });
+  }
+  oauthGuildHints.set(userId, { guilds: map, expiresAt: Date.now() + OAUTH_HINTS_TTL_MS });
+  // مسح أي كاش وصول قديم لهذا المستخدم عشان التلميحات الجديدة تاخد مفعولها
+  for (const key of accessCache.keys()) {
+    if (key.endsWith(`:${userId}`)) accessCache.delete(key);
+  }
+}
+
+function oauthHintFor(userId: string, guildId: string): OAuthGuildHint | null {
+  const entry = oauthGuildHints.get(userId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    oauthGuildHints.delete(userId);
+    return null;
+  }
+  return entry.guilds.get(guildId) || null;
+}
+
+/**
  * 🔍 مستوى وصول عضو ديسكورد في سيرفر:
  *  - owner: صاحب السيرفر (التاج)
  *  - admin: Administrator / ManageGuild / رولات إدارة التذاكر
@@ -300,13 +348,15 @@ export async function resolveGuildAccess(
       const guild = client?.guilds?.cache?.get(guildId);
       if (!guild) return null;
 
+      // 💡 تلميح OAuth أولاً: لو المستخدم داخل السيرفر فعلاً مش محتاجين نضرب Discord API
+      const hint = oauthHintFor(userId, guildId);
+
       let member = guild.members?.cache?.get(userId) || null;
-      if (!member && typeof guild.members?.fetch === 'function') {
+      if (!member && !hint && typeof guild.members?.fetch === 'function') {
         member = await guild.members.fetch(userId).catch(() => null);
       }
-      if (!member) return null;
+      if (!member && !hint) return null;
 
-      const isOwner = String(guild.ownerId) === String(userId);
       let ticketAdminIds: string[] = [];
       let ticketSupportIds: string[] = [];
       try {
@@ -322,8 +372,8 @@ export async function resolveGuildAccess(
         /* تعذّر قراءة الإعدادات — نعتمد على صلاحيات ديسكورد فقط */
       }
 
-      const hasAnyRole = (ids: string[]) => ids.some((id) => member.roles?.cache?.has?.(id));
-      const perms = member.permissions;
+      const hasAnyRole = (ids: string[]) => ids.some((id) => member?.roles?.cache?.has?.(id));
+      const perms = member?.permissions;
       const hasPerm = (name: string) => {
         try {
           return Boolean(perms?.has?.(name as any));
@@ -333,8 +383,9 @@ export async function resolveGuildAccess(
       };
 
       const hasTicketAdmin = hasAnyRole(ticketAdminIds);
+      const isOwner = Boolean(hint?.owner) || String(guild.ownerId) === String(userId);
       const isAdmin =
-        isOwner || hasPerm('Administrator') || hasPerm('ManageGuild') || hasTicketAdmin;
+        isOwner || Boolean(hint?.admin) || hasPerm('Administrator') || hasPerm('ManageGuild') || hasTicketAdmin;
       const isStaff =
         isAdmin ||
         hasAnyRole(ticketSupportIds) ||
@@ -351,12 +402,14 @@ export async function resolveGuildAccess(
             ? 'staff'
             : 'member';
 
-      const roleNames = [...(member.roles?.cache?.values?.() || [])]
-        .filter((r: any) => String(r.id) !== String(guild.id))
-        .sort((a: any, b: any) => (b.position || 0) - (a.position || 0))
-        .map((r: any) => r.name)
-        .filter(Boolean)
-        .slice(0, 12);
+      const roleNames = member
+        ? [...(member.roles?.cache?.values?.() || [])]
+            .filter((r: any) => String(r.id) !== String(guild.id))
+            .sort((a: any, b: any) => (b.position || 0) - (a.position || 0))
+            .map((r: any) => r.name)
+            .filter(Boolean)
+            .slice(0, 12)
+        : [];
 
       return { level, isOwner, isAdmin, isStaff, roleNames };
     } catch {
@@ -696,6 +749,52 @@ export function requireOwnerSession(req: Request, res: Response, next: NextFunct
   }
   (req as any).webSession = session;
   next();
+}
+
+/**
+ * 🛡️ إجراءات إدارة السيرفر (إعدادات/حماية/اقتصاد/أوامر) — للإدارة فقط.
+ * يقرأ نتيجة apiGuard من req.webAuth: جلسة المالك/مفتاح الخدمة = وصول كامل،
+ * وإلا لازم يكون مستوى المستخدم في السيرفر admin على الأقل.
+ */
+export function requireGuildAdmin(req: Request, res: Response, next: NextFunction): void {
+  const ctx = (req as any).webAuth as WebAuthContext | undefined;
+  if (!ctx) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  if (ctx.kind === 'key' || ctx.mode === 'owner' || ctx.isBotOwner) {
+    next();
+    return;
+  }
+  if (ctx.guildAccess?.isAdmin) {
+    next();
+    return;
+  }
+  res.status(403).json({
+    error: 'admin_only',
+    message: 'هذا الإجراء متاح لإدارة السيرفر فقط — تحتاج صلاحية «إدارة السيرفر» أو رول إدارة',
+  });
+}
+
+/** 👑 إجراءات مالك السيرفر فقط (مثل إخراج البوت من السيرفر) */
+export function requireGuildOwner(req: Request, res: Response, next: NextFunction): void {
+  const ctx = (req as any).webAuth as WebAuthContext | undefined;
+  if (!ctx) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  if (ctx.kind === 'key' || ctx.mode === 'owner' || ctx.isBotOwner) {
+    next();
+    return;
+  }
+  if (ctx.guildAccess?.isOwner) {
+    next();
+    return;
+  }
+  res.status(403).json({
+    error: 'owner_only',
+    message: 'هذا الإجراء متاح لمالك السيرفر فقط 👑',
+  });
 }
 
 export function logAuth(event: string, detail = ''): void {

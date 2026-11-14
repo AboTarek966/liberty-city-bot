@@ -84,13 +84,29 @@ class WebDashboard {
      * 🔗 توحيد إنهاء الدخول بين Code flow و Implicit flow:
      * يربط الجلسة الحالية إن وُجدت، أو ينشئ جلسة عامة جديدة ويضبط الكوكي.
      */
-    async finalizeOAuthLogin(req, res, flow, me) {
+    async finalizeOAuthLogin(req, res, flow, me, accessToken) {
         const owners = await (0, botOwner_1.getBotOwnerIds)(this.client);
         const isBotOwner = owners.includes(String(me.id));
         const displayName = me.global_name || me.username || 'مستخدم ديسكورد';
         const avatar = me.avatar
             ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=128`
             : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(me.id) >> 22n) % 6n)}.png`;
+        // 💡 نجيب سيرفرات المستخدم وصلاحياته من ديسكورد مباشرة ونحفظها كتلميحات
+        // (تخلي قائمة السيرفرات فورية وتشتغل مع أي عدد سيرفرات — زي برو بوت)
+        if (accessToken) {
+            try {
+                const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                });
+                if (guildsRes.ok) {
+                    const list = (await guildsRes.json());
+                    (0, webAuth_1.rememberOAuthGuilds)(String(me.id), Array.isArray(list) ? list : []);
+                }
+            }
+            catch {
+                /* تعذّر جلب القائمة — resolveGuildAccess هيرجع لكاش الأعضاء */
+            }
+        }
         // 🔗 جلسة قديمة (مالك وثّق دخوله) → نربطها بالحساب
         const linked = flow.sessionId
             ? (0, webAuth_1.markOAuthVerified)(flow.sessionId, String(me.id), displayName, { avatar, isBotOwner })
@@ -127,6 +143,11 @@ class WebDashboard {
         // ---------- حالة المصادقة ----------
         app.get('/dashboard/auth/status', (req, res) => {
             const session = (0, webAuth_1.getSession)(req);
+            const clientId = process.env.DISCORD_CLIENT_ID || '';
+            // رابط إضافة البوت لأي سيرفر جديد (زي برو بوت) — صلاحية Administrator للتبسيط
+            const inviteUrl = clientId
+                ? `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot%20applications.commands`
+                : null;
             res.json({
                 authenticated: Boolean(session),
                 user: session
@@ -147,6 +168,7 @@ class WebDashboard {
                     code: this.client.isReady(),
                     oauth: (0, webAuth_1.oauthConfigured)(),
                     requireOAuth: (0, webAuth_1.oauthRequired)(),
+                    inviteUrl,
                     // الرابط المتوقع للتسجيل في Discord Developer Portal (يساعد في الإعداد)
                     oauthRedirectUri: (0, webAuth_1.oauthRedirect)(req),
                 },
@@ -197,7 +219,8 @@ class WebDashboard {
             url.searchParams.set('client_id', clientId);
             url.searchParams.set('response_type', hasSecret ? 'code' : 'token');
             url.searchParams.set('redirect_uri', redirect);
-            url.searchParams.set('scope', 'identify');
+            // identify = بروفايل المستخدم · guilds = معرفة السيرفرات اللي يقدر يديرها (زي برو بوت)
+            url.searchParams.set('scope', 'identify guilds');
             url.searchParams.set('state', state);
             url.searchParams.set('prompt', 'consent');
             res.redirect(url.toString());
@@ -251,7 +274,7 @@ class WebDashboard {
                 const me = await meRes.json();
                 if (!me?.id)
                     throw new Error('me empty');
-                await this.finalizeOAuthLogin(req, res, flow, me);
+                await this.finalizeOAuthLogin(req, res, flow, me, tokenData.access_token);
                 (0, webAuth_1.logAuth)('oauth-ok', `user=${me.id} code${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`);
                 res.redirect('/dashboard?oauth=1');
             }
@@ -292,7 +315,7 @@ class WebDashboard {
                 const me = info?.user;
                 if (!me?.id)
                     throw new Error('no_user');
-                await this.finalizeOAuthLogin(req, res, flow, me);
+                await this.finalizeOAuthLogin(req, res, flow, me, accessToken);
                 (0, webAuth_1.logAuth)('oauth-ok', `user=${me.id} implicit${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`);
                 res.json({ ok: true });
             }

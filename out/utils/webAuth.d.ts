@@ -58,6 +58,12 @@ export declare function oauthRequired(): boolean;
 export declare function discordClientSecret(): string;
 export declare function oauthConfigured(): boolean;
 export declare function oauthRedirect(req: Request): string;
+/** يخزّن سيرفرات المستخدم من رد ديسكورد (owner/admin عبر ManageGuild أو Administrator) */
+export declare function rememberOAuthGuilds(userId: string, guilds: Array<{
+    id: string;
+    owner?: boolean;
+    permissions?: string | number;
+}>): void;
 /**
  * 🔍 مستوى وصول عضو ديسكورد في سيرفر:
  *  - owner: صاحب السيرفر (التاج)
@@ -122,6 +128,14 @@ export declare function requireSession(req: Request, res: Response, next: NextFu
 export declare function requireVerifiedSession(req: Request, res: Response, next: NextFunction): void;
 /** جلسات إدارة الأجهزة/الجلسات — لمالك البوت فقط */
 export declare function requireOwnerSession(req: Request, res: Response, next: NextFunction): void;
+/**
+ * 🛡️ إجراءات إدارة السيرفر (إعدادات/حماية/اقتصاد/أوامر) — للإدارة فقط.
+ * يقرأ نتيجة apiGuard من req.webAuth: جلسة المالك/مفتاح الخدمة = وصول كامل،
+ * وإلا لازم يكون مستوى المستخدم في السيرفر admin على الأقل.
+ */
+export declare function requireGuildAdmin(req: Request, res: Response, next: NextFunction): void;
+/** 👑 إجراءات مالك السيرفر فقط (مثل إخراج البوت من السيرفر) */
+export declare function requireGuildOwner(req: Request, res: Response, next: NextFunction): void;
 export declare function logAuth(event: string, detail?: string): void;
 export {};
 //# sourceMappingURL=webAuth.d.ts.map

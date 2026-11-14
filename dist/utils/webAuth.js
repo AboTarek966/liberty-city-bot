@@ -53,6 +53,7 @@ exports.oauthRequired = oauthRequired;
 exports.discordClientSecret = discordClientSecret;
 exports.oauthConfigured = oauthConfigured;
 exports.oauthRedirect = oauthRedirect;
+exports.rememberOAuthGuilds = rememberOAuthGuilds;
 exports.resolveGuildAccess = resolveGuildAccess;
 exports.createOAuthState = createOAuthState;
 exports.consumeOAuthState = consumeOAuthState;
@@ -72,6 +73,8 @@ exports.apiGuard = apiGuard;
 exports.requireSession = requireSession;
 exports.requireVerifiedSession = requireVerifiedSession;
 exports.requireOwnerSession = requireOwnerSession;
+exports.requireGuildAdmin = requireGuildAdmin;
+exports.requireGuildOwner = requireGuildOwner;
 exports.logAuth = logAuth;
 const crypto_1 = __importDefault(require("crypto"));
 const helpers_1 = require("./helpers");
@@ -284,6 +287,43 @@ function oauthRedirect(req) {
 const ACCESS_TTL_MS = 60 * 1000;
 const accessCache = new Map();
 const accessPending = new Map();
+const OAUTH_HINTS_TTL_MS = 15 * 60 * 1000;
+const oauthGuildHints = new Map();
+/** يخزّن سيرفرات المستخدم من رد ديسكورد (owner/admin عبر ManageGuild أو Administrator) */
+function rememberOAuthGuilds(userId, guilds) {
+    if (!userId || !Array.isArray(guilds))
+        return;
+    const map = new Map();
+    for (const g of guilds) {
+        if (!g?.id)
+            continue;
+        let perms = 0n;
+        try {
+            perms = BigInt(String(g.permissions ?? '0'));
+        }
+        catch {
+            perms = 0n;
+        }
+        const admin = Boolean(g.owner) || (perms & 0x8n) !== 0n || (perms & 0x20n) !== 0n;
+        map.set(String(g.id), { owner: Boolean(g.owner), admin });
+    }
+    oauthGuildHints.set(userId, { guilds: map, expiresAt: Date.now() + OAUTH_HINTS_TTL_MS });
+    // مسح أي كاش وصول قديم لهذا المستخدم عشان التلميحات الجديدة تاخد مفعولها
+    for (const key of accessCache.keys()) {
+        if (key.endsWith(`:${userId}`))
+            accessCache.delete(key);
+    }
+}
+function oauthHintFor(userId, guildId) {
+    const entry = oauthGuildHints.get(userId);
+    if (!entry)
+        return null;
+    if (entry.expiresAt <= Date.now()) {
+        oauthGuildHints.delete(userId);
+        return null;
+    }
+    return entry.guilds.get(guildId) || null;
+}
 /**
  * 🔍 مستوى وصول عضو ديسكورد في سيرفر:
  *  - owner: صاحب السيرفر (التاج)
@@ -307,13 +347,14 @@ async function resolveGuildAccess(client, userId, guildId) {
             const guild = client?.guilds?.cache?.get(guildId);
             if (!guild)
                 return null;
+            // 💡 تلميح OAuth أولاً: لو المستخدم داخل السيرفر فعلاً مش محتاجين نضرب Discord API
+            const hint = oauthHintFor(userId, guildId);
             let member = guild.members?.cache?.get(userId) || null;
-            if (!member && typeof guild.members?.fetch === 'function') {
+            if (!member && !hint && typeof guild.members?.fetch === 'function') {
                 member = await guild.members.fetch(userId).catch(() => null);
             }
-            if (!member)
+            if (!member && !hint)
                 return null;
-            const isOwner = String(guild.ownerId) === String(userId);
             let ticketAdminIds = [];
             let ticketSupportIds = [];
             try {
@@ -329,8 +370,8 @@ async function resolveGuildAccess(client, userId, guildId) {
             catch {
                 /* تعذّر قراءة الإعدادات — نعتمد على صلاحيات ديسكورد فقط */
             }
-            const hasAnyRole = (ids) => ids.some((id) => member.roles?.cache?.has?.(id));
-            const perms = member.permissions;
+            const hasAnyRole = (ids) => ids.some((id) => member?.roles?.cache?.has?.(id));
+            const perms = member?.permissions;
             const hasPerm = (name) => {
                 try {
                     return Boolean(perms?.has?.(name));
@@ -340,7 +381,8 @@ async function resolveGuildAccess(client, userId, guildId) {
                 }
             };
             const hasTicketAdmin = hasAnyRole(ticketAdminIds);
-            const isAdmin = isOwner || hasPerm('Administrator') || hasPerm('ManageGuild') || hasTicketAdmin;
+            const isOwner = Boolean(hint?.owner) || String(guild.ownerId) === String(userId);
+            const isAdmin = isOwner || Boolean(hint?.admin) || hasPerm('Administrator') || hasPerm('ManageGuild') || hasTicketAdmin;
             const isStaff = isAdmin ||
                 hasAnyRole(ticketSupportIds) ||
                 hasPerm('ManageMessages') ||
@@ -354,12 +396,14 @@ async function resolveGuildAccess(client, userId, guildId) {
                     : isStaff
                         ? 'staff'
                         : 'member';
-            const roleNames = [...(member.roles?.cache?.values?.() || [])]
-                .filter((r) => String(r.id) !== String(guild.id))
-                .sort((a, b) => (b.position || 0) - (a.position || 0))
-                .map((r) => r.name)
-                .filter(Boolean)
-                .slice(0, 12);
+            const roleNames = member
+                ? [...(member.roles?.cache?.values?.() || [])]
+                    .filter((r) => String(r.id) !== String(guild.id))
+                    .sort((a, b) => (b.position || 0) - (a.position || 0))
+                    .map((r) => r.name)
+                    .filter(Boolean)
+                    .slice(0, 12)
+                : [];
             return { level, isOwner, isAdmin, isStaff, roleNames };
         }
         catch {
@@ -662,6 +706,50 @@ function requireOwnerSession(req, res, next) {
     }
     req.webSession = session;
     next();
+}
+/**
+ * 🛡️ إجراءات إدارة السيرفر (إعدادات/حماية/اقتصاد/أوامر) — للإدارة فقط.
+ * يقرأ نتيجة apiGuard من req.webAuth: جلسة المالك/مفتاح الخدمة = وصول كامل،
+ * وإلا لازم يكون مستوى المستخدم في السيرفر admin على الأقل.
+ */
+function requireGuildAdmin(req, res, next) {
+    const ctx = req.webAuth;
+    if (!ctx) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+    }
+    if (ctx.kind === 'key' || ctx.mode === 'owner' || ctx.isBotOwner) {
+        next();
+        return;
+    }
+    if (ctx.guildAccess?.isAdmin) {
+        next();
+        return;
+    }
+    res.status(403).json({
+        error: 'admin_only',
+        message: 'هذا الإجراء متاح لإدارة السيرفر فقط — تحتاج صلاحية «إدارة السيرفر» أو رول إدارة',
+    });
+}
+/** 👑 إجراءات مالك السيرفر فقط (مثل إخراج البوت من السيرفر) */
+function requireGuildOwner(req, res, next) {
+    const ctx = req.webAuth;
+    if (!ctx) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+    }
+    if (ctx.kind === 'key' || ctx.mode === 'owner' || ctx.isBotOwner) {
+        next();
+        return;
+    }
+    if (ctx.guildAccess?.isOwner) {
+        next();
+        return;
+    }
+    res.status(403).json({
+        error: 'owner_only',
+        message: 'هذا الإجراء متاح لمالك السيرفر فقط 👑',
+    });
 }
 function logAuth(event, detail = '') {
     logger.info(`[${event}] ${detail}`.trim());
