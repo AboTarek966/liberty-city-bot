@@ -46,6 +46,46 @@ import {
 
 const logger = createLogger('WebDashboard');
 
+// صفحة العودة لـOAuth Implicit — تقرأ التوكن من #fragment (لا يصل للسيرفر)
+// وترسله مرة واحدة لمسار التحقق ثم تنظّف الرابط من التوكن.
+const IMPLICIT_CALLBACK_PAGE = `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>اكتمال الدخول — Omni</title>
+<style>body{background:#090d16;color:#dbe4f3;font-family:system-ui,Segoe UI,Tahoma,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}main{text-align:center;padding:24px}</style>
+</head>
+<body>
+<main>
+  <div style="font-size:46px">🤖</div>
+  <h1 style="font-size:19px;margin:10px 0">جارٍ إكمال تسجيل الدخول…</h1>
+  <p style="color:#8b9bb4;font-size:13px">لو ما اتحولتش تلقائياً، <a style="color:#22d3ee" href="/dashboard">اضغط هنا</a>.</p>
+</main>
+<script>
+(function () {
+  var frag = new URLSearchParams(location.hash.slice(1));
+  var query = new URLSearchParams(location.search);
+  var err = frag.get('error') || query.get('error');
+  var token = frag.get('access_token');
+  var state = frag.get('state') || query.get('state');
+  if (err) { location.replace('/dashboard?error=access_denied'); return; }
+  if (!token || !state) { location.replace('/dashboard?error=oauth_state'); return; }
+  try { history.replaceState({}, '', location.pathname); } catch (e) {}
+  fetch('/dashboard/auth/oauth/token', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'x-omni-csrf': '1' },
+    body: JSON.stringify({ access_token: token, state: state })
+  }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) {
+    location.replace(r.ok && d && d.ok ? '/dashboard?oauth=1' : '/dashboard?error=oauth_failed');
+  }); }).catch(function () { location.replace('/dashboard?error=oauth_failed'); });
+})();
+</script>
+</body>
+</html>`;
+
 export class WebDashboard {
   private client: OmniClient;
   private assetsDir: string;
@@ -70,6 +110,44 @@ export class WebDashboard {
   /** Guard يُركّب على /api قبل الراوتر في OmniClient */
   apiGuard() {
     return apiGuard(this.client);
+  }
+
+  /**
+   * 🔗 توحيد إنهاء الدخول بين Code flow و Implicit flow:
+   * يربط الجلسة الحالية إن وُجدت، أو ينشئ جلسة عامة جديدة ويضبط الكوكي.
+   */
+  private async finalizeOAuthLogin(
+    req: Request,
+    res: Response,
+    flow: { sessionId?: string },
+    me: any
+  ): Promise<void> {
+    const owners = await getBotOwnerIds(this.client);
+    const isBotOwner = owners.includes(String(me.id));
+    const displayName = me.global_name || me.username || 'مستخدم ديسكورد';
+    const avatar = me.avatar
+      ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=128`
+      : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(me.id) >> 22n) % 6n)}.png`;
+
+    // 🔗 جلسة قديمة (مالك وثّق دخوله) → نربطها بالحساب
+    const linked = flow.sessionId
+      ? markOAuthVerified(flow.sessionId, String(me.id), displayName, { avatar, isBotOwner })
+      : null;
+
+    // 🌍 مستخدم جديد → جلسة OAuth مستقلة
+    if (!linked) {
+      const { token } = createSession({
+        mode: 'user',
+        userId: String(me.id),
+        username: displayName,
+        avatar,
+        isBotOwner,
+        authMethod: 'oauth',
+        oauthVerified: true,
+        req,
+      });
+      setSessionCookie(res, token);
+    }
   }
 
   /** يُركّب مسارات اللوحة (صفحة + أصول + مصادقة + واجهات جلسة) */
@@ -145,6 +223,8 @@ export class WebDashboard {
 
     // ---------- OAuth (Discord) ----------
     // 🌍 دخول عام: أي شخص يقدر يسجّل بديسكورد — من غير كلمة مرور أو كود مسبق.
+    // • فيه Client Secret → Authorization Code flow (الأكثر أماناً)
+    // • مفيش Secret → Implicit flow (محتاج Client ID + Redirect URI فقط)
     app.get('/dashboard/auth/oauth/start', (req: Request, res: Response) => {
       const redirect = oauthRedirect(req);
       if (!redirect) {
@@ -152,18 +232,17 @@ export class WebDashboard {
         return;
       }
       const clientId = process.env.DISCORD_CLIENT_ID || '';
-      const clientSecret = discordClientSecret();
-      // ❌ الإعدادات غير مكتملة — إرشاد واضح بدل التبويب الفارغ
-      if (!clientId || !clientSecret) {
-        res.status(503).json({ error: 'OAuth غير مُعدّ بعد: ضع DISCORD_CLIENT_SECRET (أو DASHBOARD_OAUTH2_SECRET) في البيئة وأضف Redirect URI في Discord Developer Portal' });
+      if (!clientId) {
+        res.status(503).json({ error: 'OAuth غير مُعدّ بعد: ضع DISCORD_CLIENT_ID في البيئة وأضف Redirect URI في Discord Developer Portal' });
         return;
       }
+      const hasSecret = Boolean(discordClientSecret());
       // لو فيه جلسة موجودة نربط التوثيق بها، وإلا ننشئ جلسة جديدة بعد الرجوع
       const session = getSession(req);
       const state = createOAuthState(session?.id);
       const url = new URL('https://discord.com/oauth2/authorize');
       url.searchParams.set('client_id', clientId);
-      url.searchParams.set('response_type', 'code');
+      url.searchParams.set('response_type', hasSecret ? 'code' : 'token');
       url.searchParams.set('redirect_uri', redirect);
       url.searchParams.set('scope', 'identify');
       url.searchParams.set('state', state);
@@ -172,10 +251,21 @@ export class WebDashboard {
     });
 
     app.get('/dashboard/auth/oauth/callback', async (req: Request, res: Response) => {
+      // رفض/خطأ من ديسكورد
+      if (req.query.error) {
+        res.redirect('/dashboard?error=access_denied');
+        return;
+      }
       const code = String(req.query.code || '');
       const state = String(req.query.state || '');
+      if (!code) {
+        // Implicit flow: التوكن في #fragment — السيرفر لا يراه، نرجّع صفحة صغيرة تكمّل الدخول
+        res.setHeader('Cache-Control', 'no-store');
+        res.type('html').send(IMPLICIT_CALLBACK_PAGE);
+        return;
+      }
       const flow = consumeOAuthState(state);
-      if (!code || !flow) {
+      if (!flow) {
         res.redirect('/dashboard?error=oauth_state');
         return;
       }
@@ -205,42 +295,58 @@ export class WebDashboard {
         });
         if (!meRes.ok) throw new Error(`me ${meRes.status}`);
         const me: any = await meRes.json();
+        if (!me?.id) throw new Error('me empty');
 
-        const owners = await getBotOwnerIds(this.client);
-        const isBotOwner = owners.includes(String(me.id));
-        const displayName = me.global_name || me.username || 'مستخدم ديسكورد';
-        const avatar = me.avatar
-          ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=128`
-          : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(me.id) >> 22n) % 6n)}.png`;
-
-        // 🔗 جلسة قديمة (مالك وثّق دخوله) → نربطها بالحساب
-        let linked = flow.sessionId
-          ? markOAuthVerified(flow.sessionId, String(me.id), displayName, { avatar, isBotOwner })
-          : null;
-
-        // 🌍 مستخدم جديد → جلسة OAuth مستقلة
-        if (!linked) {
-          const { token } = createSession({
-            mode: 'user',
-            userId: String(me.id),
-            username: displayName,
-            avatar,
-            isBotOwner,
-            authMethod: 'oauth',
-            oauthVerified: true,
-            req,
-          });
-          setSessionCookie(res, token);
-        }
-
+        await this.finalizeOAuthLogin(req, res, flow, me);
         logAuth(
           'oauth-ok',
-          `user=${me.id}${isBotOwner ? ' bot-owner' : ''}${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`
+          `user=${me.id} code${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`
         );
         res.redirect('/dashboard?oauth=1');
       } catch (e: any) {
         logger.warn(`Dashboard OAuth failed: ${e?.message || e}`);
         res.redirect('/dashboard?error=oauth_failed');
+      }
+    });
+
+    // Implicit flow: المتصفح يرسل التوكن هنا بعد قراءته من الـfragment
+    app.post('/dashboard/auth/oauth/token', async (req: Request, res: Response) => {
+      const ip = clientIp(req);
+      if (!rateLimit(`oauth-token:${ip}`, 10, 10 * 60 * 1000)) {
+        res.status(429).json({ error: 'محاولات كثيرة — انتظر قليلاً' });
+        return;
+      }
+      const accessToken = String(req.body?.access_token || '');
+      const state = String(req.body?.state || '');
+      const flow = consumeOAuthState(state);
+      if (!accessToken || !flow) {
+        res.status(400).json({ error: 'oauth_state' });
+        return;
+      }
+      const clientId = process.env.DISCORD_CLIENT_ID || '';
+      try {
+        // /oauth2/@me يتحقق من التوكن + التطبيق + السكوب + المستخدم معاً
+        const meRes = await fetch('https://discord.com/api/oauth2/@me', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!meRes.ok) throw new Error(`oauth2/me ${meRes.status}`);
+        const info: any = await meRes.json();
+        const appId = String(info?.application?.id || '');
+        if (clientId && appId && appId !== clientId) throw new Error('app_mismatch');
+        const scopes: string[] = Array.isArray(info?.scopes) ? info.scopes : [];
+        if (scopes.length && !scopes.includes('identify')) throw new Error('missing_identify');
+        const me = info?.user;
+        if (!me?.id) throw new Error('no_user');
+
+        await this.finalizeOAuthLogin(req, res, flow, me);
+        logAuth(
+          'oauth-ok',
+          `user=${me.id} implicit${flow.sessionId ? ` linked=${flow.sessionId}` : ' public'}`
+        );
+        res.json({ ok: true });
+      } catch (e: any) {
+        logger.warn(`Dashboard implicit OAuth failed: ${e?.message || e}`);
+        res.status(401).json({ error: 'oauth_failed' });
       }
     });
 

@@ -249,7 +249,8 @@ function discordClientSecret() {
     return process.env.DISCORD_CLIENT_SECRET || process.env.DASHBOARD_OAUTH2_SECRET || '';
 }
 function oauthConfigured() {
-    return Boolean(process.env.DISCORD_CLIENT_ID && discordClientSecret());
+    // Client ID وحده كافٍ لـOAuth (Code flow عند وجود Secret، وإلا Implicit flow)
+    return Boolean(process.env.DISCORD_CLIENT_ID);
 }
 function oauthRedirect(req) {
     const forced = String(process.env.DISCORD_REDIRECT_URI ||

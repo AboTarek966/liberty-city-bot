@@ -234,7 +234,8 @@ export function discordClientSecret(): string {
 }
 
 export function oauthConfigured(): boolean {
-  return Boolean(process.env.DISCORD_CLIENT_ID && discordClientSecret());
+  // Client ID وحده كافٍ لـOAuth (Code flow عند وجود Secret، وإلا Implicit flow)
+  return Boolean(process.env.DISCORD_CLIENT_ID);
 }
 
 export function oauthRedirect(req: Request): string {

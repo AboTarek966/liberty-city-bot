@@ -7,6 +7,11 @@ export declare class WebDashboard {
     constructor(client: OmniClient);
     /** Guard يُركّب على /api قبل الراوتر في OmniClient */
     apiGuard(): (req: Request, res: Response, next: express.NextFunction) => Promise<void>;
+    /**
+     * 🔗 توحيد إنهاء الدخول بين Code flow و Implicit flow:
+     * يربط الجلسة الحالية إن وُجدت، أو ينشئ جلسة عامة جديدة ويضبط الكوكي.
+     */
+    private finalizeOAuthLogin;
     /** يُركّب مسارات اللوحة (صفحة + أصول + مصادقة + واجهات جلسة) */
     attach(app: Express): void;
 }
