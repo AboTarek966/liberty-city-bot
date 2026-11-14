@@ -369,7 +369,7 @@ async function startApp() {
     const invite = (LOGIN_INFO && LOGIN_INFO.inviteUrl) || '';
     $('#view').innerHTML = `
       <div class="empty">
-        <p>أنت مش عضو في أي سيرفر البوت موجود فيه — أو ماعندكش فيه صلاحيات إدارة.</p>
+        <p>أنت مش عضو في أي سيرفر البوت موجود فيه.</p>
         <p class="dim mt-sm">لو البوت لسه ما دخلش سيرفرك، ضيفه وبعدها سجّل دخولك تاني — هتشوف سيرفرك في القائمة 👑</p>
         ${invite ? `<p class="mt"><a class="btn primary" href="${esc(invite)}" target="_blank" rel="noopener noreferrer">➕ أضف البوت لسيرفرك الآن</a></p>` : ''}
       </div>`;
