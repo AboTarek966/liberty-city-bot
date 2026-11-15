@@ -9,7 +9,7 @@ const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 exports.GAMES_LIST = [
     // ⚔️ تحدي مباشر
-    { value: 'roulette', label: '🔫 روليت', usage: '/roulette @user @user2 ... — عجلة حظ متحركة (GIF) تختار ضحية عشوائية من المشاركين' },
+    { value: 'roulette', label: '🔫 روليت', usage: '/roulette — لعبة جماعية: زر دخول + زر خروج، بعد 60 ثانية العجلة تلف وتطرد!' },
     { value: 'duel', label: '⚔️ مبارزة', usage: '/duel @user — معركة جولة بجولة مع شريط صحة' },
     { value: 'tug', label: '🧱 سحب الحبل', usage: '/tug @user ... — فريقان يسحبان الحبل حتى خط النهاية' },
     { value: 'dragon', label: '🐉 معركة التنين', usage: '/dragon — اهزم التنين وانقذ القرية' },
