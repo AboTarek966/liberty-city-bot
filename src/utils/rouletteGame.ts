@@ -23,9 +23,11 @@ export interface RoulettePlayer {
   id: string;
   username: string;
   avatarUrl?: string;
+  /** true لو ده بوت (مش إنسان) */
+  isBot?: boolean;
 }
 
-type RoulettePhase = 'lobby' | 'spinning' | 'choosing' | 'done';
+export type RoulettePhase = 'lobby' | 'spinning' | 'choosing' | 'done';
 
 export interface RouletteGame {
   id: string;
@@ -44,6 +46,8 @@ export interface RouletteGame {
 export const rouletteGames = new Map<string, RouletteGame>();
 
 export const MAX_ROULETTE_PLAYERS = 25;
+/** الحد الأدنى لعدد اللاعبين قبل بدأ اللعبة */
+export const MIN_ROULETTE_PLAYERS = 4;
 const LOBBY_SECONDS = 60;
 const CHOICE_SECONDS = 30;
 
@@ -63,6 +67,7 @@ export function lobbyEmbed(game: RouletteGame, startText = 'تبدأ اللعب�
         'اللعبة تفضل هكذا حتى يتبقى **آخر لاعب** ويكون هو الفائز 👑\n\n' +
         '**القوانين:**\n' +
         '• 60 ثانية للانضمام، وبعدها تبدأ اللعبة تلقائياً\n' +
+        '• الحد الأدنى **٤ لاعبين** للبداية — وصلك لـ 4؟ اضغط **🤖 إضافة بوتات**\n' +
         '• بعد ما العجلة تقف على واحد — عنده **30 ثانية** يختار من يطرده (بزرار الشات)\n' +
         '• لو ما اختارش في الوقت المحدد → هو نفسه يتطرد 💀\n' +
         '• ممنوع الخروج بعد بدء اللعبة — الطرد هو الفاصل الوحيد'
@@ -86,7 +91,12 @@ export function lobbyRow(game: RouletteGame): ActionRowBuilder<ButtonBuilder>[] 
     .setLabel('خروج من اللعبة')
     .setStyle(ButtonStyle.Danger)
     .setEmoji('🚪');
-  return [new ActionRowBuilder<ButtonBuilder>().addComponents(join, leave)];
+  const addBots = new ButtonBuilder()
+    .setCustomId(`roulette:addbots:${game.id}`)
+    .setLabel('🤖 إضافة بوتات')
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji('🤖');
+  return [new ActionRowBuilder<ButtonBuilder>().addComponents(join, leave, addBots)];
 }
 
 // ---------- بدء اللعبة ----------
@@ -106,7 +116,7 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
     return;
   }
 
-  if (game.players.length < 2) {
+  if (game.players.length < MIN_ROULETTE_PLAYERS) {
     game.phase = 'done';
     await disableLobbyMessage(client, game).catch(() => {});
     await channel
@@ -115,7 +125,10 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
           new EmbedBuilder()
             .setColor(COLOR)
             .setTitle('❌ ألغيت لعبة الروليت')
-            .setDescription('لم ينضم لاعبان على الأقل خلال دقيقة — حاول مرة أخرى بمشاركة أكثر.')
+            .setDescription(
+              `لم ينضم ${MIN_ROULETTE_PLAYERS} لاعبين على الأقل خلال دقيقة (المنضم: ${game.players.length}).\n` +
+                'اضغط **🤖 إضافة بوتات** قبل بدء اللعبة لو العدد غير كافٍ، أو حاول مرة أخرى.'
+            )
             .setTimestamp(),
         ],
       })
@@ -273,6 +286,17 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
     });
     game.choiceMessageId = msg.id;
     game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
+
+    // 🤖 لو العجلة وقفت على بوت — يختار فوراً بدل انتظار 30 ثانية
+    const chooser = game.players.find((p) => p.id === chooserId);
+    if (chooser?.isBot) {
+      clearTimeout(game.choiceTimer);
+      const others = game.players.filter((p) => p.id !== chooserId);
+      if (others.length) {
+        const target = others[Math.floor(Math.random() * others.length)];
+        game.choiceTimer = setTimeout(() => void eliminatePlayer(client, game, target.id, 'kick'), 1600);
+      }
+    }
   } catch (err: any) {
     logger.warn(`openKickMenu failed: ${err?.message || err}`);
     cleanup(game);
@@ -426,6 +450,55 @@ function cleanup(game: RouletteGame): void {
 }
 
 // ---------- انضمام/خروج ----------
+
+/**
+ * 🤖 يضيف بوتات السيرفر كمشاركين لتكملة الحد الأدنى 4 لاعبين.
+ * يفعل واحد لكل بوت متاح؛ ويرفض لو العدد مكتمل.
+ */
+export function addBotsToLobby(
+  client: any,
+  gameId: string
+): { ok: boolean; message: string; added: string[] } {
+  const game = rouletteGames.get(gameId);
+  if (!game) return { ok: false, message: 'انتهت اللعبة أو لم تبدأ', added: [] };
+  if (game.phase !== 'lobby') return { ok: false, message: 'بدأت اللعبة بالفعل — ممنوع الإضافة الآن', added: [] };
+
+  const need = Math.max(0, MIN_ROULETTE_PLAYERS - game.players.length);
+  if (need === 0) {
+    return { ok: false, message: `الحد الأدنى مكتمل بالفعل (${game.players.length} لاعبين) — البوتات مش مطلوبة دلوقتي! 🙂`, added: [] };
+  }
+
+  const guild = client?.guilds?.cache?.get(game.guildId);
+  if (!guild) return { ok: false, message: 'تعذّر الوصول إلى كاش أعضاء السيرفر', added: [] };
+
+  const have = new Set(game.players.map((p) => p.id));
+  const omniId = client?.user?.id as string | undefined;
+
+  // كل بوت موجود في الكاش ما عدا اللي في اللعبة + Omni نفسه
+  const available = guild.members.cache
+    .filter((m: any) => m.user?.bot && m.id !== omniId && !have.has(m.id))
+    .map((m: any) => ({ member: m, id: m.id, username: m.user?.username || 'بوت', avatarUrl: m.user?.displayAvatarURL?.({ extension: 'png', size: 64 }) || undefined }));
+
+  if (available.length === 0) {
+    return { ok: false, message: 'مفيش بوتات متاحة للإضافة في السيرفر 🤖❌', added: [] };
+  }
+
+  // خلط عشوائي لتوزيع البوتات
+  for (let i = available.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [available[i], available[j]] = [available[j], available[i]];
+  }
+  const toAdd = available.slice(0, need);
+  for (const b of toAdd) {
+    game.players.push({ id: b.id, username: b.username, avatarUrl: b.avatarUrl, isBot: true });
+  }
+  const names = toAdd.map((b: { id: string; username: string; avatarUrl?: string }) => b.username);
+  return {
+    ok: true,
+    message: `🤖 تمت إضافة ${toAdd.length} بوت للعبة: ${names.join('، ')}`,
+    added: names,
+  };
+}
 
 export function addToRouletteLobby(
   gameId: string,

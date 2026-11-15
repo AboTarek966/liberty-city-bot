@@ -6,13 +6,14 @@
 // حتى يتبقى واحد = الفائز 🎉
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_ROULETTE_PLAYERS = exports.rouletteGames = void 0;
+exports.MIN_ROULETTE_PLAYERS = exports.MAX_ROULETTE_PLAYERS = exports.rouletteGames = void 0;
 exports.lobbyEmbed = lobbyEmbed;
 exports.lobbyRow = lobbyRow;
 exports.startRouletteGame = startRouletteGame;
 exports.runRouletteRound = runRouletteRound;
 exports.resolveKick = resolveKick;
 exports.eliminatePlayer = eliminatePlayer;
+exports.addBotsToLobby = addBotsToLobby;
 exports.addToRouletteLobby = addToRouletteLobby;
 exports.removeFromRouletteLobby = removeFromRouletteLobby;
 const discord_js_1 = require("discord.js");
@@ -21,6 +22,8 @@ const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('Roulette');
 exports.rouletteGames = new Map();
 exports.MAX_ROULETTE_PLAYERS = 25;
+/** الحد الأدنى لعدد اللاعبين قبل بدأ اللعبة */
+exports.MIN_ROULETTE_PLAYERS = 4;
 const LOBBY_SECONDS = 60;
 const CHOICE_SECONDS = 30;
 const COLOR = 0xed4245;
@@ -36,6 +39,7 @@ function lobbyEmbed(game, startText = 'تبدأ اللعبة خلال 60 ثان�
         'اللعبة تفضل هكذا حتى يتبقى **آخر لاعب** ويكون هو الفائز 👑\n\n' +
         '**القوانين:**\n' +
         '• 60 ثانية للانضمام، وبعدها تبدأ اللعبة تلقائياً\n' +
+        '• الحد الأدنى **٤ لاعبين** للبداية — وصلك لـ 4؟ اضغط **🤖 إضافة بوتات**\n' +
         '• بعد ما العجلة تقف على واحد — عنده **30 ثانية** يختار من يطرده (بزرار الشات)\n' +
         '• لو ما اختارش في الوقت المحدد → هو نفسه يتطرد 💀\n' +
         '• ممنوع الخروج بعد بدء اللعبة — الطرد هو الفاصل الوحيد')
@@ -57,7 +61,12 @@ function lobbyRow(game) {
         .setLabel('خروج من اللعبة')
         .setStyle(discord_js_1.ButtonStyle.Danger)
         .setEmoji('🚪');
-    return [new discord_js_1.ActionRowBuilder().addComponents(join, leave)];
+    const addBots = new discord_js_1.ButtonBuilder()
+        .setCustomId(`roulette:addbots:${game.id}`)
+        .setLabel('🤖 إضافة بوتات')
+        .setStyle(discord_js_1.ButtonStyle.Secondary)
+        .setEmoji('🤖');
+    return [new discord_js_1.ActionRowBuilder().addComponents(join, leave, addBots)];
 }
 // ---------- بدء اللعبة ----------
 async function startRouletteGame(client, gameId) {
@@ -73,7 +82,7 @@ async function startRouletteGame(client, gameId) {
         cleanup(game);
         return;
     }
-    if (game.players.length < 2) {
+    if (game.players.length < exports.MIN_ROULETTE_PLAYERS) {
         game.phase = 'done';
         await disableLobbyMessage(client, game).catch(() => { });
         await channel
@@ -82,7 +91,8 @@ async function startRouletteGame(client, gameId) {
                 new discord_js_1.EmbedBuilder()
                     .setColor(COLOR)
                     .setTitle('❌ ألغيت لعبة الروليت')
-                    .setDescription('لم ينضم لاعبان على الأقل خلال دقيقة — حاول مرة أخرى بمشاركة أكثر.')
+                    .setDescription(`لم ينضم ${exports.MIN_ROULETTE_PLAYERS} لاعبين على الأقل خلال دقيقة (المنضم: ${game.players.length}).\n` +
+                    'اضغط **🤖 إضافة بوتات** قبل بدء اللعبة لو العدد غير كافٍ، أو حاول مرة أخرى.')
                     .setTimestamp(),
             ],
         })
@@ -217,6 +227,16 @@ async function openKickMenu(client, gameId, chooserId) {
         });
         game.choiceMessageId = msg.id;
         game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
+        // 🤖 لو العجلة وقفت على بوت — يختار فوراً بدل انتظار 30 ثانية
+        const chooser = game.players.find((p) => p.id === chooserId);
+        if (chooser?.isBot) {
+            clearTimeout(game.choiceTimer);
+            const others = game.players.filter((p) => p.id !== chooserId);
+            if (others.length) {
+                const target = others[Math.floor(Math.random() * others.length)];
+                game.choiceTimer = setTimeout(() => void eliminatePlayer(client, game, target.id, 'kick'), 1600);
+            }
+        }
     }
     catch (err) {
         logger.warn(`openKickMenu failed: ${err?.message || err}`);
@@ -344,6 +364,48 @@ function cleanup(game) {
     exports.rouletteGames.delete(game.id);
 }
 // ---------- انضمام/خروج ----------
+/**
+ * 🤖 يضيف بوتات السيرفر كمشاركين لتكملة الحد الأدنى 4 لاعبين.
+ * يفعل واحد لكل بوت متاح؛ ويرفض لو العدد مكتمل.
+ */
+function addBotsToLobby(client, gameId) {
+    const game = exports.rouletteGames.get(gameId);
+    if (!game)
+        return { ok: false, message: 'انتهت اللعبة أو لم تبدأ', added: [] };
+    if (game.phase !== 'lobby')
+        return { ok: false, message: 'بدأت اللعبة بالفعل — ممنوع الإضافة الآن', added: [] };
+    const need = Math.max(0, exports.MIN_ROULETTE_PLAYERS - game.players.length);
+    if (need === 0) {
+        return { ok: false, message: `الحد الأدنى مكتمل بالفعل (${game.players.length} لاعبين) — البوتات مش مطلوبة دلوقتي! 🙂`, added: [] };
+    }
+    const guild = client?.guilds?.cache?.get(game.guildId);
+    if (!guild)
+        return { ok: false, message: 'تعذّر الوصول إلى كاش أعضاء السيرفر', added: [] };
+    const have = new Set(game.players.map((p) => p.id));
+    const omniId = client?.user?.id;
+    // كل بوت موجود في الكاش ما عدا اللي في اللعبة + Omni نفسه
+    const available = guild.members.cache
+        .filter((m) => m.user?.bot && m.id !== omniId && !have.has(m.id))
+        .map((m) => ({ member: m, id: m.id, username: m.user?.username || 'بوت', avatarUrl: m.user?.displayAvatarURL?.({ extension: 'png', size: 64 }) || undefined }));
+    if (available.length === 0) {
+        return { ok: false, message: 'مفيش بوتات متاحة للإضافة في السيرفر 🤖❌', added: [] };
+    }
+    // خلط عشوائي لتوزيع البوتات
+    for (let i = available.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [available[i], available[j]] = [available[j], available[i]];
+    }
+    const toAdd = available.slice(0, need);
+    for (const b of toAdd) {
+        game.players.push({ id: b.id, username: b.username, avatarUrl: b.avatarUrl, isBot: true });
+    }
+    const names = toAdd.map((b) => b.username);
+    return {
+        ok: true,
+        message: `🤖 تمت إضافة ${toAdd.length} بوت للعبة: ${names.join('، ')}`,
+        added: names,
+    };
+}
 function addToRouletteLobby(gameId, player) {
     const game = exports.rouletteGames.get(gameId);
     if (!game)

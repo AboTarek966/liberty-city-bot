@@ -11,6 +11,7 @@ import {
   lobbyEmbed,
   lobbyRow,
   resolveKick,
+  addBotsToLobby,
 } from '../../utils/rouletteGame';
 import { OmniClient } from '../../OmniClient';
 
@@ -58,6 +59,27 @@ const handler: ButtonHandler = {
         embeds: [lobbyEmbed(game)],
         components: lobbyRow(game),
       });
+      return;
+    }
+
+    // ========== 🤖 إضافة بوتات للعبة ==========
+    if (action === 'addbots') {
+      if (game.phase !== 'lobby') {
+        await interaction.reply({ content: '❌ بدأت اللعبة بالفعل — ممنوع الإضافة الآن.', ephemeral: true });
+        return;
+      }
+      const res = addBotsToLobby(interaction.client as OmniClient, gameId);
+      if (!res.ok) {
+        await interaction.reply({ content: `❌ ${res.message}`, ephemeral: true });
+        return;
+      }
+      // حدّث الرسالة بالبوتات المضافة
+      const row = lobbyRow(game);
+      await interaction.update({
+        embeds: [lobbyEmbed(game)],
+        components: row,
+      });
+      await interaction.followUp({ content: `🤖 ${res.message}`, ephemeral: true });
       return;
     }
 

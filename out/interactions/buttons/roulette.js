@@ -45,6 +45,26 @@ const handler = {
             });
             return;
         }
+        // ========== 🤖 إضافة بوتات للعبة ==========
+        if (action === 'addbots') {
+            if (game.phase !== 'lobby') {
+                await interaction.reply({ content: '❌ بدأت اللعبة بالفعل — ممنوع الإضافة الآن.', ephemeral: true });
+                return;
+            }
+            const res = (0, rouletteGame_1.addBotsToLobby)(interaction.client, gameId);
+            if (!res.ok) {
+                await interaction.reply({ content: `❌ ${res.message}`, ephemeral: true });
+                return;
+            }
+            // حدّث الرسالة بالبوتات المضافة
+            const row = (0, rouletteGame_1.lobbyRow)(game);
+            await interaction.update({
+                embeds: [(0, rouletteGame_1.lobbyEmbed)(game)],
+                components: row,
+            });
+            await interaction.followUp({ content: `🤖 ${res.message}`, ephemeral: true });
+            return;
+        }
         // ========== خروج من اللعبة ==========
         if (action === 'leave') {
             if (game.phase !== 'lobby') {
