@@ -87,7 +87,6 @@ const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('alias')
         .setDescription('إدارة اختصارات الأوامر')
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageGuild)
         .addSubcommand(sub => sub
         .setName('add')
         .setDescription('إضافة اختصار لأمر')
@@ -130,8 +129,20 @@ const command = {
         .addSubcommand(sub => sub.setName('clear').setDescription('🗑️ حذف جميع الاختصارات دفعة واحدة (مع تأكيد)'))
         .addSubcommand(sub => sub.setName('list').setDescription('عرض جميع الاختصارات (مع تنظيف التكرارات)')),
     cooldown: 5,
-    permissions: [discord_js_1.PermissionFlagsBits.ManageGuild],
     async execute(interaction) {
+        // صلاحيات الأمر: مالك السيرفر أو من يملك ManageGuild / Administrator
+        const guild = interaction.guild;
+        const member = interaction.member;
+        const isOwner = !!guild && guild.ownerId === interaction.user.id;
+        const hasManage = member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.ManageGuild) ||
+            member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator);
+        if (!isOwner && !hasManage) {
+            await interaction.reply({
+                content: '⛔ هذا الأمر لمالك السيرفر أو من يملك صلاحية إدارة السيرفر فقط.',
+                ephemeral: true,
+            });
+            return;
+        }
         const client = interaction.client;
         const sub = interaction.options.getSubcommand();
         if (sub === 'add') {

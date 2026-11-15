@@ -109,7 +109,6 @@ const command: Command = {
   data: new SlashCommandBuilder()
     .setName('alias')
     .setDescription('إدارة اختصارات الأوامر')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand(sub =>
       sub
         .setName('add')
@@ -263,9 +262,23 @@ const command: Command = {
     ),
 
   cooldown: 5,
-  permissions: [PermissionFlagsBits.ManageGuild],
 
   async execute(interaction: ChatInputCommandInteraction) {
+    // صلاحيات الأمر: مالك السيرفر أو من يملك ManageGuild / Administrator
+    const guild = interaction.guild;
+    const member = interaction.member as any;
+    const isOwner = !!guild && guild.ownerId === interaction.user.id;
+    const hasManage =
+      member?.permissions?.has?.(PermissionFlagsBits.ManageGuild) ||
+      member?.permissions?.has?.(PermissionFlagsBits.Administrator);
+    if (!isOwner && !hasManage) {
+      await interaction.reply({
+        content: '⛔ هذا الأمر لمالك السيرفر أو من يملك صلاحية إدارة السيرفر فقط.',
+        ephemeral: true,
+      });
+      return;
+    }
+
     const client = interaction.client as OmniClient;
     const sub = interaction.options.getSubcommand();
 
