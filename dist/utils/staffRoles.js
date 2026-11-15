@@ -50,8 +50,16 @@ function orderedCacheEntries(guild) {
 }
 function isAlreadyCorrect(guild) {
     const cached = orderedCacheEntries(guild);
+    const me = guild.members.me;
+    const myHighest = me?.roles?.highest?.position ?? 1;
     if (cached.length !== exports.STAFF_ROLES.length)
         return false;
+    // كل رتب إدارتنا بلاثة أقفال:
+    // 1) أعلى رتبة جديدة (OWNER) لازم تكون تحت رتبة البوت العليا مباشرة (myHighest-1)
+    const owner = guild.roles.cache.find((r) => r.name === exports.STAFF_ROLES[0].name);
+    if (!owner || owner.position !== Math.max(1, myHighest - 1))
+        return false;
+    // 2) بلا تساوٍ ولا عكس ترتيب بالأسفل
     for (let i = 0; i < cached.length - 1; i++) {
         if (cached[i].position <= cached[i + 1].position)
             return false;
