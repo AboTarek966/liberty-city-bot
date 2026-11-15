@@ -7,6 +7,39 @@
 //  3) Anti-Admin  : تنبيه/عقوبة عند منح صلاحية Administrator
 //  4) Auto-Backup : نسخ احتياطي دوري لبنية السيرفر + الاستعادة
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SecurityHandler = void 0;
 exports.computeHierarchy = computeHierarchy;
@@ -3958,11 +3991,27 @@ class SecurityHandler {
             logger.error(`runPeriodicScan error (${guild.name}): ${error.message}`);
         }
     }
+    /** 🎫 جلب معرفات قنوات التذاكر المعروفة (كل الأوضاع بما فيها المغلقة/المحذوفة) —
+     *  تُستبعد من النسخ الاحتياطية ومن الاستعادة حتى لو موجودة في نسخ قديمة. */
+    async ticketChannelIds(guildId) {
+        try {
+            const { Ticket } = await Promise.resolve().then(() => __importStar(require('../models')));
+            const tickets = await Ticket.find({ guildId }).select('channelId').lean();
+            return new Set((tickets || [])
+                .map((t) => String(t?.channelId || ''))
+                .filter((id) => id.length > 0));
+        }
+        catch (error) {
+            logger.warn(`ticketChannelIds(${guildId}) failed: ${error?.message || error}`);
+            return new Set();
+        }
+    }
     // إنشاء نسخة احتياطية (بنية القنوات + الرولات)
     async createBackup(guild) {
         // الأسماء التخريبية لا تُحفظ في النسخة الاحتياطية
+        const ticketIds = await this.ticketChannelIds(guild.id);
         const channels = guild.channels.cache
-            .filter(c => !c.isThread() && !(0, securityNames_1.isMaliciousSecurityName)(c.name))
+            .filter(c => !c.isThread() && !(0, securityNames_1.isMaliciousSecurityName)(c.name) && !ticketIds.has(c.id))
             .map(c => {
             const guildChannel = c; // GuildChannel types
             const base = {
@@ -4138,7 +4187,10 @@ class SecurityHandler {
             }
         }
         // 3) القنوات — الفئات أولاً، ثم الترتيب الدقيق
-        const sortedChannels = [...(data.channels || [])].sort((a, b) => {
+        // 🎫 لا تستعيد قنوات تذاكر (حتى من نسخ قديمة قبل هذا الإصلاح)
+        const ticketIds = await this.ticketChannelIds(guild.id);
+        const backupChannels = (data.channels || []).filter((cd) => !cd?.id || !ticketIds.has(String(cd.id)));
+        const sortedChannels = [...backupChannels].sort((a, b) => {
             const aCat = a.type === discord_js_1.ChannelType.GuildCategory ? 0 : 1;
             const bCat = b.type === discord_js_1.ChannelType.GuildCategory ? 0 : 1;
             if (aCat !== bCat)

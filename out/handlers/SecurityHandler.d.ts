@@ -256,6 +256,9 @@ export declare class SecurityHandler {
     syncRapidGuard(guild: Guild): Promise<void>;
     runRapidGuard(guild: Guild): Promise<void>;
     runPeriodicScan(guild: Guild): Promise<void>;
+    /** 🎫 جلب معرفات قنوات التذاكر المعروفة (كل الأوضاع بما فيها المغلقة/المحذوفة) —
+     *  تُستبعد من النسخ الاحتياطية ومن الاستعادة حتى لو موجودة في نسخ قديمة. */
+    private ticketChannelIds;
     createBackup(guild: Guild): Promise<{
         channels: number;
         roles: number;

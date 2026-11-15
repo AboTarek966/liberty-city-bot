@@ -4576,11 +4576,29 @@ export class SecurityHandler {
     }
   }
 
+  /** 🎫 جلب معرفات قنوات التذاكر المعروفة (كل الأوضاع بما فيها المغلقة/المحذوفة) —
+   *  تُستبعد من النسخ الاحتياطية ومن الاستعادة حتى لو موجودة في نسخ قديمة. */
+  private async ticketChannelIds(guildId: string): Promise<Set<string>> {
+    try {
+      const { Ticket } = await import('../models');
+      const tickets = await Ticket.find({ guildId }).select('channelId').lean();
+      return new Set(
+        (tickets || [])
+          .map((t: any) => String(t?.channelId || ''))
+          .filter((id: string) => id.length > 0)
+      );
+    } catch (error: any) {
+      logger.warn(`ticketChannelIds(${guildId}) failed: ${error?.message || error}`);
+      return new Set();
+    }
+  }
+
   // إنشاء نسخة احتياطية (بنية القنوات + الرولات)
   async createBackup(guild: Guild): Promise<{ channels: number; roles: number; size: number }> {
     // الأسماء التخريبية لا تُحفظ في النسخة الاحتياطية
+    const ticketIds = await this.ticketChannelIds(guild.id);
     const channels = guild.channels.cache
-      .filter(c => !c.isThread() && !isMaliciousSecurityName(c.name))
+      .filter(c => !c.isThread() && !isMaliciousSecurityName(c.name) && !ticketIds.has(c.id))
       .map(c => {
         const guildChannel = c as any; // GuildChannel types
         const base = {
@@ -4775,7 +4793,13 @@ export class SecurityHandler {
     }
 
     // 3) القنوات — الفئات أولاً، ثم الترتيب الدقيق
-    const sortedChannels = [...(data.channels || [])].sort((a: any, b: any) => {
+    // 🎫 لا تستعيد قنوات تذاكر (حتى من نسخ قديمة قبل هذا الإصلاح)
+    const ticketIds = await this.ticketChannelIds(guild.id);
+    const backupChannels = (data.channels || []).filter(
+      (cd: any) => !cd?.id || !ticketIds.has(String(cd.id))
+    );
+
+    const sortedChannels = [...backupChannels].sort((a: any, b: any) => {
       const aCat = a.type === ChannelType.GuildCategory ? 0 : 1;
       const bCat = b.type === ChannelType.GuildCategory ? 0 : 1;
       if (aCat !== bCat) return aCat - bCat;
