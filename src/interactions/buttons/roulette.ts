@@ -111,7 +111,7 @@ const handler: ButtonHandler = {
         return;
       }
       if (game.phase !== 'choosing') {
-        await interaction.reply({ content: '❌ مش وقت الاختيار دلوقتي.', ephemeral: true });
+        await interaction.reply({ content: '❌ ليس وقت الاختيار الآن.', ephemeral: true });
         return;
       }
       // فقط اللي اختارته العجلة يقدر يضغط

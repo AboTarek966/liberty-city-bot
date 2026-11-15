@@ -63,14 +63,14 @@ export function lobbyEmbed(game: RouletteGame, startText = 'تبدأ اللعب�
     .setColor(COLOR)
     .setTitle('🔫 لعبة الروليت')
     .setDescription(
-      'العجلة بتلف كل جولة — واللي تقف عليه لازم **يطرد لاعباً من اللعبة**.\n' +
-        'اللعبة تفضل هكذا حتى يتبقى **آخر لاعب** ويكون هو الفائز 👑\n\n' +
+      'تدور العجلة كل جولة — ومن تتوقف عليه يجب أن **يطرد لاعباً من اللعبة**.\n' +
+        'وتتكرر الجولات حتى يتبقى **آخر لاعب** وهو الفائز 👑\n\n' +
         '**القوانين:**\n' +
         '• 60 ثانية للانضمام، وبعدها تبدأ اللعبة تلقائياً\n' +
-        '• الحد الأدنى **٤ لاعبين** للبداية — وصلك لـ 4؟ اضغط **🤖 إضافة بوتات** وتختار العدد\n' +
-        '• بعد ما العجلة تقف على واحد — عنده **30 ثانية** يختار من يطرده (بزرار الشات)\n' +
-        '• لو ما اختارش في الوقت المحدد → هو نفسه يتطرد 💀\n' +
-        '• ممنوع الخروج بعد بدء اللعبة — الطرد هو الفاصل الوحيد'
+        '• الحد الأدنى **٤ لاعبين** للبدء — إن لم تكتمل العدد؟ اضغط **🤖 إضافة بوتات** واختر العدد\n' +
+        '• بعد أن تتوقف العجلة على أحد اللاعبين — يمتلك **30 ثانية** ليختار من يطرده\n' +
+        '• إن لم يختر خلال الوقت المحدد → هو نفسه يُطرد 💀\n' +
+        '• يُمنع الخروج بعد بدء اللعبة — الطرد هو الفاصل الوحيد'
     )
     .addFields({
       name: `👥 المشاركون (${game.players.length}/${MAX_ROULETTE_PLAYERS})`,
@@ -269,18 +269,18 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
       .setTitle('🎯 وقعت على...')
       .setDescription(
         `**<@${chooserId}>** — العجلة اختارتك! 💫\n` +
-          `اضغط زرار أي لاعب من الباقين لطرده من اللعبة.\n` +
-          `⏳ عندك **30 ثانية** — لو ما اخترتش، هتطرَد أنت!`
+          `اضغط زر أي لاعب من الباقين لطرده من اللعبة.\n` +
+          `⏳ لديك **30 ثانية** — إن لم تختر، فأنت المطرود!`
       )
       .addFields({
         name: `👥 المتبقون (${game.players.length})`,
         value: game.players.map((p, i) => `\`${i + 1}.\` <@${p.id}>`).join('\n').slice(0, 1024),
       })
-      .setFooter({ text: '30 ثانية فقط — من يختار بسرعة ما ينخدعش' })
+      .setFooter({ text: '30 ثانية فقط — من يختار بسرعة ينجو' })
       .setTimestamp();
 
     const msg = await channel.send({
-      content: `🎮 <@${chooserId}> — دورك يا بطل!`,
+      content: `🎮 <@${chooserId}> — حان دورك!`,
       embeds: [embed],
       components: kickButtonRows(game, chooserId),
     });
@@ -314,7 +314,7 @@ export async function resolveKick(
   game: RouletteGame,
   targetId: string
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (game.phase !== 'choosing') return { ok: false, reason: 'مش وقت الاختيار دلوقتي' };
+  if (game.phase !== 'choosing') return { ok: false, reason: 'ليس وقت الاختيار الآن' };
   const target = game.players.find((p) => p.id === targetId);
   if (!target) return { ok: false, reason: 'اللاعب ده مابقاش في اللعبة' };
   await eliminatePlayer(client, game, targetId, 'kick');
@@ -361,7 +361,7 @@ export async function eliminatePlayer(
   const targetMention = `<@${targetId}>`;
   const reasonText =
     reason === 'timeout'
-      ? 'ما اختارش أحد خلال 30 ثانية 💀'
+      ? 'لم يختر أحداً خلال 30 ثانية 💀'
       : `${chooserMention} اختاره للطرد 🔫`;
 
   // DM للمطرود
@@ -388,7 +388,7 @@ export async function eliminatePlayer(
           .setColor(COLOR)
           .setTitle('💀 طرد!')
           .setDescription(
-            `${targetMention} اتطرد من اللعبة! ${reasonText}\n👥 المتبقون الآن: **${remaining}**`
+            `${targetMention} تم طرده من اللعبة! ${reasonText}\n👥 المتبقون الآن: **${remaining}**`
           )
           .setTimestamp(),
       ],
