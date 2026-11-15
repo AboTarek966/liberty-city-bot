@@ -15,7 +15,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { renderWheelOfFortuneGif, fetchAvatarBuffer, WheelSegmentInput } from './wheelOfFortune';
-import { createLogger } from './helpers';
+import { createLogger, sleep } from './helpers';
 
 const logger = createLogger('Roulette');
 
@@ -50,6 +50,8 @@ export const MAX_ROULETTE_PLAYERS = 25;
 export const MIN_ROULETTE_PLAYERS = 4;
 const LOBBY_SECONDS = 60;
 const CHOICE_SECONDS = 30;
+/** فاصل ٥ ثوانٍ بين كل حدث ورسالة في اللعبة — أفضل للتسلسل الطبيعي */
+export const ROULETTE_DELAY_MS = 5000;
 
 const COLOR = 0xed4245;
 
@@ -148,6 +150,23 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
     )
   );
 
+  // أعلن انطلاق اللعبة، ثم انتظر 5 ثوانٍ قبل أول دورة
+  if (channel.isTextBased()) {
+    await channel
+      .send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle('🎮 انطلقت اللعبة!')
+            .setDescription(`⚔️ اللاعبون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+            .setFooter({ text: 'استعدّوا — العجلة تدور الآن' })
+            .setTimestamp(),
+        ],
+      })
+      .catch(() => {});
+  }
+  await sleep(ROULETTE_DELAY_MS);
+
   await runRouletteRound(client, game);
 }
 
@@ -216,10 +235,10 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     await channel.send({ embeds: [spinEmbed] }).catch(() => {});
   }
 
-  // بعد اللف (لحد ما تقف العجلة) — نوقف على اللي اختارته
+  // بعد اللف (لحد ما تقف العجلة) — انتظر ٥ ثوانٍ ثم نوقف على اللي اختارته
   setTimeout(
     () => void openKickMenu(client, game.id, chosen.id),
-    gif ? 2800 : 1600
+    ROULETTE_DELAY_MS
   );
 }
 
@@ -287,14 +306,14 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
     game.choiceMessageId = msg.id;
     game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
 
-    // 🤖 لو العجلة وقفت على بوت — يختار فوراً بدل انتظار 30 ثانية
+    // 🤖 لو العجلة وقفت على بوت — يختار فوراً بعد ٥ ثوانٍ
     const chooser = game.players.find((p) => p.id === chooserId);
     if (chooser?.isBot) {
       clearTimeout(game.choiceTimer);
       const others = game.players.filter((p) => p.id !== chooserId);
       if (others.length) {
         const target = others[Math.floor(Math.random() * others.length)];
-        game.choiceTimer = setTimeout(() => void eliminatePlayer(client, game, target.id, 'kick'), 1600);
+        game.choiceTimer = setTimeout(() => void eliminatePlayer(client, game, target.id, 'kick'), ROULETTE_DELAY_MS);
       }
     }
   } catch (err: any) {
@@ -357,6 +376,9 @@ export async function eliminatePlayer(
     }
   }
 
+  // انتظر خمس ثوانٍ قبل إعلان الطرد (يعطي شعوراً درامياً بالتسلسل)
+  await sleep(ROULETTE_DELAY_MS);
+
   const chooserMention = game.chooserId ? `<@${game.chooserId}>` : 'العجلة';
   const targetMention = `<@${targetId}>`;
   const reasonText =
@@ -396,9 +418,13 @@ export async function eliminatePlayer(
     .catch(() => {});
 
   if (remaining <= 1) {
+    await sleep(ROULETTE_DELAY_MS);
     await endRouletteGame(client, game);
     return;
   }
+
+  // انتظر ٥ ثوانٍ أخرى قبل استئناف الجولة التالية — تسلسل طبيعي
+  await sleep(ROULETTE_DELAY_MS);
 
   game.phase = 'spinning';
   game.chooserId = undefined;
@@ -420,6 +446,9 @@ async function endRouletteGame(client: OmniClient, game: RouletteGame): Promise<
     cleanup(game);
     return;
   }
+
+  // انتظر خمس ثوانٍ قبل الإعلان عن البطل
+  await sleep(ROULETTE_DELAY_MS);
 
   try {
     await channel.send({
@@ -447,6 +476,40 @@ function cleanup(game: RouletteGame): void {
   game.choiceTimer = undefined;
   game.startTimer = undefined;
   rouletteGames.delete(game.id);
+}
+
+/** ⏹️ يقطع اللعبة الحالية فوراً — يعلن عن نهاية اللعب ويحذف كل حالتها */
+export async function cleanupStoppedGame(client: OmniClient, game: RouletteGame): Promise<void> {
+  clearTimeout(game.choiceTimer);
+  clearTimeout(game.startTimer);
+  clearTimeout(game.choiceTimer);
+  game.phase = 'done';
+
+  const guild = client.guilds.cache.get(game.guildId);
+  const channel: any = guild?.channels.cache.get(game.channelId);
+  const winner = game.players[0];
+
+  try {
+    if (channel?.isTextBased?.()) {
+      await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle('🛑 تم إيقاف اللعبة')
+            .setDescription(
+              `اللعبة أُوقفت بواسطة مدير السيرفر.\n` +
+                (winner
+                  ? `كان متبقياً: <@${winner.id}> (${winner.username}) — اللعبة لا تُكمل بهذا الأمر.`
+                  : 'لم يُحدد فائز.')
+            )
+            .setTimestamp(),
+        ],
+      });
+    }
+  } catch {
+    /* تجاهل */
+  }
+  cleanup(game);
 }
 
 // ---------- انضمام/خروج ----------

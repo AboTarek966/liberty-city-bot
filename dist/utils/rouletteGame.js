@@ -6,13 +6,14 @@
 // حتى يتبقى واحد = الفائز 🎉
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MIN_ROULETTE_PLAYERS = exports.MAX_ROULETTE_PLAYERS = exports.rouletteGames = void 0;
+exports.ROULETTE_DELAY_MS = exports.MIN_ROULETTE_PLAYERS = exports.MAX_ROULETTE_PLAYERS = exports.rouletteGames = void 0;
 exports.lobbyEmbed = lobbyEmbed;
 exports.lobbyRow = lobbyRow;
 exports.startRouletteGame = startRouletteGame;
 exports.runRouletteRound = runRouletteRound;
 exports.resolveKick = resolveKick;
 exports.eliminatePlayer = eliminatePlayer;
+exports.cleanupStoppedGame = cleanupStoppedGame;
 exports.inventPlayersForGame = inventPlayersForGame;
 exports.addToRouletteLobby = addToRouletteLobby;
 exports.removeFromRouletteLobby = removeFromRouletteLobby;
@@ -26,6 +27,8 @@ exports.MAX_ROULETTE_PLAYERS = 25;
 exports.MIN_ROULETTE_PLAYERS = 4;
 const LOBBY_SECONDS = 60;
 const CHOICE_SECONDS = 30;
+/** فاصل ٥ ثوانٍ بين كل حدث ورسالة في اللعبة — أفضل للتسلسل الطبيعي */
+exports.ROULETTE_DELAY_MS = 5000;
 const COLOR = 0xed4245;
 // ---------- واجهة اللوبي ----------
 function lobbyEmbed(game, startText = 'تبدأ اللعبة خلال 60 ثانية') {
@@ -105,6 +108,22 @@ async function startRouletteGame(client, gameId) {
     await disableLobbyMessage(client, game).catch(() => { });
     // جيب الآفاتارات مرة واحدة للعبة كلها (بتُعاد استخدامها في كل عجلة)
     game.avatarBuffers = await Promise.all(game.players.map((p) => p.avatarUrl ? (0, wheelOfFortune_1.fetchAvatarBuffer)(p.avatarUrl).catch(() => null) : Promise.resolve(null)));
+    // أعلن انطلاق اللعبة، ثم انتظر 5 ثوانٍ قبل أول دورة
+    if (channel.isTextBased()) {
+        await channel
+            .send({
+            embeds: [
+                new discord_js_1.EmbedBuilder()
+                    .setColor(COLOR)
+                    .setTitle('🎮 انطلقت اللعبة!')
+                    .setDescription(`⚔️ اللاعبون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+                    .setFooter({ text: 'استعدّوا — العجلة تدور الآن' })
+                    .setTimestamp(),
+            ],
+        })
+            .catch(() => { });
+    }
+    await (0, helpers_1.sleep)(exports.ROULETTE_DELAY_MS);
     await runRouletteRound(client, game);
 }
 async function disableLobbyMessage(client, game) {
@@ -170,8 +189,8 @@ async function runRouletteRound(client, game) {
     else {
         await channel.send({ embeds: [spinEmbed] }).catch(() => { });
     }
-    // بعد اللف (لحد ما تقف العجلة) — نوقف على اللي اختارته
-    setTimeout(() => void openKickMenu(client, game.id, chosen.id), gif ? 2800 : 1600);
+    // بعد اللف (لحد ما تقف العجلة) — انتظر ٥ ثوانٍ ثم نوقف على اللي اختارته
+    setTimeout(() => void openKickMenu(client, game.id, chosen.id), exports.ROULETTE_DELAY_MS);
 }
 // ---------- اختيار الطرد ----------
 function kickButtonRows(game, chooserId) {
@@ -227,14 +246,14 @@ async function openKickMenu(client, gameId, chooserId) {
         });
         game.choiceMessageId = msg.id;
         game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
-        // 🤖 لو العجلة وقفت على بوت — يختار فوراً بدل انتظار 30 ثانية
+        // 🤖 لو العجلة وقفت على بوت — يختار فوراً بعد ٥ ثوانٍ
         const chooser = game.players.find((p) => p.id === chooserId);
         if (chooser?.isBot) {
             clearTimeout(game.choiceTimer);
             const others = game.players.filter((p) => p.id !== chooserId);
             if (others.length) {
                 const target = others[Math.floor(Math.random() * others.length)];
-                game.choiceTimer = setTimeout(() => void eliminatePlayer(client, game, target.id, 'kick'), 1600);
+                game.choiceTimer = setTimeout(() => void eliminatePlayer(client, game, target.id, 'kick'), exports.ROULETTE_DELAY_MS);
             }
         }
     }
@@ -287,6 +306,8 @@ async function eliminatePlayer(client, game, targetId, reason) {
             /* تجاهل */
         }
     }
+    // انتظر خمس ثوانٍ قبل إعلان الطرد (يعطي شعوراً درامياً بالتسلسل)
+    await (0, helpers_1.sleep)(exports.ROULETTE_DELAY_MS);
     const chooserMention = game.chooserId ? `<@${game.chooserId}>` : 'العجلة';
     const targetMention = `<@${targetId}>`;
     const reasonText = reason === 'timeout'
@@ -318,9 +339,12 @@ async function eliminatePlayer(client, game, targetId, reason) {
     })
         .catch(() => { });
     if (remaining <= 1) {
+        await (0, helpers_1.sleep)(exports.ROULETTE_DELAY_MS);
         await endRouletteGame(client, game);
         return;
     }
+    // انتظر ٥ ثوانٍ أخرى قبل استئناف الجولة التالية — تسلسل طبيعي
+    await (0, helpers_1.sleep)(exports.ROULETTE_DELAY_MS);
     game.phase = 'spinning';
     game.chooserId = undefined;
     game.choiceMessageId = undefined;
@@ -338,6 +362,8 @@ async function endRouletteGame(client, game) {
         cleanup(game);
         return;
     }
+    // انتظر خمس ثوانٍ قبل الإعلان عن البطل
+    await (0, helpers_1.sleep)(exports.ROULETTE_DELAY_MS);
     try {
         await channel.send({
             embeds: [
@@ -362,6 +388,36 @@ function cleanup(game) {
     game.choiceTimer = undefined;
     game.startTimer = undefined;
     exports.rouletteGames.delete(game.id);
+}
+/** ⏹️ يقطع اللعبة الحالية فوراً — يعلن عن نهاية اللعب ويحذف كل حالتها */
+async function cleanupStoppedGame(client, game) {
+    clearTimeout(game.choiceTimer);
+    clearTimeout(game.startTimer);
+    clearTimeout(game.choiceTimer);
+    game.phase = 'done';
+    const guild = client.guilds.cache.get(game.guildId);
+    const channel = guild?.channels.cache.get(game.channelId);
+    const winner = game.players[0];
+    try {
+        if (channel?.isTextBased?.()) {
+            await channel.send({
+                embeds: [
+                    new discord_js_1.EmbedBuilder()
+                        .setColor(COLOR)
+                        .setTitle('🛑 تم إيقاف اللعبة')
+                        .setDescription(`اللعبة أُوقفت بواسطة مدير السيرفر.\n` +
+                        (winner
+                            ? `كان متبقياً: <@${winner.id}> (${winner.username}) — اللعبة لا تُكمل بهذا الأمر.`
+                            : 'لم يُحدد فائز.'))
+                        .setTimestamp(),
+                ],
+            });
+        }
+    }
+    catch {
+        /* تجاهل */
+    }
+    cleanup(game);
 }
 // ---------- انضمام/خروج ----------
 // ---------- 🎭 أسماء وهمية يخترعها البوت ----------

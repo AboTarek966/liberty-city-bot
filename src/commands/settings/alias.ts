@@ -177,6 +177,7 @@ const command: Command = {
               { name: '🔼 أعلى/أقل', value: 'highlow' },
               { name: '🏁 سباق', value: 'race' },
               { name: '🎯 روليت', value: 'roulette' },
+              { name: '🛑 إيقاف الروليت', value: 'roulette_stop' },
               { name: '✂️ RPS', value: 'rps' },
               { name: '💪 قوة', value: 'power' },
               { name: '🧩 لغز', value: 'riddle' },
