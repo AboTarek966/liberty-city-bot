@@ -45,6 +45,7 @@ const threatScore_1 = require("../utils/threatScore");
 const raidScoring_1 = require("../utils/raidScoring");
 const securityAlerts_1 = require("../utils/securityAlerts");
 const helpers_2 = require("../utils/helpers");
+const badWords_1 = require("../utils/badWords");
 const logger = (0, helpers_1.createLogger)('ProtectionHandler');
 // --------------------------------------------
 // Protection Handler Class
@@ -358,8 +359,8 @@ class ProtectionHandler {
         if (automod.ignoredRoles?.some((roleId) => message.member?.roles.cache.has(roleId))) {
             return null;
         }
-        const content = message.content.toLowerCase();
-        const foundWord = automod.badWords.find((word) => content.includes(word.toLowerCase()));
+        // مطابقة على مستوى الكلمة — يفرق بين "تكسر بخاطري" (لا تطابق) و"كس" (تطابق)
+        const foundWord = (0, badWords_1.findBadWord)(message.content || '', automod.badWords || []);
         if (!foundWord)
             return null;
         return {

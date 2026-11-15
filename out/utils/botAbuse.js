@@ -10,6 +10,7 @@ const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const BotAbuseStrike_1 = require("../models/BotAbuseStrike");
 const helpers_1 = require("./helpers");
+const badWords_1 = require("./badWords");
 const securityAlerts_1 = require("./securityAlerts");
 const logger = (0, helpers_1.createLogger)('AntiBotAbuse');
 // 🧠 قائمة أساسية للإساءة (عربية + إنجليزية) — تستهدف البوت حصراً
@@ -52,19 +53,10 @@ function targetsBot(message, client) {
 }
 /** مقارنة على مستوى الكلمة — تتجنّب مطابقة "نصب" داخل "نصبر" أو "bot" داخل "both" */
 function hasAbuse(text, guildBadWords) {
-    const t = normalize(text);
-    const tokens = t.split(' ').filter(Boolean);
     const all = Array.isArray(guildBadWords) && guildBadWords.length
-        ? INSULT_WORDS.concat(guildBadWords.map((w) => normalize(w)))
+        ? INSULT_WORDS.concat(guildBadWords)
         : INSULT_WORDS;
-    return all.some((w) => {
-        if (w.includes(' '))
-            return t.includes(w);
-        if (/^[a-z ]+$/i.test(w)) {
-            return tokens.some((tok) => tok === w || tok === `${w}s`);
-        }
-        return tokens.some((tok) => tok === w || tok === `ال${w}` || tok === `${w}ة`);
-    });
+    return (0, badWords_1.findBadWord)(text, all) !== null;
 }
 /**
  * يعالج الإساءة المستهدفة للبوت.

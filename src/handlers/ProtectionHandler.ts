@@ -27,6 +27,7 @@ import {
   countEmojis,
   isZalgo,
 } from '../utils/helpers';
+import { findBadWord } from '../utils/badWords';
 
 const logger = createLogger('ProtectionHandler');
 
@@ -408,11 +409,8 @@ export class ProtectionHandler {
       return null;
     }
 
-    const content = message.content.toLowerCase();
-    
-    const foundWord = automod.badWords.find((word: string) => 
-      content.includes(word.toLowerCase())
-    );
+    // مطابقة على مستوى الكلمة — يفرق بين "تكسر بخاطري" (لا تطابق) و"كس" (تطابق)
+    const foundWord = findBadWord(message.content || '', automod.badWords || []);
 
     if (!foundWord) return null;
 

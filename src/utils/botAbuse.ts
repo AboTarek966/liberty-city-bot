@@ -8,6 +8,7 @@ import { Message, PermissionFlagsBits, EmbedBuilder, TextChannel } from 'discord
 import { getGuildSettings } from '../models';
 import { BotAbuseStrike } from '../models/BotAbuseStrike';
 import { createLogger } from './helpers';
+import { findBadWord } from './badWords';
 import { OmniClient } from '../OmniClient';
 import { securityAlertsSilent } from './securityAlerts';
 
@@ -53,18 +54,10 @@ function targetsBot(message: Message, client: OmniClient): boolean {
 
 /** مقارنة على مستوى الكلمة — تتجنّب مطابقة "نصب" داخل "نصبر" أو "bot" داخل "both" */
 function hasAbuse(text: string, guildBadWords?: string[]): boolean {
-  const t = normalize(text);
-  const tokens = t.split(' ').filter(Boolean);
   const all = Array.isArray(guildBadWords) && guildBadWords.length
-    ? INSULT_WORDS.concat(guildBadWords.map((w) => normalize(w)))
+    ? INSULT_WORDS.concat(guildBadWords)
     : INSULT_WORDS;
-  return all.some((w) => {
-    if (w.includes(' ')) return t.includes(w);
-    if (/^[a-z ]+$/i.test(w)) {
-      return tokens.some((tok) => tok === w || tok === `${w}s`);
-    }
-    return tokens.some((tok) => tok === w || tok === `ال${w}` || tok === `${w}ة`);
-  });
+  return findBadWord(text, all) !== null;
 }
 
 /**
