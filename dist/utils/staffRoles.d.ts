@@ -135,7 +135,7 @@ export declare const STAFF_ROLES: readonly [{
     readonly tier: "separator";
 }];
 export interface StaffRolesResult {
-    /** true = كل الرتب موجودة بالفعل → لم يُغيّر شيء */
+    /** true = الرتب الـ18 موجودة والترتيب صحيح بالفعل */
     skipped: boolean;
     created: string[];
     reused: string[];

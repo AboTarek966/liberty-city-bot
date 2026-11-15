@@ -1,9 +1,9 @@
 // ============================================
 // Omni Bot - 👑 رتب الإدارة (Shared) — تُستخدم من /createstaffroles ومرة واحدة عند الإقلاع
-// آمنة للتكرار: لو الرتب كلها موجودة → تُخطى بدون أي تعديل
+// آمنة للتكرار: يتحقق من الترتيب المطلوب، وإن لم يكن → يعيد ترتيبه من الأعلى للنزول
 // ============================================
 
-import { Guild, PermissionFlagsBits, RoleCreateOptions } from 'discord.js';
+import { Guild, PermissionFlagsBits, RoleCreateOptions, SetRolePositionOptions } from 'discord.js';
 import { createLogger } from './helpers';
 
 const logger = createLogger('StaffRoles');
@@ -58,7 +58,7 @@ export const STAFF_ROLES = [
 ] as const;
 
 export interface StaffRolesResult {
-  /** true = كل الرتب موجودة بالفعل → لم يُغيّر شيء */
+  /** true = الرتب الـ18 موجودة والترتيب صحيح بالفعل */
   skipped: boolean;
   created: string[];
   reused: string[];
@@ -68,32 +68,38 @@ export interface StaffRolesResult {
   finalOrder: Array<{ position: number; roleId: string; name: string }>;
 }
 
+function orderedCacheEntries(guild: Guild) {
+  return STAFF_ROLES.map((def) => guild.roles.cache.find((r) => r.name === def.name)).filter(Boolean) as any[];
+}
+
+function isAlreadyCorrect(guild: Guild): boolean {
+  const cached = orderedCacheEntries(guild);
+  if (cached.length !== STAFF_ROLES.length) return false;
+  for (let i = 0; i < cached.length - 1; i++) {
+    if ((cached[i] as any).position <= (cached[i + 1] as any).position) return false;
+  }
+  return true;
+}
+
 export async function ensureStaffRoles(guild: Guild): Promise<StaffRolesResult> {
   const me = guild.members.me;
   const myHighest = me?.roles?.highest?.position ?? 1;
   const botHighestName = me?.roles?.highest?.name ?? '—';
 
-  // 🧊 لو كل الرتب موجودة → لا شيء نغيّره (الإقلاع لا يكرر النمودج)
-  const allExist = STAFF_ROLES.every((def) => guild.roles.cache.some((r) => r.name === def.name));
-  if (allExist) {
-    // الترتيب الحقيقي من بوت ديسكورد — مش حساب وهم
-    const finalOrder = STAFF_ROLES
-      .map((def) => guild.roles.cache.find((r) => r.name === def.name))
-      .filter((r): r is NonNullable<typeof r> => Boolean(r))
-      .sort((a, b) => (b.position || 0) - (a.position || 0))
-      .map((r) => ({ position: r.position, roleId: r.id, name: r.name }));
+  // 🧊 كل الرتب موجودة والترتيب صح → لا تتغير ولا تنسخة في الإقلاع
+  if (isAlreadyCorrect(guild)) {
+    const finalOrder = orderedCacheEntries(guild)
+      .sort((a: any, b: any) => b.position - a.position)
+      .map((r: any) => ({ position: r.position, roleId: r.id, name: r.name }));
     return { skipped: true, created: [], reused: [], failed: [], botHighestName, botHighestPosition: myHighest, finalOrder };
   }
 
   const created: string[] = [];
-  const reused: string[] = [];
   const failed: string[] = [];
-  const basePos = Math.max(myHighest - 1, 1);
-  let cursor = basePos;
-  const withPositions: Array<{ id: string; position: number; name: string }> = [];
+  const reused: string[] = [];
 
+  // 1) تأكد من إنشاء كل رتبة غير موجودة + لونها/صلاحياتها محدثة
   for (const def of STAFF_ROLES) {
-    const position = cursor--;
     let role = guild.roles.cache.find((r) => r.name === def.name);
     try {
       if (role) {
@@ -117,23 +123,40 @@ export async function ensureStaffRoles(guild: Guild): Promise<StaffRolesResult> 
         role = await guild.roles.create(options);
         created.push(def.name);
       }
-      withPositions.push({ id: role.id, position, name: def.name });
     } catch (error: any) {
       failed.push(`${def.name} — ${error?.message || 'خطأ غير معروف'}`);
       logger.warn(`ensureStaffRoles failed "${def.name}": ${error?.message}`);
     }
   }
 
+  // 2) أعد التوزيع من الأعلى للأسفل بمواضع مثبتة
   try {
-    await guild.roles.setPositions(withPositions.map(({ id, position }) => ({ role: id, position })));
+    const cached = orderedCacheEntries(guild);
+    const topPosition = Math.max(1, myHighest - 1);
+    let pos = topPosition;
+    const orderedForPlacement = STAFF_ROLES.map((def) => guild.roles.cache.find((r) => r.name === def.name)).filter(Boolean) as any[];
+    for (const role of orderedForPlacement) {
+      const targetPos = pos--;
+      if (role.position !== targetPos) {
+        try {
+          await role.setPosition(targetPos, { reason: 'Omni — استعادة رتب الإدارة (إعادة الترتيب)' } as SetRolePositionOptions);
+        } catch (error: any) {
+          failed.push(`${role.name} — تثبيت موقع ${targetPos}: ${error?.message || 'خطأ'}`);
+          logger.warn(`setPosition "${role.name}" -> ${targetPos}: ${error?.message}`);
+        }
+      }
+    }
+    // تحديث الكاش للترتيب النهائي
+    await guild.roles.fetch().catch(() => null);
+    logger.info('🔧 رتب الإدارة: الترتيب أُصلح من الأعلى للأسفل');
   } catch (error: any) {
-    failed.push(`تثبيت المواقع: ${error?.message || 'خطأ'}`);
-    logger.warn(`setPositions failed: ${error?.message}`);
+    failed.push(`إعادة الترتيب: ${error?.message || 'خطأ'}`);
+    logger.warn(`reposition failed: ${error?.message}`);
   }
 
-  const finalOrder = withPositions
-    .sort((a, b) => b.position - a.position)
-    .map(({ position, id, name }) => ({ position, roleId: id, name }));
+  const finalOrder = orderedCacheEntries(guild)
+    .sort((a: any, b: any) => b.position - a.position)
+    .map((r: any) => ({ position: r.position, roleId: r.id, name: r.name }));
 
   return { skipped: false, created, reused, failed, botHighestName, botHighestPosition: myHighest, finalOrder };
 }
