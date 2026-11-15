@@ -15,7 +15,7 @@ import { Colors } from '../../utils/embeds';
 
 export const GAMES_LIST = [
   // ⚔️ تحدي مباشر
-  { value: 'roulette', label: '🔫 روليت', usage: '/roulette — روليت جماعية: زر دخول + زر خروج؛ تحتاج 4 لاعبين للبداية، يمكنك إضافة بوتات للسيرفر كلعبة' },
+  { value: 'roulette', label: '🔫 روليت', usage: '/roulette — روليت جماعية: زر دخول + زر خروج؛ تحتاج 4 لاعبين للبداية، يمكنك إضافة لاعبين وهميين بأسماء يخترعها البوت' },
   { value: 'duel', label: '⚔️ مبارزة', usage: '/duel @user — معركة جولة بجولة مع شريط صحة' },
   { value: 'tug', label: '🧱 سحب الحبل', usage: '/tug @user ... — فريقان يسحبان الحبل حتى خط النهاية' },
   { value: 'dragon', label: '🐉 معركة التنين', usage: '/dragon — اهزم التنين وانقذ القرية' },

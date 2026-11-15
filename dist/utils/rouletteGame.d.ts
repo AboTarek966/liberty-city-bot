@@ -34,15 +34,8 @@ export declare function resolveKick(client: OmniClient, game: RouletteGame, targ
     reason?: string;
 }>;
 export declare function eliminatePlayer(client: OmniClient, game: RouletteGame, targetId: string, reason: 'kick' | 'timeout'): Promise<void>;
-/**
- * 🤖 يضيف بوتات السيرفر كمشاركين لتكملة الحد الأدنى 4 لاعبين.
- * يفعل واحد لكل بوت متاح؛ ويرفض لو العدد مكتمل.
- */
-export declare function addBotsToLobby(client: any, gameId: string): {
-    ok: boolean;
-    message: string;
-    added: string[];
-};
+/** 🎲 يخترع العدد المطلوب من اللاعبين الوهميين — اسم من بيت البوت + أفتار من dicebear */
+export declare function inventPlayersForGame(count: number, existing: RoulettePlayer[]): RoulettePlayer[];
 export declare function addToRouletteLobby(gameId: string, player: RoulettePlayer): {
     ok: boolean;
     reason?: string;

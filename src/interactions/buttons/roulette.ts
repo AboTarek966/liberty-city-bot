@@ -2,7 +2,7 @@
 // Omni Bot - 🔫 أزرار لعبة الروليت (اللوبي + اختيار الطرد)
 // ============================================
 
-import { ButtonInteraction } from 'discord.js';
+import { ButtonInteraction, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import {
   rouletteGames,
@@ -11,7 +11,6 @@ import {
   lobbyEmbed,
   lobbyRow,
   resolveKick,
-  addBotsToLobby,
 } from '../../utils/rouletteGame';
 import { OmniClient } from '../../OmniClient';
 
@@ -62,24 +61,27 @@ const handler: ButtonHandler = {
       return;
     }
 
-    // ========== 🤖 إضافة بوتات للعبة ==========
+    // ========== 🤖 إضافة بوتات — اختر العدد من قائمة منبثقة ==========
     if (action === 'addbots') {
       if (game.phase !== 'lobby') {
         await interaction.reply({ content: '❌ بدأت اللعبة بالفعل — ممنوع الإضافة الآن.', ephemeral: true });
         return;
       }
-      const res = addBotsToLobby(interaction.client as OmniClient, gameId);
-      if (!res.ok) {
-        await interaction.reply({ content: `❌ ${res.message}`, ephemeral: true });
-        return;
-      }
-      // حدّث الرسالة بالبوتات المضافة
-      const row = lobbyRow(game);
-      await interaction.update({
-        embeds: [lobbyEmbed(game)],
-        components: row,
+      const options = [
+        ...Array.from({ length: 8 }, (_, i) => ({ label: `${i + 1} بوت`, value: String(i + 1), emoji: '🤖' })),
+        { label: '10 بوتات', value: '10', emoji: '👾' },
+        { label: '25 — كل البوتات', value: '25', emoji: '🎉' },
+      ];
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(`roulette_bot_count:${gameId}`)
+        .setPlaceholder('كم بوت تحب أضيف؟')
+        .addOptions(options);
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+      await interaction.reply({
+        content: '🤖 **اختر عدد البوتات اللي تحب تضيفها للعبة:**',
+        components: [row],
+        ephemeral: true,
       });
-      await interaction.followUp({ content: `🤖 ${res.message}`, ephemeral: true });
       return;
     }
 

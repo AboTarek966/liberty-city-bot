@@ -67,7 +67,7 @@ export function lobbyEmbed(game: RouletteGame, startText = 'تبدأ اللعب�
         'اللعبة تفضل هكذا حتى يتبقى **آخر لاعب** ويكون هو الفائز 👑\n\n' +
         '**القوانين:**\n' +
         '• 60 ثانية للانضمام، وبعدها تبدأ اللعبة تلقائياً\n' +
-        '• الحد الأدنى **٤ لاعبين** للبداية — وصلك لـ 4؟ اضغط **🤖 إضافة بوتات**\n' +
+        '• الحد الأدنى **٤ لاعبين** للبداية — وصلك لـ 4؟ اضغط **🤖 إضافة بوتات** وتختار العدد\n' +
         '• بعد ما العجلة تقف على واحد — عنده **30 ثانية** يختار من يطرده (بزرار الشات)\n' +
         '• لو ما اختارش في الوقت المحدد → هو نفسه يتطرد 💀\n' +
         '• ممنوع الخروج بعد بدء اللعبة — الطرد هو الفاصل الوحيد'
@@ -451,53 +451,32 @@ function cleanup(game: RouletteGame): void {
 
 // ---------- انضمام/خروج ----------
 
-/**
- * 🤖 يضيف بوتات السيرفر كمشاركين لتكملة الحد الأدنى 4 لاعبين.
- * يفعل واحد لكل بوت متاح؛ ويرفض لو العدد مكتمل.
- */
-export function addBotsToLobby(
-  client: any,
-  gameId: string
-): { ok: boolean; message: string; added: string[] } {
-  const game = rouletteGames.get(gameId);
-  if (!game) return { ok: false, message: 'انتهت اللعبة أو لم تبدأ', added: [] };
-  if (game.phase !== 'lobby') return { ok: false, message: 'بدأت اللعبة بالفعل — ممنوع الإضافة الآن', added: [] };
+// ---------- 🎭 أسماء وهمية يخترعها البوت ----------
+const FAKE_FIRST = ['أسد', 'نمر', 'ذئب', 'صقر', 'سيف', 'شبح', 'جبل', 'شهاب', 'فهد', 'حصان', 'عقاب', 'ثور', 'تنين', 'ليث', 'فرهد', 'قاهر', 'عاصف'];
+const FAKE_LAST  = ['الصحراء', 'الليل', 'الجبال', 'السماء', 'الرمال', 'الظل', 'البحر', 'اليوم', 'العاصفة', 'الصقور', 'النار', 'الحرية', 'البرق', 'الصبار', 'الفرسان'];
+const FAKE_EMOJI = ['🦁', '🐯', '🐺', '🦅', '🔥', '⚡', '🌩️', '🌪️', '⚔️', '🛡️', '💀', '🌟', '☠️', '🦾', '🎯'];
 
-  const need = Math.max(0, MIN_ROULETTE_PLAYERS - game.players.length);
-  if (need === 0) {
-    return { ok: false, message: `الحد الأدنى مكتمل بالفعل (${game.players.length} لاعبين) — البوتات مش مطلوبة دلوقتي! 🙂`, added: [] };
+const pickOne = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+/** 🎲 يخترع العدد المطلوب من اللاعبين الوهميين — اسم من بيت البوت + أفتار من dicebear */
+export function inventPlayersForGame(count: number, existing: RoulettePlayer[]): RoulettePlayer[] {
+  const free = Math.max(0, MAX_ROULETTE_PLAYERS - existing.length);
+  const n = Math.min(Math.max(0, count), free);
+  const players: RoulettePlayer[] = [];
+  for (let i = 0; i < n; i++) {
+    const first = pickOne(FAKE_FIRST);
+    const last = pickOne(FAKE_LAST);
+    const emoji = pickOne(FAKE_EMOJI);
+    const name = `${first} ${last} ${emoji}`;
+    const id = `fake_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}_${i}`;
+    players.push({
+      id,
+      username: name.slice(0, 32),
+      avatarUrl: `https://api.dicebear.com/9.x/adventurer-neutral/png?seed=${encodeURIComponent(name)}&size=64&backgroundColor=e3b6ff`,
+      isBot: true,
+    });
   }
-
-  const guild = client?.guilds?.cache?.get(game.guildId);
-  if (!guild) return { ok: false, message: 'تعذّر الوصول إلى كاش أعضاء السيرفر', added: [] };
-
-  const have = new Set(game.players.map((p) => p.id));
-  const omniId = client?.user?.id as string | undefined;
-
-  // كل بوت موجود في الكاش ما عدا اللي في اللعبة + Omni نفسه
-  const available = guild.members.cache
-    .filter((m: any) => m.user?.bot && m.id !== omniId && !have.has(m.id))
-    .map((m: any) => ({ member: m, id: m.id, username: m.user?.username || 'بوت', avatarUrl: m.user?.displayAvatarURL?.({ extension: 'png', size: 64 }) || undefined }));
-
-  if (available.length === 0) {
-    return { ok: false, message: 'مفيش بوتات متاحة للإضافة في السيرفر 🤖❌', added: [] };
-  }
-
-  // خلط عشوائي لتوزيع البوتات
-  for (let i = available.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [available[i], available[j]] = [available[j], available[i]];
-  }
-  const toAdd = available.slice(0, need);
-  for (const b of toAdd) {
-    game.players.push({ id: b.id, username: b.username, avatarUrl: b.avatarUrl, isBot: true });
-  }
-  const names = toAdd.map((b: { id: string; username: string; avatarUrl?: string }) => b.username);
-  return {
-    ok: true,
-    message: `🤖 تمت إضافة ${toAdd.length} بوت للعبة: ${names.join('، ')}`,
-    added: names,
-  };
+  return players;
 }
 
 export function addToRouletteLobby(

@@ -3,6 +3,7 @@
 // Omni Bot - 🔫 أزرار لعبة الروليت (اللوبي + اختيار الطرد)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
+const discord_js_1 = require("discord.js");
 const rouletteGame_1 = require("../../utils/rouletteGame");
 function playerFromMember(member) {
     return {
@@ -45,24 +46,27 @@ const handler = {
             });
             return;
         }
-        // ========== 🤖 إضافة بوتات للعبة ==========
+        // ========== 🤖 إضافة بوتات — اختر العدد من قائمة منبثقة ==========
         if (action === 'addbots') {
             if (game.phase !== 'lobby') {
                 await interaction.reply({ content: '❌ بدأت اللعبة بالفعل — ممنوع الإضافة الآن.', ephemeral: true });
                 return;
             }
-            const res = (0, rouletteGame_1.addBotsToLobby)(interaction.client, gameId);
-            if (!res.ok) {
-                await interaction.reply({ content: `❌ ${res.message}`, ephemeral: true });
-                return;
-            }
-            // حدّث الرسالة بالبوتات المضافة
-            const row = (0, rouletteGame_1.lobbyRow)(game);
-            await interaction.update({
-                embeds: [(0, rouletteGame_1.lobbyEmbed)(game)],
-                components: row,
+            const options = [
+                ...Array.from({ length: 8 }, (_, i) => ({ label: `${i + 1} بوت`, value: String(i + 1), emoji: '🤖' })),
+                { label: '10 بوتات', value: '10', emoji: '👾' },
+                { label: '25 — كل البوتات', value: '25', emoji: '🎉' },
+            ];
+            const menu = new discord_js_1.StringSelectMenuBuilder()
+                .setCustomId(`roulette_bot_count:${gameId}`)
+                .setPlaceholder('كم بوت تحب أضيف؟')
+                .addOptions(options);
+            const row = new discord_js_1.ActionRowBuilder().addComponents(menu);
+            await interaction.reply({
+                content: '🤖 **اختر عدد البوتات اللي تحب تضيفها للعبة:**',
+                components: [row],
+                ephemeral: true,
             });
-            await interaction.followUp({ content: `🤖 ${res.message}`, ephemeral: true });
             return;
         }
         // ========== خروج من اللعبة ==========
