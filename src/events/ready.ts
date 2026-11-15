@@ -7,6 +7,7 @@ import { Event } from '../handlers/EventHandler';
 import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { restoreGiveaways } from '../utils/giveaway';
+import { processEndedClanBattles } from '../utils/clanBattle';
 
 const logger = createLogger('Event:Ready');
 
@@ -107,6 +108,13 @@ const event: Event = {
         logger.error('Ticket inactivity sweep error:', err)
       );
     }, 15 * 60 * 1000);
+
+    // ⚔️ استطلاع مسابقات العشائر المنتهية — إعلان الفائز تلقائياً + منشن أعضائها
+    setInterval(() => {
+      void processEndedClanBattles(client).catch((err) =>
+        logger.error('Clan battle tick error:', err?.message || err)
+      );
+    }, 60_000);
 
     // 🎉 استئناف السحوبات النشطة بعد إعادة التشغيل
     void restoreGiveaways(client).catch(err =>

@@ -16,6 +16,7 @@ import {
   EmbedBuilder,
   AttachmentBuilder,
   PermissionFlagsBits,
+  ChannelType,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { Clan } from '../../models';
@@ -145,6 +146,58 @@ const command: Command = {
               { name: 'الأسبوع', value: 'week' },
               { name: 'اليوم', value: 'day' }
             )
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('competition')
+        .setDescription('⚔️ بدء مسابقة بين عشائر محددة (بعدد أيام محدد)')
+        .addStringOption((o) =>
+          o
+            .setName('clans')
+            .setDescription('أسماء العشائر المتنافسة (افصل بفاصلة)')
+            .setRequired(true)
+            .setMaxLength(200)
+        )
+        .addIntegerOption((o) =>
+          o
+            .setName('days')
+            .setDescription('عدد أيام المسابقة')
+            .setRequired(true)
+            .setMinValue(1)
+            .setMaxValue(30)
+        )
+        .addChannelOption((o) =>
+          o
+            .setName('channel')
+            .setDescription('القناة التي يُنشر فيها إعلان الفائز')
+            .setRequired(true)
+            .addChannelTypes(ChannelType.GuildText)
+        )
+        .addStringOption((o) =>
+          o
+            .setName('name')
+            .setDescription('اسم المسابقة (اختياري)')
+            .setMaxLength(48)
+        )
+    )
+    .addSubcommand((sub) => sub.setName('comp-cancel').setDescription('🛑 إلغاء المسابقة الجارية'))
+    .addSubcommand((sub) => sub.setName('comp-status').setDescription('📡 عرض تفاصيل المسابقة الجارية'))
+    .addSubcommand((sub) =>
+      sub
+        .setName('settings')
+        .setDescription('⚙️ عرض/تغيير إعدادات مسابقة العشائر')
+        .addChannelOption((o) =>
+          o
+            .setName('channel')
+            .setDescription('قناة إعلان الفائز (للتحديث)')
+        )
+        .addIntegerOption((o) =>
+          o
+            .setName('days')
+            .setDescription('المدة الافتراضية بالأيام — 1..30')
+            .setMinValue(1)
+            .setMaxValue(30)
         )
     ),
 
@@ -348,6 +401,137 @@ const command: Command = {
 
       const memberList = clan.members.slice(0, 25).map((id: string) => `<@${id}>`).join(' • ');
       if (memberList) embed.addFields({ name: '👥 أعضاء', value: memberList.slice(0, 1024) });
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    // ===== settings =====
+    if (sub === 'settings') {
+      await interaction.deferReply({ ephemeral: true });
+      const { getGuildSettings, invalidateGuildSettings } = await import('../../models');
+      const settings = await getGuildSettings(guild.id);
+      const clansCfg: any = (settings as any)?.clans || {};
+      const chOpt = interaction.options.getChannel('channel');
+      const daysOpt = interaction.options.getInteger('days');
+      if (chOpt) (settings as any).clans = { ...clansCfg, battleChannelId: chOpt.id };
+      if (daysOpt) (settings as any).clans = { ...(settings as any).clans, battleDurationDays: daysOpt };
+      if (chOpt || daysOpt) {
+        try { await settings.save(); invalidateGuildSettings(guild.id); } catch { /* تجاهل */ }
+      }
+      const after = (settings as any).clans || {};
+      const battleCh = after.battleChannelId ? `<#${after.battleChannelId}>` : 'غير محددة';
+      const days = after.battleDurationDays ?? 7;
+      const embed = new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle('⚙️ إعدادات مسابقة العشائر')
+        .addFields(
+          { name: '📣 قناة إعلان الفائز', value: battleCh, inline: true },
+          { name: '⏱️ المدة الافتراضية', value: `${days} يوم`, inline: true }
+        )
+        .setFooter({ text: 'الإعدادات تُطبّق على مسابقات العشائر' });
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    // ===== competition =====
+    if (sub === 'competition') {
+      await interaction.deferReply({ ephemeral: false });
+      const { getGuildSettings, invalidateGuildSettings, ClanBattle, Clan } = await import('../../models');
+      const clansStr = (interaction.options.getString('clans', true) || '').trim();
+      const days = interaction.options.getInteger('days', true);
+      const channel = interaction.options.getChannel('channel', true);
+      const nameInput = (interaction.options.getString('name') || '').trim();
+      const battleName = nameInput || 'مسابقة عشائرية';
+
+      // parse clans by name (comma or Arabic comma)
+      const rawNames = clansStr.split(/[,،]\s*/).map(s => s.trim()).filter(Boolean);
+      if (rawNames.length < 2) {
+        await interaction.editReply({ content: '❌ اكتب عشيرتين على الأقل مفصولة بفاصلة' });
+        return;
+      }
+      const allClans = await Clan.find({ guildId: guild.id, active: true }).lean();
+      const picked: any[] = [];
+      const missing: string[] = [];
+      for (const n of rawNames) {
+        const found = allClans.find(c => c.name.toLowerCase() === n.toLowerCase());
+        if (found) picked.push(found);
+        else missing.push(n);
+      }
+      if (missing.length) {
+        await interaction.editReply({ content: `❌ لم أجد العشائر: ${missing.map(m => `«${m}»`).join('، ')}` });
+        return;
+      }
+      const clanIds = picked.map(p => String(p._id));
+
+      // cancel any active battle
+      const active = await ClanBattle.findOne({ guildId: guild.id, status: 'active' });
+      if (active) {
+        await interaction.editReply({ content: '❌ هناك مسابقة نشطة حالياً — ألغها أولاً بـ `/clan comp-cancel`' });
+        return;
+      }
+
+      const duration = Math.max(1, Math.min(30, days || 7));
+      const startsAt = new Date();
+      const endsAt = new Date(startsAt.getTime() + duration * 24 * 60 * 60 * 1000);
+
+      const battle = await ClanBattle.create({
+        guildId: guild.id,
+        name: battleName,
+        clanIds,
+        durationDays: duration,
+        startsAt,
+        endsAt,
+        channelId: channel.id,
+        status: 'active',
+      });
+
+      const mentions = picked.map(p => `**${p.name}** (${p.members.length} عضو)`).join('\n');
+      await interaction.editReply({
+        content: `⚔️ بدأت «${battleName}»!\n\nالعشائر المتنافسة:\n${mentions}\n\n⏰ المدة: ${duration} يوم\n📅 تنتهي: ${endsAt.toLocaleString('ar')}\n📣 إعلان الفائز في: <#${channel.id}>`,
+      });
+      return;
+    }
+
+    // ===== comp-cancel =====
+    if (sub === 'comp-cancel') {
+      await interaction.deferReply({ ephemeral: true });
+      const { ClanBattle } = await import('../../models');
+      const active = await ClanBattle.findOne({ guildId: guild.id, status: 'active' });
+      if (!active) {
+        await interaction.editReply({ content: '💤 لا توجد مسابقة نشطة لإلغائها' });
+        return;
+      }
+      active.status = 'cancelled';
+      await active.save();
+      await interaction.editReply({ content: `✅ تم إلغاء المسابقة «${active.name}»` });
+      return;
+    }
+
+    // ===== comp-status =====
+    if (sub === 'comp-status') {
+      await interaction.deferReply({ ephemeral: false });
+      const { ClanBattle, Clan } = await import('../../models');
+      const battle = await ClanBattle.findOne({ guildId: guild.id, status: 'active' }).lean();
+      if (!battle) {
+        await interaction.editReply({ content: '💤 لا توجد مسابقة نشطة حالياً' });
+        return;
+      }
+      const clans = await Clan.find({ _id: { $in: battle.clanIds } }).lean();
+      const now = Date.now();
+      const remainingMs = Math.max(0, new Date(battle.endsAt).getTime() - now);
+      const rDays = Math.floor(remainingMs / 86_400_000);
+      const rHours = Math.floor((remainingMs % 86_400_000) / 3_600_000);
+      const rMin = Math.floor((remainingMs % 3_600_000) / 60_000);
+      const embed = new EmbedBuilder()
+        .setColor(0x3b82f6)
+        .setTitle(`⚔️ ${battle.name} — جارية`)
+        .addFields(
+          { name: '👥 العشائر', value: clans.map(c => `**${c.name}** — ${c.members.length} عضو`).join('\n') || 'لا توجد' },
+          { name: '⏱️ الوقت المتبقي', value: `${rDays} يوم ${rHours} ساعة ${rMin} دقيقة` },
+          { name: '📅 تنتهي', value: `<t:${Math.floor(new Date(battle.endsAt).getTime() / 1000)}:F>` },
+          { name: '📣 قناة الإعلان', value: battle.channelId ? `<#${battle.channelId}>` : 'لم تحدد' },
+        )
+        .setTimestamp();
       await interaction.editReply({ embeds: [embed] });
       return;
     }

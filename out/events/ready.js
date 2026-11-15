@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const helpers_1 = require("../utils/helpers");
 const giveaway_1 = require("../utils/giveaway");
+const clanBattle_1 = require("../utils/clanBattle");
 const logger = (0, helpers_1.createLogger)('Event:Ready');
 const event = {
     name: 'ready',
@@ -82,6 +83,10 @@ const event = {
         setInterval(() => {
             lc.ticketHandler.sweepInactiveTickets(client).catch(err => logger.error('Ticket inactivity sweep error:', err));
         }, 15 * 60 * 1000);
+        // ⚔️ استطلاع مسابقات العشائر المنتهية — إعلان الفائز تلقائياً + منشن أعضائها
+        setInterval(() => {
+            void (0, clanBattle_1.processEndedClanBattles)(client).catch((err) => logger.error('Clan battle tick error:', err?.message || err));
+        }, 60_000);
         // 🎉 استئناف السحوبات النشطة بعد إعادة التشغيل
         void (0, giveaway_1.restoreGiveaways)(client).catch(err => logger.error('Giveaway restore error:', err));
         // 🏦 فائدة البنك: تطبيق يومي (كل 24 ساعة)

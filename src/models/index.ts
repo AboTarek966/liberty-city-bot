@@ -579,6 +579,16 @@ export interface IGuildSettings extends Document {
     logChannelId?: string;
   };
 
+  // 🛡️ العشائر (Clans) وقناة إعلان المسابقات
+  clans?: {
+    /** مفعّل/معطّل — مفعّل يخلي البوت يسمح بإنشاء مسابقات */
+    enabled: boolean;
+    /** القناة التي يُنشر فيها إعلان فائز مسابقة العشائر */
+    battleChannelId?: string;
+    /** المدة الافتراضية لمسابقة العشائر (بالأيام) */
+    battleDurationDays: number;
+  };
+
   // Shop (متجر السيرفر — شراء رولات بالرصيد)
   shop: {
     enabled: boolean;
@@ -1437,6 +1447,12 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
     logChannelId: { type: String },
   },
 
+  clans: {
+    enabled: { type: Boolean, default: true },
+    battleChannelId: { type: String },
+    battleDurationDays: { type: Number, default: 7, min: 1, max: 30 },
+  },
+
   shop: {
     enabled: { type: Boolean, default: true },
     items: [ShopItemSchema],
@@ -1672,6 +1688,7 @@ export { Poll, IPoll } from './Poll';
 export { Giveaway, IGiveaway, IGiveawayRequirements } from './Giveaway';
 export { BotAbuseStrike, IBotAbuseStrike } from './BotAbuseStrike';
 export { Clan, IClan } from './Clan';
+export { ClanBattle, IClanBattle } from './ClanBattle';
 export { DashboardSession } from './DashboardSession';
 export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';

@@ -526,6 +526,14 @@ export interface IGuildSettings extends Document {
         /** قناة سجل نتائج السحوبات */
         logChannelId?: string;
     };
+    clans?: {
+        /** مفعّل/معطّل — مفعّل يخلي البوت يسمح بإنشاء مسابقات */
+        enabled: boolean;
+        /** القناة التي يُنشر فيها إعلان فائز مسابقة العشائر */
+        battleChannelId?: string;
+        /** المدة الافتراضية لمسابقة العشائر (بالأيام) */
+        battleDurationDays: number;
+    };
     shop: {
         enabled: boolean;
         items: IShopItem[];
@@ -837,6 +845,7 @@ export { Poll, IPoll } from './Poll';
 export { Giveaway, IGiveaway, IGiveawayRequirements } from './Giveaway';
 export { BotAbuseStrike, IBotAbuseStrike } from './BotAbuseStrike';
 export { Clan, IClan } from './Clan';
+export { ClanBattle, IClanBattle } from './ClanBattle';
 export { DashboardSession } from './DashboardSession';
 export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';

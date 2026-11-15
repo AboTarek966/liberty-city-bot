@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.MemberReturnRecord = exports.KnowledgeEntry = exports.DashboardSession = exports.Clan = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
+exports.BackupConfig = exports.LoggingConfig = exports.LeaveConfig = exports.WelcomeConfig = exports.LevelingConfig = exports.AutoModRule = exports.ModuleSetting = exports.AITicketApproval = exports.MemberReturnRecord = exports.KnowledgeEntry = exports.DashboardSession = exports.ClanBattle = exports.Clan = exports.BotAbuseStrike = exports.Giveaway = exports.Poll = exports.GameStats = exports.RogueBot = exports.InvestigationFinding = exports.InvestigationRun = exports.AIResponseRule = exports.AIConfig = exports.CommandAlias = exports.DashboardCommand = exports.UserAFK = exports.MuteRole = exports.UserProfile = exports.AISession = exports.Ticket = exports.JailData = exports.Warning = exports.ModerationCase = exports.GuildSettings = void 0;
 exports.getGuildSettings = getGuildSettings;
 exports.invalidateGuildSettings = invalidateGuildSettings;
 exports.getGuildSettingsFresh = getGuildSettingsFresh;
@@ -611,6 +611,11 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         manualWinners: { type: Boolean, default: true },
         logChannelId: { type: String },
     },
+    clans: {
+        enabled: { type: Boolean, default: true },
+        battleChannelId: { type: String },
+        battleDurationDays: { type: Number, default: 7, min: 1, max: 30 },
+    },
     shop: {
         enabled: { type: Boolean, default: true },
         items: [ShopItemSchema],
@@ -810,6 +815,8 @@ var BotAbuseStrike_1 = require("./BotAbuseStrike");
 Object.defineProperty(exports, "BotAbuseStrike", { enumerable: true, get: function () { return BotAbuseStrike_1.BotAbuseStrike; } });
 var Clan_1 = require("./Clan");
 Object.defineProperty(exports, "Clan", { enumerable: true, get: function () { return Clan_1.Clan; } });
+var ClanBattle_1 = require("./ClanBattle");
+Object.defineProperty(exports, "ClanBattle", { enumerable: true, get: function () { return ClanBattle_1.ClanBattle; } });
 var DashboardSession_1 = require("./DashboardSession");
 Object.defineProperty(exports, "DashboardSession", { enumerable: true, get: function () { return DashboardSession_1.DashboardSession; } });
 var KnowledgeEntry_1 = require("./KnowledgeEntry");
