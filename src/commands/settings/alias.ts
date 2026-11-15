@@ -149,6 +149,7 @@ const command: Command = {
               { name: '🖼️ أفاتار', value: 'avatar' },
               { name: '📝 إمبد', value: 'embed' },
               { name: '🏆 توب', value: 'top' },
+              { name: '🛡️ توب كلانات', value: 'clantop' },
               { name: '👤 يوزر إنفو', value: 'userinfo' }
             )
         )

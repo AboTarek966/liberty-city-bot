@@ -191,6 +191,21 @@ const command = {
         }
         const sub = interaction.options.getSubcommand();
         const guild = interaction.guild;
+        // 🔒 ما يقدرش يعمل كلانات (أو يعدّلها) غير من معه أدمنستريتور فقط
+        const READ_ONLY_SUBS = new Set(['list', 'info', 'leaderboard', 'comp-status']);
+        if (!READ_ONLY_SUBS.has(sub)) {
+            const isOwner = guild.ownerId === interaction.user.id;
+            const hasAdmin = interaction.memberPermissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator) ??
+                interaction.member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator);
+            if (!isOwner && !hasAdmin) {
+                await interaction.reply({
+                    content: '⛔ **إدارة العشائر محصورة بحاملي صلاحية أدمنستريتور فقط**\n' +
+                        '(القراءة متاحة للطاقم: `/clan list`، `/clan info`، `/clan leaderboard`، `/clan comp-status`)',
+                    ephemeral: true,
+                });
+                return;
+            }
+        }
         // ===== create =====
         if (sub === 'create') {
             await interaction.deferReply({ ephemeral: false });
