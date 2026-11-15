@@ -7,7 +7,6 @@ import { Event } from '../handlers/EventHandler';
 import { OmniClient } from '../OmniClient';
 import { createLogger } from '../utils/helpers';
 import { restoreGiveaways } from '../utils/giveaway';
-import { ensureStaffRoles } from '../utils/staffRoles';
 
 const logger = createLogger('Event:Ready');
 
@@ -108,25 +107,6 @@ const event: Event = {
         logger.error('Ticket inactivity sweep error:', err)
       );
     }, 15 * 60 * 1000);
-
-    // 👑 رتب الإدارة في Omni Store — تُجهَّز تلقائياً عند الإقلاع (تتخطى لو كانت موجودة)
-    setTimeout(() => {
-      const store = client.guilds.cache.get('1527691881293811792') as any;
-      if (!store) return;
-      void ensureStaffRoles(store)
-        .then((r) => {
-          r.finalOrder.forEach((entry) =>
-            logger.info(`   ↳ #${entry.position} ${entry.name}`)
-          );
-          return r;
-        })
-        .then((r) =>
-          r.skipped
-            ? logger.info(`👑 رتب الإدارة: جاهزة بالفعل — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`)
-            : logger.info(`👑 رتب الإدارة جاهزة: إنشاء=${r.created.length} تحديث=${r.reused.length} فشل=${r.failed.length} — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`)
-        )
-        .catch((err) => logger.error('ensureStaffRoles failed:', err?.message || err));
-    }, 6000);
 
     // 🎉 استئناف السحوبات النشطة بعد إعادة التشغيل
     void restoreGiveaways(client).catch(err =>

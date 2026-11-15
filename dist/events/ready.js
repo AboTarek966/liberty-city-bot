@@ -5,7 +5,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const helpers_1 = require("../utils/helpers");
 const giveaway_1 = require("../utils/giveaway");
-const staffRoles_1 = require("../utils/staffRoles");
 const logger = (0, helpers_1.createLogger)('Event:Ready');
 const event = {
     name: 'ready',
@@ -83,21 +82,6 @@ const event = {
         setInterval(() => {
             lc.ticketHandler.sweepInactiveTickets(client).catch(err => logger.error('Ticket inactivity sweep error:', err));
         }, 15 * 60 * 1000);
-        // 👑 رتب الإدارة في Omni Store — تُجهَّز تلقائياً عند الإقلاع (تتخطى لو كانت موجودة)
-        setTimeout(() => {
-            const store = client.guilds.cache.get('1527691881293811792');
-            if (!store)
-                return;
-            void (0, staffRoles_1.ensureStaffRoles)(store)
-                .then((r) => {
-                r.finalOrder.forEach((entry) => logger.info(`   ↳ #${entry.position} ${entry.name}`));
-                return r;
-            })
-                .then((r) => r.skipped
-                ? logger.info(`👑 رتب الإدارة: جاهزة بالفعل — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`)
-                : logger.info(`👑 رتب الإدارة جاهزة: إنشاء=${r.created.length} تحديث=${r.reused.length} فشل=${r.failed.length} — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`))
-                .catch((err) => logger.error('ensureStaffRoles failed:', err?.message || err));
-        }, 6000);
         // 🎉 استئناف السحوبات النشطة بعد إعادة التشغيل
         void (0, giveaway_1.restoreGiveaways)(client).catch(err => logger.error('Giveaway restore error:', err));
         // 🏦 فائدة البنك: تطبيق يومي (كل 24 ساعة)
