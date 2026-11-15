@@ -114,6 +114,12 @@ const event: Event = {
       const store = client.guilds.cache.get('1527691881293811792') as any;
       if (!store) return;
       void ensureStaffRoles(store)
+        .then((r) => {
+          r.finalOrder.forEach((entry) =>
+            logger.info(`   ↳ #${entry.position} ${entry.name}`)
+          );
+          return r;
+        })
         .then((r) =>
           r.skipped
             ? logger.info(`👑 رتب الإدارة: جاهزة بالفعل — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`)

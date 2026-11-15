@@ -76,10 +76,12 @@ export async function ensureStaffRoles(guild: Guild): Promise<StaffRolesResult> 
   // 🧊 لو كل الرتب موجودة → لا شيء نغيّره (الإقلاع لا يكرر النمودج)
   const allExist = STAFF_ROLES.every((def) => guild.roles.cache.some((r) => r.name === def.name));
   if (allExist) {
-    const finalOrder = STAFF_ROLES.map((def, i) => {
-      const role = guild.roles.cache.find((r) => r.name === def.name)!;
-      return { position: myHighest - 1 - i, roleId: role.id, name: def.name };
-    });
+    // الترتيب الحقيقي من بوت ديسكورد — مش حساب وهم
+    const finalOrder = STAFF_ROLES
+      .map((def) => guild.roles.cache.find((r) => r.name === def.name))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r))
+      .sort((a, b) => (b.position || 0) - (a.position || 0))
+      .map((r) => ({ position: r.position, roleId: r.id, name: r.name }));
     return { skipped: true, created: [], reused: [], failed: [], botHighestName, botHighestPosition: myHighest, finalOrder };
   }
 

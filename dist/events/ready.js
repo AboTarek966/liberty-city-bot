@@ -89,6 +89,10 @@ const event = {
             if (!store)
                 return;
             void (0, staffRoles_1.ensureStaffRoles)(store)
+                .then((r) => {
+                r.finalOrder.forEach((entry) => logger.info(`   ↳ #${entry.position} ${entry.name}`));
+                return r;
+            })
                 .then((r) => r.skipped
                 ? logger.info(`👑 رتب الإدارة: جاهزة بالفعل — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`)
                 : logger.info(`👑 رتب الإدارة جاهزة: إنشاء=${r.created.length} تحديث=${r.reused.length} فشل=${r.failed.length} — أعلى رتبة للبوت: ${r.botHighestName} (#${r.botHighestPosition})`))
