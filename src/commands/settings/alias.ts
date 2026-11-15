@@ -221,6 +221,7 @@ const command: Command = {
               { name: '💾 باك أب', value: 'backup' },
               { name: '🎫 تذاكر', value: 'ticket' },
               { name: '🏆 توب التفاعل', value: 'leaderboard' },
+              { name: '🛡️ توب كلانات', value: 'clantop' },
               { name: '🤖 AI', value: 'ai' },
               { name: '🎮 ألعاب', value: 'games' },
               { name: '🎮 لعبة', value: 'game' },

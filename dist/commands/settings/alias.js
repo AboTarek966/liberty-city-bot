@@ -116,7 +116,7 @@ const command = {
         .setName('extra2b')
         .setDescription('🛠️ أدوات + تذاكر + AI')
         .setRequired(false)
-        .addChoices({ name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, { name: '🎫 تذاكر', value: 'ticket' }, { name: '🏆 توب التفاعل', value: 'leaderboard' }, { name: '🤖 AI', value: 'ai' }, { name: '🎮 ألعاب', value: 'games' }, { name: '🎮 لعبة', value: 'game' }, { name: '🛑 إيقاف الروليت', value: 'roulette_stop' }))
+        .addChoices({ name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, { name: '🎫 تذاكر', value: 'ticket' }, { name: '🏆 توب التفاعل', value: 'leaderboard' }, { name: '🛡️ توب كلانات', value: 'clantop' }, { name: '🤖 AI', value: 'ai' }, { name: '🎮 ألعاب', value: 'games' }, { name: '🎮 لعبة', value: 'game' }, { name: '🛑 إيقاف الروليت', value: 'roulette_stop' }))
         .addStringOption(o => o
         .setName('extra3')
         .setDescription('📦 أوامر إدارية + رولات + حماية متقدمة')
