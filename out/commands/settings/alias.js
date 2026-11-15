@@ -104,7 +104,7 @@ const command = {
         .setName('extra')
         .setDescription('🎮 ألعاب (25 لعبة)')
         .setRequired(false)
-        .addChoices({ name: '🎱 8ball', value: '8ball' }, { name: '🔀 اختر', value: 'choose' }, { name: '🎲 نرد', value: 'dice' }, { name: '🪙 عملة', value: 'flip' }, { name: '😂 نكتة', value: 'joke' }, { name: '📊 تصويت', value: 'poll' }, { name: '💯 تقييم', value: 'rate' }, { name: '🎰 سلوتس', value: 'slots' }, { name: '🃏 بلاك جاك', value: 'blackjack' }, { name: '💣 قنبلة', value: 'bomb' }, { name: '🎳 بولينغ', value: 'bowling' }, { name: '🐉 تنين', value: 'dragon' }, { name: '⚔️ مبارزة', value: 'duel' }, { name: '🎣 صيد', value: 'fish' }, { name: '🎯 سهام', value: 'darts' }, { name: '🔼 أعلى/أقل', value: 'highlow' }, { name: '🏁 سباق', value: 'race' }, { name: '🎯 روليت', value: 'roulette' }, { name: '🛑 إيقاف الروليت', value: 'roulette_stop' }, { name: '✂️ RPS', value: 'rps' }, { name: '💪 قوة', value: 'power' }, { name: '🧩 لغز', value: 'riddle' }, { name: '💰 كنز', value: 'treasure' }, { name: '🧱 شد حبل', value: 'tug' }, { name: '🎡 عجلة', value: 'wheel' }, { name: '❌⭕ XO', value: 'xo' }))
+        .addChoices({ name: '🎱 8ball', value: '8ball' }, { name: '🔀 اختر', value: 'choose' }, { name: '🎲 نرد', value: 'dice' }, { name: '🪙 عملة', value: 'flip' }, { name: '😂 نكتة', value: 'joke' }, { name: '📊 تصويت', value: 'poll' }, { name: '💯 تقييم', value: 'rate' }, { name: '🎰 سلوتس', value: 'slots' }, { name: '🃏 بلاك جاك', value: 'blackjack' }, { name: '💣 قنبلة', value: 'bomb' }, { name: '🎳 بولينغ', value: 'bowling' }, { name: '🐉 تنين', value: 'dragon' }, { name: '⚔️ مبارزة', value: 'duel' }, { name: '🎣 صيد', value: 'fish' }, { name: '🎯 سهام', value: 'darts' }, { name: '🔼 أعلى/أقل', value: 'highlow' }, { name: '🏁 سباق', value: 'race' }, { name: '🎯 روليت', value: 'roulette' }, { name: '✂️ RPS', value: 'rps' }, { name: '💪 قوة', value: 'power' }, { name: '🧩 لغز', value: 'riddle' }, { name: '💰 كنز', value: 'treasure' }, { name: '🧱 شد حبل', value: 'tug' }, { name: '🎡 عجلة', value: 'wheel' }, { name: '❌⭕ XO', value: 'xo' }))
         .addStringOption(o => o
         .setName('extra2')
         .setDescription('🎵 موسيقى + حماية + معلومات')
@@ -116,7 +116,7 @@ const command = {
         .setName('extra2b')
         .setDescription('🛠️ أدوات + تذاكر + AI')
         .setRequired(false)
-        .addChoices({ name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, { name: '🎫 تذاكر', value: 'ticket' }, { name: '🏆 توب التفاعل', value: 'leaderboard' }, { name: '🤖 AI', value: 'ai' }, { name: '🎮 ألعاب', value: 'games' }, { name: '🎮 لعبة', value: 'game' }))
+        .addChoices({ name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, { name: '🎫 تذاكر', value: 'ticket' }, { name: '🏆 توب التفاعل', value: 'leaderboard' }, { name: '🤖 AI', value: 'ai' }, { name: '🎮 ألعاب', value: 'games' }, { name: '🎮 لعبة', value: 'game' }, { name: '🛑 إيقاف الروليت', value: 'roulette_stop' }))
         .addStringOption(o => o
         .setName('extra3')
         .setDescription('📦 أوامر إدارية + رولات + حماية متقدمة')
