@@ -22,49 +22,62 @@ const MIDDLE_PERMS = [
 ];
 const JUNIOR_PERMS = [discord_js_1.PermissionFlagsBits.ModerateMembers];
 const SEPARATOR_PERMS = [];
-// الأسماء الجديدة (فصحى عربية) + الأسماء القديمة (الإنجليزية المشطرة) للهجرة ضدها
+// الأسماء العربية الحالية (المخزّنة في السيرفر) — تُستخدم للهجرة رجوعه للإنجليزية
 exports.LEGACY_STAFF_ROLE_NAMES = [
-    '『👑』・𝐎𝐰𝐧𝐞𝐫',
-    '『💎』・𝐂𝐨-𝐎𝐰𝐧𝐞𝐫',
-    '『⚜️』・𝐅𝐨𝐮𝐧𝐝𝐞𝐫',
-    '『⚡』・𝐇𝐢𝐠𝐡 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭',
-    '『💼』・𝐄𝐱𝐞𝐜𝐮𝐭𝐢𝐯𝐞 𝐃𝐢𝐫𝐞𝐜𝐭𝐨𝐫',
-    '══════ 👑 𝐇𝐢𝐠𝐡 𝐒𝐭𝐚𝐟𝐟 👑 ══════',
-    '『🔥』・𝐇𝐞𝐚𝐝 𝐀𝐝𝐦𝐢𝐧',
-    '『🔱』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐀𝐝𝐦𝐢𝐧',
-    '『🛡️』・𝐀𝐝𝐦𝐢𝐧',
-    '『⚙️』・𝐒𝐮𝐩𝐞𝐫𝐯𝐢𝐬𝐨𝐫',
-    '『⚔️』・𝐇𝐞𝐚𝐝 𝐌𝐨𝐝',
-    '══════ 🛡️ 𝐌𝐢𝐝𝐝𝐥𝐞 𝐒𝐭𝐚𝐟𝐟 🛡️ ══════',
-    '『🔰』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐌𝐨𝐝',
-    '『🔨』・𝐌𝐨𝐝𝐞𝐫𝐚𝐭𝐨𝐫',
-    '『🎧』・𝐒𝐮𝐩𝐩𝐨𝐫𝐭 𝐓𝐞𝐚𝐦',
-    '『🌟』・𝐇𝐞𝐥𝐩𝐞𝐫',
-    '『📝』・𝐓𝐫𝐢𝐚𝐥 𝐒𝐭𝐚𝐟𝐟',
-    '══════ 🔰 𝐉𝐮𝐧𝐢𝐨𝐫 𝐒𝐭𝐚𝐟𝐟 🔰 ══════',
+    '『👑』・المالك',
+    '『💎』・نائب المالك',
+    '『⚜️』・المؤسس',
+    '『⚡』・الإدارة العليا',
+    '『💼』・المدير التنفيذي',
+    '══════ 👑 الإدارة العليا ══════',
+    '『🔥』・رئيس الإداريين',
+    '『🔱』・إداري خبير',
+    '『🛡️』・إداري عام',
+    '『⚙️』・مشرف عام',
+    '『⚔️』・رئيس المراقبين',
+    '══════ 🛡️ الإدارة الوسطى ══════',
+    '『🔰』・مراقب أول',
+    '『🔨』・مراقب',
+    '『🎧』・فريق الدعم',
+    '『🌟』・مساعد',
+    '『📝』・إداري تحت التجربة',
+    '══════ 🔰 الإدارة الصغرى ══════',
+    // أدوار المطوّرين — غير موجودة حتى الآن (إنشاء جديد)
+    '『💻』・𝐋𝐞𝐚𝐝 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫',
+    '『🖥️』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫',
+    '『⌨️』・𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫',
+    '『🛠️』・𝐉𝐮𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫',
+    '══════ 💻 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫 𝐓𝐞𝐚𝐦 ══════',
 ];
+const SEPARATOR_LOW = [discord_js_1.PermissionFlagsBits.ManageMessages];
 exports.STAFF_ROLES = [
-    // ===== 👑 الإدارة العليا =====
-    { name: '『👑』・المالك', color: 0xf1c40f, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
-    { name: '『💎』・نائب المالك', color: 0xe67e22, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
-    { name: '『⚜️』・المؤسس', color: 0x9b59b6, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
-    { name: '『⚡』・الإدارة العليا', color: 0xe74c3c, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
-    { name: '『💼』・المدير التنفيذي', color: 0xe91e63, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
-    { name: '══════ 👑 الإدارة العليا ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
-    // ===== 🛡️ الإدارة الوسطى =====
-    { name: '『🔥』・رئيس الإداريين', color: 0xe74c3c, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
-    { name: '『🔱』・إداري خبير', color: 0xf39c12, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
-    { name: '『🛡️』・إداري عام', color: 0x95a5a6, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
-    { name: '『⚙️』・مشرف عام', color: 0x2ecc71, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
-    { name: '『⚔️』・رئيس المراقبين', color: 0x34495e, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
-    { name: '══════ 🛡️ الإدارة الوسطى ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
-    // ===== 🔰 الإدارة الصغرى =====
-    { name: '『🔰』・مراقب أول', color: 0x1abc9c, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
-    { name: '『🔨』・مراقب', color: 0x27ae60, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
-    { name: '『🎧』・فريق الدعم', color: 0x3498db, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
-    { name: '『🌟』・مساعد', color: 0xf7dc6f, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
-    { name: '『📝』・إداري تحت التجربة', color: 0x7f8c8d, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
-    { name: '══════ 🔰 الإدارة الصغرى ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
+    // ===== 👑 High Staff =====
+    { name: '『👑』・𝐎𝐰𝐧𝐞𝐫', color: 0xf1c40f, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
+    { name: '『💎』・𝐂𝐨-𝐎𝐰𝐧𝐞𝐫', color: 0xe67e22, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
+    { name: '『⚜️』・𝐅𝐨𝐮𝐧𝐝𝐞𝐫', color: 0x9b59b6, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
+    { name: '『⚡』・𝐇𝐢𝐠𝐡 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭', color: 0xe74c3c, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
+    { name: '『💼』・𝐄𝐱𝐞𝐜𝐮𝐭𝐢𝐯𝐞 𝐃𝐢𝐫𝐞𝐜𝐭𝐨𝐫', color: 0xe91e63, perms: HIGH_PERMS, hoist: true, mentionable: true, tier: 'high' },
+    { name: '══════ 👑 𝐇𝐢𝐠𝐡 𝐒𝐭𝐚𝐟𝐟 👑 ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
+    // ===== 🛡️ Middle Staff =====
+    { name: '『🔥』・𝐇𝐞𝐚𝐝 𝐀𝐝𝐦𝐢𝐧', color: 0xe74c3c, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
+    { name: '『🔱』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐀𝐝𝐦𝐢𝐧', color: 0xf39c12, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
+    { name: '『🛡️』・𝐀𝐝𝐦𝐢𝐧', color: 0x95a5a6, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
+    { name: '『⚙️』・𝐒𝐮𝐩𝐞𝐫𝐯𝐢𝐬𝐨𝐫', color: 0x2ecc71, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
+    { name: '『⚔️』・𝐇𝐞𝐚𝐝 𝐌𝐨𝐝', color: 0x34495e, perms: MIDDLE_PERMS, hoist: true, mentionable: true, tier: 'middle' },
+    { name: '══════ 🛡️ 𝐌𝐢𝐝𝐝𝐥𝐞 𝐒𝐭𝐚𝐟𝐟 🛡️ ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
+    // ===== 🔰 Junior Staff =====
+    { name: '『🔰』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐌𝐨𝐝', color: 0x1abc9c, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
+    { name: '『🔨』・𝐌𝐨𝐝𝐞𝐫𝐚𝐭𝐨𝐫', color: 0x27ae60, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
+    { name: '『🎧』・𝐒𝐮𝐩𝐩𝐨𝐫𝐭 𝐓𝐞𝐚𝐦', color: 0x3498db, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
+    { name: '『🌟』・𝐇𝐞𝐥𝐩𝐞𝐫', color: 0xf7dc6f, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
+    { name: '『📝』・𝐓𝐫𝐢𝐚𝐥 𝐒𝐭𝐚𝐟𝐟', color: 0x7f8c8d, perms: JUNIOR_PERMS, hoist: true, mentionable: true, tier: 'junior' },
+    { name: '══════ 🔰 𝐉𝐮𝐧𝐢𝐨𝐫 𝐒𝐭𝐚𝐟𝐟 🔰 ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
+    // ===== 💻 Developer Team — تحت الرتب الإدارية =====
+    { name: '『💻』・𝐋𝐞𝐚𝐝 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫', color: 0x00b894, perms: SEPARATOR_LOW, hoist: true, mentionable: true, tier: 'dev' },
+    { name: '『🖥️』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫', color: 0x0984e3, perms: SEPARATOR_LOW, hoist: true, mentionable: true, tier: 'dev' },
+    { name: '『⌨️』・𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫', color: 0x6c5ce7, perms: SEPARATOR_LOW, hoist: true, mentionable: true, tier: 'dev' },
+    { name: '『🛠️』・𝐉𝐮𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫', color: 0xa29bfe, perms: SEPARATOR_LOW, hoist: true, mentionable: true, tier: 'dev' },
+    { name: '══════ 💻 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫 𝐓𝐞𝐚𝐦 ══════', color: 0x2f3136, perms: SEPARATOR_PERMS, hoist: false, mentionable: false, tier: 'separator' },
 ];
 function orderedCacheEntries(guild) {
     const entries = [];

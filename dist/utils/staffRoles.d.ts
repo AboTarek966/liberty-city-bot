@@ -5,130 +5,165 @@ export interface StaffRoleDef {
     perms: bigint[];
     hoist: boolean;
     mentionable: boolean;
-    tier: 'high' | 'middle' | 'junior' | 'separator';
+    tier: 'high' | 'middle' | 'junior' | 'dev' | 'separator';
 }
-export declare const LEGACY_STAFF_ROLE_NAMES: readonly ["『👑』・𝐎𝐰𝐧𝐞𝐫", "『💎』・𝐂𝐨-𝐎𝐰𝐧𝐞𝐫", "『⚜️』・𝐅𝐨𝐮𝐧𝐝𝐞𝐫", "『⚡』・𝐇𝐢𝐠𝐡 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭", "『💼』・𝐄𝐱𝐞𝐜𝐮𝐭𝐢𝐯𝐞 𝐃𝐢𝐫𝐞𝐜𝐭𝐨𝐫", "══════ 👑 𝐇𝐢𝐠𝐡 𝐒𝐭𝐚𝐟𝐟 👑 ══════", "『🔥』・𝐇𝐞𝐚𝐝 𝐀𝐝𝐦𝐢𝐧", "『🔱』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐀𝐝𝐦𝐢𝐧", "『🛡️』・𝐀𝐝𝐦𝐢𝐧", "『⚙️』・𝐒𝐮𝐩𝐞𝐫𝐯𝐢𝐬𝐨𝐫", "『⚔️』・𝐇𝐞𝐚𝐝 𝐌𝐨𝐝", "══════ 🛡️ 𝐌𝐢𝐝𝐝𝐥𝐞 𝐒𝐭𝐚𝐟𝐟 🛡️ ══════", "『🔰』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐌𝐨𝐝", "『🔨』・𝐌𝐨𝐝𝐞𝐫𝐚𝐭𝐨𝐫", "『🎧』・𝐒𝐮𝐩𝐩𝐨𝐫𝐭 𝐓𝐞𝐚𝐦", "『🌟』・𝐇𝐞𝐥𝐩𝐞𝐫", "『📝』・𝐓𝐫𝐢𝐚𝐥 𝐒𝐭𝐚𝐟𝐟", "══════ 🔰 𝐉𝐮𝐧𝐢𝐨𝐫 𝐒𝐭𝐚𝐟𝐟 🔰 ══════"];
+export declare const LEGACY_STAFF_ROLE_NAMES: readonly ["『👑』・المالك", "『💎』・نائب المالك", "『⚜️』・المؤسس", "『⚡』・الإدارة العليا", "『💼』・المدير التنفيذي", "══════ 👑 الإدارة العليا ══════", "『🔥』・رئيس الإداريين", "『🔱』・إداري خبير", "『🛡️』・إداري عام", "『⚙️』・مشرف عام", "『⚔️』・رئيس المراقبين", "══════ 🛡️ الإدارة الوسطى ══════", "『🔰』・مراقب أول", "『🔨』・مراقب", "『🎧』・فريق الدعم", "『🌟』・مساعد", "『📝』・إداري تحت التجربة", "══════ 🔰 الإدارة الصغرى ══════", "『💻』・𝐋𝐞𝐚𝐝 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫", "『🖥️』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫", "『⌨️』・𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫", "『🛠️』・𝐉𝐮𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫", "══════ 💻 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫 𝐓𝐞𝐚𝐦 ══════"];
 export declare const STAFF_ROLES: readonly [{
-    readonly name: "『👑』・المالك";
+    readonly name: "『👑』・𝐎𝐰𝐧𝐞𝐫";
     readonly color: 15844367;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "high";
 }, {
-    readonly name: "『💎』・نائب المالك";
+    readonly name: "『💎』・𝐂𝐨-𝐎𝐰𝐧𝐞𝐫";
     readonly color: 15105570;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "high";
 }, {
-    readonly name: "『⚜️』・المؤسس";
+    readonly name: "『⚜️』・𝐅𝐨𝐮𝐧𝐝𝐞𝐫";
     readonly color: 10181046;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "high";
 }, {
-    readonly name: "『⚡』・الإدارة العليا";
+    readonly name: "『⚡』・𝐇𝐢𝐠𝐡 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭";
     readonly color: 15158332;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "high";
 }, {
-    readonly name: "『💼』・المدير التنفيذي";
+    readonly name: "『💼』・𝐄𝐱𝐞𝐜𝐮𝐭𝐢𝐯𝐞 𝐃𝐢𝐫𝐞𝐜𝐭𝐨𝐫";
     readonly color: 15277667;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "high";
 }, {
-    readonly name: "══════ 👑 الإدارة العليا ══════";
+    readonly name: "══════ 👑 𝐇𝐢𝐠𝐡 𝐒𝐭𝐚𝐟𝐟 👑 ══════";
     readonly color: 3092790;
     readonly perms: bigint[];
     readonly hoist: false;
     readonly mentionable: false;
     readonly tier: "separator";
 }, {
-    readonly name: "『🔥』・رئيس الإداريين";
+    readonly name: "『🔥』・𝐇𝐞𝐚𝐝 𝐀𝐝𝐦𝐢𝐧";
     readonly color: 15158332;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "middle";
 }, {
-    readonly name: "『🔱』・إداري خبير";
+    readonly name: "『🔱』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐀𝐝𝐦𝐢𝐧";
     readonly color: 15965202;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "middle";
 }, {
-    readonly name: "『🛡️』・إداري عام";
+    readonly name: "『🛡️』・𝐀𝐝𝐦𝐢𝐧";
     readonly color: 9807270;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "middle";
 }, {
-    readonly name: "『⚙️』・مشرف عام";
+    readonly name: "『⚙️』・𝐒𝐮𝐩𝐞𝐫𝐯𝐢𝐬𝐨𝐫";
     readonly color: 3066993;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "middle";
 }, {
-    readonly name: "『⚔️』・رئيس المراقبين";
+    readonly name: "『⚔️』・𝐇𝐞𝐚𝐝 𝐌𝐨𝐝";
     readonly color: 3426654;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "middle";
 }, {
-    readonly name: "══════ 🛡️ الإدارة الوسطى ══════";
+    readonly name: "══════ 🛡️ 𝐌𝐢𝐝𝐝𝐥𝐞 𝐒𝐭𝐚𝐟𝐟 🛡️ ══════";
     readonly color: 3092790;
     readonly perms: bigint[];
     readonly hoist: false;
     readonly mentionable: false;
     readonly tier: "separator";
 }, {
-    readonly name: "『🔰』・مراقب أول";
+    readonly name: "『🔰』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐌𝐨𝐝";
     readonly color: 1752220;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "junior";
 }, {
-    readonly name: "『🔨』・مراقب";
+    readonly name: "『🔨』・𝐌𝐨𝐝𝐞𝐫𝐚𝐭𝐨𝐫";
     readonly color: 2600544;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "junior";
 }, {
-    readonly name: "『🎧』・فريق الدعم";
+    readonly name: "『🎧』・𝐒𝐮𝐩𝐩𝐨𝐫𝐭 𝐓𝐞𝐚𝐦";
     readonly color: 3447003;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "junior";
 }, {
-    readonly name: "『🌟』・مساعد";
+    readonly name: "『🌟』・𝐇𝐞𝐥𝐩𝐞𝐫";
     readonly color: 16243823;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "junior";
 }, {
-    readonly name: "『📝』・إداري تحت التجربة";
+    readonly name: "『📝』・𝐓𝐫𝐢𝐚𝐥 𝐒𝐭𝐚𝐟𝐟";
     readonly color: 8359053;
     readonly perms: bigint[];
     readonly hoist: true;
     readonly mentionable: true;
     readonly tier: "junior";
 }, {
-    readonly name: "══════ 🔰 الإدارة الصغرى ══════";
+    readonly name: "══════ 🔰 𝐉𝐮𝐧𝐢𝐨𝐫 𝐒𝐭𝐚𝐟𝐟 🔰 ══════";
+    readonly color: 3092790;
+    readonly perms: bigint[];
+    readonly hoist: false;
+    readonly mentionable: false;
+    readonly tier: "separator";
+}, {
+    readonly name: "『💻』・𝐋𝐞𝐚𝐝 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫";
+    readonly color: 47252;
+    readonly perms: bigint[];
+    readonly hoist: true;
+    readonly mentionable: true;
+    readonly tier: "dev";
+}, {
+    readonly name: "『🖥️』・𝐒𝐞𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫";
+    readonly color: 623843;
+    readonly perms: bigint[];
+    readonly hoist: true;
+    readonly mentionable: true;
+    readonly tier: "dev";
+}, {
+    readonly name: "『⌨️』・𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫";
+    readonly color: 7101671;
+    readonly perms: bigint[];
+    readonly hoist: true;
+    readonly mentionable: true;
+    readonly tier: "dev";
+}, {
+    readonly name: "『🛠️』・𝐉𝐮𝐧𝐢𝐨𝐫 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫";
+    readonly color: 10656766;
+    readonly perms: bigint[];
+    readonly hoist: true;
+    readonly mentionable: true;
+    readonly tier: "dev";
+}, {
+    readonly name: "══════ 💻 𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫 𝐓𝐞𝐚𝐦 ══════";
     readonly color: 3092790;
     readonly perms: bigint[];
     readonly hoist: false;
