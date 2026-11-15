@@ -541,8 +541,15 @@ const handler = {
                 settings.automod.badWords = value.split(/\r?\n/).map(w => w.trim()).filter(w => w.length > 0);
                 break;
             case 'ai:personality': {
+                // 🧩 شخصيّة واحدة في كل مكان: اللوق للـAI نفسه يتعب على customPersonality
+                // (الكتلة [MASK] داخل برومبت الردود)، والنظام/الداشبورد تقرأ systemPrompt —
+                // لازم يتكتبوا الاتنين بقيمة واحدة وإلا لوحّت كل لوحة ردود مختلفة عن غيرها.
+                const ai = settings.ai || {};
+                ai.systemPrompt = value;
+                settings.ai = ai;
+                (0, models_1.invalidateGuildSettings)(guildId);
                 await settings.save();
-                await models_1.AIConfig.findOneAndUpdate({ guildId }, { customPersonality: value }, { upsert: true }).catch(() => { });
+                await models_1.AIConfig.findOneAndUpdate({ guildId }, { customPersonality: value, systemPrompt: value }, { upsert: true }).catch(() => { });
                 break;
             }
             case 'ai:custom': {

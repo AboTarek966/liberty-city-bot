@@ -545,10 +545,17 @@ const handler: ModalHandler = {
         settings.automod.badWords = value.split(/\r?\n/).map(w => w.trim()).filter(w => w.length > 0);
         break;
       case 'ai:personality': {
+        // 🧩 شخصيّة واحدة في كل مكان: اللوق للـAI نفسه يتعب على customPersonality
+        // (الكتلة [MASK] داخل برومبت الردود)، والنظام/الداشبورد تقرأ systemPrompt —
+        // لازم يتكتبوا الاتنين بقيمة واحدة وإلا لوحّت كل لوحة ردود مختلفة عن غيرها.
+        const ai = (settings as any).ai || {};
+        ai.systemPrompt = value;
+        (settings as any).ai = ai;
+        invalidateGuildSettings(guildId);
         await settings.save();
         await AIConfig.findOneAndUpdate(
           { guildId },
-          { customPersonality: value },
+          { customPersonality: value, systemPrompt: value },
           { upsert: true }
         ).catch(() => {});
         break;

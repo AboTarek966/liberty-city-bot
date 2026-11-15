@@ -342,6 +342,7 @@ async function handleConfig(interaction: ChatInputCommandInteraction, client: Om
   if (systemPrompt) {
     settings.ai.systemPrompt = systemPrompt;
     aiUpdate.systemPrompt = systemPrompt;
+    aiUpdate.customPersonality = systemPrompt; // شخصية عامة واحدة في كل الأماكن
   }
   if (temperature !== null) {
     settings.ai.temperature = temperature;

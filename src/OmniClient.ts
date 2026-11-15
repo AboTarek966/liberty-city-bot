@@ -1068,6 +1068,8 @@ export class OmniClient extends Client {
       const target = map[key];
       if (target && value !== undefined) set[target] = value;
     }
+    // شخصية عامة واحدة: لو systemPrompt اتغير من اللوحة نكتبه في customPersonality كمان
+    if (typeof set.systemPrompt === 'string') set.customPersonality = set.systemPrompt;
     if (Object.keys(set).length === 0) return;
 
     const { AIConfig } = await import('./models');
