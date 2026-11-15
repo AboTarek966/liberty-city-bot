@@ -20,12 +20,12 @@ const command = {
         .setDescription('ما الذي تريد تصفيره؟')
         .setRequired(true)
         .addChoices({ name: 'كل شيء — النقاط + السجل الزمني', value: 'all' }, { name: 'النقاط فقط — تحتفظ بالسجل الزمني', value: 'points' }, { name: 'السجل الزمني فقط — تحتفظ بالنقاط', value: 'log' }))
-        .addUserOption((o) => o.setName('user').setDescription('اختياري — تصفير نقاط عضو بعينه فقط').setRequired(false))
         .addStringOption((o) => o
         .setName('confirm')
         .setDescription('اكتب «نقطة» (أو نعم) للتأكيد — العملية نهائية')
         .setRequired(true)
-        .setMaxLength(32)),
+        .setMaxLength(32))
+        .addUserOption((o) => o.setName('user').setDescription('اختياري — تصفير نقاط عضو بعينه فقط').setRequired(false)),
     cooldown: 5,
     async execute(interaction) {
         if (!interaction.guild || !interaction.member) {

@@ -33,15 +33,15 @@ const command: Command = {
           { name: 'السجل الزمني فقط — تحتفظ بالنقاط', value: 'log' }
         )
     )
-    .addUserOption((o) =>
-      o.setName('user').setDescription('اختياري — تصفير نقاط عضو بعينه فقط').setRequired(false)
-    )
     .addStringOption((o) =>
       o
         .setName('confirm')
         .setDescription('اكتب «نقطة» (أو نعم) للتأكيد — العملية نهائية')
         .setRequired(true)
         .setMaxLength(32)
+    )
+    .addUserOption((o) =>
+      o.setName('user').setDescription('اختياري — تصفير نقاط عضو بعينه فقط').setRequired(false)
     ),
 
   cooldown: 5,
