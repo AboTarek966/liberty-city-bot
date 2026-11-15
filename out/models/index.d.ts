@@ -836,6 +836,7 @@ export { GameStats } from './GameStats';
 export { Poll, IPoll } from './Poll';
 export { Giveaway, IGiveaway, IGiveawayRequirements } from './Giveaway';
 export { BotAbuseStrike, IBotAbuseStrike } from './BotAbuseStrike';
+export { Clan, IClan } from './Clan';
 export { DashboardSession } from './DashboardSession';
 export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';
