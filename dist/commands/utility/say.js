@@ -29,7 +29,10 @@ const command = {
         }
         const channel = interaction.channel;
         if (channel && typeof channel.send === 'function') {
-            await channel.send({ content: text }).catch(() => { });
+            await channel.send({
+                content: text,
+                allowedMentions: { parse: ['everyone', 'roles', 'users'] },
+            }).catch(() => { });
         }
     },
 };
