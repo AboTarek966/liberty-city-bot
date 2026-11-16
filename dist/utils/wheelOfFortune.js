@@ -445,63 +445,67 @@ async function renderWheelOfFortuneGif(opts) {
                 ctx.restore();
             }
             const avatar = images[i];
-            const avatarR = Math.max(20, Math.min(36, SEG_R * (n <= 4 ? 0.21 : n <= 6 ? 0.18 : 0.155)));
-            const avatarDist = SEG_R * 0.64;
+            const avatarR = Math.max(18, Math.min(34, SEG_R * (n <= 4 ? 0.2 : n <= 6 ? 0.17 : 0.145)));
+            const groupDist = SEG_R * 0.56;
+            const label = String(segs[i].label || '').slice(0, 12);
+            // الاسم بالعرض + الصورة بجانبه (مجموعة أفقية ثابتة الاتجاه داخل القطعة)
+            ctx.save();
+            ctx.rotate(mid);
+            ctx.translate(groupDist, 0);
+            ctx.rotate(-mid); // إبقاء النص والصورة أفقيين على الشاشة
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            const fontSize = Math.max(13, Math.min(22, Math.round(W * (n <= 6 ? 0.018 : 0.015))));
+            ctx.font = `bold ${fontSize}px ${fontFor(label)}`;
+            let drawLabel = label;
+            const maxTextW = SEG_R * (n <= 4 ? 0.38 : n <= 6 ? 0.32 : 0.26);
+            while (ctx.measureText(drawLabel).width > maxTextW && drawLabel.length > 2)
+                drawLabel = drawLabel.slice(0, -1) + '…';
+            const textW = ctx.measureText(drawLabel).width;
+            const gap = Math.max(4, avatarR * 0.25);
+            const totalW = avatarR * 2 + gap + textW;
+            const startX = -totalW / 2;
+            const ax = startX + avatarR;
+            const ay = 0;
+            // إطار/خلفية خفيفة للمجموعة لزيادة الوضوح
+            ctx.fillStyle = 'rgba(2,6,23,0.45)';
+            rr(startX - 6, -avatarR - 4, totalW + 12, avatarR * 2 + 8, avatarR * 0.6);
+            ctx.fill();
             if (avatar) {
-                // آفاتار دائري داخل القطعة
-                const ax = Math.cos(mid) * avatarDist;
-                const ay = Math.sin(mid) * avatarDist;
                 ctx.save();
-                ctx.beginPath();
-                ctx.arc(ax, ay, avatarR + 3, 0, TAU);
-                ctx.fillStyle = 'rgba(2,6,23,0.75)';
-                ctx.fill();
                 ctx.beginPath();
                 ctx.arc(ax, ay, avatarR, 0, TAU);
                 ctx.closePath();
                 ctx.clip();
-                const side = avatarR * 2;
-                ctx.drawImage(avatar, ax - side / 2, ay - side / 2, side, side);
+                ctx.drawImage(avatar, ax - avatarR, ay - avatarR, avatarR * 2, avatarR * 2);
                 ctx.restore();
                 ctx.beginPath();
                 ctx.arc(ax, ay, avatarR, 0, TAU);
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 2.5;
                 ctx.strokeStyle = '#fbbf24';
                 ctx.stroke();
             }
             else {
-                // حرف بدلاً من الآفاتار
-                const ax = Math.cos(mid) * avatarDist;
-                const ay = Math.sin(mid) * avatarDist;
                 ctx.beginPath();
                 ctx.arc(ax, ay, avatarR, 0, TAU);
-                ctx.fillStyle = 'rgba(2,6,23,0.7)';
+                ctx.fillStyle = 'rgba(15,23,42,0.9)';
                 ctx.fill();
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 2.5;
                 ctx.strokeStyle = '#fbbf24';
                 ctx.stroke();
                 ctx.save();
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.font = `bold ${Math.round(avatarR * 1.15)}px ${fontFor(segs[i].label)}`;
+                ctx.font = `bold ${Math.round(avatarR * 1.05)}px ${fontFor(label)}`;
                 ctx.fillStyle = '#ffffff';
-                ctx.fillText((segs[i].label || '?').trim().charAt(0).toUpperCase(), ax, ay + 1);
+                ctx.fillText((label.trim().charAt(0) || '?').toUpperCase(), ax, ay + 1);
                 ctx.restore();
             }
-            // الاسم على امتداد نصف القطر (باتجاه المركز → الحافة)
-            ctx.save();
-            ctx.rotate(mid);
-            ctx.translate(SEG_R * 0.38, 0);
-            ctx.rotate(Math.PI / 2);
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const label = String(segs[i].label || '').slice(0, 14);
-            ctx.font = `bold ${Math.max(14, Math.round(W * 0.038))}px ${fontFor(label)}`;
-            ctx.lineWidth = 4;
+            const tx = ax + avatarR + gap;
+            ctx.lineWidth = 3.5;
             ctx.strokeStyle = 'rgba(2,6,23,0.95)';
-            ctx.strokeText(label, 0, 0);
+            ctx.strokeText(drawLabel, tx, ay);
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(label, 0, 0);
+            ctx.fillText(drawLabel, tx, ay);
             ctx.restore();
         }
         // الإطار الذهبي الخارجي
