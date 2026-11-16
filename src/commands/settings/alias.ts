@@ -237,6 +237,7 @@ const command: Command = {
             .addChoices(
               { name: '⚙️ إعدادات', value: 'settings' },
               { name: '⌨️ علياس', value: 'alias' },
+              { name: '🧹 فصل إدارة', value: 'dismiss' },
               { name: '🎭 رول منيو', value: 'rolemenu' },
               { name: '➕ أوتو رول', value: 'autorole' },
               { name: '➕ رول أدد', value: 'roleadd' },
