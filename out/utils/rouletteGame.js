@@ -19,6 +19,7 @@ exports.addToRouletteLobby = addToRouletteLobby;
 exports.removeFromRouletteLobby = removeFromRouletteLobby;
 const discord_js_1 = require("discord.js");
 const wheelOfFortune_1 = require("./wheelOfFortune");
+const wheelWorker_1 = require("./wheelWorker");
 const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('Roulette');
 exports.rouletteGames = new Map();
@@ -169,17 +170,31 @@ async function runRouletteRound(client, game) {
             image: game.avatarBuffers[i],
         }));
         try {
-            gif = await (0, wheelOfFortune_1.renderWheelOfFortuneGif)({
-                title: 'روليت',
-                subtitle: 'دور — وادفع مين يُطرَد',
-                segments,
-                winnerIndex,
-                hubText: 'OMNI',
-                width: 720,
-                format: 'png',
-                orientation: 'landscape',
-                resultLabel: 'عليه الدور',
-            });
+            // أولوية: الرندر داخل Worker — الصورة لا توقف الـ Event Loop أبداً
+            gif =
+                (await (0, wheelWorker_1.renderWheelInWorker)({
+                    title: 'روليت',
+                    subtitle: 'دور — وادفع مين يُطرَد',
+                    segments,
+                    winnerIndex,
+                    hubText: 'OMNI',
+                    width: 720,
+                    format: 'png',
+                    orientation: 'landscape',
+                    resultLabel: 'عليه الدور',
+                })) ||
+                    // احتياطي: لو الـ Worker غير متاح أو انتهت المهلة — نجرب الرندر المباشر (مع العلم أنه أثقل)
+                    (await (0, wheelOfFortune_1.renderWheelOfFortuneGif)({
+                        title: 'روليت',
+                        subtitle: 'دور — وادفع مين يُطرَد',
+                        segments,
+                        winnerIndex,
+                        hubText: 'OMNI',
+                        width: 720,
+                        format: 'png',
+                        orientation: 'landscape',
+                        resultLabel: 'عليه الدور',
+                    }));
         }
         catch (err) {
             logger.warn(`wheel render failed: ${err?.message || err}`);

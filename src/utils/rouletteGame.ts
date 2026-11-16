@@ -15,6 +15,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { renderWheelOfFortuneGif, fetchAvatarBuffer, WheelSegmentInput } from './wheelOfFortune';
+import { renderWheelInWorker } from './wheelWorker';
 import { createLogger, sleep } from './helpers';
 
 const logger = createLogger('Roulette');
@@ -216,17 +217,31 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
       image: game.avatarBuffers[i],
     }));
     try {
-      gif = await renderWheelOfFortuneGif({
-        title: 'روليت',
-        subtitle: 'دور — وادفع مين يُطرَد',
-        segments,
-        winnerIndex,
-        hubText: 'OMNI',
-        width: 720,
-        format: 'png',
-        orientation: 'landscape',
-        resultLabel: 'عليه الدور',
-      });
+      // أولوية: الرندر داخل Worker — الصورة لا توقف الـ Event Loop أبداً
+      gif =
+        (await renderWheelInWorker({
+          title: 'روليت',
+          subtitle: 'دور — وادفع مين يُطرَد',
+          segments,
+          winnerIndex,
+          hubText: 'OMNI',
+          width: 720,
+          format: 'png',
+          orientation: 'landscape',
+          resultLabel: 'عليه الدور',
+        })) ||
+        // احتياطي: لو الـ Worker غير متاح أو انتهت المهلة — نجرب الرندر المباشر (مع العلم أنه أثقل)
+        (await renderWheelOfFortuneGif({
+          title: 'روليت',
+          subtitle: 'دور — وادفع مين يُطرَد',
+          segments,
+          winnerIndex,
+          hubText: 'OMNI',
+          width: 720,
+          format: 'png',
+          orientation: 'landscape',
+          resultLabel: 'عليه الدور',
+        }));
     } catch (err: any) {
       logger.warn(`wheel render failed: ${err?.message || err}`);
     }
