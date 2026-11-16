@@ -166,7 +166,9 @@ async function runRouletteRound(client, game) {
             segments,
             winnerIndex,
             hubText: 'OMNI',
-            width: 440,
+            width: 1280,
+            orientation: 'landscape',
+            resultLabel: 'عليه الدور',
         });
     }
     catch (err) {

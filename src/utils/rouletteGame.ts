@@ -211,7 +211,9 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
       segments,
       winnerIndex,
       hubText: 'OMNI',
-      width: 440,
+      width: 1280,
+      orientation: 'landscape',
+      resultLabel: 'عليه الدور',
     });
   } catch (err: any) {
     logger.warn(`wheel gif failed: ${err?.message || err}`);

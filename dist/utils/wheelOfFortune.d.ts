@@ -17,6 +17,10 @@ export interface WheelOfFortuneOptions {
     delayMs?: number;
     holdMs?: number;
     hubText?: string;
+    /** 📐 portrait (عمودي — الافتراضي) أو landscape (عريض 16:9 بلوحة مشاركين) */
+    orientation?: 'portrait' | 'landscape';
+    /** نص التمييز بجانب الفائز في اللوحة/الصورة (افتراضي: الفائز) */
+    resultLabel?: string;
 }
 /**
  * رسم عجلة الحظ كـ GIF متحرك.

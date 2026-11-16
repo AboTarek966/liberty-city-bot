@@ -86,12 +86,14 @@ async function renderWheelOfFortuneGif(opts) {
     ensureFonts();
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { createCanvas } = require('@napi-rs/canvas');
-    const W = opts.width || 440;
-    const H = Math.round(W * 1.18);
-    const frames = Math.max(20, opts.frames || 34);
+    const isLandscape = opts.orientation === 'landscape';
+    const W = opts.width || (isLandscape ? 1280 : 440);
+    const H = isLandscape ? Math.round(W * 0.5625) : Math.round(W * 1.18); // 16:9 أو عمودي
+    const frames = Math.max(20, opts.frames || (isLandscape ? 30 : 34));
     const delayMs = opts.delayMs ?? 46;
     const holdMs = opts.holdMs ?? 850;
     const hubText = opts.hubText || 'OMNI';
+    const resultLabel = opts.resultLabel || 'الفائز';
     const segs = opts.segments.filter(Boolean);
     const n = segs.length;
     if (n < 2 || opts.winnerIndex < 0 || opts.winnerIndex >= n) {
@@ -104,15 +106,110 @@ async function renderWheelOfFortuneGif(opts) {
     while (target < TAU * 4.5)
         target += TAU;
     const images = await loadImages(segs);
-    const CX = W / 2;
-    const CY = Math.round(H * 0.63);
-    const R = Math.round(W * 0.335); // نصف قطر القطع
-    const RIM = Math.max(14, Math.round(W * 0.036)); // عرض الإطار الذهبي
+    // لوحة العرض: landscape ← العجلة على اليمين + لوحة مشاركين على اليسار
+    const PANEL_W = isLandscape ? Math.round(W * 0.4) : 0; // عرض لوحة المشاركين
+    const CX = isLandscape ? Math.round(PANEL_W + (W - PANEL_W) / 2) : W / 2;
+    const CY = isLandscape ? Math.round(H * 0.5) : Math.round(H * 0.63);
+    const R = isLandscape ? Math.round(Math.min(H * 0.37, (W - PANEL_W) * 0.38)) : Math.round(W * 0.335);
+    const RIM = isLandscape ? Math.round(Math.max(16, H * 0.032)) : Math.max(14, Math.round(W * 0.036));
     const HUB = Math.round(R * 0.27);
     const SEG_R = R;
     const canvas = createCanvas(W, H);
     const ctx = canvas.getContext('2d');
+    // أدوات مساعدة للرسم الزخرفي (تُعاد لكل إطار)
+    const pseudoRand = (i) => {
+        const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+        return x - Math.floor(x);
+    };
+    const rr = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    };
+    const drawDiamond = (x, y, s) => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI / 4);
+        ctx.shadowColor = 'rgba(245,158,11,0.7)';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-s / 2, -s / 2, s, s);
+        ctx.restore();
+    };
     const drawBackground = () => {
+        if (isLandscape) {
+            // لوحة المشاركين (يسرى) — خلفية داكنة متدرجة
+            const leftg = ctx.createLinearGradient(0, 0, PANEL_W, H);
+            leftg.addColorStop(0, '#070d20');
+            leftg.addColorStop(0.45, '#0b1224');
+            leftg.addColorStop(1, '#0f1730');
+            ctx.fillStyle = leftg;
+            ctx.fillRect(0, 0, PANEL_W, H);
+            // حجرة العجلة (يمنى) — توهج مركزه خلف العجلة
+            const rightg = ctx.createRadialGradient(CX, CY, R * 0.18, CX, CY, H * 0.95);
+            rightg.addColorStop(0, '#1c2740');
+            rightg.addColorStop(0.4, '#101936');
+            rightg.addColorStop(1, '#020617');
+            ctx.fillStyle = rightg;
+            ctx.fillRect(PANEL_W, 0, W - PANEL_W, H);
+            // زخرفة نقاط متناثرة على اللوحة (ثابتة بين الإطارات)
+            for (let i = 0; i < 30; i++) {
+                const x = pseudoRand(i) * PANEL_W * 0.9 + PANEL_W * 0.05;
+                const y = pseudoRand(i + 100) * H * 0.9 + H * 0.05;
+                const sz = 1 + pseudoRand(i + 200) * 2.2;
+                ctx.beginPath();
+                ctx.arc(x, y, sz, 0, TAU);
+                ctx.fillStyle = `rgba(251,191,36,${0.04 + pseudoRand(i + 300) * 0.07})`;
+                ctx.fill();
+            }
+            // توهج ناعم حول العجلة
+            const glow = ctx.createRadialGradient(CX, CY, R * 0.75, CX, CY, R * 1.9);
+            glow.addColorStop(0, 'rgba(245,158,11,0.18)');
+            glow.addColorStop(1, 'rgba(245,158,11,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(PANEL_W, 0, W - PANEL_W, H);
+            // دوائر متحدة المركز خلف العجلة
+            ctx.strokeStyle = 'rgba(148,163,184,0.06)';
+            ctx.lineWidth = 1;
+            for (let r = R * 0.55; r < H * 0.75; r += R * 0.36) {
+                ctx.beginPath();
+                ctx.arc(CX, CY, r, 0, TAU);
+                ctx.stroke();
+            }
+            // زخارف الزوايا الذهبية على اللوحة
+            const bracket = Math.round(PANEL_W * 0.062);
+            const bracketStroke = (x, y, dx, dy) => {
+                ctx.save();
+                ctx.strokeStyle = '#d4a017';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = 'rgba(212,160,23,0.65)';
+                ctx.shadowBlur = 7;
+                ctx.beginPath();
+                ctx.moveTo(x + bracket * dx, y);
+                ctx.lineTo(x, y);
+                ctx.lineTo(x, y + bracket * dy);
+                ctx.stroke();
+                ctx.restore();
+            };
+            bracketStroke(12, 12, 1, 1);
+            bracketStroke(PANEL_W - 12, 12, -1, 1);
+            bracketStroke(12, H - 12, 1, -1);
+            bracketStroke(PANEL_W - 12, H - 12, -1, -1);
+            // خط فاصل ذهبي متدرج بين اللوحة والعجلة
+            const lg = ctx.createLinearGradient(0, 0, 0, H);
+            lg.addColorStop(0, 'rgba(251,191,36,0)');
+            lg.addColorStop(0.16, 'rgba(251,191,36,0.55)');
+            lg.addColorStop(0.5, '#f59e0b');
+            lg.addColorStop(0.84, 'rgba(251,191,36,0.55)');
+            lg.addColorStop(1, 'rgba(251,191,36,0)');
+            ctx.fillStyle = lg;
+            ctx.fillRect(PANEL_W - 1, 0, 2, H);
+            return;
+        }
         const g = ctx.createRadialGradient(CX, CY, R * 0.2, CX, CY, H);
         g.addColorStop(0, '#1e293b');
         g.addColorStop(0.55, '#0f172a');
@@ -128,7 +225,7 @@ async function renderWheelOfFortuneGif(opts) {
             ctx.stroke();
         }
     };
-    const drawTitle = () => {
+    const drawTitle = (glow) => {
         const gold = ctx.createLinearGradient(0, 0, 0, H * 0.14);
         gold.addColorStop(0, '#fde68a');
         gold.addColorStop(0.5, '#f59e0b');
@@ -136,6 +233,126 @@ async function renderWheelOfFortuneGif(opts) {
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        if (isLandscape) {
+            const px = PANEL_W / 2;
+            // OMNI ROULETTE — شارة ملتصقة بالأعلى
+            ctx.font = `bold ${Math.round(W * 0.014)}px ${fontFor('OMNIROULETTE')}`;
+            ctx.shadowColor = 'rgba(245,158,11,0.4)';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#d4a017';
+            ctx.fillText('★  O M N I   R O U L E T T E  ★', px, H * 0.078);
+            ctx.shadowBlur = 0;
+            // اسم البطولة — ذهبي كبير متدرج
+            const bigGold = ctx.createLinearGradient(0, H * 0.115, 0, H * 0.235);
+            bigGold.addColorStop(0, '#fef3c7');
+            bigGold.addColorStop(0.35, '#fcd34d');
+            bigGold.addColorStop(0.7, '#d97706');
+            bigGold.addColorStop(1, '#f59e0b');
+            ctx.fillStyle = bigGold;
+            ctx.font = `bold ${Math.round(W * 0.048)}px ${fontFor(opts.title)}`;
+            ctx.shadowColor = 'rgba(245,158,11,0.5)';
+            ctx.shadowBlur = 18;
+            ctx.fillText(opts.title, px, H * 0.175);
+            ctx.shadowBlur = 0;
+            // العنوان الفرعي
+            if (opts.subtitle) {
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = `${Math.round(W * 0.017)}px ${fontFor(opts.subtitle, false)}`;
+                ctx.fillText(opts.subtitle, px, H * 0.235);
+            }
+            // خط فاصل مع ماسة في المنتصف
+            const dy = H * 0.278;
+            const lg = ctx.createLinearGradient(PANEL_W * 0.17, 0, PANEL_W * 0.83, 0);
+            lg.addColorStop(0, 'rgba(245,158,11,0)');
+            lg.addColorStop(0.5, '#f59e0b');
+            lg.addColorStop(1, 'rgba(245,158,11,0)');
+            ctx.fillStyle = lg;
+            ctx.fillRect(PANEL_W * 0.17, dy, PANEL_W * 0.66, 2);
+            drawDiamond(px, dy + 1, 8);
+            // ───── قائمة المشاركين ─────
+            const startY = H * 0.345;
+            const rowH = Math.min(Math.round(H * 0.052), 44);
+            const rowPad = 5;
+            const maxRows = Math.max(1, Math.min(n, Math.floor((H * 0.865 - startY) / rowH)));
+            for (let i = 0; i < maxRows; i++) {
+                const y = startY + i * rowH + rowH / 2;
+                const isWinnerRow = glow && i === opts.winnerIndex;
+                // خلفية الصف
+                ctx.fillStyle = isWinnerRow
+                    ? 'rgba(245,158,11,0.18)'
+                    : i % 2
+                        ? 'rgba(148,163,184,0.05)'
+                        : 'rgba(148,163,184,0.1)';
+                rr(PANEL_W * 0.075, y - rowH / 2 + rowPad / 2 + 1, PANEL_W * 0.85, rowH - rowPad, 9);
+                ctx.fill();
+                if (isWinnerRow) {
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = 'rgba(251,191,36,0.6)';
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+                // آفاتار — دائرة ذهبية + صورة أو حرف
+                const ar = rowH * 0.3;
+                const ax = PANEL_W * 0.145;
+                const av = images[i];
+                if (av) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(ax, y, ar, 0, TAU);
+                    ctx.closePath();
+                    ctx.fillStyle = '#0b1224';
+                    ctx.fill();
+                    ctx.clip();
+                    ctx.drawImage(av, ax - ar, y - ar, ar * 2, ar * 2);
+                    ctx.restore();
+                }
+                else {
+                    ctx.beginPath();
+                    ctx.arc(ax, y, ar, 0, TAU);
+                    ctx.fillStyle = '#0b1224';
+                    ctx.fill();
+                    ctx.textAlign = 'center';
+                    ctx.font = `bold ${Math.round(ar * 1.12)}px ${fontFor(String(segs[i]?.label || '?'))}`;
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillText((String(segs[i]?.label || '?').trim().charAt(0) || '?').toUpperCase(), ax, y + 1);
+                    ctx.textAlign = 'center';
+                }
+                ctx.beginPath();
+                ctx.arc(ax, y, ar, 0, TAU);
+                ctx.lineWidth = isWinnerRow ? 2.5 : 1.5;
+                ctx.strokeStyle = isWinnerRow ? '#fde047' : '#d4a017';
+                ctx.stroke();
+                // الاسم
+                const name = String(segs[i]?.label || '').slice(0, 14);
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.font = `bold ${Math.round(W * 0.0145)}px ${fontFor(name)}`;
+                ctx.fillStyle = isWinnerRow ? '#fde68a' : '#e2e8f0';
+                ctx.fillText(name, PANEL_W * 0.215, y);
+                if (isWinnerRow) {
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = `bold ${Math.round(W * 0.0175)}px ${fontFor(resultLabel)}`;
+                    ctx.fillText(resultLabel, PANEL_W * 0.845, y);
+                }
+            }
+            ctx.restore();
+            // تذييل اللوحة — المجموع + الختم
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const shown = Math.min(n, maxRows);
+            ctx.fillStyle = '#64748b';
+            ctx.font = `${Math.round(W * 0.0135)}px ${fontFor('اللاعبين', false)}`;
+            ctx.fillText(shown < n ? `و ${n - shown} لاعبين آخرين — المجموع ${n}` : `المشاركين: ${n}`, px, H * 0.895);
+            ctx.fillStyle = '#475569';
+            ctx.font = `bold ${Math.round(W * 0.0115)}px OmniSans`;
+            ctx.fillText('O M N I', px, H * 0.943);
+            ctx.restore();
+            return;
+        }
         ctx.font = `bold ${Math.round(W * 0.085)}px ${fontFor(opts.title)}`;
         ctx.shadowColor = 'rgba(245,158,11,0.45)';
         ctx.shadowBlur = 18;
@@ -340,8 +557,9 @@ async function renderWheelOfFortuneGif(opts) {
         ctx.restore();
         ctx.restore();
     };
-    // إطار ثابت نهائي: هالة ذهبية تضيء حول العجلة يومض
+    // إطار ثابت نهائي: هالة ذهبية تضيء حول العجلة + اسم المختار بشكل واضح
     const drawFinalOverlay = () => {
+        const winnerName = String(segs[opts.winnerIndex]?.label || '').slice(0, 24);
         ctx.save();
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = 34;
@@ -351,12 +569,52 @@ async function renderWheelOfFortuneGif(opts) {
         ctx.strokeStyle = 'rgba(255,215,0,0.9)';
         ctx.stroke();
         ctx.restore();
+        // لافتة كبيرة وواضحة باسم العضو اللي عليه الدور/الفائز
+        const bannerText = `${resultLabel}: ${winnerName}`;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const fontSize = isLandscape ? Math.round(W * 0.028) : Math.round(W * 0.055);
+        ctx.font = `bold ${fontSize}px ${fontFor(bannerText)}`;
+        const metrics = ctx.measureText(bannerText);
+        const padX = fontSize * 0.9;
+        const padY = fontSize * 0.55;
+        const bw = Math.min((metrics.width || bannerText.length * fontSize * 0.5) + padX * 2, (isLandscape ? W - PANEL_W : W) - 40);
+        const bh = fontSize + padY * 2;
+        const bx = CX - bw / 2;
+        const byRaw = isLandscape ? H - bh - Math.round(H * 0.045) : CY + R + RIM + Math.round(H * 0.04);
+        const by = Math.max(8, Math.min(byRaw, H - bh - 8));
+        // خلفية اللافتة
+        const bg = ctx.createLinearGradient(bx, by, bx, by + bh);
+        bg.addColorStop(0, 'rgba(120,53,15,0.95)');
+        bg.addColorStop(0.5, 'rgba(180,83,9,0.96)');
+        bg.addColorStop(1, 'rgba(120,53,15,0.95)');
+        ctx.fillStyle = bg;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 14;
+        rr(bx, by, bw, bh, 14);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#fde68a';
+        ctx.stroke();
+        // نص اللافتة
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#fffbeb';
+        // قص النص لو طويل
+        let drawText = bannerText;
+        while (ctx.measureText(drawText).width > bw - padX * 1.2 && drawText.length > 4) {
+            drawText = drawText.slice(0, -2) + '…';
+        }
+        ctx.fillText(drawText, CX, by + bh / 2 + 1);
+        ctx.restore();
     };
     const frameCount = frames + 1; // + إطار ثابت أخير لإبراز الفائز
     // 🎨 لوحة ألوان واحدة لكل الإطارات (من إطار منتصف الحركة) — أسرع وأخف على الذاكرة
     const sampleRotation = easeOutQuart(0.4) * target;
     drawBackground();
-    drawTitle();
+    drawTitle(false);
     drawWheel(sampleRotation, false);
     drawPointer();
     const { data: sampleData } = ctx.getImageData(0, 0, W, H);
@@ -378,7 +636,7 @@ async function renderWheelOfFortuneGif(opts) {
         const rotation = easeOutQuart(t) * target;
         const glow = isFinal || t > 0.93;
         drawBackground();
-        drawTitle();
+        drawTitle(glow);
         drawWheel(rotation, glow);
         drawPointer();
         if (isFinal)
