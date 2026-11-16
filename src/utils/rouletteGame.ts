@@ -211,7 +211,10 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
       segments,
       winnerIndex,
       hubText: 'OMNI',
-      width: 1280,
+      // أصغر وأخف لتجنب تجميد البوت (CPU) أثناء توليد GIF
+      width: 960,
+      frames: 24,
+      delayMs: 55,
       orientation: 'landscape',
       resultLabel: 'عليه الدور',
     });
