@@ -49,6 +49,7 @@ const models_1 = require("../../models");
 const ActivityTracker_1 = require("../../handlers/ActivityTracker");
 const clanImage_1 = require("../../utils/clanImage");
 const helpers_1 = require("../../utils/helpers");
+const botOwner_1 = require("../../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('Clan');
 const DEFAULT_COLOR = 0x3498db;
 const MAX_CLANS_PER_GUILD = 15;
@@ -191,15 +192,26 @@ const command = {
         }
         const sub = interaction.options.getSubcommand();
         const guild = interaction.guild;
-        // 🔒 ما يقدرش يعمل كلانات (أو يعدّلها) غير من معه أدمنستريتور فقط
+        // 🔒 إدارة/فعاليات العشائر: أدمنستريتور + أعلى رول في السيرفر (أو مالك البوت)
         const READ_ONLY_SUBS = new Set(['list', 'info', 'leaderboard', 'comp-status']);
         if (!READ_ONLY_SUBS.has(sub)) {
-            const isOwner = guild.ownerId === interaction.user.id;
+            const member = interaction.member instanceof discord_js_1.GuildMember
+                ? interaction.member
+                : await guild.members.fetch(interaction.user.id).catch(() => null);
+            const botOwner = await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id).catch(() => false);
+            const isGuildOwner = guild.ownerId === interaction.user.id;
             const hasAdmin = interaction.memberPermissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator) ??
-                interaction.member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator);
-            if (!isOwner && !hasAdmin) {
+                member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator) ??
+                false;
+            // أعلى رول موجود في السيرفر (حسب ترتيب الرتب)
+            const topRole = guild.roles.highest;
+            const hasHighestRole = !!member && !!topRole && member.roles.cache.has(topRole.id);
+            if (!botOwner && !isGuildOwner && !(hasAdmin && hasHighestRole)) {
                 await interaction.reply({
-                    content: '⛔ **إدارة العشائر محصورة بحاملي صلاحية أدمنستريتور فقط**\n' +
+                    content: '⛔ **إدارة وفعاليات العشائر محصورة بـ:**\n' +
+                        '• من يملك صلاحية **أدمنستريتور** ومعه **أعلى رول** موجود في السيرفر\n' +
+                        '• أو مالك السيرفر\n' +
+                        '• أو مالك البوت\n\n' +
                         '(القراءة متاحة للطاقم: `/clan list`، `/clan info`، `/clan leaderboard`، `/clan comp-status`)',
                     ephemeral: true,
                 });
