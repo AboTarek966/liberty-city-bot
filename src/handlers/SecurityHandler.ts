@@ -2334,7 +2334,7 @@ export class SecurityHandler {
         logger.info(`✅ Hierarchy fixed in ${guild.name} — البوت الآن أعلى رتبة`);
       } else {
         logger.warn(
-          `🚨 Hierarchy: bot NOT top in ${guild.name} | bot=#${status.botPosition} | offenders=${status.offenderCount}`
+          `🚨 Hierarchy: bot NOT top in ${guild.name} | bot="${status.botRoleName}" #${status.botPosition} | فوقه: ${status.offenders.join('، ') || '—'} | offenders=${status.offenderCount}`
         );
       }
       return status;

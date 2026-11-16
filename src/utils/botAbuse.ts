@@ -197,9 +197,15 @@ export async function handleBotAbuse(
       || (await guild.members.fetch(message.author.id).catch(() => null));
     if (!member) return false;
     if (member.id === guild.ownerId) return false;
-    if (member.permissions.has(PermissionFlagsBits.Administrator)) return false;
-    // رتبة العضو يجب أن تكون أقل من رتبة البوت (وإلا لا يمكن التصرف)
-    if (member.roles.highest && botMember.roles.highest.position <= member.roles.highest.position) return false;
+    if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+      logger.debug(`AntiBotAbuse: تجاوز ${member.user.tag} — لديه صلاحية Administrator`);
+      return false;
+    }
+    // 🚦 رتبة العضو يجب أن تكون أقل من رتبة البوت **للتصعيد فقط** (سحب رولات/حظر).
+    //    الحذف والتحذير يعملان حتى لو كانت رتبته أعلى — Discord يسمح بحذف الرسائل بصلاحية ManageMessages
+    //    بغض النظر عن ترتيب الرولات، فلا نصمت تماماً كما كان يحدث سابقاً.
+    const canEscalate =
+      !member.roles.highest || botMember.roles.highest.position > member.roles.highest.position;
 
     // هل الرسالة تستهدف البوت فعلاً؟
     if (!(await targetsBot(message, client))) return false;
@@ -241,8 +247,11 @@ export async function handleBotAbuse(
 
     // 1️⃣ تحذير لفظي
     if (count === 1) {
+      const escalationHint = canEscalate
+        ? 'إذا كررتها ستُسحب رولاتك. في المرة الثالثة يتم الحظر.'
+        : `لا أستطيع سحب رولاتك أو حظرك لأن رولك «${member.roles.highest.name}» أعلى من رول البوت — رتّب رول البوت أعلى لحماية كاملة.`;
       await (message.channel as any).send({
-        content: `⚠️ ${member} هذه إساءة للبوت — مرة واحدة فقط مسموحة. إذا كررتها ستُسحب رولاتك. في المرة الثالثة يتم الحظر.`,
+        content: `⚠️ ${member} هذه إساءة للبوت — مرة واحدة فقط مسموحة. ${escalationHint}`,
       }).catch(() => {});
       await sendLog('تحذير لفظي');
       return true;
@@ -250,6 +259,15 @@ export async function handleBotAbuse(
 
     // 2️⃣ سحب كل الرولات القابلة للإزالة
     if (count === 2) {
+      // ❗ رول العضو أعلى من رول البوت → لا يمكن سحب الرولات أو الحظر
+      if (!canEscalate) {
+        await (message.channel as any).send({
+          content: `⚠️ ${member} تم تسجيل إساءة جديدة للبوت (${count}). رولك «${member.roles.highest.name}» أعلى من رول البوت، لذلك لا أستطيع سحب الرولات أو الحظر — رتّب رول البوت أعلى لحماية كاملة.`,
+        }).catch(() => {});
+        await sendLog(`تعذر التصعيد — رول العضو «${member.roles.highest.name}» أعلى من رول البوت`);
+        return true;
+      }
+
       const meHighest = botMember.roles.highest.position;
       const removable = member.roles.cache.filter(
         (r) => r.id !== guild.id && r.position < meHighest && r.editable
@@ -268,6 +286,13 @@ export async function handleBotAbuse(
 
     // 3️⃣ حظر
     if (count >= 3) {
+      if (!canEscalate) {
+        await (message.channel as any).send({
+          content: `⚠️ ${member} تم تسجيل إساءة جديدة للبوت (${count}). رولك «${member.roles.highest.name}» أعلى من رول البوت، لذلك لا أستطيع الحظر — رتّب رول البوت أعلى لحماية كاملة.`,
+        }).catch(() => {});
+        await sendLog(`تعذر الحظر — رول العضو «${member.roles.highest.name}» أعلى من رول البوت`);
+        return true;
+      }
       await member.ban({ reason: 'إساءة متكررة للبوت (3 مرات)', deleteMessageSeconds: 604800 }).catch(() => {});
       await sendLog('حظر');
       return true;
