@@ -65,15 +65,23 @@ const BOT_NAME_PATTERN = /(^|\s)(بوت|البوت|يا\s?بوت|bot|the\s?bot|o
 // كابسة شاملة: يابوت / بوتك / بوتات / كل حرف ما بوت — رسالة عن البوت بغض النظر عن كتابة الحدود
 const BOT_SUBSTRING_PATTERN = /بوت|omni|bot|liber(ty|ti)/i;
 
-function targetsBot(message: Message, client: OmniClient): boolean {
+async function targetsBot(message: Message, client: OmniClient): Promise<boolean> {
   const meId = client.user?.id;
   if (meId && message.mentions?.users?.has(meId)) return true;
   if (meId && message.mentions?.members?.has(meId)) return true;
-  // ردّ مباشر على رسالة البوت
+
+  // ردّ مباشر على رسالة البوت (يشمل الحالات التي لا يُعبّأ فيها mentions.repliedUser)
   if (meId && message.reference?.messageId) {
     const replied = message.mentions?.repliedUser;
     if (replied?.id === meId) return true;
+    try {
+      const ref = await message.fetchReference();
+      if (ref?.author?.id === meId) return true;
+    } catch {
+      /* تجاهل فشل جلب الرسالة المُشار إليها */
+    }
   }
+
   // إشارة/اسم البوت داخل الرسالة
   const content = normalizeForAbuse(message.content || '');
   if (BOT_NAME_PATTERN.test(content)) return true;
@@ -178,7 +186,7 @@ export async function handleBotAbuse(
     if (member.roles.highest && botMember.roles.highest.position <= member.roles.highest.position) return false;
 
     // هل الرسالة تستهدف البوت فعلاً؟
-    if (!targetsBot(message, client)) return false;
+    if (!(await targetsBot(message, client))) return false;
     if (!hasAbuse(message.content || '', (settings as any)?.automod?.badWords)) return false;
 
     // حذف الرسالة (إن أمكن)
