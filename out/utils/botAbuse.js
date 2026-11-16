@@ -199,10 +199,9 @@ async function handleBotAbuse(message) {
             return false;
         if (member.id === guild.ownerId)
             return false;
-        if (member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
-            logger.debug(`AntiBotAbuse: تجاوز ${member.user.tag} — لديه صلاحية Administrator`);
-            return false;
-        }
+        // 🔓 لا استثناء للأدمن: السياسة المطلوبة = حذف → سحب رتب → حظر
+        //    (Timeout مستحيل على Administrator بحكم Discord، لكن سحب الرولات والحظر مسموحان
+        //     طالما رول البوت أعلى — ولو الرول أعلى، نكتفي بالحذف والتحذير مع توضيح السبب)
         // 🚦 رتبة العضو يجب أن تكون أقل من رتبة البوت **للتصعيد فقط** (سحب رولات/حظر).
         //    الحذف والتحذير يعملان حتى لو كانت رتبته أعلى — Discord يسمح بحذف الرسائل بصلاحية ManageMessages
         //    بغض النظر عن ترتيب الرولات، فلا نصمت تماماً كما كان يحدث سابقاً.
@@ -210,8 +209,11 @@ async function handleBotAbuse(message) {
         // هل الرسالة تستهدف البوت فعلاً؟
         if (!(await targetsBot(message, client)))
             return false;
-        if (!hasAbuse(message.content || '', settings?.automod?.badWords))
+        if (!hasAbuse(message.content || '', settings?.automod?.badWords)) {
+            // 🔍 تشخيص: رسالة موجّهة للبوت ولم تُصنّف كإساءة — نسجّل النص لاكتشاف الكلمات الناقصة
+            logger.debug(`AntiBotAbuse: رسالة للبوت خارج القاموس | ${message.author.tag} | "${(message.content || '').slice(0, 180)}"`);
             return false;
+        }
         // حذف الرسالة (إن أمكن)
         if (message.deletable) {
             await message.delete().catch(() => { });
