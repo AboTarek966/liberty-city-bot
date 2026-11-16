@@ -14,7 +14,7 @@ const securityAlerts_1 = require("./securityAlerts");
 const abuseDetector_1 = require("./abuseDetector");
 const logger = (0, helpers_1.createLogger)('AntiBotAbuse');
 // 🤖 اسم البوت داخل الرسالة (بعد التطبيع)
-const BOT_NAME_PATTERN = /(^|\s)(بوت|البوت|يابوت|بوتك|بوتي|بوتنا|بوتكم|بوتات|bot|thebot|omni|اومني|ليبرتي|liberty|liberti|liber)(\s|$)/iu;
+const BOT_NAME_PATTERN = /(^|\s)(?:و|ف|ب)?(?:ال)?(?:يا)?(بوت|بوتك|بوتي|بوتنا|بوتكم|بوتات|bot|thebot|omni|اومني|ليبرتي|liberty|liberti|liber)(\s|$)/iu;
 // أسماء لصيقة مثل OmniBot / LibertyBot (بدون كلمة bot منفصلة لتفادي robot)
 const BOT_SUBSTRING_PATTERN = /omni|اومني|ليبرتي|liberty|liberti/i;
 /** كلمات الحظر المخصّصة للسيرفر (تُعامل كإساءة إضافية) */

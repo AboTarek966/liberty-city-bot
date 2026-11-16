@@ -112,11 +112,14 @@ const command = {
                 : record
                     ? `عدد الإساءات: **${record.count ?? 0}**`
                     : 'لا يوجد سجل إساءات';
+            const ownerNote = targetUser && targetUser.id === guild?.ownerId
+                ? '\n👑 هذا العضو مالك السيرفر — مستثنى من العقوبات بحكم Discord.'
+                : '';
             embed.addFields({
                 name: `👤 سجل ${user.tag}`,
                 value: `${recordLine}${targetUser
                     ? `\n${hierarchyLine(botMember?.roles.highest.position, targetUser.roles.highest.position, targetUser.roles.highest.name)}`
-                    : ''}`,
+                    : ''}${ownerNote}`,
                 inline: false,
             });
         }
