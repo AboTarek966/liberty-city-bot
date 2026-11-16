@@ -1694,6 +1694,7 @@ export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';
 export { AITicketApproval, IAITicketApproval } from './AITicketApproval';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';
+export { Store, StoreOrder, IStore, IStoreProject, IStoreOrder, StoreOrderStatus } from './Store';
 
 // --------------------------------------------
 // Helper Functions
