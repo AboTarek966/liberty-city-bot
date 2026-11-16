@@ -14,6 +14,45 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const helpers_1 = require("./helpers");
 const logger = (0, helpers_1.createLogger)('WheelOfFortune');
+// 🗜️ كاش صغير لصور PNG الثابتة — يمنع إعادة الرسم المكلفة عند تكرار نفس الجولة/الفائز
+const PNG_CACHE_MAX = 48;
+const pngRenderCache = new Map();
+function pngCacheKey(opts) {
+    const normalizedSegments = (opts.segments || [])
+        .filter(Boolean)
+        .map((s) => `${String(s.label || '').slice(0, 24)}|${s.image ? 'img' : 'txt'}`)
+        .join('~');
+    return [
+        opts.orientation || 'portrait',
+        opts.width || '',
+        opts.winnerIndex,
+        String(opts.title || '').slice(0, 40),
+        String(opts.subtitle || '').slice(0, 60),
+        String(opts.hubText || '').slice(0, 24),
+        String(opts.resultLabel || '').slice(0, 32),
+        normalizedSegments,
+    ].join('::');
+}
+function pngCacheGet(key) {
+    const hit = pngRenderCache.get(key);
+    if (!hit)
+        return undefined;
+    // أعد التفعيل لتجديد موضعه (تقريب LRU)
+    pngRenderCache.delete(key);
+    pngRenderCache.set(key, hit);
+    return hit;
+}
+function pngCacheSet(key, value) {
+    if (pngRenderCache.has(key))
+        pngRenderCache.delete(key);
+    pngRenderCache.set(key, value);
+    while (pngRenderCache.size > PNG_CACHE_MAX) {
+        const firstKey = pngRenderCache.keys().next().value;
+        if (firstKey === undefined)
+            break;
+        pngRenderCache.delete(firstKey);
+    }
+}
 let fontsChecked = false;
 let useBundledFonts = false;
 /** سجّل الخطوط المضمّنة مع البوت (تعمل بدون أي خطوط نظام) */
@@ -621,15 +660,17 @@ async function renderWheelOfFortuneGif(opts) {
     };
     const frameCount = frames + 1; // + إطار ثابت أخير لإبراز الفائز
     const wantPng = opts.format === 'png';
-    // 🎨 لوحة ألوان واحدة لكل الإطارات (من إطار منتصف الحركة) — أسرع وأخف على الذاكرة
-    const sampleRotation = easeOutQuart(0.4) * target;
-    drawBackground();
-    drawTitle(false);
-    drawWheel(sampleRotation, false);
-    drawPointer();
-    const { data: sampleData } = ctx.getImageData(0, 0, W, H);
-    // مسار سريع لخصر الموارد: صورة ثابتة واحدة (PNG) بدل GIF كامل
+    // مسار سريع لخصر الموارد: صورة ثابتة واحدة (PNG) بدل GIF كامل — مع كاش للجولات المكررة
+    let pngKey = null;
     if (wantPng) {
+        if (!opts.noCache) {
+            pngKey = pngCacheKey(opts);
+            const cached = pngCacheGet(pngKey);
+            if (cached) {
+                logger.info(`🎡 wheel PNG cache hit (${W}x${H})`);
+                return cached;
+            }
+        }
         const rotation = target; // استقر على الفائز
         drawBackground();
         drawTitle(true);
@@ -638,9 +679,18 @@ async function renderWheelOfFortuneGif(opts) {
         drawFinalOverlay();
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const png = ctx.canvas.toBuffer('image/png');
+        if (pngKey)
+            pngCacheSet(pngKey, png);
         logger.info(`🎡 wheel PNG rendered (${W}x${H})`);
         return png;
     }
+    // مسار GIF فقط: عينة إطار واحد لاختيار لوحة الألوان
+    const sampleRotation = easeOutQuart(0.4) * target;
+    drawBackground();
+    drawTitle(false);
+    drawWheel(sampleRotation, false);
+    drawPointer();
+    const { data: sampleData } = ctx.getImageData(0, 0, W, H);
     // ترميز GIF (مضمّن مع البوت — لا يعتمد على node_modules في الاستضافة)
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     let gifenc;

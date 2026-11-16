@@ -27,6 +27,8 @@ export interface WheelOfFortuneOptions {
      * - 'png': صورة ثابتة أخف بكثير على المعالج (موصى به عند الضغط العالي)
      */
     format?: 'gif' | 'png';
+    /** تجاهل الكاش وإرجاع صورة جديدة */
+    noCache?: boolean;
 }
 /**
  * رسم عجلة الحظ كـ GIF متحرك.

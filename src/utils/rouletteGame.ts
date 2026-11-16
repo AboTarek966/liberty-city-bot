@@ -143,12 +143,19 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
   // إزالة زرار اللوبي من الرسالة الأصلية
   await disableLobbyMessage(client, game).catch(() => {});
 
-  // جيب الآفاتارات مرة واحدة للعبة كلها (بتُعاد استخدامها في كل عجلة)
-  game.avatarBuffers = await Promise.all(
-    game.players.map((p) =>
-      p.avatarUrl ? fetchAvatarBuffer(p.avatarUrl).catch(() => null) : Promise.resolve(null)
-    )
-  );
+  // 🖼️ صورة ديناميكية ثابتة (PNG + كاش) مفعّلة افتراضياً — أخف بكثير من GIF
+  //    لتعطيل الصورة مؤقتاً في بيئة ضعيفة: ROULETTE_RENDER_WHEEL=false
+  //    أو للتعطيل القسري: ROULETTE_DISABLE_WHEEL=true
+  const WANT_WHEEL =
+    (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
+    (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
+  game.avatarBuffers = WANT_WHEEL
+    ? await Promise.all(
+        game.players.map((p) =>
+          p.avatarUrl ? fetchAvatarBuffer(p.avatarUrl).catch(() => null) : Promise.resolve(null)
+        )
+      )
+    : [];
 
   // أعلن انطلاق اللعبة، ثم انتظر 5 ثوانٍ قبل أول دورة
   if (channel.isTextBased()) {
@@ -196,35 +203,40 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     return;
   }
 
-  const segments: WheelSegmentInput[] = game.players.map((p, i) => ({
-    label: (p.username || '?').slice(0, 12),
-    image: game.avatarBuffers[i],
-  }));
   const winnerIndex = Math.floor(Math.random() * game.players.length);
   const chosen = game.players[winnerIndex];
 
   let gif: Buffer | null = null;
-  try {
-    gif = await renderWheelOfFortuneGif({
-      title: 'روليت',
-      subtitle: 'دور — وادفع مين يُطرَد',
-      segments,
-      winnerIndex,
-      hubText: 'OMNI',
-      // استخدام صورة ثابتة (PNG) بدل GIF لتقليل استهلاك المعالج — GIF كان يسبب تجميد البوت
-      width: 960,
-      format: 'png',
-      orientation: 'landscape',
-      resultLabel: 'عليه الدور',
-    });
-  } catch (err: any) {
-    logger.warn(`wheel gif failed: ${err?.message || err}`);
+  const WANT_WHEEL =
+    (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
+    (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
+  if (WANT_WHEEL) {
+    const segments: WheelSegmentInput[] = game.players.map((p, i) => ({
+      label: (p.username || '?').slice(0, 12),
+      image: game.avatarBuffers[i],
+    }));
+    try {
+      gif = await renderWheelOfFortuneGif({
+        title: 'روليت',
+        subtitle: 'دور — وادفع مين يُطرَد',
+        segments,
+        winnerIndex,
+        hubText: 'OMNI',
+        width: 720,
+        format: 'png',
+        orientation: 'landscape',
+        resultLabel: 'عليه الدور',
+      });
+    } catch (err: any) {
+      logger.warn(`wheel render failed: ${err?.message || err}`);
+    }
   }
 
   const spinEmbed = new EmbedBuilder()
     .setColor(COLOR)
-    .setTitle('🎡 العجلة وصلت!')
+    .setTitle(WANT_WHEEL ? '🎡 العجلة وصلت!' : '🎡 العجلة تدور...')
     .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+    .setFooter({ text: WANT_WHEEL ? 'وقفت العجلة — الدور الجاي للّي اتشارد' : 'جاري تحديد عليه الدور...' })
     .setTimestamp();
 
   if (gif) {
@@ -404,7 +416,11 @@ export async function eliminatePlayer(
 
   const idx = game.players.findIndex((p) => p.id === targetId);
   game.players.splice(idx, 1);
-  game.avatarBuffers.splice(idx, 1);
+  if (game.avatarBuffers && game.avatarBuffers.length === game.players.length + 1) {
+    game.avatarBuffers.splice(idx, 1);
+  } else {
+    game.avatarBuffers = [];
+  }
 
   const remaining = game.players.length;
   await channel
