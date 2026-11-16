@@ -138,12 +138,12 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   const images = await loadImages(segs);
 
   // لوحة العرض: landscape ← العجلة على اليمين + لوحة مشاركين على اليسار
-  const PANEL_W = isLandscape ? Math.round(W * 0.4) : 0; // عرض لوحة المشاركين
+  const PANEL_W = isLandscape ? Math.round(W * 0.34) : 0; // عرض لوحة المشاركين أصغر لتعظيم العجلة
   const CX = isLandscape ? Math.round(PANEL_W + (W - PANEL_W) / 2) : W / 2;
   const CY = isLandscape ? Math.round(H * 0.5) : Math.round(H * 0.63);
-  const R = isLandscape ? Math.round(Math.min(H * 0.37, (W - PANEL_W) * 0.38)) : Math.round(W * 0.335);
-  const RIM = isLandscape ? Math.round(Math.max(16, H * 0.032)) : Math.max(14, Math.round(W * 0.036));
-  const HUB = Math.round(R * 0.27);
+  const R = isLandscape ? Math.round(Math.min(H * 0.42, (W - PANEL_W) * 0.44)) : Math.round(W * 0.335);
+  const RIM = isLandscape ? Math.round(Math.max(18, H * 0.036)) : Math.max(14, Math.round(W * 0.036));
+  const HUB = Math.round(R * 0.26);
   const SEG_R = R;
 
   const canvas = createCanvas(W, H);
@@ -307,32 +307,32 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       drawDiamond(px, dy + 1, 8);
 
       // ───── قائمة المشاركين ─────
-      const startY = H * 0.345;
-      const rowH = Math.min(Math.round(H * 0.052), 44);
-      const rowPad = 5;
-      const maxRows = Math.max(1, Math.min(n, Math.floor((H * 0.865 - startY) / rowH)));
+      const startY = H * 0.33;
+      const rowH = Math.min(Math.round(H * 0.062), 56);
+      const rowPad = 6;
+      const maxRows = Math.max(1, Math.min(n, Math.floor((H * 0.88 - startY) / rowH)));
       for (let i = 0; i < maxRows; i++) {
         const y = startY + i * rowH + rowH / 2;
         const isWinnerRow = glow && i === opts.winnerIndex;
         // خلفية الصف
         ctx.fillStyle = isWinnerRow
-          ? 'rgba(245,158,11,0.18)'
+          ? 'rgba(245,158,11,0.22)'
           : i % 2
-            ? 'rgba(148,163,184,0.05)'
-            : 'rgba(148,163,184,0.1)';
-        rr(PANEL_W * 0.075, y - rowH / 2 + rowPad / 2 + 1, PANEL_W * 0.85, rowH - rowPad, 9);
+            ? 'rgba(148,163,184,0.06)'
+            : 'rgba(148,163,184,0.12)';
+        rr(PANEL_W * 0.05, y - rowH / 2 + rowPad / 2, PANEL_W * 0.9, rowH - rowPad, 10);
         ctx.fill();
         if (isWinnerRow) {
           ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 2;
-          ctx.shadowColor = 'rgba(251,191,36,0.6)';
-          ctx.shadowBlur = 10;
+          ctx.lineWidth = 2.5;
+          ctx.shadowColor = 'rgba(251,191,36,0.65)';
+          ctx.shadowBlur = 12;
           ctx.stroke();
           ctx.shadowBlur = 0;
         }
-        // آفاتار — دائرة ذهبية + صورة أو حرف
-        const ar = rowH * 0.3;
-        const ax = PANEL_W * 0.145;
+        // آفاتار — أكبر، بجانب الاسم
+        const ar = rowH * 0.38;
+        const ax = PANEL_W * 0.14;
         const av = images[i];
         if (av) {
           ctx.save();
@@ -350,28 +350,32 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
           ctx.fillStyle = '#0b1224';
           ctx.fill();
           ctx.textAlign = 'center';
-          ctx.font = `bold ${Math.round(ar * 1.12)}px ${fontFor(String(segs[i]?.label || '?'))}`;
+          ctx.font = `bold ${Math.round(ar * 1.05)}px ${fontFor(String(segs[i]?.label || '?'))}`;
           ctx.fillStyle = '#f8fafc';
           ctx.fillText((String(segs[i]?.label || '?').trim().charAt(0) || '?').toUpperCase(), ax, y + 1);
           ctx.textAlign = 'center';
         }
         ctx.beginPath();
         ctx.arc(ax, y, ar, 0, TAU);
-        ctx.lineWidth = isWinnerRow ? 2.5 : 1.5;
+        ctx.lineWidth = isWinnerRow ? 3 : 2;
         ctx.strokeStyle = isWinnerRow ? '#fde047' : '#d4a017';
         ctx.stroke();
-        // الاسم
-        const name = String(segs[i]?.label || '').slice(0, 14);
+        // الاسم — بجانب الصورة وبعرض أكبر
+        const name = String(segs[i]?.label || '').slice(0, 20);
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.font = `bold ${Math.round(W * 0.0145)}px ${fontFor(name)}`;
+        ctx.font = `bold ${Math.round(W * 0.019)}px ${fontFor(name)}`;
         ctx.fillStyle = isWinnerRow ? '#fde68a' : '#e2e8f0';
-        ctx.fillText(name, PANEL_W * 0.215, y);
+        const nameX = ax + ar + Math.round(PANEL_W * 0.045);
+        const rightBound = isWinnerRow ? PANEL_W * 0.66 : PANEL_W * 0.92;
+        let drawName = name;
+        while (ctx.measureText(drawName).width > rightBound - nameX && drawName.length > 3) drawName = drawName.slice(0, -2) + '…';
+        ctx.fillText(drawName, nameX, y);
         if (isWinnerRow) {
           ctx.textAlign = 'right';
           ctx.fillStyle = '#fbbf24';
-          ctx.font = `bold ${Math.round(W * 0.0175)}px ${fontFor(resultLabel)}`;
-          ctx.fillText(resultLabel, PANEL_W * 0.845, y);
+          ctx.font = `bold ${Math.round(W * 0.019)}px ${fontFor(resultLabel)}`;
+          ctx.fillText(resultLabel, PANEL_W * 0.92, y);
         }
       }
       ctx.restore();
@@ -490,8 +494,8 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       }
 
       const avatar = images[i];
-      const avatarR = Math.max(18, Math.min(30, SEG_R * (n <= 4 ? 0.19 : n <= 6 ? 0.16 : 0.135)));
-      const avatarDist = SEG_R * 0.66;
+      const avatarR = Math.max(20, Math.min(36, SEG_R * (n <= 4 ? 0.21 : n <= 6 ? 0.18 : 0.155)));
+      const avatarDist = SEG_R * 0.64;
 
       if (avatar) {
         // آفاتار دائري داخل القطعة
@@ -537,14 +541,14 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       // الاسم على امتداد نصف القطر (باتجاه المركز → الحافة)
       ctx.save();
       ctx.rotate(mid);
-      ctx.translate(SEG_R * 0.34, 0);
+      ctx.translate(SEG_R * 0.38, 0);
       ctx.rotate(Math.PI / 2);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const label = String(segs[i].label || '').slice(0, 12);
-      ctx.font = `bold ${Math.max(12, Math.round(W * 0.032))}px ${fontFor(label)}`;
-      ctx.lineWidth = 3.5;
-      ctx.strokeStyle = 'rgba(2,6,23,0.9)';
+      const label = String(segs[i].label || '').slice(0, 14);
+      ctx.font = `bold ${Math.max(14, Math.round(W * 0.038))}px ${fontFor(label)}`;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(2,6,23,0.95)';
       ctx.strokeText(label, 0, 0);
       ctx.fillStyle = '#ffffff';
       ctx.fillText(label, 0, 0);
