@@ -1,1 +1,1 @@
-{"version":3,"file":"say.d.ts","sourceRoot":"","sources":["../../../src/commands/utility/say.ts"],"names":[],"mappings":"AASA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAExD,QAAA,MAAM,OAAO,EAAE,OAsCd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"say.d.ts","sourceRoot":"","sources":["../../../src/commands/utility/say.ts"],"names":[],"mappings":"AAUA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAMxD,QAAA,MAAM,OAAO,EAAE,OA6Cd,CAAC;AAkGF,eAAe,OAAO,CAAC"}
