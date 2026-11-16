@@ -159,7 +159,7 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
   // إزالة زرار اللوبي من الرسالة الأصلية
   await disableLobbyMessage(client, game).catch(() => {});
 
-  // 🖼️ صورة ديناميكية ثابتة (PNG + كاش) مفعّلة افتراضياً — أخف بكثير من GIF
+  // 🎡 عجلة متحركة GIF كما كانت سابقاً — الرندر داخل Worker مشترك حتى لا يتجمّد البوت
   //    لتعطيل الصورة مؤقتاً في بيئة ضعيفة: ROULETTE_RENDER_WHEEL=false
   //    أو للتعطيل القسري: ROULETTE_DISABLE_WHEEL=true
   const WANT_WHEEL =
@@ -228,7 +228,8 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
       image: game.avatarBuffers[i],
     }));
     try {
-      // الرندر داخل Worker المشترك — لا يوجد احتياطي على الخيط الرئيسي (لا تجميد للبوت)
+      // الرندر داخل Worker المشترك — GIF متحركة بدون تجميد الخيط الرئيسي
+      // (المهلة أطول من PNG لأن GIF يرسم 30 إطاراً)
       gif = await renderWheelInWorker({
         title: 'روليت',
         subtitle: 'دور — وادفع مين يُطرَد',
@@ -236,10 +237,10 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
         winnerIndex,
         hubText: 'OMNI',
         width: 720,
-        format: 'png',
+        format: 'gif',
         orientation: 'landscape',
         resultLabel: 'عليه الدور',
-      });
+      }, 30000);
     } catch (err: any) {
       logger.warn(`wheel render failed: ${err?.message || err}`);
     }
@@ -257,7 +258,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     await channel
       .send({
         embeds: [spinEmbed],
-        files: [new AttachmentBuilder(gif, { name: 'roulette.png' })],
+        files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })],
       })
       .catch(() => {});
   } else {
