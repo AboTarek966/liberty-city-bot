@@ -132,7 +132,7 @@ const command: Command = {
     const adminRoles = member.roles.cache.filter(isAdminRole);
     if (adminRoles.size === 0) {
       await interaction.editReply({
-        content: `ℹ️ **${member}** لا يملك أي رول إدارة في هذا السيرفر.`,
+        content: `ℹ️ **${member.user.tag}** لا يملك أي رول إدارة في هذا السيرفر.`,
       });
       return;
     }
@@ -159,19 +159,36 @@ const command: Command = {
     const remainingAdmin = fresh.roles.cache.filter(isAdminRole);
 
     const roleList = (roles: Role[], empty: string) =>
-      roles.length ? roles.map((r) => `${r}`).join('، ') : empty;
+      roles.length ? roles.map((r) => `«${r.name}»`).join('، ') : empty;
 
+    const removedNames = removed.map((r) => `«${r.name}»`).join('، ');
+    const blockedNames = [...blocked.values(), ...failed].map((r) => `«${r.name}»`).join('، ');
+    const remainingNames = remainingAdmin.map((r) => `«${r.name}»`).join('، ');
+
+    // 💬 رد عادي مثل رسالة التايم أوت / الكتم (بدون إمبد)
+    const lines = [
+      `🧹 **${member.user.tag}** تم فصله من الإدارة — سُحبت ${removed.length} رول${removedNames ? ` (${removedNames})` : ''} | ${reason}`,
+    ];
+    if (blockedNames) {
+      lines.push(`⚠️ تعذر سحب ${blockedNames} — رتّب رول البوت أعلى من هذه الرولات`);
+    }
+    if (remainingAdmin.size) {
+      lines.push(`🚨 ما زال يملك رولات إدارة أعلى من البوت: ${remainingNames} — رتّب رول البوت ثم كرّر الأمر`);
+    }
+    await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
+
+    // 📋 الإمبد للسجل فقط (بنفس نمط سجلات التايم أوت/الرولات)
     const embed = new EmbedBuilder()
       .setTitle('🧹 فصل إداري')
       .setColor(remainingAdmin.size ? Colors.warning : Colors.error)
       .setDescription(
         remainingAdmin.size
-          ? `تم سحب الرولات القابلة للسحب من **${member}**، لكن ما زال يملك رول إدارة أعلى من رول البوت.`
-          : `تم فصل **${member}** من الإدارة وسحب كل رولات الإدارة القابلة للسحب.`
+          ? `تم سحب الرولات القابلة للسحب من **${member.user.tag}**، لكن ما زال يملك رول إدارة أعلى من رول البوت.`
+          : `تم فصل **${member.user.tag}** من الإدارة وسحب كل رولات الإدارة القابلة للسحب.`
       )
       .addFields(
-        { name: '👤 العضو', value: `${member} \`${member.id}\``, inline: true },
-        { name: '🛡️ المنفذ', value: `${interaction.user} \`${interaction.user.id}\``, inline: true },
+        { name: '👤 العضو', value: `**${member.user.tag}** \`${member.id}\``, inline: true },
+        { name: '🛡️ المنفذ', value: `**${interaction.user.tag}** \`${interaction.user.id}\``, inline: true },
         { name: '📝 السبب', value: reason, inline: false },
         {
           name: `✅ الرولات المسحوبة (${removed.length})`,
@@ -183,11 +200,10 @@ const command: Command = {
       .setFooter({ text: `${guild.name} • Dismiss Admin` });
 
     if (blocked.size || failed.length) {
-      const blockedNames = [...blocked.values(), ...failed].map((r) => `${r}`);
       embed.addFields({
-        name: `⚠️ رولات لم تُسحب (${blockedNames.length})`,
+        name: `⚠️ رولات لم تُسحب (${blocked.size + failed.length})`,
         value:
-          `${blockedNames.join('، ')}\n` +
+          `${blockedNames}\n` +
           '> هذه الرولات أعلى من رول البوت أو غير قابلة للتعديل — اسحب رول البوت فوقها لحماية كاملة.',
         inline: false,
       });
@@ -197,13 +213,11 @@ const command: Command = {
       embed.addFields({
         name: '🚨 تحذير',
         value:
-          `العضو ما زال يملك رولات إدارة من: ${remainingAdmin.map((r) => `${r}`).join('، ')}\n` +
+          `العضو ما زال يملك رولات إدارة من: ${remainingNames}\n` +
           '> رتّب رول البوت أعلى من هذه الرولات ثم كرّر الأمر.',
         inline: false,
       });
     }
-
-    await interaction.editReply({ embeds: [embed] });
 
     // 📋 سجل العملية في قناة السجلات (أو قناة حماية إن لم تُفعّل السجلات)
     try {
