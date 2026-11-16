@@ -119,7 +119,7 @@ const event = {
                 logger.error(`Honeypot check failed: ${error.message}`);
             }
         }
-        // 🤖 مكافحة الإساءة للبوت — يحذر → يسحب الرولات → يحظر
+        // 🤖 مكافحة الإساءة للبوت — يحذف + يحذر → يسحب الرولات → يحظر
         if (message.guild) {
             try {
                 const handled = await (0, botAbuse_1.handleBotAbuse)(message);

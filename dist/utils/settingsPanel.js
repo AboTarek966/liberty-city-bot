@@ -385,7 +385,7 @@ function buildProtection(guild, s) {
         `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n` +
         `> ${on(s.honeypot?.enabled)} **قناة الطعم 🍯** — أي رسالة فيها = عقوبة فورية (\`/honeypot\`)\n` +
         `> ${on(p.ownerApproval !== false)} **موافقة المالك 👑 عند الإطفاء** — إطفاء أي حماية يحتاج نقرة مالك السيرفر (التاج)\n` +
-        `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n` +
+        `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — حذف + تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n` +
         `> ${on(p.punishmentTracker?.enabled !== false)} **تتبع العقوبات 🔄** — يمنع تجاوز العقوبات بالمغادرة والعودة (يُعيد السجن/الكتم تلقائياً)\n\n` +
         `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled), toggleBtn('protection', 'antiExplicit', 'إباحي', '🔞', !!p.antiExplicit?.enabled));

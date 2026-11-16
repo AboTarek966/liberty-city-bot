@@ -19,7 +19,7 @@ export interface IGuildSettings extends Document {
         silentSecurityAlerts?: boolean;
         /** 👑 إطفاء أي حماية لا يُطبَّق إلا بموافقة مالك السيرفر (صاحب التاج) — مفعّل ما لم يُعطَّل صراحة */
         ownerApproval?: boolean;
-        /** 🤖 مكافحة الإساءة للبوت: يحذر ثم يسحب كل الرولات القابلة للإزالة ثم يحظر */
+        /** 🤖 مكافحة الإساءة للبوت: يحذف ويحذر ثم يسحب كل الرولات القابلة للإزالة ثم يحظر */
         antiBotAbuse?: {
             enabled: boolean;
         };

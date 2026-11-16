@@ -45,6 +45,28 @@ function unifyDigits(s) {
         .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
         .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
 }
+/** حروف لاتينية شائعة داخل كلمة عربية (كsمك) → الحرف العربي المقابل */
+const LATIN_LOOKALIKE = {
+    a: 'ا', b: 'ب', c: 'ك', d: 'د', e: 'ي', f: 'ف', g: 'ج', h: 'ه',
+    i: 'ي', j: 'ج', k: 'ك', l: 'ل', m: 'م', n: 'ن', o: 'و', p: 'ب',
+    q: 'ق', r: 'ر', s: 'س', t: 'ت', u: 'و', v: 'ف', w: 'و', x: 'كس',
+    y: 'ي', z: 'ز',
+};
+/**
+ * الكلمات المختلطة (عربي + لاتيني) غالباً تكون تمويهاً: "كsمك" / "kسمك".
+ * نحوّل الحروف اللاتينية فيها إلى أقرب حرف عربي، مع ترك الكلمات اللاتينية
+ * الخالصة كما هي (حتى يظل Omni/Bot قابلاً للتعرّف).
+ */
+function foldMixedScriptWords(s) {
+    return s
+        .split(' ')
+        .map((word) => {
+        if (!/[a-z]/.test(word) || !/[\u0600-\u06FF]/.test(word))
+            return word;
+        return word.replace(/[a-z]/g, (ch) => LATIN_LOOKALIKE[ch] ?? ch);
+    })
+        .join(' ');
+}
 /** تقليل أي حرف مكرر مرتين أو أكثر إلى حرف واحد (كسسسمك → كسمك) */
 function collapseRepeats(s) {
     return String(s || '').replace(/(.)\1+/gu, '$1');
@@ -63,6 +85,8 @@ function normalizeArabic(text) {
     t = t
         .replace(/\$/g, 'س')
         .replace(/@/g, 'ا');
+    // خلط الحروف (كsمك / kسمك) → حروف عربية قبل حذف الرموز
+    t = foldMixedScriptWords(t);
     // أي رمز/ترقيم → مسافة (يكشف ك-س-م-ك)
     t = t.replace(/[^\p{L}\p{N}\s]+/gu, ' ');
     // ضغط تكرار الحروف: كسسسسمك → كسمك
@@ -286,6 +310,17 @@ exports.HARD_SLURS = [
     'metnak', 'metnaka', 'khawal', 'khawwal', 'gahba', 'gahaba',
     'ya kalb', 'ya kelb', 'ibn el kalb', 'ebn el kalb', 'ibn klb', 'ebn klb',
 ];
+/**
+ * ما يُعتبر "سباً صريحاً" حتى بدون منشن/ردّ.
+ * العربية والأرابيزي الصريحة فقط — بدون الإنجليزية، لأن الشتائم الإنجليزية
+ * قد تكون لكلام عام غير موجه للبوت (وتُكتشف عادةً عند المنشن/الردّ).
+ */
+const ENGLISH_ONLY_SLURS = new Set([
+    'fuck', 'fuk', 'motherfuck', 'fuckyou', 'asshole', 'bitch', 'bastard', 'cunt',
+    'whore', 'slut', 'kys', 'kill yourself', 'retard', 'faggot', 'nigger', 'nigga',
+    'shut up', 'stfu',
+]);
+const STANDALONE_SLURS = exports.HARD_SLURS.filter((t) => !ENGLISH_ONLY_SLURS.has(t));
 // --------------------------------------------
 // المطابقة
 // --------------------------------------------
@@ -510,7 +545,7 @@ function containsHardSlur(rawText, extraWords = []) {
     if (matchLooseTerm(text, ARABIZI_HARD_SLURS))
         return true;
     const ar = arabicParts(stripBenignCompounds(normalizeArabic(text)));
-    for (const raw of exports.HARD_SLURS) {
+    for (const raw of STANDALONE_SLURS) {
         // الكلمات اللاتينية تُفحص في المسار الإنجليزي فقط
         if (/^[a-z0-9\s']+$/i.test(raw))
             continue;
@@ -521,7 +556,7 @@ function containsHardSlur(rawText, extraWords = []) {
     }
     const en = englishParts(text);
     if (en.tokens.length) {
-        for (const raw of exports.HARD_SLURS) {
+        for (const raw of STANDALONE_SLURS) {
             if (!/^[a-z0-9\s']+$/i.test(raw))
                 continue;
             // بدون prefix: نتجنب niggardly / retardant

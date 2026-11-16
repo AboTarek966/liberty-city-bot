@@ -57,6 +57,9 @@ async function targetsBotQuick(message, client) {
         if (BOT_SUBSTRING_PATTERN.test(normalized))
             return true;
     }
+    // الاسم الملتصق بحرف عربي (Omniبوت) قد يتشوّه بعد تطبيع الخلط — نفحص النص الخام أيضاً
+    if (BOT_SUBSTRING_PATTERN.test(content.toLowerCase()))
+        return true;
     // سب صريح بلا ذكر البوت — "يا ابن الكلب" وحدها لا تُقرأ كترحيب
     if (!(0, abuseDetector_1.containsHardSlur)(content))
         return false;

@@ -122,7 +122,7 @@ const event: Event = {
       }
     }
 
-    // 🤖 مكافحة الإساءة للبوت — يحذر → يسحب الرولات → يحظر
+    // 🤖 مكافحة الإساءة للبوت — يحذف + يحذر → يسحب الرولات → يحظر
     if (message.guild) {
       try {
         const handled = await handleBotAbuse(message);

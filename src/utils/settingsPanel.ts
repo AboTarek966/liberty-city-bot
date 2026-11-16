@@ -464,7 +464,7 @@ function buildProtection(guild: Guild, s: any): BuiltPanel {
     `> ${on(s.verification?.enabled)} **توثيق بالزر** — رسالة يحصل فيها العضو على رول التوثيق\n` +
     `> ${on(s.honeypot?.enabled)} **قناة الطعم 🍯** — أي رسالة فيها = عقوبة فورية (\`/honeypot\`)\n` +
     `> ${on(p.ownerApproval !== false)} **موافقة المالك 👑 عند الإطفاء** — إطفاء أي حماية يحتاج نقرة مالك السيرفر (التاج)\n` +
-    `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n` +
+    `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — حذف + تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n` +
     `> ${on(p.punishmentTracker?.enabled !== false)} **تتبع العقوبات 🔄** — يمنع تجاوز العقوبات بالمغادرة والعودة (يُعيد السجن/الكتم تلقائياً)\n\n` +
     `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``
   );

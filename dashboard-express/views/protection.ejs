@@ -63,7 +63,7 @@
     <div class="form-row-3">
       <label class="field-check"><input type="checkbox" data-toggle="protection.silentSecurityAlerts" <%= P.silentSecurityAlerts ? 'checked' : '' %>><span>🤫 وضع الصمت الأمني — الحماية تعمل بدون تنبيهات تخريب</span></label>
       <label class="field-check"><input type="checkbox" data-toggle="protection.blockMaliciousNames" <%= P.blockMaliciousNames !== false ? 'checked' : '' %>><span>☢️ حذف/إرجاع القنوات والرولات ذات الاسم المشبوه (nuke/nuker...)</span></label>
-      <label class="field-check"><input type="checkbox" data-toggle="protection.antiBotAbuse.enabled" <%= P.antiBotAbuse?.enabled !== false ? 'checked' : '' %>><span>🤖 مكافحة الإساءة للبوت — تحذير ← سحب الرولات ← حظر</span></label>
+      <label class="field-check"><input type="checkbox" data-toggle="protection.antiBotAbuse.enabled" <%= P.antiBotAbuse?.enabled !== false ? 'checked' : '' %>><span>🤖 مكافحة الإساءة للبوت — حذف + تحذير ← سحب الرولات ← حظر</span></label>
       <label class="field-check"><input type="checkbox" data-toggle="protection.antiExplicit.enabled" <%= P.antiExplicit?.enabled ? 'checked' : '' %>><span>🔞 مكافحة المحتوى الإباحي — حذف فوري وحظر المرسل</span></label>
       <label class="field-check"><input type="checkbox" data-toggle="protection.punishmentTracker.enabled" <%= P.punishmentTracker?.enabled !== false ? 'checked' : '' %>><span>🔄 تتبع العقوبات — يمنع الهروب من العقوبة بإعادة الدخول</span></label>
     </div>
