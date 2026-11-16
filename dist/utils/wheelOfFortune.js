@@ -620,6 +620,7 @@ async function renderWheelOfFortuneGif(opts) {
         ctx.restore();
     };
     const frameCount = frames + 1; // + إطار ثابت أخير لإبراز الفائز
+    const wantPng = opts.format === 'png';
     // 🎨 لوحة ألوان واحدة لكل الإطارات (من إطار منتصف الحركة) — أسرع وأخف على الذاكرة
     const sampleRotation = easeOutQuart(0.4) * target;
     drawBackground();
@@ -627,6 +628,19 @@ async function renderWheelOfFortuneGif(opts) {
     drawWheel(sampleRotation, false);
     drawPointer();
     const { data: sampleData } = ctx.getImageData(0, 0, W, H);
+    // مسار سريع لخصر الموارد: صورة ثابتة واحدة (PNG) بدل GIF كامل
+    if (wantPng) {
+        const rotation = target; // استقر على الفائز
+        drawBackground();
+        drawTitle(true);
+        drawWheel(rotation, true);
+        drawPointer();
+        drawFinalOverlay();
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const png = ctx.canvas.toBuffer('image/png');
+        logger.info(`🎡 wheel PNG rendered (${W}x${H})`);
+        return png;
+    }
     // ترميز GIF (مضمّن مع البوت — لا يعتمد على node_modules في الاستضافة)
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     let gifenc;

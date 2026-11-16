@@ -78,6 +78,12 @@ export interface WheelOfFortuneOptions {
   orientation?: 'portrait' | 'landscape';
   /** نص التمييز بجانب الفائز في اللوحة/الصورة (افتراضي: الفائز) */
   resultLabel?: string;
+  /**
+   * 🖼️ صيغة المخرجات:
+   * - 'gif' (افتراضي): GIF متحرك
+   * - 'png': صورة ثابتة أخف بكثير على المعالج (موصى به عند الضغط العالي)
+   */
+  format?: 'gif' | 'png';
 }
 
 const PALETTE = [
@@ -678,6 +684,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   };
 
   const frameCount = frames + 1; // + إطار ثابت أخير لإبراز الفائز
+  const wantPng = (opts as any).format === 'png';
 
   // 🎨 لوحة ألوان واحدة لكل الإطارات (من إطار منتصف الحركة) — أسرع وأخف على الذاكرة
   const sampleRotation = easeOutQuart(0.4) * target;
@@ -686,6 +693,20 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   drawWheel(sampleRotation, false);
   drawPointer();
   const { data: sampleData } = ctx.getImageData(0, 0, W, H);
+
+  // مسار سريع لخصر الموارد: صورة ثابتة واحدة (PNG) بدل GIF كامل
+  if (wantPng) {
+    const rotation = target; // استقر على الفائز
+    drawBackground();
+    drawTitle(true);
+    drawWheel(rotation, true);
+    drawPointer();
+    drawFinalOverlay();
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const png = ctx.canvas.toBuffer('image/png');
+    logger.info(`🎡 wheel PNG rendered (${W}x${H})`);
+    return png;
+  }
 
   // ترميز GIF (مضمّن مع البوت — لا يعتمد على node_modules في الاستضافة)
   // eslint-disable-next-line @typescript-eslint/no-var-requires

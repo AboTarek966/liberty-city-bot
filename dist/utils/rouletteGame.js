@@ -166,10 +166,9 @@ async function runRouletteRound(client, game) {
             segments,
             winnerIndex,
             hubText: 'OMNI',
-            // أصغر وأخف لتجنب تجميد البوت (CPU) أثناء توليد GIF
+            // استخدام صورة ثابتة (PNG) بدل GIF لتقليل استهلاك المعالج — GIF كان يسبب تجميد البوت
             width: 960,
-            frames: 24,
-            delayMs: 55,
+            format: 'png',
             orientation: 'landscape',
             resultLabel: 'عليه الدور',
         });
@@ -179,7 +178,7 @@ async function runRouletteRound(client, game) {
     }
     const spinEmbed = new discord_js_1.EmbedBuilder()
         .setColor(COLOR)
-        .setTitle('🎡 العجلة تدور...')
+        .setTitle('🎡 العجلة وصلت!')
         .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
         .setTimestamp();
     if (gif) {
@@ -187,7 +186,7 @@ async function runRouletteRound(client, game) {
         await channel
             .send({
             embeds: [spinEmbed],
-            files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })],
+            files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.png' })],
         })
             .catch(() => { });
     }

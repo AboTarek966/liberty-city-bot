@@ -21,6 +21,12 @@ export interface WheelOfFortuneOptions {
     orientation?: 'portrait' | 'landscape';
     /** نص التمييز بجانب الفائز في اللوحة/الصورة (افتراضي: الفائز) */
     resultLabel?: string;
+    /**
+     * 🖼️ صيغة المخرجات:
+     * - 'gif' (افتراضي): GIF متحرك
+     * - 'png': صورة ثابتة أخف بكثير على المعالج (موصى به عند الضغط العالي)
+     */
+    format?: 'gif' | 'png';
 }
 /**
  * رسم عجلة الحظ كـ GIF متحرك.

@@ -211,10 +211,9 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
       segments,
       winnerIndex,
       hubText: 'OMNI',
-      // أصغر وأخف لتجنب تجميد البوت (CPU) أثناء توليد GIF
+      // استخدام صورة ثابتة (PNG) بدل GIF لتقليل استهلاك المعالج — GIF كان يسبب تجميد البوت
       width: 960,
-      frames: 24,
-      delayMs: 55,
+      format: 'png',
       orientation: 'landscape',
       resultLabel: 'عليه الدور',
     });
@@ -224,7 +223,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
 
   const spinEmbed = new EmbedBuilder()
     .setColor(COLOR)
-    .setTitle('🎡 العجلة تدور...')
+    .setTitle('🎡 العجلة وصلت!')
     .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
     .setTimestamp();
 
@@ -233,7 +232,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     await channel
       .send({
         embeds: [spinEmbed],
-        files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })],
+        files: [new AttachmentBuilder(gif, { name: 'roulette.png' })],
       })
       .catch(() => {});
   } else {
