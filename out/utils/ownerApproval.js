@@ -13,10 +13,45 @@
 //      (إن لم يكن DEVELOPER_USER_ID مضبوطاً يُسمح لمن عنده صلاحية
 //      الإعدادات أن يطلب — لكن الموافقة تبقى للمالك/المطوّر.)
 // ============================================
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PROTECTION_LABELS = void 0;
 exports.protectionFieldLabel = protectionFieldLabel;
 exports.approvalEnabled = approvalEnabled;
+exports.hasHighestServerRole = hasHighestServerRole;
+exports.canDirectlyDisableProtection = canDirectlyDisableProtection;
 exports.canRequestProtectionOff = canRequestProtectionOff;
 exports.gateProtectionOff = gateProtectionOff;
 exports.requestOwnerApproval = requestOwnerApproval;
@@ -68,19 +103,41 @@ const TTL_MS = 5 * 60 * 1000; // 5 دقائق
 function approvalEnabled(settings) {
     return settings?.protection?.ownerApproval !== false;
 }
-/** من يقدّرون "طلب" إطفاء الحماية (الموافقة نفسها للمالك وحده) */
+/** هل العضو يحمل أعلى رول موجود في السيرفر؟ */
+function hasHighestServerRole(guild, member) {
+    if (!guild || !member)
+        return false;
+    const top = guild.roles.highest;
+    return !!top && member.roles.cache.has(top.id);
+}
+/** من يقدر يطفي الحماية مباشرة (بدون طلب موافقة): مالك البوت أو حامل أعلى رول */
+async function canDirectlyDisableProtection(guild, userId, member, client) {
+    // "انا" = مالك البوت (التطبيق/DEVELOPER_USER_ID/OWNER_ID)
+    if (client) {
+        try {
+            const { isBotOwner } = await Promise.resolve().then(() => __importStar(require('./botOwner')));
+            if (await isBotOwner(client, userId))
+                return true;
+        }
+        catch { /* تجاهل */ }
+    }
+    else {
+        const devId = process.env.DEVELOPER_USER_ID;
+        const ownerId = process.env.OWNER_ID;
+        if (devId && userId === devId)
+            return true;
+        if (ownerId && userId === ownerId)
+            return true;
+    }
+    let m = member;
+    if (!m)
+        m = await guild.members.fetch(userId).catch(() => null);
+    return hasHighestServerRole(guild, m);
+}
+/** من يقدّر "طلب" إطفاء الحماية (أي شخص لديه وصول للإعدادات يمكنه الطلب، والقرار للمخوّلين) */
 function canRequestProtectionOff(settings, guild, userId) {
-    if (guild.ownerId === userId)
-        return true; // 👑 المالك (التاج)
-    const devId = process.env.DEVELOPER_USER_ID;
-    if (devId && userId === devId)
-        return true; // 🛠️ مطوّر البوت
-    // 🚫 الوايت ليست لا تمنح أي حق طلب — الجميع متساوٍ
-    // البيئة غير مضبوطة (لم يُحدَّد DEVELOPER_USER_ID) → نسمح لمن عنده صلاحية الإعدادات أن يطلب
-    // (الحدّ الفعلي دائمًا هو نقرة المالك — لا شيء يُطفى بدون التاج 👑)
-    if (!devId)
-        return true;
-    return false;
+    // السماح بتقديم الطلب — البوابة/الموافقة هي التي تقيّد التنفيذ
+    return true;
 }
 /**
  * بوابة "إطفاء الحماية" — تُستدعى قبل تطبيق أي إطفاء.
@@ -89,14 +146,10 @@ function canRequestProtectionOff(settings, guild, userId) {
 async function gateProtectionOff(opts) {
     if (!approvalEnabled(opts.settings))
         return null; // الخيار مطفأ → إطفاء مباشر (القديم)
-    if (opts.guild.ownerId === opts.user.id)
-        return null; // 👑 المالك يطفى بنفسه
-    const devEnv = process.env.DEVELOPER_USER_ID;
-    if (devEnv && opts.user.id === devEnv)
-        return null; // 🛠️ المطوّر يطفى بنفسه (المالك والمطوّر الأساسيان)
-    if (!canRequestProtectionOff(opts.settings, opts.guild, opts.user.id)) {
-        return '⛔ إطفاء الحماية محصور بمالك السيرفر 👑 والمطوّر فقط';
-    }
+    // المباشر: مالك البوت (أنا) أو حامل أعلى رول في السيرفر
+    const canDirect = await canDirectlyDisableProtection(opts.guild, opts.user.id, opts.member ?? null, opts.client);
+    if (canDirect)
+        return null;
     const label = protectionFieldLabel(opts.field);
     const sent = await requestOwnerApproval({
         guild: opts.guild,
@@ -105,8 +158,8 @@ async function gateProtectionOff(opts) {
         requestedBy: opts.user,
     });
     return sent === 'sent'
-        ? `👑 أُرسل طلب إيقاف **${label}** إلى مالك السيرفر${devEnv ? ' والمطوّر' : ''} — **لن يُطفى شيء قبل الموافقة** (أزرار ✅/❌ لمدة 5 دقائق)`
-        : '❌ تعذّر إرسال الطلب للمالك (لا توجد صلاحية إرسال في هذه القناة)';
+        ? `👑 أُرسل طلب إيقاف **${label}** — **لن يُطفى شيء قبل موافقة مالك البوت أو صاحب أعلى رول** (أزرار ✅/❌ لمدة 5 دقائق)`
+        : '❌ تعذّر إرسال طلب الموافقة (لا توجد صلاحية إرسال في هذه القناة)';
 }
 /** إرسال رسالة الطلب للمالك (منشن + أزرار موافقة/رفض) */
 async function requestOwnerApproval(opts) {
@@ -138,10 +191,25 @@ async function requestOwnerApproval(opts) {
         expires: Date.now() + TTL_MS,
     });
     try {
+        const mentions = new Set();
+        // مالك البوت / المطوّر
         const devEnv = process.env.DEVELOPER_USER_ID;
+        const ownerEnv = process.env.OWNER_ID;
+        if (devEnv)
+            mentions.add(`<@${devEnv}>`);
+        if (ownerEnv)
+            mentions.add(`<@${ownerEnv}>`);
+        // أعلى رول في السيرفر (منشن رول ليصل تنبيه لصاحبه/حامليه)
+        const topRole = opts.guild.roles?.highest;
+        if (topRole && topRole.id !== opts.guild.id)
+            mentions.add(`<@&${topRole.id}>`);
+        // احتياطي: مالك السيرفر إن كان هو حامل أعلى رول أو لزيادة الوضوح
+        if (opts.guild.ownerId)
+            mentions.add(`<@${opts.guild.ownerId}>`);
+        const content = Array.from(mentions).join(' ').trim() || undefined;
         await ch.send({
-            content: `<@${opts.guild.ownerId}>${devEnv ? ` <@${devEnv}>` : ''}`, // منشن المالك (+ المطوّر إن وُجد)
-            allowedMentions: { parse: ['users'] },
+            content,
+            allowedMentions: { parse: ['users', 'roles'] },
             embeds: [embed],
             components: [row],
         });
@@ -226,16 +294,13 @@ function findApprovalChannel(guild, settings) {
  * @returns null = مسموح فوراً · نص = تم إرسال الطلب/مُنع (لا يُطبَّق شيء)
  */
 async function gateDashboardProtectionOff(opts) {
+    // جلسات قديمة بدون هوية مستخدم (كلمة مرور عامة) — سماح حذر كما كان
     if (!opts.userId)
-        return null; // جلسة مالك البوت القديمة (كلمة مرور/كود)
-    if (String(opts.guild.ownerId) === String(opts.userId))
-        return null; // 👑 صاحب السيرفر
-    const devId = process.env.DEVELOPER_USER_ID;
-    if (devId && String(opts.userId) === String(devId))
-        return null; // 🛠️ مطوّر البوت
-    const member = await opts.guild.members
-        .fetch(String(opts.userId))
-        .catch(() => null);
+        return null;
+    const member = await opts.guild.members.fetch(String(opts.userId)).catch(() => null);
+    const canDirect = await canDirectlyDisableProtection(opts.guild, String(opts.userId), member, opts.client);
+    if (canDirect)
+        return null;
     if (!member) {
         return '⛔ لازم تكون عضواً في السيرفر عشان تطلب إيقاف الحماية';
     }
@@ -252,7 +317,7 @@ async function gateDashboardProtectionOff(opts) {
         source: 'لوحة التحكم',
     });
     return sent === 'sent'
-        ? `👑 أُرسل طلب إيقاف **${label}** إلى مالك السيرفر — **لن يُطفأ شيء قبل ما يضغط ✅ موافقة** (صلاحية الأزرار 5 دقائق)`
-        : '❌ تعذّر إرسال طلب الموافقة للمالك — تأكد أن البوت يقدر يرسل في قناة سجل الحماية';
+        ? `👑 أُرسل طلب إيقاف **${label}** — **لن يُطفأ شيء قبل موافقة مالك البوت أو صاحب أعلى رول** (صلاحية الأزرار 5 دقائق)`
+        : '❌ تعذّر إرسال طلب الموافقة — تأكد أن البوت يقدر يرسل في قناة سجل الحماية';
 }
 //# sourceMappingURL=ownerApproval.js.map

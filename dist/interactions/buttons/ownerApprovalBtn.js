@@ -5,6 +5,7 @@
 //    يقرّر: صاحب التاج (المالك 👑) + مطوّر البوت (🛠️ DEVELOPER_USER_ID).
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
+const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const ownerApproval_1 = require("../../utils/ownerApproval");
 const botOwner_1 = require("../../utils/botOwner");
@@ -15,17 +16,20 @@ const handler = {
             await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
             return;
         }
-        // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مالك البوت — الأساسيان
-        const isGuildOwner = interaction.user.id === interaction.guild.ownerId;
+        // ✅ يحق القرار لمالك البوت أو حامل أعلى رول في السيرفر
         const isBotAdmin = await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id);
-        if (!isGuildOwner && !isBotAdmin) {
+        const member = interaction.member instanceof discord_js_1.GuildMember
+            ? interaction.member
+            : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const isTopRole = (0, ownerApproval_1.hasHighestServerRole)(interaction.guild, member);
+        if (!isBotAdmin && !isTopRole) {
             await interaction.reply({
-                content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 ومالك البوت 🛠️ فقط**',
+                content: '👑 يحق الموافقة/الرفض على إطفاء الحماية **لمالك البوت أو صاحب أعلى رول في السيرفر فقط**',
                 ephemeral: true,
             });
             return;
         }
-        const who = isGuildOwner ? 'مالك السيرفر' : 'مالك البوت';
+        const who = isBotAdmin ? 'مالك البوت' : 'صاحب أعلى رول';
         const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
         const verdict = parts[1];
         const field = parts[2];

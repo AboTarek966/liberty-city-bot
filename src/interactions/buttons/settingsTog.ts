@@ -72,6 +72,8 @@ const handler: ButtonHandler = {
               user: interaction.user,
               channel: interaction.channel,
               field: `chan:${channelId}:${check}`,
+              client: interaction.client,
+              member: interaction.member as any,
             });
             if (gateMsg) {
               await interaction.followUp({ content: gateMsg, ephemeral: true });
@@ -120,6 +122,8 @@ const handler: ButtonHandler = {
             user: interaction.user,
             channel: interaction.channel,
             field,
+            client: interaction.client,
+            member: interaction.member as any,
           });
           if (gateMsg) {
             await interaction.followUp({ content: gateMsg, ephemeral: true });
@@ -147,6 +151,8 @@ const handler: ButtonHandler = {
               user: interaction.user,
               channel: interaction.channel,
               field: 'blocknames',
+              client: interaction.client,
+              member: interaction.member as any,
             });
             if (gateMsg) {
               await interaction.followUp({ content: gateMsg, ephemeral: true });

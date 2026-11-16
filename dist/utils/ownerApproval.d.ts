@@ -1,4 +1,4 @@
-import { Guild, User } from 'discord.js';
+import { Guild, GuildMember, User } from 'discord.js';
 /** أسماء الميزات للعرض في رسائل الطلب والموافقة */
 export declare const PROTECTION_LABELS: Record<string, string>;
 /** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> */
@@ -11,7 +11,11 @@ interface PendingApproval {
 }
 /** الخيار مفعّل ما لم يُعطَّل صراحة — undefined = مفعّل (آمن افتراضياً) */
 export declare function approvalEnabled(settings: any): boolean;
-/** من يقدّرون "طلب" إطفاء الحماية (الموافقة نفسها للمالك وحده) */
+/** هل العضو يحمل أعلى رول موجود في السيرفر؟ */
+export declare function hasHighestServerRole(guild: Guild, member: GuildMember | null | undefined): boolean;
+/** من يقدر يطفي الحماية مباشرة (بدون طلب موافقة): مالك البوت أو حامل أعلى رول */
+export declare function canDirectlyDisableProtection(guild: Guild, userId: string, member?: GuildMember | null, client?: any): Promise<boolean>;
+/** من يقدّر "طلب" إطفاء الحماية (أي شخص لديه وصول للإعدادات يمكنه الطلب، والقرار للمخوّلين) */
 export declare function canRequestProtectionOff(settings: any, guild: Guild, userId: string): boolean;
 /**
  * بوابة "إطفاء الحماية" — تُستدعى قبل تطبيق أي إطفاء.
@@ -23,6 +27,8 @@ export declare function gateProtectionOff(opts: {
     user: User;
     channel: any;
     field: string;
+    client?: any;
+    member?: GuildMember | null;
 }): Promise<string | null>;
 /** إرسال رسالة الطلب للمالك (منشن + أزرار موافقة/رفض) */
 export declare function requestOwnerApproval(opts: {
@@ -56,6 +62,7 @@ export declare function gateDashboardProtectionOff(opts: {
     guild: Guild;
     userId?: string;
     field: string;
+    client?: any;
 }): Promise<string | null>;
 export {};
 //# sourceMappingURL=ownerApproval.d.ts.map

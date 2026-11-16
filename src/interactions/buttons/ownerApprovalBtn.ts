@@ -4,11 +4,11 @@
 //    يقرّر: صاحب التاج (المالك 👑) + مطوّر البوت (🛠️ DEVELOPER_USER_ID).
 // ============================================
 
-import { ButtonInteraction } from 'discord.js';
+import { ButtonInteraction, GuildMember } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { OmniClient } from '../../OmniClient';
-import { takePending, protectionFieldLabel } from '../../utils/ownerApproval';
+import { takePending, protectionFieldLabel, hasHighestServerRole } from '../../utils/ownerApproval';
 import { isBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
@@ -19,17 +19,22 @@ const handler: ButtonHandler = {
       return;
     }
 
-    // 👑 يحق القرار لمالك السيرفر (التاج) + 🛠️ مالك البوت — الأساسيان
-    const isGuildOwner = interaction.user.id === interaction.guild.ownerId;
+    // ✅ يحق القرار لمالك البوت أو حامل أعلى رول في السيرفر
     const isBotAdmin = await isBotOwner(interaction.client, interaction.user.id);
-    if (!isGuildOwner && !isBotAdmin) {
+    const member =
+      interaction.member instanceof GuildMember
+        ? interaction.member
+        : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    const isTopRole = hasHighestServerRole(interaction.guild, member);
+
+    if (!isBotAdmin && !isTopRole) {
       await interaction.reply({
-        content: '👑 يحق الموافقة على إطفاء الحماية **لمالك السيرفر 👑 ومالك البوت 🛠️ فقط**',
+        content: '👑 يحق الموافقة/الرفض على إطفاء الحماية **لمالك البوت أو صاحب أعلى رول في السيرفر فقط**',
         ephemeral: true,
       });
       return;
     }
-    const who = isGuildOwner ? 'مالك السيرفر' : 'مالك البوت';
+    const who = isBotAdmin ? 'مالك البوت' : 'صاحب أعلى رول';
 
     const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
     const verdict = parts[1];
