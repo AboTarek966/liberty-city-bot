@@ -1205,8 +1205,21 @@ export class OmniClient extends Client {
       );
       logger.info('✅ Registered slash commands globally');
     } catch (error) {
-      logger.error('Failed to register slash commands:', error);
-      throw error;
+      // لا نوقف البوت بسبب فشل تسجيل الأوامر — الأوامر الحالية تبقى كما هي
+      logger.error('Failed to register slash commands — bot will keep running:', error);
+    }
+  }
+
+  /** تسجيل الأوامر الخاصة بالسيرفرات (commands guildOnly) — تُستدعى بعد الـready */
+  async registerGuildOnlyCommands(guildIds: string[]): Promise<void> {
+    try {
+      await this.commandHandler.registerGuildOnlyCommands(
+        config.discord.clientId,
+        config.discord.token,
+        guildIds
+      );
+    } catch (error) {
+      logger.error('Failed to register guild-only commands:', error);
     }
   }
 

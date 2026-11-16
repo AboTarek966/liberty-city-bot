@@ -12,6 +12,8 @@ const guildCreateEvent = {
     async execute(guild) {
         logger.info(`📥 Bot joined guild: ${guild.name} (${guild.id})`);
         const client = guild.client;
+        // 🧹 تسجيل الأوامر المخصّصة للسيرفر في السيرفر الجديد
+        void client.registerGuildOnlyCommands([guild.id]);
         // 🛡️ تأمين السيرفر الجديد فوراً:
         //    1) فحص التسلّم — البوت لازم أعلى رتبة وإلا كل الحماية معطّلة
         //    2) نسخة احتياطية أولى — تمهيداً للاستعادة التلقائية

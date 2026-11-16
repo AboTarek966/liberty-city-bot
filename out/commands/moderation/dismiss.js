@@ -50,6 +50,8 @@ const command = {
         .addStringOption((o) => o.setName('reason').setDescription('سبب الفصل (اختياري)').setRequired(false).setMaxLength(300)),
     cooldown: 5,
     permissions: [discord_js_1.PermissionFlagsBits.Administrator],
+    // لا تُسجل عالمياً: ديسكورد يحد التطبيق بـ100 أمر عالمي — هذا الأمر يُسجل لكل سيرفر فقط
+    guildOnly: true,
     async execute(interaction) {
         const guild = interaction.guild;
         if (!guild) {

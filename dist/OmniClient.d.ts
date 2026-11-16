@@ -61,6 +61,8 @@ export declare class OmniClient extends Client {
     private connectDatabase;
     private loadHandlers;
     registerCommands(): Promise<void>;
+    /** تسجيل الأوامر الخاصة بالسيرفرات (commands guildOnly) — تُستدعى بعد الـready */
+    registerGuildOnlyCommands(guildIds: string[]): Promise<void>;
     setStatus(): void;
     cleanup(): Promise<void>;
 }

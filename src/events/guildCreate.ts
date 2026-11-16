@@ -17,6 +17,9 @@ const guildCreateEvent: Event = {
 
     const client = guild.client as OmniClient;
 
+    // 🧹 تسجيل الأوامر المخصّصة للسيرفر في السيرفر الجديد
+    void client.registerGuildOnlyCommands([guild.id]);
+
     // 🛡️ تأمين السيرفر الجديد فوراً:
     //    1) فحص التسلّم — البوت لازم أعلى رتبة وإلا كل الحماية معطّلة
     //    2) نسخة احتياطية أولى — تمهيداً للاستعادة التلقائية

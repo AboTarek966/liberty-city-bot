@@ -64,6 +64,8 @@ const command: Command = {
 
   cooldown: 5,
   permissions: [PermissionFlagsBits.Administrator],
+  // لا تُسجل عالمياً: ديسكورد يحد التطبيق بـ100 أمر عالمي — هذا الأمر يُسجل لكل سيرفر فقط
+  guildOnly: true,
 
   async execute(interaction: ChatInputCommandInteraction) {
     const guild = interaction.guild;

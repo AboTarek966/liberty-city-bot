@@ -33,6 +33,13 @@ const event: Event = {
 
     // 💾 بدء النسخ الاحتياطي التلقائي فوراً (تأخير ثانية واحدة فقط — لا نترك السيرفر بلا نسخة)
     const lc = client as OmniClient;
+
+    // 🧹 تسجيل الأوامر المخصّصة للسيرفر (لتفادي حد ديسكورد العالمي 100 أمر)
+    const guildOnlyIds = Array.from(client.guilds.cache.keys());
+    if (guildOnlyIds.length) {
+      void lc.registerGuildOnlyCommands(guildOnlyIds);
+    }
+
     let index = 0;
     client.guilds.cache.forEach(guild => {
       const delay = 1000 + index * 2000;

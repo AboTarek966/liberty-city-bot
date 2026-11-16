@@ -43,6 +43,8 @@ export interface Command {
   cooldown?: number;
   permissions?: bigint[];
   ownerOnly?: boolean;
+  /** يسجّل على كل سيرفر بدل القائمة العالمية (لتجاوز حد ديسكورد العالمي 100 أمر) */
+  guildOnly?: boolean;
 }
 
 export class CommandHandler {
@@ -106,9 +108,26 @@ export class CommandHandler {
   // --------------------------------------------
   // Register Slash Commands
   // --------------------------------------------
+  private commandData(guildOnly: boolean): any[] {
+    return Array.from(this.commands.values())
+      .filter((cmd) => Boolean(cmd.guildOnly) === guildOnly)
+      .map(cmd => cmd.data.toJSON());
+  }
+
+  /** تسجيل الأوامر العالمية — تتجاوز حد ديسكورد (100) فتكون الأوامر guildOnly خارجة عنها */
   async registerCommands(clientId: string, token: string, guildId?: string): Promise<void> {
-    const commandsData = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
-    
+    const commandsData = this.commandData(false);
+
+    if (commandsData.length > 100) {
+      // حارس حماية: بدل أن يتعطل البوت عند تجاوز الحد، نسجّل أول 100 ونوّهاً في السجل
+      const dropped = commandsData.slice(100).map((c: any) => c?.name);
+      logger.error(
+        `عدد الأوامر العالمية ${commandsData.length} يتجاوز حد ديسكورد (100) — ` +
+          `سيتم تسجيل أول 100 فقط. المستبعدون: ${dropped.join(', ')}`
+      );
+      commandsData.splice(100);
+    }
+
     try {
       const rest = new REST({ version: '10' }).setToken(token);
 
@@ -137,6 +156,32 @@ export class CommandHandler {
     } catch (error) {
       logger.error('Failed to register slash commands:', error);
       throw error;
+    }
+  }
+
+  /** تسجيل الأوامر المخصّصة للسيرفرات فقط — لا تُستبدل الأوامر العالمية */
+  async registerGuildOnlyCommands(
+    clientId: string,
+    token: string,
+    guildIds: string[]
+  ): Promise<void> {
+    const commandsData = this.commandData(true);
+    if (!commandsData.length) return;
+    if (!guildIds.length) {
+      logger.warn('⚠️ لا توجد سيرفرات متاحة لتسجيل الأوامر الخاصة بالسيرفر');
+      return;
+    }
+
+    const rest = new REST({ version: '10' }).setToken(token);
+    for (const id of guildIds) {
+      try {
+        await rest.put(Routes.applicationGuildCommands(clientId, id), {
+          body: commandsData,
+        });
+        logger.info(`Registered ${commandsData.length} guild-only command(s) in ${id}`);
+      } catch (error: any) {
+        logger.error(`Failed to register guild-only commands in ${id}: ${error?.message || error}`);
+      }
     }
   }
 

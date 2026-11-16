@@ -21,6 +21,8 @@ export interface Command {
     cooldown?: number;
     permissions?: bigint[];
     ownerOnly?: boolean;
+    /** يسجّل على كل سيرفر بدل القائمة العالمية (لتجاوز حد ديسكورد العالمي 100 أمر) */
+    guildOnly?: boolean;
 }
 export declare class CommandHandler {
     private client;
@@ -28,7 +30,11 @@ export declare class CommandHandler {
     private cooldowns;
     constructor(client: Client);
     loadCommands(): Promise<void>;
+    private commandData;
+    /** تسجيل الأوامر العالمية — تتجاوز حد ديسكورد (100) فتكون الأوامر guildOnly خارجة عنها */
     registerCommands(clientId: string, token: string, guildId?: string): Promise<void>;
+    /** تسجيل الأوامر المخصّصة للسيرفرات فقط — لا تُستبدل الأوامر العالمية */
+    registerGuildOnlyCommands(clientId: string, token: string, guildIds: string[]): Promise<void>;
     handleCommand(interaction: ChatInputCommandInteraction): Promise<void>;
     handleAutocomplete(interaction: AutocompleteInteraction): Promise<void>;
     private setCooldown;
