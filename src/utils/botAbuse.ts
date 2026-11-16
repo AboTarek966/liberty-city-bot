@@ -8,33 +8,61 @@ import { Message, PermissionFlagsBits, EmbedBuilder, TextChannel } from 'discord
 import { getGuildSettings } from '../models';
 import { BotAbuseStrike } from '../models/BotAbuseStrike';
 import { createLogger } from './helpers';
-import { findBadWord } from './badWords';
+import { normalizeBadWord } from './badWords';
 import { OmniClient } from '../OmniClient';
 import { securityAlertsSilent } from './securityAlerts';
 
 const logger = createLogger('AntiBotAbuse');
 
-// 🧠 قائمة أساسية للإساءة (عربية + إنجليزية) — تستهدف البوت حصراً
+// 🧠 قائمة أساسية للإساءة (عربية + إنجليزية) — شاملة قدر الإمكان للبوت
+// ملاحظة: الكشف يعتمد تطابق الكلمات/العبارات بعد التطبيع مع معالجة "يا/ال" والتكرار،
+// وليس مجرد وجود الكلمة في AutoMod.
 const INSULT_WORDS = [
-  // عربي — شتائم وإساءات شائعة (صريحة فقط)
-  'كلب', 'حيوان', 'حمار', 'عاهر', 'عاهرة', 'قحبة', 'خول', 'عرص', 'حقير', 'قذر', 'تافه', 'غبي', 'فاشل',
-  'نصاب', 'احتيال', 'نصب', 'شرموطة', 'شرموط', 'خرا', 'عاهة', 'عاهات', 'خسيس', 'قبيح', 'زق',
-  'معفن', 'معفنة', 'خراي', 'خراوان', 'متناك', 'متناكه', 'نيك', 'انيك', 'منيك', 'منايك', 'منيكه',
-  'خائب', 'خسيس', 'دنيء', 'حقير', 'قنضه', 'طريد', 'حقير', 'عكود', 'ديل', 'عجاج',
-  'كس امك', 'كس اختك', 'يابن الكلب', 'يابن العاهرة', 'يابن الحرام',
-  'scam', 'scammer', 'fraud', 'fake', 'rip off',
+  // شتائم/إهانات عربية شائعة (فصحى/عامية)
+  'كلب', 'يا كلب', 'حيوان', 'يا حيوان', 'حمار', 'يا حمار', 'بغل', 'جحش', 'بقره', 'بقرة', 'خنزير', 'قرد',
+  'غبي', 'غبى', 'غبيه', 'اغبى', 'اهبل', 'هبل', 'هبي', 'متخلف', 'متخلفة', 'معتوه', 'معتوهه', 'معوق', 'منغولي',
+  'عبيط', 'عبيطه', 'ابله', 'ابله', 'تافه', 'تافهه', 'سخيف', 'سخيفه', 'فاشل', 'فاشله', 'فاشلين', 'بائس', 'تعيس',
+  'حقير', 'حقيره', 'قذر', 'قذره', 'وسخ', 'وسخه', 'معفن', 'معفنه', 'قبيح', 'قبيحه', 'مقرف', 'مقرفه', 'مقزز',
+  'خسيس', 'خسيسه', 'دني', 'دنيء', 'سافل', 'سافله', 'وضيع', 'منحط', 'صايع', 'هامل', 'عديم', 'تافه اوي',
+  'زباله', 'زبالة', 'قمامه', 'قمامة', 'كوم زباله', 'زفت', 'خرا', 'خره', 'خراي', 'زق', 'زب', 'طيز', 'عرصه',
+  'نصاب', 'نصابين', 'حرامي', 'سارق', 'محتال', 'احتيال', 'نصب', 'خداع', 'كداب', 'كذاب', 'كدابه',
+  'مزعج', 'ممل', 'غثيث', 'تافه', 'عديم الفائده', 'عديم الفائدة', 'مالوش لازمه', 'ماله لازمه', 'ولا تسوى', 'ما تسوى',
+  'ضعيف', 'هزيل', 'مهرج', 'مسخره', 'مسخرة', 'هزء', 'سخيف', 'مريض', 'مجنون',
+  // ألفاظ بذيئة/شتائم مركبة شائعة
+  'عاهر', 'عاهرة', 'قحبة', 'قحبه', 'قحاب', 'شرموطة', 'شرموطه', 'شرموط', 'شاذ', 'شاذه',
+  'خول', 'عرص', 'معرص', 'ديوث', 'ديوس', 'قواد', 'قواده', 'لبوه', 'لبوة',
+  'متناك', 'متناكه', 'منيوك', 'منيوكه', 'منايك', 'منيك', 'منيكه', 'انيك', 'نيك', 'ناك', 'زاني', 'زانية', 'فاجر', 'فاجرة',
+  'كسمك', 'كس امك', 'كس اختك', 'كس اخوك', 'كس ابوك', 'كس امكم', 'كس ام', 'كسختك', 'كس اختكم',
+  'يلعن امك', 'يلعن ابوك', 'يلعن شكلك', 'يلعن ابو امك', 'يلعن دينك', 'يلعنك', 'ملعون',
+  'ابن الكلب', 'يابن الكلب', 'ابن العاهرة', 'يابن العاهرة', 'ابن الحرام', 'يابن الحرام', 'ابن الوسخة', 'ابن الوسخه',
+  'ابن القحبة', 'ابن القحبه', 'ابن المتناكة', 'ابن المتناكه', 'ابن الشرموطة', 'ابن الشرموطه',
+  'يا ابن الكلب', 'يا ابن الحرام', 'يا ابن العاهرة', 'يا ابن القحبة', 'يا ابن الشرموطة',
+  'ولد الكلب', 'ولد الحرام', 'ولد القحبة', 'ولد الزنا',
+  // إهانة/طرد/تهديد مباشر (عند توجيهها للبوت)
+  'انقلع', 'اخرج', 'اطلع', 'اغرب', 'اختف', 'ابعد', 'اخرس', 'اسكت', 'اسكتي', 'سكته', 'سكوت',
+  'روح موت', 'مت', 'اموت', 'اقتل نفسك', 'اذبح نفسك', 'انتحر', 'فكك', 'تعطل', 'اغلق', 'اطفي',
+  'تفو', 'اتفو', 'اتفو عليك', 'عيب عليك', 'يا عيب الشوم',
   // إنجليزي
-  'fuck', 'fucking', 'shit', 'bitch', 'asshole', 'dick', 'stupid', 'idiot', 'dumb', 'worst', 'terrible',
-  'useless', 'annoying', 'kys', 'trash', 'garbage', 'wtf', 'whore', 'slut',
-  'go die', 'kill yourself', 'fuck you', 'fuck off', 'go to hell',
+  'fuck', 'fucking', 'fucked', 'fucker', 'motherfucker', 'mf', 'shit', 'bullshit', 'shitty', 'crap',
+  'bitch', 'ass', 'asshole', 'dick', 'dickhead', 'pussy', 'bastard', 'cunt', 'whore', 'slut', 'hoe',
+  'jerk', 'moron', 'stupid', 'idiot', 'dumb', 'dumbass', 'retard', 'retarded', 'loser', 'pathetic', 'lame',
+  'trash', 'garbage', 'useless', 'worthless', 'annoying', 'worst', 'terrible', 'horrible', 'awful',
+  'suck', 'sucks', 'shut up', 'shutup', 'stfu', 'kys', 'kill yourself', 'die', 'go die',
+  'fuck you', 'fuck off', 'fuck u', 'fuk you', 'fuk off', 'go to hell', 'piss off', 'wtf', 'wth',
+  'scam', 'scammer', 'fraud', 'fake', 'ripoff', 'rip off', 'bot trash', 'trash bot', 'stupid bot', 'dumb bot',
 ];
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+function collapseRepeats(s: string): string {
+  // تقليل تكرار الحروف (غبييي -> غبيي/غبي تقريباً) لتحسين المطابقة بدون كسر المعنى كثيراً
+  return s.replace(/(.)\1{2,}/gu, '$1$1');
+}
+
+function normalizeForAbuse(text: string): string {
+  return collapseRepeats(normalizeBadWord(text));
 }
 
 const BOT_NAME_PATTERN = /(^|\s)(بوت|البوت|يا\s?بوت|bot|the\s?bot|omni|ليبرتي|liber(ty|ti))(\s|$)/iu;
-// كابسة شاملة: يابوت / بوتك / بوتات / كل حرف ما بوت — رسالة عن البوت بست قروض بغض النظر عن كتابة الحدود
+// كابسة شاملة: يابوت / بوتك / بوتات / كل حرف ما بوت — رسالة عن البوت بغض النظر عن كتابة الحدود
 const BOT_SUBSTRING_PATTERN = /بوت|omni|bot|liber(ty|ti)/i;
 
 function targetsBot(message: Message, client: OmniClient): boolean {
@@ -46,18 +74,77 @@ function targetsBot(message: Message, client: OmniClient): boolean {
     const replied = message.mentions?.repliedUser;
     if (replied?.id === meId) return true;
   }
-  // إشارة/اسم البوت داخل الرسالة — تحرير: متسامح أوسع (الكتابة بلا حدود صريحة)
-  const content = normalize(message.content || '');
+  // إشارة/اسم البوت داخل الرسالة
+  const content = normalizeForAbuse(message.content || '');
   if (BOT_NAME_PATTERN.test(content)) return true;
   return BOT_SUBSTRING_PATTERN.test(content);
 }
 
-/** مقارنة على مستوى الكلمة — تتجنّب مطابقة "نصب" داخل "نصبر" أو "bot" داخل "both" */
+function buildTokenVariants(token: string): string[] {
+  const out = new Set<string>([token]);
+  // إزالة نداء شائع ملتصق: يا/ي (ياغبي، ياحمار)
+  for (const prefix of ['يا', 'ي', 'ويا', 'اي', 'ايه']) {
+    if (token.startsWith(prefix) && token.length > prefix.length + 1) {
+      out.add(token.slice(prefix.length));
+    }
+  }
+  // إزالة "ال" التعريف الشائعة إن بقيت بشكل ملتصق
+  for (const t of Array.from(out)) {
+    if (t.startsWith('ال') && t.length > 3) out.add(t.slice(2));
+  }
+  // صيغ نهاية شائعة
+  for (const t of Array.from(out)) {
+    if (t.endsWith('ه') && t.length > 2) out.add(t.slice(0, -1) + 'ة');
+    if (t.endsWith('ي') && t.length > 2) out.add(t.slice(0, -1));
+  }
+  return Array.from(out);
+}
+
 function hasAbuse(text: string, guildBadWords?: string[]): boolean {
-  const all = Array.isArray(guildBadWords) && guildBadWords.length
+  const allRaw = Array.isArray(guildBadWords) && guildBadWords.length
     ? INSULT_WORDS.concat(guildBadWords)
     : INSULT_WORDS;
-  return findBadWord(text, all) !== null;
+
+  const normalizedText = normalizeForAbuse(text);
+  if (!normalizedText) return false;
+  const tokens = normalizedText.split(' ').filter(Boolean);
+  const tokenSet = new Set(tokens);
+  const expandedTokenSet = new Set<string>();
+  for (const tok of tokens) {
+    for (const v of buildTokenVariants(tok)) expandedTokenSet.add(v);
+  }
+
+  for (const rawWord of allRaw) {
+    const word = normalizeForAbuse(rawWord);
+    if (!word) continue;
+
+    // عبارة متعددة الكلمات: نبحث عنها كعبارة متجاورة داخل النص المطبّع
+    if (word.includes(' ')) {
+      if (normalizedText.includes(word)) return true;
+      continue;
+    }
+
+    // كلمة إنجليزية: تطابق تام + جمع بسيط
+    if (/^[a-z0-9]+$/i.test(word)) {
+      if (expandedTokenSet.has(word) || expandedTokenSet.has(`${word}s`) || tokenSet.has(word)) return true;
+      continue;
+    }
+
+    // كلمة عربية/أخرى: قارن ضد التوكنات وصيغها (يا/ال/نهايات) مع تطبيع موحّد
+    for (const tok of tokens) {
+      const variants = buildTokenVariants(tok);
+      for (const v of variants) {
+        if (v === word) return true;
+        // دعم صيغ شائعة: ال+كلمة، كلمة+ه/ة
+        if (v === `ال${word}`) return true;
+        if (word.startsWith('ال') && v === word.slice(2)) return true;
+        if (v === `${word}ه` || v === `${word}ة`) return true;
+        if ((word.endsWith('ه') || word.endsWith('ة')) && v === word.slice(0, -1)) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
