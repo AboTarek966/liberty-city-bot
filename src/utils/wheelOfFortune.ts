@@ -197,11 +197,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d') as any;
 
-  // أدوات مساعدة للرسم الزخرفي (تُعاد لكل إطار)
-  const pseudoRand = (i: number) => {
-    const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-    return x - Math.floor(x);
-  };
+  // أدوات مساعدة للرسم
   const rr = (x: number, y: number, w: number, h: number, r: number) => {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -215,8 +211,6 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(Math.PI / 4);
-    ctx.shadowColor = 'rgba(245,158,11,0.7)';
-    ctx.shadowBlur = 8;
     ctx.fillStyle = '#f59e0b';
     ctx.fillRect(-s / 2, -s / 2, s, s);
     ctx.restore();
@@ -224,36 +218,15 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
 
   const drawBackground = () => {
     if (isLandscape) {
-      // لوحة المشاركين (يسرى) — خلفية داكنة متدرجة
-      const leftg = ctx.createLinearGradient(0, 0, PANEL_W, H);
-      leftg.addColorStop(0, '#070d20');
-      leftg.addColorStop(0.45, '#0b1224');
-      leftg.addColorStop(1, '#0f1730');
-      ctx.fillStyle = leftg;
+      // لوحة المشاركين (يسرى) — خلفية داكنة
+      ctx.fillStyle = '#0b1224';
       ctx.fillRect(0, 0, PANEL_W, H);
-      // حجرة العجلة (يمنى) — توهج مركزه خلف العجلة
-      const rightg = ctx.createRadialGradient(CX, CY, R * 0.18, CX, CY, H * 0.95);
-      rightg.addColorStop(0, '#1c2740');
-      rightg.addColorStop(0.4, '#101936');
-      rightg.addColorStop(1, '#020617');
-      ctx.fillStyle = rightg;
+      // حجرة العجلة (يمنى) — داكنة موحّدة
+      ctx.fillStyle = '#030712';
       ctx.fillRect(PANEL_W, 0, W - PANEL_W, H);
-      // زخرفة نقاط متناثرة على اللوحة (ثابتة بين الإطارات)
-      for (let i = 0; i < 30; i++) {
-        const x = pseudoRand(i) * PANEL_W * 0.9 + PANEL_W * 0.05;
-        const y = pseudoRand(i + 100) * H * 0.9 + H * 0.05;
-        const sz = 1 + pseudoRand(i + 200) * 2.2;
-        ctx.beginPath();
-        ctx.arc(x, y, sz, 0, TAU);
-        ctx.fillStyle = `rgba(251,191,36,${0.04 + pseudoRand(i + 300) * 0.07})`;
-        ctx.fill();
-      }
-      // توهج ناعم حول العجلة
-      const glow = ctx.createRadialGradient(CX, CY, R * 0.75, CX, CY, R * 1.9);
-      glow.addColorStop(0, 'rgba(245,158,11,0.18)');
-      glow.addColorStop(1, 'rgba(245,158,11,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(PANEL_W, 0, W - PANEL_W, H);
+      // توهج بسيط خلف العجلة (بدون تدرجات مكلفة)
+      ctx.fillStyle = 'rgba(245,158,11,0.08)';
+      ctx.fillRect(PANEL_W, 0, Math.round((W - PANEL_W) * 0.35), H);
       // دوائر متحدة المركز خلف العجلة
       ctx.strokeStyle = 'rgba(148,163,184,0.06)';
       ctx.lineWidth = 1;
@@ -268,8 +241,6 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
         ctx.save();
         ctx.strokeStyle = '#d4a017';
         ctx.lineWidth = 3;
-        ctx.shadowColor = 'rgba(212,160,23,0.65)';
-        ctx.shadowBlur = 7;
         ctx.beginPath();
         ctx.moveTo(x + bracket * dx, y);
         ctx.lineTo(x, y);
@@ -281,24 +252,13 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       bracketStroke(PANEL_W - 12, 12, -1, 1);
       bracketStroke(12, H - 12, 1, -1);
       bracketStroke(PANEL_W - 12, H - 12, -1, -1);
-      // خط فاصل ذهبي متدرج بين اللوحة والعجلة
-      const lg = ctx.createLinearGradient(0, 0, 0, H);
-      lg.addColorStop(0, 'rgba(251,191,36,0)');
-      lg.addColorStop(0.16, 'rgba(251,191,36,0.55)');
-      lg.addColorStop(0.5, '#f59e0b');
-      lg.addColorStop(0.84, 'rgba(251,191,36,0.55)');
-      lg.addColorStop(1, 'rgba(251,191,36,0)');
-      ctx.fillStyle = lg;
+      // خط فاصل ذهبي بين اللوحة والعجلة
+      ctx.fillStyle = '#f59e0b';
       ctx.fillRect(PANEL_W - 1, 0, 2, H);
       return;
     }
-    const g = ctx.createRadialGradient(CX, CY, R * 0.2, CX, CY, H);
-    g.addColorStop(0, '#1e293b');
-    g.addColorStop(0.55, '#0f172a');
-    g.addColorStop(1, '#020617');
-    ctx.fillStyle = g;
+    ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, W, H);
-    // خطوط شفافة خفيفة
     ctx.strokeStyle = 'rgba(148,163,184,0.07)';
     ctx.lineWidth = 1;
     for (let r = R * 0.55; r < H; r += R * 0.36) {
@@ -309,10 +269,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   };
 
   const drawTitle = (glow: boolean) => {
-    const gold = ctx.createLinearGradient(0, 0, 0, H * 0.14);
-    gold.addColorStop(0, '#fde68a');
-    gold.addColorStop(0.5, '#f59e0b');
-    gold.addColorStop(1, '#b45309');
+    const gold = '#f59e0b';
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -321,23 +278,12 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       const px = PANEL_W / 2;
       // OMNI ROULETTE — شارة ملتصقة بالأعلى
       ctx.font = `bold ${Math.round(W * 0.014)}px ${fontFor('OMNIROULETTE')}`;
-      ctx.shadowColor = 'rgba(245,158,11,0.4)';
-      ctx.shadowBlur = 10;
       ctx.fillStyle = '#d4a017';
       ctx.fillText('★  O M N I   R O U L E T T E  ★', px, H * 0.078);
-      ctx.shadowBlur = 0;
-      // اسم البطولة — ذهبي كبير متدرج
-      const bigGold = ctx.createLinearGradient(0, H * 0.115, 0, H * 0.235);
-      bigGold.addColorStop(0, '#fef3c7');
-      bigGold.addColorStop(0.35, '#fcd34d');
-      bigGold.addColorStop(0.7, '#d97706');
-      bigGold.addColorStop(1, '#f59e0b');
-      ctx.fillStyle = bigGold;
+      // اسم البطولة — ذهبي
+      ctx.fillStyle = '#fcd34d';
       ctx.font = `bold ${Math.round(W * 0.048)}px ${fontFor(opts.title)}`;
-      ctx.shadowColor = 'rgba(245,158,11,0.5)';
-      ctx.shadowBlur = 18;
       ctx.fillText(opts.title, px, H * 0.175);
-      ctx.shadowBlur = 0;
       // العنوان الفرعي
       if (opts.subtitle) {
         ctx.fillStyle = '#94a3b8';
@@ -346,11 +292,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       }
       // خط فاصل مع ماسة في المنتصف
       const dy = H * 0.278;
-      const lg = ctx.createLinearGradient(PANEL_W * 0.17, 0, PANEL_W * 0.83, 0);
-      lg.addColorStop(0, 'rgba(245,158,11,0)');
-      lg.addColorStop(0.5, '#f59e0b');
-      lg.addColorStop(1, 'rgba(245,158,11,0)');
-      ctx.fillStyle = lg;
+      ctx.fillStyle = '#f59e0b';
       ctx.fillRect(PANEL_W * 0.17, dy, PANEL_W * 0.66, 2);
       drawDiamond(px, dy + 1, 8);
 
@@ -373,10 +315,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
         if (isWinnerRow) {
           ctx.strokeStyle = '#fbbf24';
           ctx.lineWidth = 2.5;
-          ctx.shadowColor = 'rgba(251,191,36,0.65)';
-          ctx.shadowBlur = 12;
           ctx.stroke();
-          ctx.shadowBlur = 0;
         }
         // آفاتار — أكبر، بجانب الاسم
         const ar = rowH * 0.38;
@@ -448,11 +387,8 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
     }
 
     ctx.font = `bold ${Math.round(W * 0.085)}px ${fontFor(opts.title)}`;
-    ctx.shadowColor = 'rgba(245,158,11,0.45)';
-    ctx.shadowBlur = 18;
     ctx.fillStyle = gold;
     ctx.fillText(opts.title, CX, H * 0.068);
-    ctx.shadowBlur = 0;
     if (opts.subtitle) {
       ctx.font = `${Math.round(W * 0.033)}px ${fontFor(opts.subtitle, false)}`;
       ctx.fillStyle = '#94a3b8';
@@ -465,23 +401,17 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
     const tipY = CY - R - RIM * 0.4;
     const baseY = Math.max(H * 0.145, tipY - R * 0.5);
     const halfBase = R * 0.11;
-    const g = ctx.createLinearGradient(0, baseY, 0, tipY);
-    g.addColorStop(0, '#fde047');
-    g.addColorStop(1, '#eab308');
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.moveTo(CX, tipY);
     ctx.lineTo(CX - halfBase, baseY);
     ctx.lineTo(CX + halfBase, baseY);
     ctx.closePath();
-    ctx.fillStyle = g;
+    ctx.fillStyle = '#fde047';
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#713f12';
     ctx.stroke();
-    ctx.shadowBlur = 0;
     // مسمار التثبيت
     ctx.beginPath();
     ctx.arc(CX, baseY, Math.max(6, R * 0.045), 0, TAU);
@@ -512,12 +442,12 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       ctx.fillStyle = color;
       ctx.fill();
 
-      // تدرّج داخلي خفيف (عمق)
-      const inner = ctx.createRadialGradient(0, 0, SEG_R * 0.15, 0, 0, SEG_R);
-      inner.addColorStop(0, 'rgba(255,255,255,0.22)');
-      inner.addColorStop(0.75, 'rgba(255,255,255,0)');
-      inner.addColorStop(1, 'rgba(0,0,0,0.38)');
-      ctx.fillStyle = inner;
+      // تدرّج داخلي خفيف مُبسّط (بدون radial gradient)
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, SEG_R, a0, a1);
+      ctx.closePath();
       ctx.fill();
 
       // فواصل ذهبية
@@ -531,8 +461,6 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
 
       if (glowWinner && i === opts.winnerIndex) {
         ctx.save();
-        ctx.shadowColor = '#ffd700';
-        ctx.shadowBlur = 26;
         ctx.lineWidth = 7;
         ctx.strokeStyle = '#ffd700';
         ctx.beginPath();
@@ -608,32 +536,22 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
       ctx.restore();
     }
 
-    // الإطار الذهبي الخارجي
-    const rim = ctx.createLinearGradient(-SEG_R, -SEG_R, SEG_R, SEG_R);
-    rim.addColorStop(0, '#fef3c7');
-    rim.addColorStop(0.25, '#f59e0b');
-    rim.addColorStop(0.5, '#92400e');
-    rim.addColorStop(0.75, '#fbbf24');
-    rim.addColorStop(1, '#78350f');
+    // الإطار الذهبي الخارجي (بدون تدرجات مكلفة)
     ctx.beginPath();
     ctx.arc(0, 0, SEG_R + RIM * 0.5, 0, TAU);
     ctx.lineWidth = RIM;
-    ctx.strokeStyle = rim;
+    ctx.strokeStyle = '#f59e0b';
     ctx.stroke();
-    // براغٍ على الإطار
+    // براغٍ على الإطار (مبسطة)
     const rivetR = SEG_R + RIM * 0.5;
-    const rivets = 18;
+    const rivets = 10;
     for (let i = 0; i < rivets; i++) {
       const a = (i / rivets) * TAU;
       const rx = Math.cos(a) * rivetR;
       const ry = Math.sin(a) * rivetR;
       ctx.beginPath();
       ctx.arc(rx, ry, RIM * 0.22, 0, TAU);
-      const rg = ctx.createRadialGradient(rx - 1, ry - 1, 0.5, rx, ry, RIM * 0.3);
-      rg.addColorStop(0, '#fffbeb');
-      rg.addColorStop(0.6, '#d4a017');
-      rg.addColorStop(1, '#451a03');
-      ctx.fillStyle = rg;
+      ctx.fillStyle = '#d4a017';
       ctx.fill();
     }
     // الحلقة الداخلية
@@ -646,11 +564,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
     // المركز (المحور)
     ctx.beginPath();
     ctx.arc(0, 0, HUB, 0, TAU);
-    const hub = ctx.createRadialGradient(-HUB * 0.35, -HUB * 0.35, HUB * 0.1, 0, 0, HUB);
-    hub.addColorStop(0, '#fda4af');
-    hub.addColorStop(0.35, '#e11d48');
-    hub.addColorStop(1, '#4c0519');
-    ctx.fillStyle = hub;
+    ctx.fillStyle = '#e11d48';
     ctx.fill();
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#fbbf24';
@@ -674,8 +588,6 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   const drawFinalOverlay = () => {
     const winnerName = String(segs[opts.winnerIndex]?.label || '').slice(0, 24);
     ctx.save();
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 34;
     ctx.beginPath();
     ctx.arc(CX, CY, SEG_R + RIM, 0, TAU);
     ctx.lineWidth = 5;
@@ -698,23 +610,14 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
     const bx = CX - bw / 2;
     const byRaw = isLandscape ? H - bh - Math.round(H * 0.045) : CY + R + RIM + Math.round(H * 0.04);
     const by = Math.max(8, Math.min(byRaw, H - bh - 8));
-    // خلفية اللافتة
-    const bg = ctx.createLinearGradient(bx, by, bx, by + bh);
-    bg.addColorStop(0, 'rgba(120,53,15,0.95)');
-    bg.addColorStop(0.5, 'rgba(180,83,9,0.96)');
-    bg.addColorStop(1, 'rgba(120,53,15,0.95)');
-    ctx.fillStyle = bg;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 14;
+    // خلفية اللافتة (لون ثابت — بدون تدرج مكلف)
+    ctx.fillStyle = 'rgba(180,83,9,0.96)';
     rr(bx, by, bw, bh, 14);
     ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = '#fde68a';
     ctx.stroke();
     // نص اللافتة
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = 6;
     ctx.fillStyle = '#fffbeb';
     // قص النص لو طويل
     let drawText = bannerText;
