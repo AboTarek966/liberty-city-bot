@@ -260,7 +260,16 @@ window.LC = (() => {
     const busy = btn;
     if (busy) { busy.dataset.old = busy.innerHTML; busy.disabled = true; busy.innerHTML = '<span class="spinner"></span>'; }
     try {
-      await api(`/api/guilds/${guildId}/settings`, { method: 'PATCH', body: payload });
+      const json = await api(`/api/guilds/${guildId}/settings`, { method: 'PATCH', body: payload });
+      // 👑 بوابة الحماية: لو أُرسل طلب موافقة بدل الحفظ — نعرض الرسالة ولا نعتبره محفوظاً
+      if (json && json.approvalRequired) {
+        toast(json.message || 'أُرسل طلب موافقة — الحماية لن تُطفى قبل موافقة مالك البوت أو صاحب أعلى رول', 'warn', 5000);
+        return false;
+      }
+      if (json && json.error) {
+        toast('فشل: ' + json.error, 'error');
+        return false;
+      }
       toast('تم الحفظ ✅');
       return true;
     } catch (e) {

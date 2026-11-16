@@ -14,6 +14,10 @@
 // ============================================
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Guild, GuildMember, User } from 'discord.js';
+import { createLogger } from './helpers';
+import { securityAlertsSilent } from './securityAlerts';
+
+const logger = createLogger('ProtectionGate');
 
 /** أسماء الميزات للعرض في رسائل الطلب والموافقة */
 export const PROTECTION_LABELS: Record<string, string> = {
@@ -43,12 +47,87 @@ export const PROTECTION_LABELS: Record<string, string> = {
   all: 'كل الحماية 🛡️',
 };
 
-/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> */
+/**
+ * 🧰 يجمع **كل** الحمايات التي سيتم إطفاؤها في التعديل (وليس أولها فقط).
+ * يستخدمها عامل لوحة التحكم لرصد الطلب كله قبل تطبيقه (atomic).
+ * العودة: رموز حقول تُستخدم في أزرار الموافقة (ownappr:yes:<field>).
+ * الرموز:
+ *   • 'antiSpam' / 'antiRaid' / ...            — إطفاء حماية كاملة (prot.<field>.enabled=false)
+ *   • 'ownerApproval' / 'blocknames' / ...      — بوليان مستقلة
+ *   • 'lockdown' / 'silentSecurityAlerts'       — بوليان مستقلة
+ *   • 'aiAutoMod:category:<id>'                 — تعطيل فئة من الذكاء الاصطناعي
+ *   • 'path:<dotted.path>'                      — بوليان متداخلة عشوائية (prot.path...=false)
+ */
+export function collectProtectionOffFields(update: any, current: any): string[] {
+  const patch = update?.protection;
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return [];
+  const cur = current || {};
+  const disables = new Set<string>();
+
+  // 1) بوليان مستقلة على مستوى protection
+  const independentFields = ['ownerApproval', 'blockMaliciousNames', 'lockdown', 'silentSecurityAlerts'];
+  for (const key of independentFields) {
+    if (patch[key] === false && cur[key] !== false) {
+      disables.add(key === 'blockMaliciousNames' ? 'blocknames' : key);
+    }
+  }
+
+  // 2) aiAutoMod.categories.<id> = false
+  const catsPatch = (patch.aiAutoMod as any)?.categories;
+  if (catsPatch && typeof catsPatch === 'object' && !Array.isArray(catsPatch)) {
+    const catsCur = (cur?.aiAutoMod as any)?.categories || {};
+    for (const [catId, value] of Object.entries(catsPatch)) {
+      if (value === false && catsCur[catId] !== false) disables.add(`aiAutoMod:category:${catId}`);
+    }
+  }
+
+  // 3) كل باقي المفاتيح: protection.<feature>.enabled=false وباقي البوليان المتداخلة
+  const handledTop = new Set(['ownerApproval', 'blockMaliciousNames', 'lockdown', 'silentSecurityAlerts', 'aiAutoMod']);
+  const walk = (patchNode: any, curNode: any, dotted: string) => {
+    for (const [k, v] of Object.entries(patchNode || {})) {
+      if (v === undefined || v === null) continue;
+      const full = dotted ? `${dotted}.${k}` : k;
+      const curV = curNode ? curNode[k] : undefined;
+
+      // بوليان مباشرة =false
+      if (v === false && curV !== false) { disables.add(`path:${full}`); continue; }
+      if (v === false && curV && typeof curV === 'object') continue; // بوليان مفترضة لكن التشكيل غريب — نتجاهله
+
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        // protection.<feature>.enabled=false ← نعامله كرمز الحماية الكاملة (موافقة إطفاء الحماية نفسها)
+        if (dotted === '' && (v as any).enabled === false) {
+          disables.add(k);
+          continue;
+        }
+        walk(v, curV, full);
+      }
+    }
+  };
+
+  for (const [k, v] of Object.entries(patch)) {
+    if (handledTop.has(k)) continue;
+    if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, cur[k], k);
+    else if (v === false && cur[k] !== false) disables.add(`path:${k}`);
+  }
+
+  return Array.from(disables);
+}
+
+/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> وفئات الذكاء الاصطناعي aiAutoMod:category:<id> ومسارات path:<dotted> */
 export function protectionFieldLabel(field: string): string {
   if (field.startsWith('chan:')) {
     const [, channelId, check] = field.split(':');
     const checkLabel = PROTECTION_LABELS[check] || check || 'حماية';
     return `${checkLabel} في القناة <#${channelId}>`;
+  }
+  if (field.startsWith('aiAutoMod:category:')) {
+    const catId = field.split(':')[2] || '?';
+    return `فئة الذكاء الاصطناعي (${catId})`;
+  }
+  if (field.startsWith('path:')) {
+    const dotted = field.slice(5);
+    const last = dotted.split('.').pop() || dotted;
+    return `إعداد ${last} (${dotted})`;
   }
   return PROTECTION_LABELS[field] || field;
 }
@@ -124,7 +203,18 @@ export async function gateProtectionOff(opts: {
 
   // المباشر: مالك البوت (أنا) أو حامل أعلى رول في السيرفر
   const canDirect = await canDirectlyDisableProtection(opts.guild, opts.user.id, opts.member ?? null, opts.client);
-  if (canDirect) return null;
+  if (canDirect) {
+    await logProtectionGateDecision({
+      guild: opts.guild,
+      settings: opts.settings,
+      field: opts.field,
+      outcome: 'direct_allowed',
+      userId: opts.user.id,
+      requestedByTag: (opts.user as any)?.tag || null,
+      source: 'إعدادات ديسكورد',
+    });
+    return null;
+  }
 
   const label = protectionFieldLabel(opts.field);
   const sent = await requestOwnerApproval({
@@ -132,7 +222,19 @@ export async function gateProtectionOff(opts: {
     channel: opts.channel,
     field: opts.field,
     requestedBy: opts.user,
+    source: 'إعدادات ديسكورد',
   });
+  if (sent === 'sent') {
+    await logProtectionGateDecision({
+      guild: opts.guild,
+      settings: opts.settings,
+      field: opts.field,
+      outcome: 'approval_requested',
+      userId: opts.user.id,
+      requestedByTag: (opts.user as any)?.tag || null,
+      source: 'إعدادات ديسكورد',
+    });
+  }
 
   return sent === 'sent'
     ? `👑 أُرسل طلب إيقاف **${label}** — **لن يُطفى شيء قبل موافقة مالك البوت أو صاحب أعلى رول** (أزرار ✅/❌ لمدة 5 دقائق)`
@@ -223,23 +325,173 @@ export function takePending(guildId: string, field: string): PendingApproval | n
 
 /**
  * 🔎 استخراج أول حماية مطلوب إطفاؤها من تعديل إعدادات قادم من اللوحة.
- * يدعم المسارات: protection.<feature>.enabled=false
- * وخصائص بوليان مستقلة: ownerApproval / blockMaliciousNames.
+ * يدعم:
+ *  • protection.<feature>.enabled=false
+ *  • خصائص بوليان مستقلة: ownerApproval / blockMaliciousNames / lockdown
+ *  • بوليان مباشرة أو عبر مسار فرعي: silentSecurityAlerts / punishmentTracker.enabled /
+ *    antiBotAbuse.enabled / antiExplicit.enabled / aiAutoMod.enabled / categories.* /
+ *    aiTranslator.enabled / showOriginal / aiTicketAssistant.* (analyzeOnCreate/autoClaim/notifyAdminsOnFailure/...)
+ *  • مسار حرقي: protection.<feature>.<key> فقط إذا كانت القيمة boolean false تحت مفتاح معروف (categories/...).
  */
 export function detectProtectionOffField(updates: any): string | null {
   const patch = updates?.protection;
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return null;
 
-  const independentFields = ['ownerApproval', 'blockMaliciousNames'];
+  // 1) بوليان مستقلة على مستوى protection مباشرة
+  const independentFields = ['ownerApproval', 'blockMaliciousNames', 'lockdown', 'silentSecurityAlerts'];
   for (const key of independentFields) {
-    if (patch[key] === false) return key === 'blockMaliciousNames' ? 'blocknames' : 'ownerApproval';
+    if (patch[key] === false) {
+      if (key === 'blockMaliciousNames') return 'blocknames';
+      if (key === 'lockdown') return 'lockdown';
+      if (key === 'silentSecurityAlerts') return 'silentSecurityAlerts';
+      return 'ownerApproval';
+    }
   }
 
+  // 2) المفاتيح المندمجة المسطحة التي تُرسل كـ { protection: { <path>: false } } — يدوية واجمة خاصة نتعقبها هنا
+  //    (اختيارات: antiBotAbuse / antiExplicit / punishmentTracker / whitelist / aiTranslator / aiTicketAssistant)
+  const explicitBooleanPaths: Record<string, string> = {
+    'antiBotAbuse.enabled': 'antiBotAbuse',
+    'antiExplicit.enabled': 'antiExplicit',
+    'punishmentTracker.enabled': 'punishmentTracker',
+    'whitelist.enabled': 'whitelist',
+    'autoMod.enabled': 'autoMod',
+    'zalgo.enabled': 'zalgo',
+    'scamFilter.enabled': 'scamFilter',
+    'messageScanner.enabled': 'messageScanner',
+    'aiAutoMod.enabled': 'aiAutoMod',
+    'aiTranslator.enabled': 'aiTranslator',
+    'aiTranslator.showOriginal': 'aiTranslator',
+    'aiTicketAssistant.enabled': 'aiTicketAssistant',
+    'aiTicketAssistant.analyzeOnCreate': 'aiTicketAssistant',
+    'aiTicketAssistant.autoClaim': 'aiTicketAssistant',
+    'aiTicketAssistant.notifyAdminsOnFailure': 'aiTicketAssistant',
+    'aiTicketAssistant.requireAdminApprovalForBans': 'aiTicketAssistant',
+    'aiTicketAssistant.requireAdminApprovalForPermissions': 'aiTicketAssistant',
+    'aiTicketAssistant.requireAdminApprovalForRoles': 'aiTicketAssistant',
+  };
+
+  // معالجة draft عبر مسار نجمة لـ aiAutoMod.categories.<id>=false (تعطيل فئة بأكملها)
+  if (patch.aiAutoMod && typeof patch.aiAutoMod === 'object' && !Array.isArray(patch.aiAutoMod)) {
+    const cats = (patch.aiAutoMod as any).categories;
+    if (cats && typeof cats === 'object' && !Array.isArray(cats)) {
+      for (const [catId, value] of Object.entries(cats)) {
+        if (value === false) return `aiAutoMod:category:${catId}`;
+      }
+    }
+  }
+
+  for (const [dotted, field] of Object.entries(explicitBooleanPaths)) {
+    const parts = dotted.split('.');
+    let cur: any = patch;
+    let ok = true;
+    for (const part of parts) {
+      if (cur && typeof cur === 'object' && !Array.isArray(cur) && part in cur) {
+        cur = cur[part];
+      } else { ok = false; break; }
+    }
+    if (ok && cur === false) return field;
+  }
+
+  // 3) السلوك القديم: protection.<feature>.enabled=false (مبطّن/ضمن كائن تفعيل)
   for (const [key, value] of Object.entries(patch)) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
     if ((value as any).enabled === false) return key;
   }
   return null;
+}
+
+// --------------------------------------------
+// سجل بوابة الحماية: يتتبع أي محاولة إطفاء حماية وكيف انتهت
+// --------------------------------------------
+export type ProtectionGateOutcome =
+  | 'direct_allowed'   // سماح مباشر (مالك البوت أو حامل أعلى رول — أو مطلع ذو وصول قديم)
+  | 'approval_requested' // طلب موافقة أُرسل — يُنتظر الرد 5 دقائق
+  | 'approved'          // وافق مالك البوت/أعلى رول → تم الإطفاء
+  | 'denied'            // رُفض الطلب → الحماية باقية
+  | 'expired'          // انتهت صلاحية الطلب (5 دقائق) دون رد
+  | 'blocked';          // لم يتم الإطفاء — لا يوجد سياق هوية كافٍ لتحقق البوابة
+
+export async function logProtectionGateDecision(opts: {
+  guild: Guild;
+  settings?: any;
+  field: string;
+  outcome: ProtectionGateOutcome;
+  userId?: string | null;
+  requestedByTag?: string | null;
+  source?: string | null;
+  note?: string | null;
+}): Promise<void> {
+  const label = protectionFieldLabel(opts.field);
+  const line =
+    `[ProtectionGate] ${opts.outcome} field=${opts.field} guild=${opts.guild?.id || '?'} ` +
+    `user=${opts.userId || '?'} tag=${opts.requestedByTag || '?'} source=${opts.source || '?'}${opts.note ? ' note=' + opts.note : ''}`;
+  switch (opts.outcome) {
+    case 'direct_allowed':
+      logger.info(line);
+      break;
+    case 'approval_requested':
+      logger.info(line);
+      break;
+    case 'approved':
+      logger.info(line);
+      break;
+    case 'denied':
+      logger.warn(line);
+      break;
+    case 'expired':
+      logger.warn(line);
+      break;
+    case 'blocked':
+      logger.warn(line);
+      break;
+  }
+
+  if (securityAlertsSilent(opts.settings || {})) return;
+
+  try {
+    const channel = findApprovalChannel(opts.guild, opts.settings || {});
+    if (!channel || typeof channel.send !== 'function') return;
+
+    const outcomeColor =
+      opts.outcome === 'direct_allowed' ? 0x57f287
+      : opts.outcome === 'approval_requested' ? 0xf1c40f
+      : opts.outcome === 'approved' ? 0xe74c3c
+      : opts.outcome === 'denied' ? 0x95a5a6
+      : opts.outcome === 'expired' ? 0x95a5a6
+      : 0xef4444;
+
+    const title =
+      opts.outcome === 'direct_allowed'
+        ? '🟢 إطفاء حماية مباشر'
+        : opts.outcome === 'approval_requested'
+          ? '🟡 طلب إطفاء حماية — بانتظار الموافقة'
+          : opts.outcome === 'approved'
+            ? '🔴 إطفاء حماية — وافقت الإدارة العليا'
+            : opts.outcome === 'denied'
+              ? '⚪ رُفض طلب الإطفاء'
+              : opts.outcome === 'expired'
+                ? '⌛ انتهت صلاحية طلب الإطفاء'
+                : '🚫 بوابة الحماية — طلبات مرفوضة';
+
+    const userId = opts.userId || '?';
+    const expectedWho = `<@${userId}>`;
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setColor(outcomeColor)
+      .setDescription(`**الحماية:** ${label}`)
+      .addFields(
+        { name: '👤 المطلِب', value: expectedWho, inline: true },
+        { name: '🛠️ المصدر', value: opts.source || 'غير محدد', inline: true },
+        { name: '📌 النتيجة', value: opts.outcome, inline: true },
+        ...(opts.note ? [{ name: '📝 ملاحظة', value: String(opts.note).slice(0, 400), inline: false }] : []),
+      )
+      .setFooter({ text: `${opts.guild?.name || 'unknown'} • Protection Gate` })
+      .setTimestamp();
+    await channel.send({ embeds: [embed] }).catch(() => {});
+  } catch {
+    /* فشل إرسال السجل — لا يُفشل العملية نفسها */
+  }
 }
 
 /** اختيار قناة يرسل فيها البوت طلب موافقة المالك (سجل الحماية ← قناة النظام ← أول قناة نصية) */
@@ -282,7 +534,9 @@ export function findApprovalChannel(guild: Guild, settings: any): any | null {
  * 👑 بوابة إطفاء الحماية من **لوحة التحكم** تحديداً.
  * تختلف عن بوابة ديسكورد في أنها تطلب موافقة المالك دائماً (حتى لو خيار
  * ownerApproval نفسه مطفأ) لأن تعديل اللوحة يجب ألا يتجاوز مالك السيرفر.
- * الاستثناء الوحيد: مالك السيرفر نفسه أو مطوّر البوت.
+ * الاستثناء الوحيد: مالك البوت أو حامل أعلى رول (معرّف عبر جلسة Discord).
+ * جلسات بلا علم بالهوية (كلمة مرور عامة/Legacy) لا تقدر تُطفئ الحماية بصمت —
+ * تُرفض وتُسجل في بوابة الحماية.
  *
  * @returns null = مسموح فوراً · نص = تم إرسال الطلب/مُنع (لا يُطبَّق شيء)
  */
@@ -293,12 +547,37 @@ export async function gateDashboardProtectionOff(opts: {
   field: string;
   client?: any;
 }): Promise<string | null> {
-  // جلسات قديمة بدون هوية مستخدم (كلمة مرور عامة) — سماح حذر كما كان
-  if (!opts.userId) return null;
+  // جلسات بدون هوية Discord — تُرفض وتُسجَّل (لا سماح صامت)
+  if (!opts.userId) {
+    await logProtectionGateDecision({
+      guild: opts.guild,
+      settings: opts.settings,
+      field: opts.field,
+      outcome: 'blocked',
+      userId: null,
+      source: 'لوحة التحكم',
+      note: 'جلسة بلا هوية Discord — الطلب مرفوض حفاظاً على الحماية',
+    });
+    return '⛔ يجب تسجيل الدخول إلى لوحة التحكم بحساب Discord (جلسة ديسكورد) لها صلاحية مرجعها، وإلا تُرفض أي محاولة إطفاء حماية';
+  }
+
+  // لو كانت بوابة "موافقة مالك السيرفر" مطفّأة في الإعدادات — الحماية غير مُقيّدة بالكامل
+  if (!approvalEnabled(opts.settings)) return null;
 
   const member = await opts.guild.members.fetch(String(opts.userId)).catch(() => null);
   const canDirect = await canDirectlyDisableProtection(opts.guild, String(opts.userId), member, opts.client);
-  if (canDirect) return null;
+  if (canDirect) {
+    await logProtectionGateDecision({
+      guild: opts.guild,
+      settings: opts.settings,
+      field: opts.field,
+      outcome: 'direct_allowed',
+      userId: opts.userId,
+      requestedByTag: member?.user?.tag || null,
+      source: 'لوحة التحكم',
+    });
+    return null;
+  }
 
   if (!member) {
     return '⛔ لازم تكون عضواً في السيرفر عشان تطلب إيقاف الحماية';
@@ -317,6 +596,17 @@ export async function gateDashboardProtectionOff(opts: {
     requestedBy: member.user,
     source: 'لوحة التحكم',
   });
+  if (sent === 'sent') {
+    await logProtectionGateDecision({
+      guild: opts.guild,
+      settings: opts.settings,
+      field: opts.field,
+      outcome: 'approval_requested',
+      userId: opts.userId,
+      requestedByTag: member?.user?.tag || null,
+      source: 'لوحة التحكم',
+    });
+  }
 
   return sent === 'sent'
     ? `👑 أُرسل طلب إيقاف **${label}** — **لن يُطفأ شيء قبل موافقة مالك البوت أو صاحب أعلى رول** (صلاحية الأزرار 5 دقائق)`

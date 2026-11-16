@@ -49,7 +49,8 @@ const models_1 = require("../../models");
 const ActivityTracker_1 = require("../../handlers/ActivityTracker");
 const clanImage_1 = require("../../utils/clanImage");
 const helpers_1 = require("../../utils/helpers");
-const botOwner_1 = require("../../utils/botOwner");
+const clanPerms_1 = require("../../utils/clanPerms");
+const clancomp_1 = require("../../interactions/buttons/clancomp");
 const logger = (0, helpers_1.createLogger)('Clan');
 const DEFAULT_COLOR = 0x3498db;
 const MAX_CLANS_PER_GUILD = 15;
@@ -142,6 +143,14 @@ const command = {
         .addSubcommand((sub) => sub.setName('list').setDescription('📋 عرض كل العشائر'))
         .addSubcommand((sub) => sub.setName('info').setDescription('👤 معلومات عشيرة').addStringOption((o) => o.setName('name').setDescription('اسم العشيرة').setRequired(true)))
         .addSubcommand((sub) => sub
+        .setName('mystats')
+        .setDescription('📊 إحصائياتك داخل عشيرتك (رسائل/فويس/ترتيب)')
+        .addStringOption((o) => o
+        .setName('period')
+        .setDescription('الفترة الزمنية')
+        .addChoices({ name: 'اليوم', value: 'day' }, { name: 'الأسبوع', value: 'week' }, { name: 'الشهر', value: 'month' }, { name: 'الكلي', value: 'total' })))
+        .addSubcommand((sub) => sub.setName('comp').setDescription('⚔️ لوحة التحكم السريع في المسابقة (أزرار: بدء/إلغاء/ترتيب/حالة)'))
+        .addSubcommand((sub) => sub
         .setName('leaderboard')
         .setDescription('🏆 لوحة أفضل العشائر (صورة)')
         .addStringOption((o) => o
@@ -192,29 +201,15 @@ const command = {
         }
         const sub = interaction.options.getSubcommand();
         const guild = interaction.guild;
-        // 🔒 إدارة/فعاليات العشائر: أدمنستريتور + أعلى رول في السيرفر (أو مالك البوت)
-        const READ_ONLY_SUBS = new Set(['list', 'info', 'leaderboard', 'comp-status']);
+        // 🔒 إدارة/فعاليات العشائر: أدمنستريتور + أعلى رول (أو مالك البوت/مالك السيرفر)
+        const READ_ONLY_SUBS = new Set(['list', 'info', 'leaderboard', 'comp-status', 'mystats']);
         if (!READ_ONLY_SUBS.has(sub)) {
             const member = interaction.member instanceof discord_js_1.GuildMember
                 ? interaction.member
                 : await guild.members.fetch(interaction.user.id).catch(() => null);
-            const botOwner = await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id).catch(() => false);
-            const isGuildOwner = guild.ownerId === interaction.user.id;
-            const hasAdmin = interaction.memberPermissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator) ??
-                member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator) ??
-                false;
-            // أعلى رول موجود في السيرفر (حسب ترتيب الرتب)
-            const topRole = guild.roles.highest;
-            const hasHighestRole = !!member && !!topRole && member.roles.cache.has(topRole.id);
-            if (!botOwner && !isGuildOwner && !(hasAdmin && hasHighestRole)) {
-                await interaction.reply({
-                    content: '⛔ **إدارة وفعاليات العشائر محصورة بـ:**\n' +
-                        '• من يملك صلاحية **أدمنستريتور** ومعه **أعلى رول** موجود في السيرفر\n' +
-                        '• أو مالك السيرفر\n' +
-                        '• أو مالك البوت\n\n' +
-                        '(القراءة متاحة للطاقم: `/clan list`، `/clan info`، `/clan leaderboard`، `/clan comp-status`)',
-                    ephemeral: true,
-                });
+            const allowed = await (0, clanPerms_1.canManageClans)(guild, interaction.user.id, member, interaction.client).catch(() => false);
+            if (!allowed) {
+                await interaction.reply({ content: (0, clanPerms_1.clanAccessDeniedMessage)(), ephemeral: true });
                 return;
             }
         }
@@ -344,6 +339,85 @@ const command = {
             }
             await clan.deleteOne();
             await interaction.editReply({ content: `🗑️ تم حذف عشيرة «${name}» نهائياً` });
+            return;
+        }
+        // ===== mystats =====
+        if (sub === 'mystats') {
+            await interaction.deferReply({ ephemeral: true });
+            const period = (interaction.options.getString('period') || 'month');
+            const memberId = interaction.user.id;
+            // العشيرة التي ينتمي إليها المستخدم
+            const clan = await models_1.Clan.findOne({ guildId: guild.id, active: true, members: memberId }).lean();
+            if (!clan) {
+                await interaction.editReply({ content: '❌ أنت مش مشترك في أي عشيرة — اطلب من الإدارة إضافتك بـ `/clan addmember`' });
+                return;
+            }
+            const now = new Date();
+            const date = period === 'day' ? (0, ActivityTracker_1.getDayKey)(now)
+                : period === 'week' ? (0, ActivityTracker_1.getWeekKey)(now)
+                    : period === 'month' ? (0, ActivityTracker_1.getMonthKey)(now)
+                        : 'all';
+            const docs = await ActivityTracker_1.ActivityStats.find({ guildId: guild.id, userId: { $in: clan.members }, period, date }).lean();
+            const perMember = new Map();
+            for (const d of docs) {
+                const cur = perMember.get(d.userId) || { messages: 0, voiceMinutes: 0, voiceJoins: 0 };
+                cur.messages += d.messages || 0;
+                cur.voiceMinutes += d.voiceMinutes || 0;
+                cur.voiceJoins += d.voiceJoins || 0;
+                perMember.set(d.userId, cur);
+            }
+            const mine = perMember.get(memberId) || { messages: 0, voiceMinutes: 0, voiceJoins: 0 };
+            const scoreOf = (s) => s.messages + s.voiceMinutes * 10;
+            // الترتيب داخل العشيرة
+            const ranked = [...perMember.entries()]
+                .map(([uid, s]) => ({ uid, score: scoreOf(s) }))
+                .sort((a, b) => b.score - a.score);
+            const rank = ranked.findIndex((r) => r.uid === memberId) + 1;
+            const totalScore = ranked.reduce((a, b) => a + b.score, 0);
+            const avgPerMember = clan.members.length ? Math.round(totalScore / clan.members.length) : 0;
+            const top1 = ranked[0];
+            const periodLabel = { day: 'اليوم', week: 'الأسبوع', month: 'الشهر', total: 'الكلي' }[period];
+            const h = Math.floor(mine.voiceMinutes / 60);
+            const m = mine.voiceMinutes % 60;
+            const lines = [
+                `**${clanEmoji(clan.name)} ${clan.name}** — ${periodLabel}`,
+                '',
+                `💬 الرسائل: **${mine.messages}**`,
+                `🔊 الفويس: **${h}س ${m}د** (${mine.voiceMinutes} دقيقة)`,
+                `🎙️ مرات الانضمام للفويس: **${mine.voiceJoins}**`,
+                `⭐ نقاطك: **${scoreOf(mine)}** (رسائل + دقائق فويس × 10)`,
+                `🏆 ترتيبك داخل العشيرة: **${rank > 0 ? rank : '—'} من ${clan.members.length}**`,
+                `📈 متوسط العشيرة: ${avgPerMember} نقطة`,
+            ];
+            if (top1 && top1.uid !== memberId) {
+                lines.push(`🥇 المتصدر: <@${top1.uid}> (${top1.score})`);
+            }
+            else if (top1) {
+                lines.push('🥇 أنت المتصدر حالياً! 🎉');
+            }
+            const embed = new discord_js_1.EmbedBuilder()
+                .setColor(clan.color || DEFAULT_COLOR)
+                .setTitle('📊 إحصائياتي في العشيرة')
+                .setDescription(lines.join('\n'))
+                .setFooter({ text: 'يُحسب من نشاط الرسائل والفويس داخل السيرفر' })
+                .setTimestamp();
+            await interaction.editReply({ embeds: [embed] });
+            return;
+        }
+        // ===== comp (لوحة أزرار سريعة للمسابقة) =====
+        if (sub === 'comp') {
+            await interaction.deferReply({ ephemeral: true });
+            const embed = new discord_js_1.EmbedBuilder()
+                .setColor(0x3b82f6)
+                .setTitle('⚔️ لوحة مسابقة العشائر')
+                .setDescription('أزرار سريعة بدلاً من أوامر طويلة:\n' +
+                '• **▶️ بدء مسابقة** — نافذة فيها أسماء العشائر وعدد الأيام واسم المسابقة\n' +
+                '• **📊 الترتيب الحالي** — نقاط العشائر خلال الشهر\n' +
+                '• **📋 الحالة** — الوقت المتبقي وقناة الإعلان\n' +
+                '• **🛑 إلغاء المسابقة** — لمن يملك صلاحية إدارة العشائر فقط')
+                .setFooter({ text: 'أكمل القنوات الافتراضية من /clan settings' })
+                .setTimestamp();
+            await interaction.editReply({ embeds: [embed], components: [(0, clancomp_1.buildClanCompPanel)()] });
             return;
         }
         // ===== list =====

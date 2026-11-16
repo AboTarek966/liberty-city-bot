@@ -483,6 +483,52 @@ app.get('/dashboard/:guildId/logs', requireAuth, (req, res) => guildPageData(req
 app.get('/dashboard/:guildId/economy', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'economy'));
 app.get('/dashboard/:guildId/welcome', requireAuth, (req, res) => guildPageData(req, res, req.params.guildId, 'welcome'));
 
+// --------------------------------------------
+// 👑 بوابة إطفاء الحماية (من لوحة التحكم في وضع "بلا API بوت")
+//    يرصد أي إطفاء حماية في التحديث ويتطلبه عبر طابور الأوامر — يمنع الالتفاف
+//    على بوابة مالك البوت/أعلى رول عبر كتابة Mongo مباشرة.
+// --------------------------------------------
+function detectProtectionOffLocal(patch, cur) {
+  const disables = new Set();
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return [];
+  cur = cur || {};
+
+  // بوليان مستقلة على مستوى protection
+  const independent = ['ownerApproval', 'blockMaliciousNames', 'lockdown', 'silentSecurityAlerts'];
+  for (const k of independent) {
+    if (patch[k] === false && cur[k] !== false) disables.add(k === 'blockMaliciousNames' ? 'blocknames' : k);
+  }
+
+  // aiAutoMod.categories.<id>=false
+  const cats = patch?.aiAutoMod?.categories;
+  if (cats && typeof cats === 'object' && !Array.isArray(cats)) {
+    const curCats = cur?.aiAutoMod?.categories || {};
+    for (const [id, v] of Object.entries(cats)) {
+      if (v === false && curCats[id] !== false) disables.add('aiAutoMod:category:' + id);
+    }
+  }
+
+  // باقي المفاتيح: protection.<feature>.enabled=false + بوليان متداخلة
+  const walk = (node, curNode, prefix) => {
+    for (const [k, v] of Object.entries(node || {})) {
+      if (v === undefined || v === null) continue;
+      const full = prefix ? prefix + '.' + k : k;
+      const curV = curNode ? curNode[k] : undefined;
+      if (v === false && curV !== false) { disables.add('path:' + full); continue; }
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        if (prefix === '' && v.enabled === false) { disables.add(k); continue; }
+        walk(v, curV, full);
+      }
+    }
+  };
+  for (const [k, v] of Object.entries(patch)) {
+    if (['ownerApproval', 'blockMaliciousNames', 'lockdown', 'silentSecurityAlerts', 'aiAutoMod'].includes(k)) continue;
+    if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, cur[k], k);
+    else if (v === false && cur[k] !== false) disables.add('path:' + k);
+  }
+  return [...disables];
+}
+
 async function settingsUpdateHandler(req, res) {
   const { guildId } = req.params;
   const guild = req.session.guilds.find(g => g.id === guildId);
@@ -503,6 +549,60 @@ async function settingsUpdateHandler(req, res) {
       const featureKeys = { ...body };
       delete featureKeys.protection;
       body.protection = { ...(body.protection || {}), [featureId]: featureKeys };
+    }
+
+    // 👑 بوابة الحماية: أي إطفاء يمر عبر طابور الأوامر (مالك البوت/أعلى رول أو موافقة)
+    //    لا يُطفى شيء عبر الكتابة المباشرة في Mongo — الحماية تبقى حتى الموافقة.
+    if (body.protection && typeof body.protection === 'object' && !Array.isArray(body.protection)) {
+      const current = (await getSettings(guildId))?.protection || {};
+      const disables = detectProtectionOffLocal(body.protection, current);
+      if (disables.length > 0) {
+        const sessionUser = req.session.user || {};
+        const requestedBy = {
+          id: String(sessionUser.id || sessionUser.userId || ''),
+          tag: sessionUser.discriminator && sessionUser.discriminator !== '0'
+            ? `${sessionUser.username}#${sessionUser.discriminator}`
+            : (sessionUser.username || 'لوحة التحكم'),
+          username: sessionUser.username || 'لوحة التحكم',
+        };
+        if (!requestedBy.id) {
+          return res.status(401).json({ error: 'يجب تسجيل الدخول بـ Discord لتعديل الحماية' });
+        }
+        const protectionPatch = body.protection;
+        const rest = { ...body };
+        delete rest.protection;
+
+        const result = await runCommand(guildId, 'protection_off_update', {
+          patch: protectionPatch,
+          requestedBy,
+          actor: requestedBy.username,
+        }, 25000);
+
+        if (result.ok && result.result?.applied) {
+          // طبّق باقي الحقول (غير الحماية) بنفس المسار لكن بدون protection مكررة
+          if (Object.keys(rest).length > 0) await saveSettings(guildId, rest);
+          return res.json({
+            success: true,
+            applied: true,
+            fields: result.result.fields || [],
+            message: result.result.message || '✅ تم تطبيق تعديل الحماية',
+          });
+        }
+        if (result.ok && result.result?.pending) {
+          if (Object.keys(rest).length > 0) await saveSettings(guildId, rest);
+          return res.status(202).json({
+            approvalRequired: true,
+            pending: true,
+            fields: result.result.fields || [],
+            message: result.result.message || '⏳ أرسل طلب موافقة — الحماية لن تُطفى قبل موافقة مالك البوت أو صاحب أعلى رول',
+          });
+        }
+        // البوت غير متصل / خطأ — لا تُكتب ولا شيء يخص الحماية
+        return res.status(503).json({
+          approvalRequired: true,
+          error: (result.error || 'تعذر الوصول للبوت لتمرير تغيير الحماية — الحماية تبقى كما هي'),
+        });
+      }
     }
 
     const result = await saveSettings(guildId, body);

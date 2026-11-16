@@ -8,7 +8,7 @@ import { ButtonInteraction, GuildMember } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { OmniClient } from '../../OmniClient';
-import { takePending, protectionFieldLabel, hasHighestServerRole } from '../../utils/ownerApproval';
+import { takePending, protectionFieldLabel, hasHighestServerRole, logProtectionGateDecision } from '../../utils/ownerApproval';
 import { isBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
@@ -48,14 +48,35 @@ const handler: ButtonHandler = {
         embeds: [],
         components: [],
       });
+      await logProtectionGateDecision({
+        guild: interaction.guild,
+        field,
+        outcome: 'expired',
+        userId: interaction.user.id,
+        requestedByTag: interaction.user.tag,
+        source: 'لوحة التحكم',
+        note: 'انتهت صلاحية الطلب (5 دقائق)',
+      });
       return;
     }
+
+    const sourceTag = pending.requestedByTag || null;
+    const logSource = 'لوحة التحكم';
 
     if (verdict === 'no') {
       await interaction.update({
         content: `❌ رفض ${who} ${interaction.user} طلب إيقاف **${label}** — الحماية تبقى مفعّلة ✅\nطلبه: <@${pending.requestedBy}>`,
         embeds: [],
         components: [],
+      });
+      await logProtectionGateDecision({
+        guild: interaction.guild,
+        field,
+        outcome: 'denied',
+        userId: interaction.user.id,
+        requestedByTag: sourceTag || interaction.user.tag,
+        source: logSource,
+        note: `رفض بواسطة ${who}`,
       });
       return;
     }
@@ -82,6 +103,29 @@ const handler: ButtonHandler = {
         prot.ownerApproval = false; // خيار الموافقة نفسه — بوليان مستقل
       } else if (field === 'blocknames') {
         prot.blockMaliciousNames = false; // بوليان مستقل
+      } else if (field === 'lockdown') {
+        prot.lockdown = false; // بوليان مستقل (وضع الطوارئ)
+      } else if (field === 'silentSecurityAlerts') {
+        prot.silentSecurityAlerts = false; // تبديل وضع الصمت الأمني
+      } else if (field.startsWith('aiAutoMod:category:')) {
+        // 🧠 تعطيل فئة محددة من ذكاء الأوتومود بدل إطفاء الذكاء كله
+        const catId = field.split(':')[2];
+        if (!prot.aiAutoMod || typeof prot.aiAutoMod !== 'object') prot.aiAutoMod = { enabled: true, categories: {} };
+        if (!prot.aiAutoMod.categories || typeof prot.aiAutoMod.categories !== 'object') prot.aiAutoMod.categories = {};
+        prot.aiAutoMod.categories[catId] = false;
+      } else if (field.startsWith('path:')) {
+        // 🧭 بوليان متداخلة عشوائية (مثل aiTicketAssistant.autoClaim) — نعبر المسار كامل ونضع false
+        const dotted = field.slice(5);
+        const parts = dotted.split('.').filter(Boolean);
+        if (parts.length) {
+          let node: any = prot;
+          for (let i = 0; i < parts.length - 1; i++) {
+            const p = parts[i];
+            if (!node[p] || typeof node[p] !== 'object' || Array.isArray(node[p])) node[p] = {};
+            node = node[p];
+          }
+          node[parts[parts.length - 1]] = false;
+        }
       } else {
         if (!prot[field]) prot[field] = { enabled: false };
         prot[field].enabled = false;
@@ -104,6 +148,16 @@ const handler: ButtonHandler = {
         content: `✅ وافق ${who} ${interaction.user} — تم إيقاف **${label}** فوراً\nطلبها: <@${pending.requestedBy}> (${pending.requestedByTag})`,
         embeds: [],
         components: [],
+      });
+      await logProtectionGateDecision({
+        guild: interaction.guild,
+        settings,
+        field,
+        outcome: 'approved',
+        userId: interaction.user.id,
+        requestedByTag: pending.requestedByTag || sourceTag || interaction.user.tag,
+        source: logSource,
+        note: `موافقة بواسطة ${who} على طلب <@${pending.requestedBy}>`,
       });
     } catch (error) {
       await interaction

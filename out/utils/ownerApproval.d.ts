@@ -1,7 +1,19 @@
 import { Guild, GuildMember, User } from 'discord.js';
 /** أسماء الميزات للعرض في رسائل الطلب والموافقة */
 export declare const PROTECTION_LABELS: Record<string, string>;
-/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> */
+/**
+ * 🧰 يجمع **كل** الحمايات التي سيتم إطفاؤها في التعديل (وليس أولها فقط).
+ * يستخدمها عامل لوحة التحكم لرصد الطلب كله قبل تطبيقه (atomic).
+ * العودة: رموز حقول تُستخدم في أزرار الموافقة (ownappr:yes:<field>).
+ * الرموز:
+ *   • 'antiSpam' / 'antiRaid' / ...            — إطفاء حماية كاملة (prot.<field>.enabled=false)
+ *   • 'ownerApproval' / 'blocknames' / ...      — بوليان مستقلة
+ *   • 'lockdown' / 'silentSecurityAlerts'       — بوليان مستقلة
+ *   • 'aiAutoMod:category:<id>'                 — تعطيل فئة من الذكاء الاصطناعي
+ *   • 'path:<dotted.path>'                      — بوليان متداخلة عشوائية (prot.path...=false)
+ */
+export declare function collectProtectionOffFields(update: any, current: any): string[];
+/** 🎯 اسم الحماية للعرض — يدعم استثناءات القنوات بصيغة chan:<channelId>:<check> وفئات الذكاء الاصطناعي aiAutoMod:category:<id> ومسارات path:<dotted> */
 export declare function protectionFieldLabel(field: string): string;
 interface PendingApproval {
     field: string;
@@ -43,17 +55,35 @@ export declare function requestOwnerApproval(opts: {
 export declare function takePending(guildId: string, field: string): PendingApproval | null;
 /**
  * 🔎 استخراج أول حماية مطلوب إطفاؤها من تعديل إعدادات قادم من اللوحة.
- * يدعم المسارات: protection.<feature>.enabled=false
- * وخصائص بوليان مستقلة: ownerApproval / blockMaliciousNames.
+ * يدعم:
+ *  • protection.<feature>.enabled=false
+ *  • خصائص بوليان مستقلة: ownerApproval / blockMaliciousNames / lockdown
+ *  • بوليان مباشرة أو عبر مسار فرعي: silentSecurityAlerts / punishmentTracker.enabled /
+ *    antiBotAbuse.enabled / antiExplicit.enabled / aiAutoMod.enabled / categories.* /
+ *    aiTranslator.enabled / showOriginal / aiTicketAssistant.* (analyzeOnCreate/autoClaim/notifyAdminsOnFailure/...)
+ *  • مسار حرقي: protection.<feature>.<key> فقط إذا كانت القيمة boolean false تحت مفتاح معروف (categories/...).
  */
 export declare function detectProtectionOffField(updates: any): string | null;
+export type ProtectionGateOutcome = 'direct_allowed' | 'approval_requested' | 'approved' | 'denied' | 'expired' | 'blocked';
+export declare function logProtectionGateDecision(opts: {
+    guild: Guild;
+    settings?: any;
+    field: string;
+    outcome: ProtectionGateOutcome;
+    userId?: string | null;
+    requestedByTag?: string | null;
+    source?: string | null;
+    note?: string | null;
+}): Promise<void>;
 /** اختيار قناة يرسل فيها البوت طلب موافقة المالك (سجل الحماية ← قناة النظام ← أول قناة نصية) */
 export declare function findApprovalChannel(guild: Guild, settings: any): any | null;
 /**
  * 👑 بوابة إطفاء الحماية من **لوحة التحكم** تحديداً.
  * تختلف عن بوابة ديسكورد في أنها تطلب موافقة المالك دائماً (حتى لو خيار
  * ownerApproval نفسه مطفأ) لأن تعديل اللوحة يجب ألا يتجاوز مالك السيرفر.
- * الاستثناء الوحيد: مالك السيرفر نفسه أو مطوّر البوت.
+ * الاستثناء الوحيد: مالك البوت أو حامل أعلى رول (معرّف عبر جلسة Discord).
+ * جلسات بلا علم بالهوية (كلمة مرور عامة/Legacy) لا تقدر تُطفئ الحماية بصمت —
+ * تُرفض وتُسجل في بوابة الحماية.
  *
  * @returns null = مسموح فوراً · نص = تم إرسال الطلب/مُنع (لا يُطبَّق شيء)
  */

@@ -110,6 +110,140 @@ class DashboardCommandWorker {
             (0, models_1.invalidateGuildSettings)(guildId);
             return { ok: true, invalidated: true, at: new Date().toISOString() };
         }
+        // 👑 تعديل/إطفاء الحماية من لوحة التحكم — يمرّ ببوابة مالك البوت/أعلى رول الذاتية
+        //    (مالك البوت أو حامل أعلى رول → تطبيق مباشر + سجل · غيرهما → طلب موافقة، ولا يتغيّر شيء قبل الموافقة)
+        if (command === 'protection_off_update') {
+            const patch = payload?.patch;
+            if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+                throw new Error('لا توجد تعديلات حماية لتمريرها');
+            }
+            const actorId = String(payload?.requestedBy?.id || '');
+            const actorTag = String(payload?.requestedBy?.tag || payload?.requestedBy?.username || payload?.actor || 'لوحة التحكم');
+            if (!actorId)
+                throw new Error('يجب تسجيل الدخول بـ Discord لتعديل إعدادات الحماية');
+            const guild2 = this.client.guilds.cache.get(guildId);
+            if (!guild2)
+                throw new Error('البوت غير موجود في هذا السيرفر');
+            const { getGuildSettingsFresh, invalidateGuildSettings: invalidate } = await Promise.resolve().then(() => __importStar(require('../models')));
+            const settings = await getGuildSettingsFresh(guildId);
+            const sAny = settings;
+            const curProtection = sAny?.protection || {};
+            const { collectProtectionOffFields, approvalEnabled, canDirectlyDisableProtection, findApprovalChannel, requestOwnerApproval, logProtectionGateDecision, } = await Promise.resolve().then(() => __importStar(require('../utils/ownerApproval')));
+            const fields = collectProtectionOffFields({ protection: patch }, curProtection);
+            const member = await guild2.members.fetch(actorId).catch(() => null);
+            const applyDirect = async (reason) => {
+                // دمج عميق على مستوى protection ثم الحفظ
+                if (!sAny.protection)
+                    sAny.protection = {};
+                const merge = (target, patchObj) => {
+                    for (const [k, v] of Object.entries(patchObj || {})) {
+                        if (v && typeof v === 'object' && !Array.isArray(v) && target[k] && typeof target[k] === 'object' && !Array.isArray(target[k])) {
+                            merge(target[k], v);
+                        }
+                        else {
+                            target[k] = v;
+                        }
+                    }
+                };
+                merge(sAny.protection, patch);
+                if (typeof settings.markModified === 'function')
+                    settings.markModified('protection');
+                await settings.save();
+                invalidate(guildId);
+                for (const f of fields) {
+                    await logProtectionGateDecision({
+                        guild: guild2,
+                        settings: sAny,
+                        field: f,
+                        outcome: 'direct_allowed',
+                        userId: actorId,
+                        requestedByTag: actorTag,
+                        source: 'لوحة التحكم',
+                        note: reason,
+                    });
+                }
+                return {
+                    applied: true,
+                    fields,
+                    message: fields.length === 0
+                        ? '✅ تم تطبيق تعديل الحماية'
+                        : `✅ تم تطبيق تعديل الحماية مباشرة (${fields.length} حقل)`,
+                };
+            };
+            // الإطفاء ممنوع/مقيد فقط لو فيه حقول فعلياً تطفى (وإلا التشديدات تُطبّق فوراً)
+            if (fields.length === 0)
+                return applyDirect('تفعيل/تعديل بلا إطفاء حماية');
+            if (!approvalEnabled(sAny))
+                return applyDirect('خيار موافقة المالك مطفأ في إعدادات الحماية');
+            const canDirect = await canDirectlyDisableProtection(guild2, actorId, member, this.client);
+            if (canDirect)
+                return applyDirect('مالك البوت أو حامل أعلى رول');
+            if (!member) {
+                for (const f of fields) {
+                    await logProtectionGateDecision({
+                        guild: guild2,
+                        settings: sAny,
+                        field: f,
+                        outcome: 'blocked',
+                        userId: actorId,
+                        requestedByTag: actorTag,
+                        source: 'لوحة التحكم',
+                        note: 'المُطلِب ليس عضواً في السيرفر',
+                    });
+                }
+                return { applied: false, pending: false, fields, message: '⛔ يجب أن تكون عضواً في السيرفر عشان تعدّل الحماية' };
+            }
+            // غير مخوّل — لا نطبّق شيئاً · نرسل طلب موافقة لكل حقل (نفس سياسة /settings)
+            const channel = findApprovalChannel(guild2, sAny);
+            if (!channel) {
+                for (const f of fields) {
+                    await logProtectionGateDecision({
+                        guild: guild2,
+                        settings: sAny,
+                        field: f,
+                        outcome: 'blocked',
+                        userId: actorId,
+                        requestedByTag: actorTag,
+                        source: 'لوحة التحكم',
+                        note: 'لا توجد قناة سجل للحماية لإرسال طلب الموافقة',
+                    });
+                }
+                return {
+                    applied: false,
+                    pending: false,
+                    fields,
+                    message: '❌ لا توجد قناة أقدر أبعت فيها طلب الموافقة — حدد قناة سجل للحماية أو اسمح للبوت بالإرسال',
+                };
+            }
+            let sentCount = 0;
+            for (const f of fields) {
+                const sent = await requestOwnerApproval({
+                    guild: guild2,
+                    channel,
+                    field: f,
+                    requestedBy: member.user,
+                    source: 'لوحة التحكم',
+                });
+                if (sent === 'sent') {
+                    sentCount++;
+                    await logProtectionGateDecision({
+                        guild: guild2,
+                        settings: sAny,
+                        field: f,
+                        outcome: 'approval_requested',
+                        userId: actorId,
+                        requestedByTag: actorTag,
+                        source: 'لوحة التحكم',
+                    });
+                }
+            }
+            return {
+                applied: false,
+                pending: true,
+                fields,
+                message: `⏳ ${sentCount ? `أُرسل طلب موافقة (${sentCount}) بأزرار ✅/❌ — ` : ''}**لن تُطفى أي حماية قبل موافقة مالك البوت أو صاحب أعلى رول** (صالح 5 دقائق)`,
+            };
+        }
         // 🎯 قائمة سيرفرات البوت الفعلية (لا يحتاج وجود بالسيرفر — أمر عام)
         if (command === 'bot_guilds') {
             const gl = this.client.guilds.cache.map((g) => ({
