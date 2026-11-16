@@ -172,50 +172,62 @@ async function runRouletteRound(client, game) {
     }
     const winnerIndex = Math.floor(Math.random() * game.players.length);
     const chosen = game.players[winnerIndex];
-    let gif = null;
+    // 🎡 نرسل إمبد العجلة فوراً — ثم تُبنى GIF داخل Worker وتُلحق بالرسالة حين تكتمل
+    //    (اللاعب لا ينتظر الرندر، والبوت ما يتجمد أبداً)
     const WANT_WHEEL = (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
         (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
-    if (WANT_WHEEL) {
+    const spinEmbed = new discord_js_1.EmbedBuilder()
+        .setColor(COLOR)
+        .setTitle('🎡 العجلة تدور...')
+        .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+        .setFooter({ text: 'جاري تحديد عليه الدور...' })
+        .setTimestamp();
+    game.choiceTimer && clearTimeout(game.choiceTimer);
+    const spinMessage = await channel.send({ embeds: [spinEmbed] }).catch(() => null);
+    if (WANT_WHEEL && spinMessage) {
         const segments = game.players.map((p, i) => ({
             label: (p.username || '?').slice(0, 12),
             image: game.avatarBuffers[i],
         }));
-        try {
-            // الرندر داخل Worker المشترك — GIF متحركة بدون تجميد الخيط الرئيسي
-            // (المهلة أطول من PNG لأن GIF يرسم 30 إطاراً)
-            gif = await (0, wheelWorker_1.renderWheelInWorker)({
-                title: 'روليت',
-                subtitle: 'دور — وادفع مين يُطرَد',
-                segments,
-                winnerIndex,
-                hubText: 'OMNI',
-                width: 720,
-                format: 'gif',
-                orientation: 'landscape',
-                resultLabel: 'عليه الدور',
-            }, 30000);
-        }
-        catch (err) {
-            logger.warn(`wheel render failed: ${err?.message || err}`);
-        }
-    }
-    const spinEmbed = new discord_js_1.EmbedBuilder()
-        .setColor(COLOR)
-        .setTitle(WANT_WHEEL ? '🎡 العجلة وصلت!' : '🎡 العجلة تدور...')
-        .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
-        .setFooter({ text: WANT_WHEEL ? 'وقفت العجلة — الدور الجاي للّي اتشارد' : 'جاري تحديد عليه الدور...' })
-        .setTimestamp();
-    if (gif) {
-        game.choiceTimer && clearTimeout(game.choiceTimer);
-        await channel
-            .send({
-            embeds: [spinEmbed],
-            files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })],
-        })
-            .catch(() => { });
-    }
-    else {
-        await channel.send({ embeds: [spinEmbed] }).catch(() => { });
+        // الرندر في الخلفية — الإمبد لا يعتمد على اكتمالها
+        void (async () => {
+            try {
+                const gif = await (0, wheelWorker_1.renderWheelInWorker)({
+                    title: 'روليت',
+                    subtitle: 'دور — وادفع مين يُطرَد',
+                    segments,
+                    winnerIndex,
+                    hubText: 'OMNI',
+                    width: 640,
+                    format: 'gif',
+                    orientation: 'landscape',
+                    resultLabel: 'عليه الدور',
+                    frames: 12,
+                    delayMs: 55,
+                }, 90000);
+                if (!gif) {
+                    logger.warn('wheel GIF render skipped (worker/timeout)');
+                    return;
+                }
+                if (game.phase === 'done')
+                    return;
+                const arrivedEmbed = new discord_js_1.EmbedBuilder()
+                    .setColor(COLOR)
+                    .setTitle('🎡 العجلة وصلت!')
+                    .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+                    .setFooter({ text: 'وقفت العجلة — الدور الجاي للّي اتشارد' })
+                    .setTimestamp();
+                await spinMessage
+                    .edit({
+                    embeds: [arrivedEmbed],
+                    files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })],
+                })
+                    .catch(() => { });
+            }
+            catch (err) {
+                logger.warn(`wheel render failed: ${err?.message || err}`);
+            }
+        })();
     }
     // بعد اللف (لحد ما تقف العجلة) — انتظر ٥ ثوانٍ ثم نوقف على اللي اختارته
     setTimeout(() => void openKickMenu(client, game.id, chosen.id), exports.ROULETTE_DELAY_MS);
