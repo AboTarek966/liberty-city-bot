@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const moderationGuard_1 = require("../../utils/moderationGuard");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('timeout')
@@ -38,9 +39,10 @@ const command = {
             return;
         }
         // Check if bot can moderate
-        if (!member.moderatable) {
+        const timeoutCheck = (0, moderationGuard_1.checkTimeoutability)(member);
+        if (!timeoutCheck.canAttempt) {
             await interaction.editReply({
-                content: '❌ لا أستطيع كتم هذا العضو. تأكد أن رتبتي أعلى من رتبته',
+                content: `❌ لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}`,
             });
             return;
         }
@@ -65,7 +67,7 @@ const command = {
         }
         catch (error) {
             await interaction.editReply({
-                content: `❌ حدث خطأ: ${error.message}`,
+                content: `❌ حدث خطأ: ${(0, moderationGuard_1.describeTimeoutApiError)(member, error)}`,
             });
         }
     },

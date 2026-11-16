@@ -50,6 +50,7 @@ import {
 } from '../utils/mediaGen';
 import { runHoneypot } from '../utils/honeypot';
 import { handleBotAbuse } from '../utils/botAbuse';
+import { checkTimeoutability, describeTimeoutApiError } from '../utils/moderationGuard';
 import { handleAutoReply } from '../utils/autoReply';
 
 const logger = createLogger('Event:MessageCreate');
@@ -1049,17 +1050,22 @@ async function runAliasCommand(
 
       const target = await guild.members.fetch(userId).catch(() => null);
       if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
-      if (!target.moderatable)
-        return respond(message, '❌ لا أستطيع كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
+      const timeoutCheck = checkTimeoutability(target);
+      if (!timeoutCheck.canAttempt)
+        return respond(message, `❌ لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}`);
 
-      const result = await client.moderationHandler.timeout({
-        guild,
-        moderator: member,
-        target,
-        reason,
-        duration,
-      });
-      return respond(message, result.simpleMsg);
+      try {
+        const result = await client.moderationHandler.timeout({
+          guild,
+          moderator: member,
+          target,
+          reason,
+          duration,
+        });
+        return respond(message, result.simpleMsg);
+      } catch (e: any) {
+        return respond(message, `❌ فشل الكتم: ${describeTimeoutApiError(target, e)}`);
+      }
     }
 
     case 'warn': {
@@ -1228,15 +1234,18 @@ async function runAliasCommand(
       if (!userId) return usage('<@المستخدم>');
       const target = await guild.members.fetch(userId).catch(() => null);
       if (!target) return respond(message, '❌ العضو غير موجود في السيرفر');
-      if (!target.moderatable)
-        return respond(message, '❌ لا أستطيع إلغاء كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
       if (!target.isCommunicationDisabled())
         return respond(message, 'ℹ️ هذا العضو غير مكتوم أصلاً');
+      const timeoutCheck = checkTimeoutability(target);
+      if (!timeoutCheck.canAttempt)
+        return respond(message, `❌ لا أستطيع إلغاء كتم هذا العضو — ${timeoutCheck.reason}`);
 
-      await target.timeout(null, `إلغاء تايم أوت بواسطة ${member.user.tag}`).catch(() => {
-        return respond(message, '❌ فشل إلغاء التايم أوت — تحقق من صلاحيات البوت');
-      });
-      return respond(message, `✅ **تم إلغاء تايم أوت** <@${userId}>`);
+      try {
+        await target.timeout(null, `إلغاء تايم أوت بواسطة ${member.user.tag}`);
+        return respond(message, `✅ **تم إلغاء تايم أوت** <@${userId}>`);
+      } catch (e: any) {
+        return respond(message, `❌ فشل إلغاء التايم أوت: ${describeTimeoutApiError(target, e)}`);
+      }
     }
 
     case 'unban': {

@@ -43,6 +43,7 @@ exports.getAllToolNames = getAllToolNames;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
 const helpers_1 = require("../utils/helpers");
+const moderationGuard_1 = require("../utils/moderationGuard");
 const rolePicker_1 = require("../utils/rolePicker");
 const logger = (0, helpers_1.createLogger)('AITools');
 // 🔎 حل الرول من ID أو اسم (لما الـ AI يمرّر اسم الرول بدل ID)
@@ -146,12 +147,15 @@ registerTool('timeout_user', {
         const target = await guild.members.fetch(userId).catch(() => null);
         if (!target)
             return { success: false, message: '❌ العضو غير موجود' };
-        if (!target.moderatable)
-            return { success: false, message: '❌ لا أستطيع كتم هذا العضو' };
         if (target.id === executor.id)
             return { success: false, message: '❌ لا تستطيع كتم نفسك' };
         if (target.id === guild.ownerId)
             return { success: false, message: '❌ لا تستطيع كتم المالك' };
+        const timeoutCheck = (0, moderationGuard_1.checkTimeoutability)(target);
+        if (!timeoutCheck.canAttempt) {
+            logger.warn(`timeout_user blocked | target=${target.user.tag} | ${timeoutCheck.reason}`);
+            return { success: false, message: `❌ لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}` };
+        }
         const ms = Math.min(Math.max(1, durationMinutes), 40320) * 60 * 1000;
         try {
             await target.timeout(ms, `${executor.user.tag}: ${reason}`);
@@ -159,7 +163,7 @@ registerTool('timeout_user', {
             return { success: true, message: `⏱️ **تم كتم** <@${userId}> لمدة ${durationMinutes} دقيقة`, data: { userId, durationMinutes, reason } };
         }
         catch (e) {
-            return { success: false, message: `❌ فشل الكتم: ${e.message}` };
+            return { success: false, message: `❌ فشل الكتم: ${(0, moderationGuard_1.describeTimeoutApiError)(target, e)}` };
         }
     },
 });

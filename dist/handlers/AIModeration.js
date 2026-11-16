@@ -48,6 +48,7 @@ const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const rolePicker_1 = require("../utils/rolePicker");
+const moderationGuard_1 = require("../utils/moderationGuard");
 const logger = (0, helpers_1.createLogger)('AIModeration');
 // ⚠️ الترتيب مهم: "رفع الكتم" يجب أن يُفحص قبل "كتم"
 const ACTIONS = [
@@ -400,15 +401,26 @@ async function executeAIModeration(message, client, question) {
                 const member = target.member || (await guild.members.fetch(target.user.id).catch(() => null));
                 if (!member)
                     throw new Error('العضو غير موجود في السيرفر');
-                if (!member.moderatable)
-                    throw new Error('لا أستطيع كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
-                const result = await client.moderationHandler.timeout({
-                    guild,
-                    moderator,
-                    target: member,
-                    reason,
-                    duration: `${durationMs}ms`,
-                });
+                const timeoutCheck = (0, moderationGuard_1.checkTimeoutability)(member);
+                logger.warn(`Timeout check | target=${member.user.tag} | targetRole="${member.roles.highest.name}" #${member.roles.highest.position}` +
+                    ` | botRole="${guild.members.me?.roles.highest.name}" #${guild.members.me?.roles.highest.position}` +
+                    ` | admin=${member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)} | canAttempt=${timeoutCheck.canAttempt}` +
+                    (timeoutCheck.reason ? ` | reason=${timeoutCheck.reason}` : ''));
+                if (!timeoutCheck.canAttempt)
+                    throw new Error(`لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}`);
+                let result;
+                try {
+                    result = await client.moderationHandler.timeout({
+                        guild,
+                        moderator,
+                        target: member,
+                        reason,
+                        duration: `${durationMs}ms`,
+                    });
+                }
+                catch (e) {
+                    throw new Error((0, moderationGuard_1.describeTimeoutApiError)(member, e));
+                }
                 embed = result.embed;
                 msg = result.simpleMsg;
                 break;

@@ -59,6 +59,7 @@ const rolePicker_1 = require("../utils/rolePicker");
 const mediaGen_1 = require("../utils/mediaGen");
 const honeypot_1 = require("../utils/honeypot");
 const botAbuse_1 = require("../utils/botAbuse");
+const moderationGuard_1 = require("../utils/moderationGuard");
 const autoReply_1 = require("../utils/autoReply");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
@@ -938,16 +939,22 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
             const target = await guild.members.fetch(userId).catch(() => null);
             if (!target)
                 return respond(message, '❌ العضو غير موجود في السيرفر');
-            if (!target.moderatable)
-                return respond(message, '❌ لا أستطيع كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
-            const result = await client.moderationHandler.timeout({
-                guild,
-                moderator: member,
-                target,
-                reason,
-                duration,
-            });
-            return respond(message, result.simpleMsg);
+            const timeoutCheck = (0, moderationGuard_1.checkTimeoutability)(target);
+            if (!timeoutCheck.canAttempt)
+                return respond(message, `❌ لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}`);
+            try {
+                const result = await client.moderationHandler.timeout({
+                    guild,
+                    moderator: member,
+                    target,
+                    reason,
+                    duration,
+                });
+                return respond(message, result.simpleMsg);
+            }
+            catch (e) {
+                return respond(message, `❌ فشل الكتم: ${(0, moderationGuard_1.describeTimeoutApiError)(target, e)}`);
+            }
         }
         case 'warn': {
             // 🔢 تحذير تسلسلي: "ت 2 @user" ← رقم المستوى قبل المنشن
@@ -1110,14 +1117,18 @@ async function runAliasCommand(message, client, commandName, args, shortcut, mem
             const target = await guild.members.fetch(userId).catch(() => null);
             if (!target)
                 return respond(message, '❌ العضو غير موجود في السيرفر');
-            if (!target.moderatable)
-                return respond(message, '❌ لا أستطيع إلغاء كتم هذا العضو — تأكد أن رتبتي أعلى من رتبته');
             if (!target.isCommunicationDisabled())
                 return respond(message, 'ℹ️ هذا العضو غير مكتوم أصلاً');
-            await target.timeout(null, `إلغاء تايم أوت بواسطة ${member.user.tag}`).catch(() => {
-                return respond(message, '❌ فشل إلغاء التايم أوت — تحقق من صلاحيات البوت');
-            });
-            return respond(message, `✅ **تم إلغاء تايم أوت** <@${userId}>`);
+            const timeoutCheck = (0, moderationGuard_1.checkTimeoutability)(target);
+            if (!timeoutCheck.canAttempt)
+                return respond(message, `❌ لا أستطيع إلغاء كتم هذا العضو — ${timeoutCheck.reason}`);
+            try {
+                await target.timeout(null, `إلغاء تايم أوت بواسطة ${member.user.tag}`);
+                return respond(message, `✅ **تم إلغاء تايم أوت** <@${userId}>`);
+            }
+            catch (e) {
+                return respond(message, `❌ فشل إلغاء التايم أوت: ${(0, moderationGuard_1.describeTimeoutApiError)(target, e)}`);
+            }
         }
         case 'unban': {
             const userId = parseUserId(args[0]);

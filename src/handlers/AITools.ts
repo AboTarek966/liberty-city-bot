@@ -29,6 +29,7 @@ import {
 import { OmniClient } from './../OmniClient';
 import { getGuildSettings, ModerationCase } from '../models';
 import { createLogger } from '../utils/helpers';
+import { checkTimeoutability, describeTimeoutApiError } from '../utils/moderationGuard';
 import { canManageTarget, isRoleGrantable } from '../utils/rolePicker';
 
 const logger = createLogger('AITools');
@@ -161,9 +162,13 @@ registerTool('timeout_user', {
   async func({ guild, executor }, { userId, durationMinutes, reason }) {
     const target = await guild.members.fetch(userId).catch(() => null);
     if (!target) return { success: false, message: '❌ العضو غير موجود' };
-    if (!target.moderatable) return { success: false, message: '❌ لا أستطيع كتم هذا العضو' };
     if (target.id === executor.id) return { success: false, message: '❌ لا تستطيع كتم نفسك' };
     if (target.id === guild.ownerId) return { success: false, message: '❌ لا تستطيع كتم المالك' };
+    const timeoutCheck = checkTimeoutability(target);
+    if (!timeoutCheck.canAttempt) {
+      logger.warn(`timeout_user blocked | target=${target.user.tag} | ${timeoutCheck.reason}`);
+      return { success: false, message: `❌ لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}` };
+    }
 
     const ms = Math.min(Math.max(1, durationMinutes), 40320) * 60 * 1000;
     try {
@@ -171,7 +176,7 @@ registerTool('timeout_user', {
       await ModerationCase.create({ guildId: guild.id, userId: target.id, moderatorId: executor.id, type: 'timeout', reason, duration: ms });
       return { success: true, message: `⏱️ **تم كتم** <@${userId}> لمدة ${durationMinutes} دقيقة`, data: { userId, durationMinutes, reason } };
     } catch (e: any) {
-      return { success: false, message: `❌ فشل الكتم: ${e.message}` };
+      return { success: false, message: `❌ فشل الكتم: ${describeTimeoutApiError(target, e)}` };
     }
   },
 });

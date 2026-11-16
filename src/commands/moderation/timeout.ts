@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
+import { checkTimeoutability, describeTimeoutApiError } from '../../utils/moderationGuard';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -56,9 +57,10 @@ const command: Command = {
     }
 
     // Check if bot can moderate
-    if (!member.moderatable) {
+    const timeoutCheck = checkTimeoutability(member);
+    if (!timeoutCheck.canAttempt) {
       await interaction.editReply({
-        content: '❌ لا أستطيع كتم هذا العضو. تأكد أن رتبتي أعلى من رتبته',
+        content: `❌ لا أستطيع كتم هذا العضو — ${timeoutCheck.reason}`,
       });
       return;
     }
@@ -85,7 +87,7 @@ const command: Command = {
       });
     } catch (error: any) {
       await interaction.editReply({
-        content: `❌ حدث خطأ: ${error.message}`,
+        content: `❌ حدث خطأ: ${describeTimeoutApiError(member, error)}`,
       });
     }
   },
