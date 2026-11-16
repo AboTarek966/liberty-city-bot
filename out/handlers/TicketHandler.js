@@ -121,7 +121,7 @@ class TicketHandler {
             });
         }
         else if (claimedByBot) {
-            // 🤖 استلمها البوت → أي إداري يقدر يأخذها، والإلغاء للمسؤول فقط
+            // 🤖 استلمها البوت → أي إداري يقدر يأخذها مباشرة، وأي إداري/دعم يقدر يلغي استلامها
             claimOptions.push({
                 label: 'استلام التذكرة من البوت',
                 value: 'claim',
@@ -131,11 +131,19 @@ class TicketHandler {
             claimOptions.push({
                 label: 'إلغاء استلام البوت',
                 value: 'unclaim',
-                description: 'إعادة التذكرة غير مستلمة — صلاحية Administrator فقط',
+                description: 'إعادة التذكرة غير مستلمة — بعدها أي إداري آخر يستلمها',
                 emoji: '↩️',
             });
         }
-        // استلام بشري = نهائي: لا نعرض خيار إلغاء الاستلام إطلاقاً
+        else {
+            // 👤 مستلمة بشرياً → الإداري المستلم (أو أي إداري/دعم آخر) يقدر يلغي الاستلام
+            claimOptions.push({
+                label: 'إلغاء الاستلام',
+                value: 'unclaim',
+                description: 'إلغاء استلام التذكرة — بعدها يقدر أي إداري آخر يستلمها',
+                emoji: '↩️',
+            });
+        }
         const options = [
             {
                 label: 'إضافة عضو أو إداري',
@@ -193,13 +201,12 @@ class TicketHandler {
                 .setEmoji('↩️'));
         }
         else {
-            // 🔒 استلام بشري نهائي — زر معطّل للتوضيح فقط
+            // 👤 مستلمة بشرياً — زر «إلغاء الاستلام» للإداري المستلم أو أي إداري/دعم آخر
             claimRow.addComponents(new discord_js_1.ButtonBuilder()
-                .setCustomId('ticket_claim_locked')
-                .setLabel('تم الاستلام — نهائي ولا يمكن إلغاؤه')
-                .setStyle(discord_js_1.ButtonStyle.Secondary)
-                .setEmoji('🔒')
-                .setDisabled(true));
+                .setCustomId('ticket_unclaim')
+                .setLabel('إلغاء الاستلام')
+                .setStyle(discord_js_1.ButtonStyle.Danger)
+                .setEmoji('↩️'));
         }
         return [selectRow, claimRow];
     }
@@ -716,7 +723,7 @@ class TicketHandler {
                 });
                 jobs.push(channel.send({ embeds: [claimEmbed] }));
                 // Update buttons (show unclaim instead of claim)
-                jobs.push(this.updateTicketButtons(channel, true));
+                jobs.push(this.updateTicketButtons(channel, true, claimedBy.id === this.client.user?.id));
             }
             this.logTicketEvent(guild, 'claim', ticket, claimedBy.user);
             await Promise.allSettled(jobs);
@@ -735,14 +742,15 @@ class TicketHandler {
             throw new Error('لم يتم العثور على التذكرة');
         if (ticket.status !== 'claimed')
             throw new Error('التذكرة غير مستلمة');
-        // 🔒 استلام بشري = نهائي: لا أحد يقدر يلغي استلام تذكرة استلمها إداري/عضو
-        const isAIClaim = !!this.client.user?.id && ticket.claimedBy === this.client.user.id;
-        if (!isAIClaim) {
-            throw new Error('لا يمكن إلغاء استلام التذكرة — الاستلام نهائي ولا يمكن التراجع عنه.');
-        }
-        // 🤖 تذكرة استلمها البوت: فقط من يملك صلاحية Administrator يقدر يشيل استلامها
-        if (!unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
-            throw new Error('فقط من يملك صلاحية Administrator يمكنه إلغاء استلام تذكرة استلمها البوت.');
+        // 🛡️ نفس صلاحية الاستلام: إداري/دعم يقدر يلغي الاستلام —
+        //    سواء كان هو المستلم أو إداري/دعم آخر (لتسليم التذكرة لزميل)
+        const settings = await (0, models_1.getGuildSettings)(guild.id);
+        const canUnclaim = unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+            unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+            (settings.tickets.adminRoleIds || []).some((id) => unclaimedBy.roles.cache.has(id)) ||
+            (settings.tickets.supportRoleIds || []).some((id) => unclaimedBy.roles.cache.has(id));
+        if (!canUnclaim) {
+            throw new Error('تحتاج أن تكون من فريق الدعم أو الإدارة لإلغاء استلام التذكرة');
         }
         const previousClaimer = guild.members.cache.get(ticket.claimedBy);
         ticket.status = 'open';

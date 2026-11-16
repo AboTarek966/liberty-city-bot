@@ -36,8 +36,17 @@ const handler = {
                 }
                 // ---------- ↩️ إلغاء الاستلام ----------
                 case 'unclaim': {
+                    const settings = await (0, models_1.getGuildSettings)(selectInteraction.guild.id);
+                    const canUnclaim = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+                        member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
+                        (settings.tickets.adminRoleIds || []).some((id) => member.roles.cache.has(id)) ||
+                        (settings.tickets.supportRoleIds || []).some((id) => member.roles.cache.has(id));
+                    if (!canUnclaim) {
+                        await selectInteraction.editReply({ content: '❌ تحتاج أن تكون من فريق الدعم أو الإدارة لإلغاء الاستلام' });
+                        return;
+                    }
                     await client.ticketHandler.unclaimTicket(selectInteraction.channelId, member);
-                    await selectInteraction.editReply({ content: '↩️ تم إلغاء استلام التذكرة' });
+                    await selectInteraction.editReply({ content: '↩️ تم إلغاء استلام التذكرة — يمكن لأي إداري آخر استلامها الآن' });
                     break;
                 }
                 // ---------- 👑 استدعاء الإدارة العليا ----------

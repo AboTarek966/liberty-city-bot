@@ -49,8 +49,18 @@ const handler: SelectMenuHandler = {
 
         // ---------- ↩️ إلغاء الاستلام ----------
         case 'unclaim': {
+          const settings = await getGuildSettings(selectInteraction.guild.id);
+          const canUnclaim =
+            member.permissions.has(PermissionFlagsBits.Administrator) ||
+            member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+            (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||
+            (settings.tickets.supportRoleIds || []).some((id: string) => member.roles.cache.has(id));
+          if (!canUnclaim) {
+            await selectInteraction.editReply({ content: '❌ تحتاج أن تكون من فريق الدعم أو الإدارة لإلغاء الاستلام' });
+            return;
+          }
           await client.ticketHandler.unclaimTicket(selectInteraction.channelId, member);
-          await selectInteraction.editReply({ content: '↩️ تم إلغاء استلام التذكرة' });
+          await selectInteraction.editReply({ content: '↩️ تم إلغاء استلام التذكرة — يمكن لأي إداري آخر استلامها الآن' });
           break;
         }
 

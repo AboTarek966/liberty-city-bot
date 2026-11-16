@@ -5,6 +5,7 @@
 import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
+import { getGuildSettings } from '../../models';
 
 const handler: ButtonHandler = {
   id: 'ticket_unclaim',
@@ -20,8 +21,22 @@ const handler: ButtonHandler = {
         interaction.guild.members.cache.get(interaction.user.id) ??
         (await interaction.guild.members.fetch(interaction.user.id));
 
+      const settings = await getGuildSettings(interaction.guild.id);
+      const canUnclaim =
+        member.permissions.has(PermissionFlagsBits.Administrator) ||
+        member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+        (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||
+        (settings.tickets.supportRoleIds || []).some((id: string) => member.roles.cache.has(id));
+
+      if (!canUnclaim) {
+        await interaction.editReply({ content: '❌ تحتاج أن تكون من فريق الدعم أو الإدارة لإلغاء الاستلام' });
+        return;
+      }
+
       await client.ticketHandler.unclaimTicket(interaction.channelId, member);
-      await interaction.editReply({ content: '↩️ تم إلغاء استلام التذكرة' });
+      await interaction.editReply({
+        content: '↩️ تم إلغاء استلام التذكرة — يمكن لأي إداري آخر استلامها الآن',
+      });
     } catch (error: any) {
       await interaction.editReply({
         content: `❌ ${error.message || 'حدث خطأ'}`,
