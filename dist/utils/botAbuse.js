@@ -60,6 +60,15 @@ function normalizeForAbuse(text) {
 const BOT_NAME_PATTERN = /(^|\s)(بوت|البوت|يا\s?بوت|bot|the\s?bot|omni|ليبرتي|liber(ty|ti))(\s|$)/iu;
 // كابسة شاملة: يابوت / بوتك / بوتات / كل حرف ما بوت — رسالة عن البوت بغض النظر عن كتابة الحدود
 const BOT_SUBSTRING_PATTERN = /بوت|omni|bot|liber(ty|ti)/i;
+// إهانات مباشرة لا تجوز قراءتها كسلام — تُعتبر مستهدِفة البوت حتى لو ما ذكرته
+// (بعد التطبيع: إزالة التتشكيل/الزخرفة وتوحيد الحروف). هدفنا رد "مرحبا" على سب صريح = خطأ.
+const STANDALONE_INSULTS = [
+    'كسمك', 'كس امك', 'كس اختك', 'كس اخوك', 'كس ابوك',
+    'انيك', 'منيوك', 'منيوكه', 'منيك', 'نيك',
+    'يا كلب', 'يا حمار', 'يا حيوان', 'يا عاهر', 'يا عاهرة', 'يا قحبة', 'يا شرموطة',
+    'يا ابن الكلب', 'يا ابن الحرام', 'يا ابن العاهر', 'يا ابن القحبة',
+    'متناك', 'متناكة', 'يا ابن المتناكة', 'يا ابن المتناكه',
+];
 async function targetsBot(message, client) {
     const meId = client.user?.id;
     if (meId && message.mentions?.users?.has(meId))
@@ -84,7 +93,14 @@ async function targetsBot(message, client) {
     const content = normalizeForAbuse(message.content || '');
     if (BOT_NAME_PATTERN.test(content))
         return true;
-    return BOT_SUBSTRING_PATTERN.test(content);
+    if (BOT_SUBSTRING_PATTERN.test(content))
+        return true;
+    // إهانة مباشرة بلا ذكر البوت — "كسمك" وحدها لا تُقرأ كترحيب؛ اللعب = مستهدِف
+    for (const phrase of STANDALONE_INSULTS) {
+        if (content.includes(phrase))
+            return true;
+    }
+    return false;
 }
 function buildTokenVariants(token) {
     const out = new Set([token]);
