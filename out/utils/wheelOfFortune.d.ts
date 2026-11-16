@@ -35,6 +35,5 @@ export interface WheelOfFortuneOptions {
  * @returns Buffer للـ GIF — ارسله كـ attachment.
  */
 export declare function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Promise<Buffer>;
-/** تحميل آفاتار ديسكورد كـ Buffer (null عند الفشل — لا تُرمي) */
 export declare function fetchAvatarBuffer(url: string): Promise<Buffer | null>;
 //# sourceMappingURL=wheelOfFortune.d.ts.map

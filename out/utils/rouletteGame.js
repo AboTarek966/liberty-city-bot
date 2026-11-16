@@ -31,6 +31,17 @@ const CHOICE_SECONDS = 30;
 /** فاصل ٥ ثوانٍ بين كل حدث ورسالة في اللعبة — أفضل للتسلسل الطبيعي */
 exports.ROULETTE_DELAY_MS = 5000;
 const COLOR = 0xed4245;
+/** 🖼️ تحميل الآفاتارات على دفعات (٦ في المرة) بدل كل اللاعبين دفعة واحدة — أقل ضغطاً على الاستضافة */
+async function fetchAvatarsInBatches(players, batch = 6) {
+    const out = new Array(players.length).fill(null);
+    for (let i = 0; i < players.length; i += batch) {
+        const slice = players.slice(i, i + batch);
+        const results = await Promise.all(slice.map((p) => p.avatarUrl ? (0, wheelOfFortune_1.fetchAvatarBuffer)(p.avatarUrl).catch(() => null) : Promise.resolve(null)));
+        for (let j = 0; j < results.length; j++)
+            out[i + j] = results[j];
+    }
+    return out;
+}
 // ---------- واجهة اللوبي ----------
 function lobbyEmbed(game, startText = 'تبدأ اللعبة خلال 60 ثانية') {
     const names = game.players.length
@@ -113,7 +124,7 @@ async function startRouletteGame(client, gameId) {
     const WANT_WHEEL = (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
         (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
     game.avatarBuffers = WANT_WHEEL
-        ? await Promise.all(game.players.map((p) => p.avatarUrl ? (0, wheelOfFortune_1.fetchAvatarBuffer)(p.avatarUrl).catch(() => null) : Promise.resolve(null)))
+        ? await fetchAvatarsInBatches(game.players, 6)
         : [];
     // أعلن انطلاق اللعبة، ثم انتظر 5 ثوانٍ قبل أول دورة
     if (channel.isTextBased()) {
@@ -170,31 +181,18 @@ async function runRouletteRound(client, game) {
             image: game.avatarBuffers[i],
         }));
         try {
-            // أولوية: الرندر داخل Worker — الصورة لا توقف الـ Event Loop أبداً
-            gif =
-                (await (0, wheelWorker_1.renderWheelInWorker)({
-                    title: 'روليت',
-                    subtitle: 'دور — وادفع مين يُطرَد',
-                    segments,
-                    winnerIndex,
-                    hubText: 'OMNI',
-                    width: 720,
-                    format: 'png',
-                    orientation: 'landscape',
-                    resultLabel: 'عليه الدور',
-                })) ||
-                    // احتياطي: لو الـ Worker غير متاح أو انتهت المهلة — نجرب الرندر المباشر (مع العلم أنه أثقل)
-                    (await (0, wheelOfFortune_1.renderWheelOfFortuneGif)({
-                        title: 'روليت',
-                        subtitle: 'دور — وادفع مين يُطرَد',
-                        segments,
-                        winnerIndex,
-                        hubText: 'OMNI',
-                        width: 720,
-                        format: 'png',
-                        orientation: 'landscape',
-                        resultLabel: 'عليه الدور',
-                    }));
+            // الرندر داخل Worker المشترك — لا يوجد احتياطي على الخيط الرئيسي (لا تجميد للبوت)
+            gif = await (0, wheelWorker_1.renderWheelInWorker)({
+                title: 'روليت',
+                subtitle: 'دور — وادفع مين يُطرَد',
+                segments,
+                winnerIndex,
+                hubText: 'OMNI',
+                width: 720,
+                format: 'png',
+                orientation: 'landscape',
+                resultLabel: 'عليه الدور',
+            });
         }
         catch (err) {
             logger.warn(`wheel render failed: ${err?.message || err}`);

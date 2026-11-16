@@ -6,7 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const gameUtil_1 = require("../../utils/gameUtil");
-const wheelOfFortune_1 = require("../../utils/wheelOfFortune");
+const wheelWorker_1 = require("../../utils/wheelWorker");
 const PRIZES = [
     { name: 'جوهرة', weight: 1, line: '🏆 **جاكبوت!** أنت محظوظ اليوم' },
     { name: 'ميدالية ذهبية', weight: 3, line: '🔥 رهيب! جائزة نادرة' },
@@ -49,13 +49,15 @@ const command = {
         }));
         let gifBuffer = null;
         try {
-            gifBuffer = await (0, wheelOfFortune_1.renderWheelOfFortuneGif)({
+            // الرندر داخل Worker — GIF لا يتجمّد البوت ولا يستهلك خيطه الرئيسي
+            gifBuffer = await (0, wheelWorker_1.renderWheelInWorker)({
                 title: 'عجلة الحظ',
                 subtitle: 'دوّرها... حظّك فين؟',
                 segments,
                 winnerIndex: winIndex,
                 hubText: 'OMNI',
-            });
+                format: 'gif',
+            }, 25000);
         }
         catch (err) {
             console.warn(`[Wheel] wheel gif failed: ${err?.message || err}`);

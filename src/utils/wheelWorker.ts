@@ -2,6 +2,9 @@
 // Omni Bot - Worker للرندر (عجلة الحظ / روليت)
 // ينفّذ رسم الصورة داخل Worker Thread حتى لا يتجمّد
 // الـ Event Loop الرئيسي للبوت على الاستضافات الضعيفة.
+//
+// تصميم: Worker واحد مشترك (singleton) يُعاد استخدامه،
+// مع مهلة لكل طلب — لو تجاوزها نغلق الـ Worker ونكمل بدون صورة.
 // ============================================
 
 import { Worker, isMainThread, parentPort } from 'worker_threads';
@@ -41,8 +44,8 @@ if (!isMainThread && parentPort) {
   port.on('message', async (msg: WheelRenderRequest) => {
     try {
       if (!msg?.opts || !msg?.id) return;
-      // دائماً PNG داخل الـ Worker — GIF يُرسم في الخيط الرئيسي عند الحاجة فقط
-      const out = await renderWheelOfFortuneGif({ ...msg.opts, format: 'png' });
+      // التنسيق يأتي من opts (png للروليت، gif لأمر /wheel) — وكل ذلك بعيداً عن الـ Event Loop
+      const out = await renderWheelOfFortuneGif({ ...msg.opts });
       const res: WheelRenderOk = { ok: true, id: msg.id, buffer: out };
       port.postMessage(res);
     } catch (error: any) {
@@ -69,72 +72,108 @@ export function canUseWheelWorker(): boolean {
   }
 }
 
+let sharedWorker: Worker | null = null;
+let sharedWorkerFailed = false;
+
+const pending = new Map<
+  string,
+  { resolve: (buffer: Buffer | null) => void; timer: NodeJS.Timeout }
+>();
+
+function ensureWorker(): Worker | null {
+  if (sharedWorkerFailed) return null;
+  if (sharedWorker) return sharedWorker;
+  try {
+    const workerPath = path.join(__dirname, 'wheelWorker.js');
+    sharedWorker = new Worker(workerPath, { eval: false });
+    sharedWorker.on('message', (msg: WheelRenderResponse) => {
+      if (!msg?.id) return;
+      const entry = pending.get(msg.id);
+      if (!entry) return;
+      pending.delete(msg.id);
+      clearTimeout(entry.timer);
+      if (msg.ok && msg.buffer) {
+        try {
+          entry.resolve(Buffer.from(msg.buffer));
+        } catch {
+          entry.resolve(null);
+        }
+      } else {
+        logger.warn(`wheel worker error: ${(msg as WheelRenderErr).error}`);
+        entry.resolve(null);
+      }
+    });
+    const onWorkerDead = (reason: string) => {
+      logger.warn(`wheel worker dead (${reason}) — closing`);
+      killSharedWorker();
+      const entries = [...pending.values()];
+      pending.clear();
+      for (const entry of entries) {
+        clearTimeout(entry.timer);
+        entry.resolve(null);
+      }
+    };
+    sharedWorker.on('error', (err) => onWorkerDead(String(err?.message || err)));
+    sharedWorker.on('exit', (code) => {
+      if (code !== 0) onWorkerDead(`exit code ${code}`);
+    });
+    return sharedWorker;
+  } catch (err: any) {
+    logger.warn(`wheel worker spawn failed: ${err?.message || err}`);
+    sharedWorkerFailed = true;
+    return null;
+  }
+}
+
+function killSharedWorker(): void {
+  const worker = sharedWorker;
+  sharedWorker = null;
+  if (worker) {
+    try {
+      void worker.terminate();
+    } catch {
+      /* تجاهل */
+    }
+  }
+}
+
+/** تنظيف عند إيقاف البوت */
+export function terminateWheelWorker(): void {
+  killSharedWorker();
+}
+
 /**
- * يحاول الرندر داخل خيوط عاملة لـ Node.
- * يرجع null لو الـ Worker غير متاح أو حدث خطأ/مهلة — المكالم الاحتياطي في الدفعة الأم.
+ * يحاول الرندر داخل Worker.
+ * يعيد null لو الـ Worker غير متاح أو حدث خطأ/مهلة — المستدعي يرسل الرسالة بدون صورة (لا تجميد للبوت).
  */
-export async function renderWheelInWorker(opts: WheelOfFortuneOptions, timeoutMs = 20000): Promise<Buffer | null> {
+export async function renderWheelInWorker(
+  opts: WheelOfFortuneOptions,
+  timeoutMs = 15000
+): Promise<Buffer | null> {
   if (!canUseWheelWorker()) return null;
 
   const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const worker = ensureWorker();
+  if (!worker) return null;
 
   return new Promise<Buffer | null>((resolve) => {
-    let settled = false;
-    let worker: Worker;
-    const done = (v: Buffer | null) => {
-      if (settled) return;
-      settled = true;
-      try { worker?.terminate(); } catch {}
-      resolve(v);
-    };
-
-    try {
-      const workerPath = path.join(__dirname, 'wheelWorker.js');
-      worker = new Worker(workerPath, { eval: false });
-    } catch (err: any) {
-      logger.warn(`wheel worker spawn failed: ${err?.message || err}`);
-      resolve(null);
-      return;
-    }
-
     const timer = setTimeout(() => {
-      logger.warn(`wheel worker timeout (>${timeoutMs}ms) — falling back`);
-      done(null);
+      pending.delete(id);
+      logger.warn(`wheel worker timeout (>${timeoutMs}ms) — sending without image`);
+      // Worker قد يكون عالقاً — أغلقه ليُعاد إنشاؤه للطلبات القادمة
+      killSharedWorker();
+      resolve(null);
     }, timeoutMs);
 
-    worker.on('message', (msg: WheelRenderResponse) => {
-      clearTimeout(timer);
-      if (!msg) {
-        done(null);
-        return;
-      }
-      if (msg.ok) {
-        try {
-          done(Buffer.from(msg.buffer));
-        } catch {
-          done(null);
-        }
-        return;
-      }
-      logger.warn(`wheel worker error: ${msg.error}`);
-      done(null);
-    });
+    pending.set(id, { resolve, timer });
 
-    worker.on('error', (err) => {
+    try {
+      worker.postMessage({ id, opts: { ...opts } } as WheelRenderRequest);
+    } catch (err: any) {
+      pending.delete(id);
       clearTimeout(timer);
-      logger.warn(`wheel worker error event: ${String(err?.message || err)}`);
-      done(null);
-    });
-
-    worker.on('exit', (code) => {
-      clearTimeout(timer);
-      if (code !== 0 && !settled) {
-        logger.warn(`wheel worker exited with code ${code}`);
-        done(null);
-      }
-    });
-
-    // اطلب الرندر — دائماً PNG
-    worker.postMessage({ id, opts: { ...opts, format: 'png' } } as WheelRenderRequest);
+      logger.warn(`wheel worker postMessage failed: ${String(err?.message || err)}`);
+      resolve(null);
+    }
   });
 }

@@ -6,7 +6,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, AttachmentBuilder } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { sleep } from '../../utils/gameUtil';
-import { renderWheelOfFortuneGif, WheelSegmentInput } from '../../utils/wheelOfFortune';
+import { WheelSegmentInput } from '../../utils/wheelOfFortune';
+import { renderWheelInWorker } from '../../utils/wheelWorker';
 
 interface Prize {
   name: string;
@@ -63,13 +64,18 @@ const command: Command = {
 
     let gifBuffer: Buffer | null = null;
     try {
-      gifBuffer = await renderWheelOfFortuneGif({
-        title: 'عجلة الحظ',
-        subtitle: 'دوّرها... حظّك فين؟',
-        segments,
-        winnerIndex: winIndex,
-        hubText: 'OMNI',
-      });
+      // الرندر داخل Worker — GIF لا يتجمّد البوت ولا يستهلك خيطه الرئيسي
+      gifBuffer = await renderWheelInWorker(
+        {
+          title: 'عجلة الحظ',
+          subtitle: 'دوّرها... حظّك فين؟',
+          segments,
+          winnerIndex: winIndex,
+          hubText: 'OMNI',
+          format: 'gif',
+        },
+        25000
+      );
     } catch (err: any) {
       console.warn(`[Wheel] wheel gif failed: ${err?.message || err}`);
     }

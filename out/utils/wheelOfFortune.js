@@ -630,21 +630,42 @@ async function renderWheelOfFortuneGif(opts) {
     logger.info(`🎡 wheel GIF rendered: ${out.length} bytes in ${frameCount} frames (${W}x${H})`);
     return out;
 }
-/** تحميل آفاتار ديسكورد كـ Buffer (null عند الفشل — لا تُرمي) */
+/** تحميل آفاتار ديسكورد كـ Buffer (null عند الفشل — لا تُرمي) — مع كاش LRU وكاش للفترة المتزامنة */
+const AVATAR_CACHE_MAX = 64;
+const avatarCache = new Map();
 async function fetchAvatarBuffer(url) {
-    try {
-        const axios = require('axios');
-        const res = await axios.get(url, {
-            responseType: 'arraybuffer',
-            timeout: 8000,
-            maxContentLength: 4 * 1024 * 1024,
-            maxBodyLength: 4 * 1024 * 1024,
-        });
-        const buf = Buffer.from(res.data);
-        return buf.length ? buf : null;
-    }
-    catch {
+    const key = String(url || '').slice(0, 512);
+    if (!key)
         return null;
+    const cached = avatarCache.get(key);
+    if (cached) {
+        avatarCache.delete(key);
+        avatarCache.set(key, cached);
+        return cached;
     }
+    const promise = (async () => {
+        try {
+            const axios = require('axios');
+            const res = await axios.get(key, {
+                responseType: 'arraybuffer',
+                timeout: 8000,
+                maxContentLength: 4 * 1024 * 1024,
+                maxBodyLength: 4 * 1024 * 1024,
+            });
+            const buf = Buffer.from(res.data);
+            return buf.length ? buf : null;
+        }
+        catch {
+            return null;
+        }
+    })();
+    avatarCache.set(key, promise);
+    while (avatarCache.size > AVATAR_CACHE_MAX) {
+        const firstKey = avatarCache.keys().next().value;
+        if (firstKey === undefined)
+            break;
+        avatarCache.delete(firstKey);
+    }
+    return promise;
 }
 //# sourceMappingURL=wheelOfFortune.js.map
