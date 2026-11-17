@@ -112,7 +112,7 @@ function priceLine(n) {
 }
 /** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
 function buildTransferCommand(payeeId, amount) {
-    return `credit ${payeeId} ${Math.max(0, Math.floor(amount))}#`;
+    return `#credit ${payeeId} ${Math.max(0, Math.floor(amount))}`;
 }
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */
 function parsePrice(input) {

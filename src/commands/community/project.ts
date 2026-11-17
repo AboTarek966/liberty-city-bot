@@ -216,7 +216,7 @@ const command: Command = {
       await store.save();
       const transferPreview = store.payeeId
         ? buildTransferCommand(store.payeeId, computeTransferAmount(price, store.taxPercent ?? 5))
-        : `credit <payee_id> ${computeTransferAmount(price, store.taxPercent ?? 5)}#`;
+        : `#credit <payee_id> ${computeTransferAmount(price, store.taxPercent ?? 5)}`;
       await interaction.reply({
         content:
           `✅ تمت إضافة **${name}** إلى المتجر\n` +

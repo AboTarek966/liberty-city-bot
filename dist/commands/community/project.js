@@ -147,7 +147,7 @@ const command = {
             await store.save();
             const transferPreview = store.payeeId
                 ? (0, store_1.buildTransferCommand)(store.payeeId, (0, store_1.computeTransferAmount)(price, store.taxPercent ?? 5))
-                : `credit <payee_id> ${(0, store_1.computeTransferAmount)(price, store.taxPercent ?? 5)}#`;
+                : `#credit <payee_id> ${(0, store_1.computeTransferAmount)(price, store.taxPercent ?? 5)}`;
             await interaction.reply({
                 content: `✅ تمت إضافة **${name}** إلى المتجر\n` +
                     `> 💰 السعر الصافي: ${(0, store_1.priceLine)(price)} كريديت\n` +

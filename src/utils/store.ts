@@ -92,7 +92,7 @@ export function priceLine(n: number): string {
 
 /** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
 export function buildTransferCommand(payeeId: string, amount: number): string {
-  return `credit ${payeeId} ${Math.max(0, Math.floor(amount))}#`;
+  return `#credit ${payeeId} ${Math.max(0, Math.floor(amount))}`;
 }
 
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */
