@@ -47,17 +47,19 @@ export async function handleApplicationIntent(message: Message): Promise<boolean
   // لا يوجد أمر تقديم معرّف → لا نتدخل (رسائل التقديم العادية تمر للذكاء الاصطناعي)
   if (!appCmd) return false;
 
-  // هل الرسالة داخل تذكرة مفتوحة يمتلكها العضو؟
+  // هل الرسالة داخل تذكرة مفتوحة/نشطة؟
   const ticketInChannel = await Ticket.findOne({
     guildId: message.guild.id,
     channelId: message.channel.id,
     status: { $in: ['open', 'claimed', 'waiting'] },
   }).lean().catch(() => null);
 
-  if (ticketInChannel && String(ticketInChannel.userId) === message.author.id) {
-    // داخل تذكرة العضو → أرسل نموذج التقديم + رسالة الانتظار
+  if (ticketInChannel) {
+    // داخل تذكرة → أرسل نموذج التقديم + رسالة الانتظار
+    const applicantId = String(ticketInChannel.userId || message.author.id);
+    const isOwner = String(ticketInChannel.userId) === message.author.id;
     const form = String(appCmd.content || '')
-      .replace(/\{user\}/g, `<@${message.author.id}>`)
+      .replace(/\{user\}/g, `<@${applicantId}>`)
       .replace(/\{server\}/g, message.guild.name);
 
     appCmd.uses = (appCmd.uses || 0) + 1;
@@ -75,20 +77,20 @@ export async function handleApplicationIntent(message: Message): Promise<boolean
       .setDescription(
         `${resolveEmojiShortcodes(form.substring(0, 3800), message.guild)}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `⏳ **انتظر الإدارة** — هيتم مراجعة طلبك والرد عليك داخل هذه التذكرة **بالقبول أو الرفض**.\n` +
-        `📌 ما ترسلش الطلب أكثر من مرة، وأي استفسار اكتبه هنا وهيتشاف.`
+        `⏳ **انتظر الإدارة** — هيتم مراجعة الطلب والرد داخل هذه التذكرة **بالقبول أو الرفض**.\n` +
+        `📌 يُفضّل عدم تكرار الطلب، وأي استفسار يُكتب هنا.`
       )
       .setFooter({ text: `${message.guild.name} • طلب تقديم إدارة` })
       .setTimestamp();
 
     await message
       .reply({
-        content: mention ? `${mention} — وصل طلب تقديم جديد 📥` : undefined,
+        content: mention ? `${mention} — ${isOwner ? 'وصل طلب تقديم جديد' : 'تم طلب نموذج التقديم'} 📥` : undefined,
         embeds: [embed],
         allowedMentions: { roles: adminRoles },
       })
       .catch(() => {});
-    logger.info(`📝 طلب تقديم إدارة من ${message.author.tag} — أُرسل النموذج داخل التذكرة`);
+    logger.info(`📝 طلب/نموذج تقديم إدارة من ${message.author.tag} داخل تذكرة ${message.channel.id}`);
     return true;
   }
 
