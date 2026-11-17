@@ -17,6 +17,12 @@ export declare function formatNumber(num: number, locale?: string): string;
 export declare function randomInt(min: number, max: number): number;
 export declare function clamp(num: number, min: number, max: number): number;
 export declare function roundTo(num: number, decimals: number): number;
+/**
+ * تنفيذ عمليات مصفوفة بحد أقصى من التزامن — يحافظ على ترتيب النتائج
+ * (Promise.allSettled لكل عنصر) بدون كسر معدل ديسكورد للطلبات.
+ * تستدعي كل عنصر بالدالة { item, index } وترجع مصفوفة نتائج settled.
+ */
+export declare function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<Array<PromiseSettledResult<R>>>;
 export declare function chunkArray<T>(array: T[], size: number): T[][];
 export declare function shuffleArray<T>(array: T[]): T[];
 export declare function uniqueArray<T>(array: T[]): T[];
