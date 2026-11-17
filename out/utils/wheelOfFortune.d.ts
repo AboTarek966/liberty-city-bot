@@ -30,6 +30,8 @@ export interface WheelOfFortuneOptions {
     /** تجاهل الكاش وإرجاع صورة جديدة */
     noCache?: boolean;
 }
+/** فحص بسيط للبايتات السحرية — يستبعد أي buffer ليس صورة حقيقية (يحمي الـ canvas من الـ segfault) */
+export declare function isLikelyImage(buf: Buffer | null | undefined): boolean;
 /**
  * رسم عجلة الحظ كـ GIF متحرك.
  * @returns Buffer للـ GIF — ارسله كـ attachment.

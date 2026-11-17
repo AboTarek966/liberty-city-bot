@@ -8,6 +8,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isLikelyImage = isLikelyImage;
 exports.renderWheelOfFortuneGif = renderWheelOfFortuneGif;
 exports.fetchAvatarBuffer = fetchAvatarBuffer;
 const path_1 = __importDefault(require("path"));
@@ -101,6 +102,28 @@ const PALETTE = [
     '#0ea5e9', '#7c3aed', '#db2777', '#14b8a6',
 ];
 const TAU = Math.PI * 2;
+/** فحص بسيط للبايتات السحرية — يستبعد أي buffer ليس صورة حقيقية (يحمي الـ canvas من الـ segfault) */
+function isLikelyImage(buf) {
+    if (!buf || buf.length < 12)
+        return false;
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47)
+        return true;
+    // JPEG: FF D8 FF
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
+        return true;
+    // GIF: 47 49 46 38
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38)
+        return true;
+    // WebP: RIFF....WEBP
+    if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+        buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50)
+        return true;
+    // BMP: 42 4D
+    if (buf[0] === 0x42 && buf[1] === 0x4d)
+        return true;
+    return false;
+}
 const POINTER = -Math.PI / 2; // أعلى العجلة
 const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
 async function loadImages(segments) {
@@ -108,6 +131,9 @@ async function loadImages(segments) {
     const { loadImage } = require('@napi-rs/canvas');
     return Promise.all(segments.map(async (seg) => {
         if (!seg.image || !seg.image.length)
+            return null;
+        // 🛡️ لا نمرر عشوائية/HTML/خطأ إلى loadImage — فقط صور حقيقية
+        if (!isLikelyImage(seg.image))
             return null;
         try {
             return await loadImage(seg.image);
@@ -655,7 +681,7 @@ async function fetchAvatarBuffer(url) {
                 maxBodyLength: 4 * 1024 * 1024,
             });
             const buf = Buffer.from(res.data);
-            return buf.length ? buf : null;
+            return buf.length && isLikelyImage(buf) ? buf : null;
         }
         catch {
             return null;

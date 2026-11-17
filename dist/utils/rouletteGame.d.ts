@@ -29,6 +29,8 @@ export declare const MAX_ROULETTE_PLAYERS = 25;
 export declare const MIN_ROULETTE_PLAYERS = 4;
 /** فاصل ٥ ثوانٍ بين كل حدث ورسالة في اللعبة — أفضل للتسلسل الطبيعي */
 export declare const ROULETTE_DELAY_MS = 5000;
+/** إزالة الإيموجي ورموز الزخرفة — رسّام العجلة (native) ينهار على بعض الرموز — نعرض الاسم فقط */
+export declare function wheelSafeLabel(s: string): string;
 export declare function lobbyEmbed(game: RouletteGame, startText?: string): EmbedBuilder;
 export declare function lobbyRow(game: RouletteGame): ActionRowBuilder<ButtonBuilder>[];
 export declare function startRouletteGame(client: OmniClient, gameId: string): Promise<void>;

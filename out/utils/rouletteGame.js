@@ -7,6 +7,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ROULETTE_DELAY_MS = exports.MIN_ROULETTE_PLAYERS = exports.MAX_ROULETTE_PLAYERS = exports.rouletteGames = void 0;
+exports.wheelSafeLabel = wheelSafeLabel;
 exports.lobbyEmbed = lobbyEmbed;
 exports.lobbyRow = lobbyRow;
 exports.startRouletteGame = startRouletteGame;
@@ -34,6 +35,14 @@ const COLOR = 0xed4245;
 /** عرض آمن للاعب — المنشن للأعضاء الحقيقيين، وأسماء البوتات الوهمية بولد وإيموجي 🤖 */
 function playerDisplay(p) {
     return p.isBot ? `**${(0, helpers_1.escapeMarkdown)(p.username)}** 🤖` : `<@${p.id}>`;
+}
+/** إزالة الإيموجي ورموز الزخرفة — رسّام العجلة (native) ينهار على بعض الرموز — نعرض الاسم فقط */
+function wheelSafeLabel(s) {
+    const cleaned = String(s || '')
+        .replace(/[^\p{L}\p{N} #@.\-_]/gu, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    return cleaned.slice(0, 12) || 'لاعب';
 }
 /** سطر مرقّم لكل لاعب — أوضح من خط واحد مليء بالفواصل */
 function playerLine(p, i) {
@@ -198,7 +207,7 @@ async function runRouletteRound(client, game) {
     const WANT_WHEEL = (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
         (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
     const segments = game.players.map((p, i) => ({
-        label: (p.username || '?').slice(0, 12),
+        label: wheelSafeLabel(p.username),
         image: game.avatarBuffers?.[i],
     }));
     let gif = null;
@@ -217,12 +226,38 @@ async function runRouletteRound(client, game) {
                 resultLabel: 'عليه الدور',
                 frames: 10,
                 delayMs: 55,
-            }, 45000);
+            }, 40000);
             logger.info(`🎡 wheel pre-render: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t0}ms` : 'FAILED/timeout'}`);
         }
         catch (err) {
             logger.warn(`wheel pre-render failed: ${err?.message || err}`);
             gif = null;
+        }
+        // 🔁 محاولة نداء جديدة بدون آفاتارات لو فشلت الأولى (إنعاش على الاستضافة الضعيفة)
+        if (!gif) {
+            logger.warn('🎡 wheel render failed — retrying without avatar images');
+            const t1 = Date.now();
+            const plainSegments = segments.map((s) => ({ label: s.label }));
+            try {
+                gif = await (0, wheelWorker_1.renderWheelInWorker)({
+                    title: 'روليت',
+                    subtitle: 'دور — وادفع مين يُطرَد',
+                    segments: plainSegments,
+                    winnerIndex,
+                    hubText: 'OMNI',
+                    width: 360,
+                    format: 'gif',
+                    orientation: 'portrait',
+                    resultLabel: 'عليه الدور',
+                    frames: 8,
+                    delayMs: 55,
+                }, 40000);
+                logger.info(`🎡 wheel retry: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t1}ms` : 'FAILED/timeout'}`);
+            }
+            catch (err) {
+                logger.warn(`wheel retry failed: ${err?.message || err}`);
+                gif = null;
+            }
         }
     }
     // نُخزّنها على بيانات اللعبة — رسالة الطرد التالية ستعرضها أيضاً (تأكيد إضافي أنها أمام اللاعب)
