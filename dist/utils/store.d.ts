@@ -3,6 +3,8 @@ import { IStore, IStoreProject } from '../models';
 export declare const STORE_KEY = "main";
 export declare const DEFAULT_TAX_PERCENT = 5;
 export declare const DEFAULT_PROBOT_PREFIX = "!";
+/** المستلم الافتراضي لتحويلات ProBot (مالك المتجر) — يقدر يتغير من /project config payee */
+export declare const DEFAULT_PAYEE_ID: string;
 /** قراءة وثيقة المتجر (تنشئها عند أول استخدام) مع تحديث الإعدادات الافتراضية */
 export declare function getStore(createIfMissing?: boolean): Promise<IStore | null>;
 /** نفس القراءة لكن كـ lean (للقوائم السريعة) — قد ترجع null */

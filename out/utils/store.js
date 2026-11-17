@@ -9,7 +9,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_PROBOT_PREFIX = exports.DEFAULT_TAX_PERCENT = exports.STORE_KEY = void 0;
+exports.DEFAULT_PAYEE_ID = exports.DEFAULT_PROBOT_PREFIX = exports.DEFAULT_TAX_PERCENT = exports.STORE_KEY = void 0;
 exports.getStore = getStore;
 exports.getStoreLean = getStoreLean;
 exports.canManageStore = canManageStore;
@@ -31,6 +31,8 @@ const botOwner_1 = require("./botOwner");
 exports.STORE_KEY = 'main';
 exports.DEFAULT_TAX_PERCENT = 5;
 exports.DEFAULT_PROBOT_PREFIX = '!';
+/** المستلم الافتراضي لتحويلات ProBot (مالك المتجر) — يقدر يتغير من /project config payee */
+exports.DEFAULT_PAYEE_ID = process.env.STORE_PAYEE_ID || '1342238662368296980';
 /** قراءة وثيقة المتجر (تنشئها عند أول استخدام) مع تحديث الإعدادات الافتراضية */
 async function getStore(createIfMissing = true) {
     try {
@@ -38,16 +40,21 @@ async function getStore(createIfMissing = true) {
         if (!doc && createIfMissing) {
             doc = await models_1.Store.create({
                 key: exports.STORE_KEY,
-                payeeId: process.env.DEVELOPER_USER_ID || undefined,
+                payeeId: exports.DEFAULT_PAYEE_ID,
                 probotPrefix: exports.DEFAULT_PROBOT_PREFIX,
                 taxPercent: exports.DEFAULT_TAX_PERCENT,
                 projects: [],
                 managerIds: [],
             });
         }
-        if (doc && !doc.payeeId && process.env.DEVELOPER_USER_ID) {
-            doc.payeeId = process.env.DEVELOPER_USER_ID;
-            await doc.save().catch(() => { });
+        // ترحيل: لو المستلم لسه فاضي أو كان افتراضي قديم (DEVELOPER_USER_ID) نحدّثه للمستلم المعتمد
+        if (doc) {
+            const legacyDefault = process.env.DEVELOPER_USER_ID;
+            const needsMigration = !doc.payeeId || (!!legacyDefault && doc.payeeId === legacyDefault && doc.payeeId !== exports.DEFAULT_PAYEE_ID);
+            if (needsMigration) {
+                doc.payeeId = exports.DEFAULT_PAYEE_ID;
+                await doc.save().catch(() => { });
+            }
         }
         return doc;
     }
@@ -145,6 +152,7 @@ function buildStoreEmbed(store) {
         : 'المتجر فارغ حالياً — ترقّب الجديد عاجلاً.';
     const tax = Number(store.taxPercent ?? exports.DEFAULT_TAX_PERCENT);
     const prefix = store.probotPrefix || exports.DEFAULT_PROBOT_PREFIX;
+    const payee = store.payeeId;
     return new discord_js_1.EmbedBuilder()
         .setColor(0xf59e0b)
         .setTitle('🛍️ متجر بروجيكتات Omni')
@@ -153,6 +161,7 @@ function buildStoreEmbed(store) {
         '\n\n' +
         `> 💸 **الأسعار موضع طلب تحويل صافي** — ProBot يديق **${tax}%** من كل تحويل، ` +
         'ولهذا بنعرض لك أمر التحويل **بالمبلغ اللازم** حتى يوصلك البائع** السعر الصافي كامل**.\n' +
+        (payee ? `> 💳 **الدفع يروح لـ <@${payee}>** عبر \`${prefix}pay\`.\n` : '') +
         `> ⚡ بعد ما تدفع، دوس \`دفعت\` داخل شاشة التأكيد ونوصلك إيصال فور التسليم.`)
         .setFooter({ text: `Omni Store • ProBot ${prefix}pay` })
         .setTimestamp();

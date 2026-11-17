@@ -13,6 +13,8 @@ import { isBotOwner } from './botOwner';
 export const STORE_KEY = 'main';
 export const DEFAULT_TAX_PERCENT = 5;
 export const DEFAULT_PROBOT_PREFIX = '!';
+/** المستلم الافتراضي لتحويلات ProBot (مالك المتجر) — يقدر يتغير من /project config payee */
+export const DEFAULT_PAYEE_ID = process.env.STORE_PAYEE_ID || '1342238662368296980';
 
 /** قراءة وثيقة المتجر (تنشئها عند أول استخدام) مع تحديث الإعدادات الافتراضية */
 export async function getStore(createIfMissing = true): Promise<IStore | null> {
@@ -21,16 +23,22 @@ export async function getStore(createIfMissing = true): Promise<IStore | null> {
     if (!doc && createIfMissing) {
       doc = await Store.create({
         key: STORE_KEY,
-        payeeId: process.env.DEVELOPER_USER_ID || undefined,
+        payeeId: DEFAULT_PAYEE_ID,
         probotPrefix: DEFAULT_PROBOT_PREFIX,
         taxPercent: DEFAULT_TAX_PERCENT,
         projects: [],
         managerIds: [],
       });
     }
-    if (doc && !doc.payeeId && process.env.DEVELOPER_USER_ID) {
-      doc.payeeId = process.env.DEVELOPER_USER_ID;
-      await doc.save().catch(() => {});
+    // ترحيل: لو المستلم لسه فاضي أو كان افتراضي قديم (DEVELOPER_USER_ID) نحدّثه للمستلم المعتمد
+    if (doc) {
+      const legacyDefault = process.env.DEVELOPER_USER_ID;
+      const needsMigration =
+        !doc.payeeId || (!!legacyDefault && doc.payeeId === legacyDefault && doc.payeeId !== DEFAULT_PAYEE_ID);
+      if (needsMigration) {
+        doc.payeeId = DEFAULT_PAYEE_ID;
+        await doc.save().catch(() => {});
+      }
     }
     return doc;
   } catch (error) {
@@ -124,6 +132,7 @@ export function buildStoreEmbed(store: IStore): EmbedBuilder {
 
   const tax = Number(store.taxPercent ?? DEFAULT_TAX_PERCENT);
   const prefix = store.probotPrefix || DEFAULT_PROBOT_PREFIX;
+  const payee = store.payeeId;
 
   return new EmbedBuilder()
     .setColor(0xf59e0b)
@@ -134,6 +143,7 @@ export function buildStoreEmbed(store: IStore): EmbedBuilder {
         '\n\n' +
         `> 💸 **الأسعار موضع طلب تحويل صافي** — ProBot يديق **${tax}%** من كل تحويل، ` +
         'ولهذا بنعرض لك أمر التحويل **بالمبلغ اللازم** حتى يوصلك البائع** السعر الصافي كامل**.\n' +
+        (payee ? `> 💳 **الدفع يروح لـ <@${payee}>** عبر \`${prefix}pay\`.\n` : '') +
         `> ⚡ بعد ما تدفع، دوس \`دفعت\` داخل شاشة التأكيد ونوصلك إيصال فور التسليم.`
     )
     .setFooter({ text: `Omni Store • ProBot ${prefix}pay` })
