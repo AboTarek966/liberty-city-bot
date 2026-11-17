@@ -46,6 +46,30 @@ const handler: ButtonHandler = {
       await store.save().catch(() => {});
     }
 
+    // 🏷️ منح رول المشتري (إن وُجد مربوط بالبروجيكت)
+    let roleLine: string | null = null;
+    const deliveryRoleId = (project as any)?.deliveryRoleId as string | undefined;
+    if (deliveryRoleId) {
+      const guild = interaction.guild;
+      if (!guild) {
+        roleLine = '⚠️ تعذر منح رول المشتري — الزر أُستخدم خارج السيرفر.';
+      } else {
+        const member = await guild.members.fetch(order.buyerId).catch(() => null);
+        if (!member) {
+          roleLine = '⚠️ تعذر جلب عضوية المشتري من السيرفر لمنحه الرول.';
+        } else if (member.roles.cache.has(deliveryRoleId)) {
+          roleLine = `🏷️ رول المشتري: <@&${deliveryRoleId}> — يملكه بالفعل ✅`;
+        } else {
+          try {
+            await member.roles.add(deliveryRoleId, `Omni Store — تسليم طلب #${order.orderId}`);
+            roleLine = `🏷️ رول المشتري: <@&${deliveryRoleId}> ✅ تم منحه`;
+          } catch {
+            roleLine = `⚠️ رول المشتري: <@&${deliveryRoleId}> — تعذر منحه (رتبة البوت/الصلاحيات أو الرول غير موجود)`;
+          }
+        }
+      }
+    }
+
     const confirmedEmbed = new EmbedBuilder()
       .setColor(0x57f287)
       .setTitle('✅ تم التسليم والاستلام')
@@ -57,6 +81,7 @@ const handler: ButtonHandler = {
           `👤 **أكّد التسليم:** <@${interaction.user.id}>`,
           '',
           project ? `📊 إجمالي مبيعات هذا البروجيكت: **${project.sales}**` : null,
+          roleLine,
         ]
           .filter(Boolean)
           .join('\n')

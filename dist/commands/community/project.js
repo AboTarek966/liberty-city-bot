@@ -68,6 +68,16 @@ const command = {
         .setMaxValue(25))
         .addChannelOption((o) => o.setName('log-channel').setDescription('قناة سجل الطلبات (اختياري — وإلا تصل للبائع خاص)').setRequired(false)))
         .addSubcommand((s) => s
+        .setName('buy-role')
+        .setDescription('ربط رول يتمنح تلقائياً للمشتري عند تأكيد استلام الدفع/التسليم (اتركه فارغاً لمسح الربط)')
+        .addStringOption((o) => o
+        .setName('name')
+        .setDescription('البروجيكت')
+        .setRequired(true)
+        .setAutocomplete(true))
+        .addRoleOption((o) => o.setName('role').setDescription('الرول الذي يتمنح للمشتري — فارغ = مسح الربط').setRequired(false))
+        .addBooleanOption((o) => o.setName('clear').setDescription('صح = مسح ربط الرول من البروجيكت').setRequired(false)))
+        .addSubcommand((s) => s
         .setName('manager-add')
         .setDescription('إضافة عضو يدير المتجر نيابةً عنك')
         .addUserOption((o) => o.setName('user').setDescription('العضو').setRequired(true)))
@@ -312,7 +322,7 @@ const command = {
                     const priceText = discount
                         ? `${(0, store_1.projectPriceLine)(p)}`
                         : (0, store_1.priceLine)((0, store_1.getEffectivePrice)(p));
-                    return `**${i + 1}.** ${p.enabled ? '🟢' : '⏸️'} **${p.name}** — 💰 ${priceText} | 📊 ${p.sales || 0} مبيعة | 🔑 \`${p.id}\``;
+                    return `**${i + 1}.** ${p.enabled ? '🟢' : '⏸️'} **${p.name}** — 💰 ${priceText} | 📊 ${p.sales || 0} مبيعة | 🔑 \`${p.id}\`${p.deliveryRoleId ? ` | 🏷️ <@&${p.deliveryRoleId}>` : ''}`;
                 })
                     .join('\n')
                 : 'لا توجد بروجيكتات بعد.';
@@ -366,6 +376,42 @@ const command = {
             }
             await store.save();
             await interaction.reply({ content: `✅ تم تحديث إعدادات المتجر\n> ${changes.join('\n> ')}`, ephemeral: true });
+            return;
+        }
+        // ---------- ربط رول المشتري (تمنح تلقائياً عند تأكيد التسليم) ----------
+        if (sub === 'buy-role') {
+            const name = interaction.options.getString('name', true);
+            const role = interaction.options.getRole('role');
+            const clear = interaction.options.getBoolean('clear');
+            const project = (store.projects || []).find((p) => p.name.toLowerCase() === name.toLowerCase());
+            if (!project) {
+                await interaction.reply({ content: '❌ لا يوجد بروجيكت بهذا الاسم — راجع `/project list`', ephemeral: true });
+                return;
+            }
+            const current = project.deliveryRoleId;
+            if (clear || !role) {
+                if (project.deliveryRoleId)
+                    project.deliveryRoleId = undefined;
+                await store.save();
+                await interaction.reply({
+                    content: current
+                        ? `✅ أُزيل ربط الرول عن **${project.name}** — لن يتمنح أي رول للمشترين الجدد تلقائياً.`
+                        : 'ℹ️ لا يوجد ربط رول لهذا البروجيكت حالياً.',
+                    ephemeral: true,
+                });
+                return;
+            }
+            if (role.id === interaction.guildId) {
+                await interaction.reply({ content: '⛔ لا يمكن ربط رول @everyone كدور تسليم.', ephemeral: true });
+                return;
+            }
+            project.deliveryRoleId = role.id;
+            await store.save();
+            await interaction.reply({
+                content: `✅ ربطنا رول <@&${role.id}> بـ **${project.name}**\n` +
+                    `> 🏷️ المشتري هيتاخد الرول تلقائياً لحظة تأكيدك استلام الدفع/التسليم من زر **تم التسليم والاستلام**.`,
+                ephemeral: true,
+            });
             return;
         }
         // ---------- المخولين ----------

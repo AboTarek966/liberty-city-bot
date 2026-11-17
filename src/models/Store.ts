@@ -17,6 +17,8 @@ export interface IStoreProject {
   price: number;
   /** نسبة خصم على هذا البروجيكت (0-99) — 0 أو غير محدد = بدون خصم */
   discountPercent?: number;
+  /** الرول اللي يتمنح للمشتري تلقائياً عند تأكيد البائع استلام الدفع/التسليم (اختياري) */
+  deliveryRoleId?: string;
   enabled: boolean;
   sales: number;
   createdBy?: string;
@@ -43,6 +45,8 @@ const StoreProjectSchema = new Schema<IStoreProject>(
     description: { type: String, trim: true },
     price: { type: Number, required: true, min: 1 },
     discountPercent: { type: Number, min: 0, max: 99 },
+    /** الرول اللي يتمنح تلقائياً للمشتري عند تأكيد استلام الدفع/التسليم */
+    deliveryRoleId: { type: String },
     enabled: { type: Boolean, default: true },
     sales: { type: Number, default: 0, min: 0 },
     createdBy: { type: String },

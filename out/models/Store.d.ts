@@ -8,6 +8,8 @@ export interface IStoreProject {
     price: number;
     /** نسبة خصم على هذا البروجيكت (0-99) — 0 أو غير محدد = بدون خصم */
     discountPercent?: number;
+    /** الرول اللي يتمنح للمشتري تلقائياً عند تأكيد البائع استلام الدفع/التسليم (اختياري) */
+    deliveryRoleId?: string;
     enabled: boolean;
     sales: number;
     createdBy?: string;

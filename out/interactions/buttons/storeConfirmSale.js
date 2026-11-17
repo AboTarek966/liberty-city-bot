@@ -40,6 +40,33 @@ const handler = {
             project.sales = (project.sales || 0) + 1;
             await store.save().catch(() => { });
         }
+        // 🏷️ منح رول المشتري (إن وُجد مربوط بالبروجيكت)
+        let roleLine = null;
+        const deliveryRoleId = project?.deliveryRoleId;
+        if (deliveryRoleId) {
+            const guild = interaction.guild;
+            if (!guild) {
+                roleLine = '⚠️ تعذر منح رول المشتري — الزر أُستخدم خارج السيرفر.';
+            }
+            else {
+                const member = await guild.members.fetch(order.buyerId).catch(() => null);
+                if (!member) {
+                    roleLine = '⚠️ تعذر جلب عضوية المشتري من السيرفر لمنحه الرول.';
+                }
+                else if (member.roles.cache.has(deliveryRoleId)) {
+                    roleLine = `🏷️ رول المشتري: <@&${deliveryRoleId}> — يملكه بالفعل ✅`;
+                }
+                else {
+                    try {
+                        await member.roles.add(deliveryRoleId, `Omni Store — تسليم طلب #${order.orderId}`);
+                        roleLine = `🏷️ رول المشتري: <@&${deliveryRoleId}> ✅ تم منحه`;
+                    }
+                    catch {
+                        roleLine = `⚠️ رول المشتري: <@&${deliveryRoleId}> — تعذر منحه (رتبة البوت/الصلاحيات أو الرول غير موجود)`;
+                    }
+                }
+            }
+        }
         const confirmedEmbed = new discord_js_1.EmbedBuilder()
             .setColor(0x57f287)
             .setTitle('✅ تم التسليم والاستلام')
@@ -50,6 +77,7 @@ const handler = {
             `👤 **أكّد التسليم:** <@${interaction.user.id}>`,
             '',
             project ? `📊 إجمالي مبيعات هذا البروجيكت: **${project.sales}**` : null,
+            roleLine,
         ]
             .filter(Boolean)
             .join('\n'))
