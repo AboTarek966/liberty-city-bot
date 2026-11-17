@@ -44,6 +44,7 @@ const StoreProjectSchema = new mongoose_1.Schema({
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     price: { type: Number, required: true, min: 1 },
+    discountPercent: { type: Number, min: 0, max: 99 },
     enabled: { type: Boolean, default: true },
     sales: { type: Number, default: 0, min: 0 },
     createdBy: { type: String },

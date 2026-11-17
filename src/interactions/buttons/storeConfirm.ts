@@ -19,6 +19,8 @@ import {
   priceLine,
   formatCredits,
   buildTransferCommand,
+  getEffectivePrice,
+  normalizeDiscountPercent,
 } from '../../utils/store';
 import { StoreOrder } from '../../models';
 
@@ -46,7 +48,10 @@ const handler: ButtonHandler = {
     }
 
     const tax = Number(store.taxPercent ?? 5);
-    const amount = computeTransferAmount(project.price, tax);
+    const discount = normalizeDiscountPercent(project.discountPercent);
+    const basePrice = Math.max(1, Math.floor(Number(project.price) || 0));
+    const netPrice = getEffectivePrice(project);
+    const amount = computeTransferAmount(netPrice, tax);
 
     // ♻︎ منع تكرار طلبات مفتوحة لنفس المشروع ونفس المشتري خلال 15 دقيقة
     const since = new Date(Date.now() - 15 * 60_000);
@@ -63,7 +68,7 @@ const handler: ButtonHandler = {
         orderId: shortId(6),
         projectId: project.id,
         projectName: project.name,
-        price: project.price,
+        price: netPrice,
         amount,
         taxPercent: tax,
         payeeId: store.payeeId,
@@ -82,7 +87,10 @@ const handler: ButtonHandler = {
           `📦 **البروجيكت:** ${project.name}`,
           `🧾 **الطلب:** #${order.orderId}`,
           '',
-          `💰 **السعر الصافي (يوصلك البائع):** ${priceLine(project.price)} كريديت`,
+          discount
+            ? `💰 **السعر الأساسي:** ~~${priceLine(basePrice)}~~ كريديت`
+            : `💰 **السعر الصافي (يوصلك البائع):** ${priceLine(netPrice)} كريديت`,
+          discount ? `🏷️ **خصم:** ${discount}% — **السعر بعد الخصم:** ${priceLine(netPrice)} كريديت` : null,
           `🧾 **خصم ProBot:** ${tax}% من كل تحويل`,
           `💳 **المطلوب تحويله:** ${formatCredits(amount)} كريديت`,
           '',
@@ -91,7 +99,9 @@ const handler: ButtonHandler = {
           '',
           `> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ البوت — الصيغة: \`#credit ${store.payeeId} ${amount}\``,
           '> 💡 المبلغ مظبوط يصلك **صافي** على سعر البروجيكت بعد خصم ProBot.',
-        ].join('\n')
+        ]
+          .filter(Boolean)
+          .join('\n')
       )
       .setFooter({ text: 'Omni Store • انتظر تأكيد البائع من بلوك الإيصال' })
       .setTimestamp();

@@ -17,6 +17,10 @@ exports.computeTransferAmount = computeTransferAmount;
 exports.formatCredits = formatCredits;
 exports.formatShort = formatShort;
 exports.priceLine = priceLine;
+exports.normalizeDiscountPercent = normalizeDiscountPercent;
+exports.getEffectivePrice = getEffectivePrice;
+exports.projectPriceLine = projectPriceLine;
+exports.parseDiscountPercent = parseDiscountPercent;
 exports.buildTransferCommand = buildTransferCommand;
 exports.parsePrice = parsePrice;
 exports.shortId = shortId;
@@ -110,6 +114,47 @@ function formatShort(n) {
 function priceLine(n) {
     return `\`${formatCredits(n)}\` (${formatShort(n)})`;
 }
+/** نسبة خصم صالحة (0 = بدون خصم) */
+function normalizeDiscountPercent(value) {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n) || n <= 0)
+        return 0;
+    return Math.min(99, Math.max(0, n));
+}
+/** السعر الصافي الفعلي للمشروع بعد خصم العرض (إن وجد) */
+function getEffectivePrice(project) {
+    const base = Math.max(1, Math.floor(Number(project.price) || 0));
+    const discount = normalizeDiscountPercent(project.discountPercent);
+    if (!discount)
+        return base;
+    return Math.max(1, Math.ceil(base * (100 - discount) / 100));
+}
+/** سطر عرض السعر مع الخصم إن وجد */
+function projectPriceLine(project) {
+    const base = Math.max(1, Math.floor(Number(project.price) || 0));
+    const discount = normalizeDiscountPercent(project.discountPercent);
+    const effective = getEffectivePrice(project);
+    if (!discount)
+        return priceLine(effective);
+    return `~~${priceLine(base)}~~ → ${priceLine(effective)} (**خصم ${discount}%**)`;
+}
+/** تحليل نسبة خصم من نص مثل "25" أو "%25" أو "25%" — يرجع 0 لإزالة الخصم، null إذا غير مفهوم */
+function parseDiscountPercent(input) {
+    const raw = String(input || '').trim().toLowerCase().replace(/[٪\s]/g, '');
+    if (!raw)
+        return null;
+    if (raw === '0' || raw === 'none' || raw === 'لا' || raw === 'بدون' || raw === 'off' || raw === 'remove')
+        return 0;
+    const cleaned = raw.replace(/%/g, '');
+    if (!/^\d{1,2}$/.test(cleaned))
+        return null;
+    const n = Number(cleaned);
+    if (!Number.isFinite(n))
+        return null;
+    if (n < 0 || n > 99)
+        return null;
+    return n;
+}
 /** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
 function buildTransferCommand(payeeId, amount) {
     return `#credit ${payeeId} ${Math.max(0, Math.floor(amount))}`;
@@ -152,7 +197,7 @@ function buildStoreEmbed(store) {
     const lines = projects.length
         ? projects.map((p, i) => {
             const desc = p.description?.trim() ? `\n    ┗ ${p.description.trim().slice(0, 100)}` : '';
-            return `**${i + 1}.** 📦 **${p.name}** — 💰 ${priceLine(p.price)} كريديت${desc}`;
+            return `**${i + 1}.** 📦 **${p.name}** — 💰 ${projectPriceLine(p)} كريديت${desc}`;
         }).join('\n')
         : 'المتجر فارغ حالياً — ترقّب الجديد عاجلاً.';
     const tax = Number(store.taxPercent ?? exports.DEFAULT_TAX_PERCENT);
@@ -174,12 +219,16 @@ function buildStoreEmbed(store) {
 /** بناء قائمة الاختيار (select) للمشاريع المفعّلة */
 function buildStoreSelect(store) {
     const projects = (store.projects || []).filter((p) => p.enabled);
-    const options = projects.slice(0, 25).map((p) => ({
-        label: `${p.name.slice(0, 60)} — ${formatShort(p.price)} كريديت`.slice(0, 100),
-        value: p.id,
-        description: (p.description?.trim() || 'بروجيكت جاهز للتسليم').slice(0, 100),
-        emoji: '📦',
-    }));
+    const options = projects.slice(0, 25).map((p) => {
+        const discount = normalizeDiscountPercent(p.discountPercent);
+        const effective = getEffectivePrice(p);
+        return {
+            label: `${p.name.slice(0, 45)} — ${formatShort(effective)}${discount ? ` (-${discount}%)` : ''}`.slice(0, 100),
+            value: p.id,
+            description: (p.description?.trim() || (discount ? `خصم ${discount}%` : 'بروجيكت جاهز للتسليم')).slice(0, 100),
+            emoji: '📦',
+        };
+    });
     if (!options.length)
         return null;
     const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.StringSelectMenuBuilder()

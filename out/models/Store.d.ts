@@ -4,8 +4,10 @@ export interface IStoreProject {
     id: string;
     name: string;
     description?: string;
-    /** السعر الصافي (بعد خصم ProBot) بالكريديت */
+    /** السعر الصافي الأساسي (قبل خصم العرض، إن وجد) بالكريديت */
     price: number;
+    /** نسبة خصم على هذا البروجيكت (0-99) — 0 أو غير محدد = بدون خصم */
+    discountPercent?: number;
     enabled: boolean;
     sales: number;
     createdBy?: string;

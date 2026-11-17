@@ -27,6 +27,14 @@ export declare function formatCredits(n: number): string;
 export declare function formatShort(n: number): string;
 /** سطر سعر كامل: 10,000,000 (10M) */
 export declare function priceLine(n: number): string;
+/** نسبة خصم صالحة (0 = بدون خصم) */
+export declare function normalizeDiscountPercent(value: unknown): number;
+/** السعر الصافي الفعلي للمشروع بعد خصم العرض (إن وجد) */
+export declare function getEffectivePrice(project: Pick<IStoreProject, 'price' | 'discountPercent'>): number;
+/** سطر عرض السعر مع الخصم إن وجد */
+export declare function projectPriceLine(project: Pick<IStoreProject, 'price' | 'discountPercent'>): string;
+/** تحليل نسبة خصم من نص مثل "25" أو "%25" أو "25%" — يرجع 0 لإزالة الخصم، null إذا غير مفهوم */
+export declare function parseDiscountPercent(input: string): number | null;
 /** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
 export declare function buildTransferCommand(payeeId: string, amount: number): string;
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */

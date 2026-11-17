@@ -90,6 +90,43 @@ export function priceLine(n: number): string {
   return `\`${formatCredits(n)}\` (${formatShort(n)})`;
 }
 
+/** نسبة خصم صالحة (0 = بدون خصم) */
+export function normalizeDiscountPercent(value: unknown): number {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(99, Math.max(0, n));
+}
+
+/** السعر الصافي الفعلي للمشروع بعد خصم العرض (إن وجد) */
+export function getEffectivePrice(project: Pick<IStoreProject, 'price' | 'discountPercent'>): number {
+  const base = Math.max(1, Math.floor(Number(project.price) || 0));
+  const discount = normalizeDiscountPercent(project.discountPercent);
+  if (!discount) return base;
+  return Math.max(1, Math.ceil(base * (100 - discount) / 100));
+}
+
+/** سطر عرض السعر مع الخصم إن وجد */
+export function projectPriceLine(project: Pick<IStoreProject, 'price' | 'discountPercent'>): string {
+  const base = Math.max(1, Math.floor(Number(project.price) || 0));
+  const discount = normalizeDiscountPercent(project.discountPercent);
+  const effective = getEffectivePrice(project);
+  if (!discount) return priceLine(effective);
+  return `~~${priceLine(base)}~~ → ${priceLine(effective)} (**خصم ${discount}%**)`;
+}
+
+/** تحليل نسبة خصم من نص مثل "25" أو "%25" أو "25%" — يرجع 0 لإزالة الخصم، null إذا غير مفهوم */
+export function parseDiscountPercent(input: string): number | null {
+  const raw = String(input || '').trim().toLowerCase().replace(/[٪\s]/g, '');
+  if (!raw) return null;
+  if (raw === '0' || raw === 'none' || raw === 'لا' || raw === 'بدون' || raw === 'off' || raw === 'remove') return 0;
+  const cleaned = raw.replace(/%/g, '');
+  if (!/^\d{1,2}$/.test(cleaned)) return null;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return null;
+  if (n < 0 || n > 99) return null;
+  return n;
+}
+
 /** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
 export function buildTransferCommand(payeeId: string, amount: number): string {
   return `#credit ${payeeId} ${Math.max(0, Math.floor(amount))}`;
@@ -131,7 +168,7 @@ export function buildStoreEmbed(store: IStore): EmbedBuilder {
   const lines = projects.length
     ? projects.map((p, i) => {
         const desc = p.description?.trim() ? `\n    ┗ ${p.description.trim().slice(0, 100)}` : '';
-        return `**${i + 1}.** 📦 **${p.name}** — 💰 ${priceLine(p.price)} كريديت${desc}`;
+        return `**${i + 1}.** 📦 **${p.name}** — 💰 ${projectPriceLine(p)} كريديت${desc}`;
       }).join('\n')
     : 'المتجر فارغ حالياً — ترقّب الجديد عاجلاً.';
 
@@ -158,12 +195,16 @@ export function buildStoreEmbed(store: IStore): EmbedBuilder {
 /** بناء قائمة الاختيار (select) للمشاريع المفعّلة */
 export function buildStoreSelect(store: IStore) {
   const projects = (store.projects || []).filter((p) => p.enabled);
-  const options = projects.slice(0, 25).map((p) => ({
-    label: `${p.name.slice(0, 60)} — ${formatShort(p.price)} كريديت`.slice(0, 100),
-    value: p.id,
-    description: (p.description?.trim() || 'بروجيكت جاهز للتسليم').slice(0, 100),
-    emoji: '📦',
-  }));
+  const options = projects.slice(0, 25).map((p) => {
+    const discount = normalizeDiscountPercent(p.discountPercent);
+    const effective = getEffectivePrice(p);
+    return {
+      label: `${p.name.slice(0, 45)} — ${formatShort(effective)}${discount ? ` (-${discount}%)` : ''}`.slice(0, 100),
+      value: p.id,
+      description: (p.description?.trim() || (discount ? `خصم ${discount}%` : 'بروجيكت جاهز للتسليم')).slice(0, 100),
+      emoji: '📦',
+    };
+  });
 
   if (!options.length) return null;
 

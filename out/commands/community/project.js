@@ -29,9 +29,19 @@ const command = {
         .addStringOption((o) => o.setName('price').setDescription('السعر الصافي الجديد (مثال: 10m)').setRequired(true).setMaxLength(30)))
         .addSubcommand((s) => s
         .setName('edit')
-        .setDescription('تعديل بروجيكت (الاسم/الوصف/التفعيل)')
+        .setDescription('تعديل بروجيكت (الاسم/السعر/الخصم/الوصف/التفعيل)')
         .addStringOption((o) => o.setName('name').setDescription('البروجيكت').setRequired(true).setAutocomplete(true))
         .addStringOption((o) => o.setName('new-name').setDescription('اسم جديد (اختياري)').setRequired(false).setMaxLength(80))
+        .addStringOption((o) => o
+        .setName('price')
+        .setDescription('تعديل السعر الأساسي الصافي (مثال: 10m أو 10000000)')
+        .setRequired(false)
+        .setMaxLength(30))
+        .addStringOption((o) => o
+        .setName('discount')
+        .setDescription('نسبة خصم على البروجيكت (مثال: 25 أو 25% — 0 لإزالة الخصم)')
+        .setRequired(false)
+        .setMaxLength(10))
         .addStringOption((o) => o.setName('description').setDescription('وصف جديد (اختياري)').setRequired(false).setMaxLength(120))
         .addBooleanOption((o) => o.setName('clear-description').setDescription('مسح الوصف الحالي').setRequired(false))
         .addBooleanOption((o) => o.setName('enabled').setDescription('صحيح = تفعيل • خطأ = إيقاف مؤقت').setRequired(false)))
@@ -83,10 +93,14 @@ const command = {
             const matches = (store.projects || [])
                 .filter((p) => !q || p.name.toLowerCase().includes(q))
                 .slice(0, 25)
-                .map((p) => ({
-                name: `${p.name} — ${(0, store_1.formatShort)(p.price)} كريديت`.slice(0, 100),
-                value: p.name,
-            }));
+                .map((p) => {
+                const discount = (0, store_1.normalizeDiscountPercent)(p.discountPercent);
+                const effective = (0, store_1.getEffectivePrice)(p);
+                return {
+                    name: `${p.name} — ${(0, store_1.formatShort)(effective)}${discount ? ` (-${discount}%)` : ''} كريديت`.slice(0, 100),
+                    value: p.name,
+                };
+            });
             await interaction.respond(matches);
         }
         catch {
@@ -140,6 +154,7 @@ const command = {
                 name,
                 description,
                 price,
+                discountPercent: 0,
                 enabled: true,
                 sales: 0,
                 createdBy: interaction.user.id,
@@ -152,6 +167,7 @@ const command = {
                 content: `✅ تمت إضافة **${name}** إلى المتجر\n` +
                     `> 💰 السعر الصافي: ${(0, store_1.priceLine)(price)} كريديت\n` +
                     `> 🧾 أمر التحويل الذي سيظهر للمشتري: \`${transferPreview}\` (بعد خصم ProBot ${store.taxPercent ?? 5}% يصلك الصافي كامل)\n` +
+                    '> 🏷️ لإضافة خصم لاحقاً: `/project edit name:... discount:25`\n' +
                     'الظهور للمشترين: `/store` أو اختصار علياس.',
                 ephemeral: true,
             });
@@ -173,8 +189,11 @@ const command = {
             const oldPrice = project.price;
             project.price = price;
             await store.save();
+            const discount = (0, store_1.normalizeDiscountPercent)(project.discountPercent);
+            const effective = (0, store_1.getEffectivePrice)(project);
             await interaction.reply({
-                content: `✅ سعر **${project.name}** صار ${(0, store_1.priceLine)(price)} (كان ${(0, store_1.priceLine)(oldPrice)})`,
+                content: `✅ السعر الأساسي لـ **${project.name}** صار ${(0, store_1.priceLine)(price)} (كان ${(0, store_1.priceLine)(oldPrice)})` +
+                    (discount ? `\n> 🏷️ خصم قائم: ${discount}% — السعر الفعلي الآن ${(0, store_1.priceLine)(effective)}` : ''),
                 ephemeral: true,
             });
             return;
@@ -183,6 +202,8 @@ const command = {
         if (sub === 'edit') {
             const name = interaction.options.getString('name', true);
             const newName = interaction.options.getString('new-name')?.trim();
+            const priceText = interaction.options.getString('price');
+            const discountText = interaction.options.getString('discount');
             const description = interaction.options.getString('description')?.trim();
             const clearDescription = interaction.options.getBoolean('clear-description') ?? false;
             const enabled = interaction.options.getBoolean('enabled');
@@ -201,6 +222,37 @@ const command = {
                 changes.push(`الاسم: \`${project.name}\` ← \`${newName}\``);
                 project.name = newName;
             }
+            if (priceText !== null) {
+                const parsed = (0, store_1.parsePrice)(priceText);
+                if (!parsed) {
+                    await interaction.reply({
+                        content: '❌ السعر غير مفهوم. أمثلة: `10m` • `500k` • `10000000` • `2 مليون`',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                const old = project.price;
+                project.price = parsed;
+                changes.push(`السعر الأساسي: ${(0, store_1.priceLine)(old)} ← ${(0, store_1.priceLine)(parsed)}`);
+            }
+            if (discountText !== null) {
+                const parsedDiscount = (0, store_1.parseDiscountPercent)(discountText);
+                if (parsedDiscount === null) {
+                    await interaction.reply({
+                        content: '❌ نسبة الخصم غير مفهومة. أمثلة: `25` • `25%` • `%25` • `0` لإزالة الخصم',
+                        ephemeral: true,
+                    });
+                    return;
+                }
+                const oldDiscount = (0, store_1.normalizeDiscountPercent)(project.discountPercent);
+                project.discountPercent = parsedDiscount;
+                if (parsedDiscount === 0) {
+                    changes.push(oldDiscount ? `الخصم: ${oldDiscount}% ← بدون خصم` : 'الخصم: بدون خصم');
+                }
+                else {
+                    changes.push(`الخصم: ${oldDiscount ? `${oldDiscount}%` : 'بدون'} ← ${parsedDiscount}%`);
+                }
+            }
             if (clearDescription) {
                 project.description = undefined;
                 changes.push('الوصف: مُسح');
@@ -218,7 +270,15 @@ const command = {
                 return;
             }
             await store.save();
-            await interaction.reply({ content: `✅ تم تعديل **${project.name}**\n> ${changes.join('\n> ')}`, ephemeral: true });
+            const effective = (0, store_1.getEffectivePrice)(project);
+            const discount = (0, store_1.normalizeDiscountPercent)(project.discountPercent);
+            const priceSummary = discount
+                ? `> 💰 السعر الآن: ${(0, store_1.projectPriceLine)(project)} (صافي فعلي: ${(0, store_1.priceLine)(effective)})`
+                : `> 💰 السعر الآن: ${(0, store_1.priceLine)(effective)}`;
+            await interaction.reply({
+                content: `✅ تم تعديل **${project.name}**\n> ${changes.join('\n> ')}\n${priceSummary}`,
+                ephemeral: true,
+            });
             return;
         }
         // ---------- حذف ----------
@@ -244,10 +304,16 @@ const command = {
             const enabled = projects.filter((p) => p.enabled).length;
             const disabled = projects.length - enabled;
             const totalSales = projects.reduce((sum, p) => sum + (p.sales || 0), 0);
-            const revenue = projects.reduce((sum, p) => sum + (p.sales || 0) * p.price, 0);
+            const revenue = projects.reduce((sum, p) => sum + (p.sales || 0) * (0, store_1.getEffectivePrice)(p), 0);
             const lines = projects.length
                 ? projects
-                    .map((p, i) => `**${i + 1}.** ${p.enabled ? '🟢' : '⏸️'} **${p.name}** — 💰 ${(0, store_1.priceLine)(p.price)} | 📊 ${p.sales || 0} مبيعة | 🔑 \`${p.id}\``)
+                    .map((p, i) => {
+                    const discount = (0, store_1.normalizeDiscountPercent)(p.discountPercent);
+                    const priceText = discount
+                        ? `${(0, store_1.projectPriceLine)(p)}`
+                        : (0, store_1.priceLine)((0, store_1.getEffectivePrice)(p));
+                    return `**${i + 1}.** ${p.enabled ? '🟢' : '⏸️'} **${p.name}** — 💰 ${priceText} | 📊 ${p.sales || 0} مبيعة | 🔑 \`${p.id}\``;
+                })
                     .join('\n')
                 : 'لا توجد بروجيكتات بعد.';
             const embed = new discord_js_1.EmbedBuilder()

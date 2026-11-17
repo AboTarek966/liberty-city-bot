@@ -13,8 +13,10 @@ export interface IStoreProject {
   id: string;
   name: string;
   description?: string;
-  /** السعر الصافي (بعد خصم ProBot) بالكريديت */
+  /** السعر الصافي الأساسي (قبل خصم العرض، إن وجد) بالكريديت */
   price: number;
+  /** نسبة خصم على هذا البروجيكت (0-99) — 0 أو غير محدد = بدون خصم */
+  discountPercent?: number;
   enabled: boolean;
   sales: number;
   createdBy?: string;
@@ -40,6 +42,7 @@ const StoreProjectSchema = new Schema<IStoreProject>(
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     price: { type: Number, required: true, min: 1 },
+    discountPercent: { type: Number, min: 0, max: 99 },
     enabled: { type: Boolean, default: true },
     sales: { type: Number, default: 0, min: 0 },
     createdBy: { type: String },
