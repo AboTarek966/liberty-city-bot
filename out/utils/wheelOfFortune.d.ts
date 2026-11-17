@@ -30,6 +30,8 @@ export interface WheelOfFortuneOptions {
     /** تجاهل الكاش وإرجاع صورة جديدة */
     noCache?: boolean;
 }
+/** نص آمن للرسّام: أحرف لاتينية فقط — استضافة البوت تتعطل على نصوص عربية في العجلة */
+export declare function wheelLatin(s: string, fallback: string): string;
 /** فحص بسيط للبايتات السحرية — يستبعد أي buffer ليس صورة حقيقية (يحمي الـ canvas من الـ segfault) */
 export declare function isLikelyImage(buf: Buffer | null | undefined): boolean;
 /**

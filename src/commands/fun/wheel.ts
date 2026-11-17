@@ -11,20 +11,22 @@ import { renderWheelInWorker } from '../../utils/wheelWorker';
 
 interface Prize {
   name: string;
+  /** الاسم الظاهر على العجلة — أحرف لاتينية فقط لأن الاستضافة لا ترسم العربية على الصورة */
+  wheel: string;
   weight: number;
   line: string;
 }
 
 const PRIZES: Prize[] = [
-  { name: 'جوهرة', weight: 1, line: '🏆 **جاكبوت!** أنت محظوظ اليوم' },
-  { name: 'ميدالية ذهبية', weight: 3, line: '🔥 رهيب! جائزة نادرة' },
-  { name: 'هدية', weight: 8, line: '🎉 هدية لطيفة' },
-  { name: 'تذكرة', weight: 14, line: '🎟️ ربحت تذكرة' },
-  { name: 'نجمة', weight: 18, line: '⭐ نقطة حظ' },
-  { name: 'عملة', weight: 22, line: '🪙 ربحت خمسة ريالات' },
-  { name: 'لا شيء', weight: 20, line: '😅 لا شيء هذه المرة' },
-  { name: 'دجاجة', weight: 8, line: '🐔 دجاجة؟ على الأقل شوف!' },
-  { name: 'حظ سيء', weight: 6, line: '💀 العجلة سرقت فلوسك' },
+  { name: 'جوهرة', wheel: 'DIAMOND', weight: 1, line: '🏆 **جاكبوت!** أنت محظوظ اليوم' },
+  { name: 'ميدالية ذهبية', wheel: 'GOLD', weight: 3, line: '🔥 رهيب! جائزة نادرة' },
+  { name: 'هدية', wheel: 'GIFT', weight: 8, line: '🎉 هدية لطيفة' },
+  { name: 'تذكرة', wheel: 'TICKET', weight: 14, line: '🎟️ ربحت تذكرة' },
+  { name: 'نجمة', wheel: 'STAR', weight: 18, line: '⭐ نقطة حظ' },
+  { name: 'عملة', wheel: 'COIN', weight: 22, line: '🪙 ربحت خمسة ريالات' },
+  { name: 'لا شيء', wheel: 'NOTHING', weight: 20, line: '😅 لا شيء هذه المرة' },
+  { name: 'دجاجة', wheel: 'CHICKEN', weight: 8, line: '🐔 دجاجة؟ على الأقل شوف!' },
+  { name: 'حظ سيء', wheel: 'BAD LUCK', weight: 6, line: '💀 العجلة سرقت فلوسك' },
 ];
 
 const PRIZE_COLORS = [
@@ -58,7 +60,7 @@ const command: Command = {
     const prize = PRIZES[winIndex];
 
     const segments: WheelSegmentInput[] = PRIZES.map((p, i) => ({
-      label: p.name,
+      label: p.wheel,
       color: PRIZE_COLORS[i % PRIZE_COLORS.length],
     }));
 
@@ -67,12 +69,13 @@ const command: Command = {
       // الرندر داخل Worker — GIF لا يتجمّد البوت ولا يستهلك خيطه الرئيسي
       gifBuffer = await renderWheelInWorker(
         {
-          title: 'عجلة الحظ',
-          subtitle: 'دوّرها... حظّك فين؟',
+          title: 'WHEEL OF FATE',
+          subtitle: 'SPIN TO WIN',
           segments,
           winnerIndex: winIndex,
           hubText: 'OMNI',
           format: 'gif',
+          resultLabel: 'WINNER',
         },
         25000
       );

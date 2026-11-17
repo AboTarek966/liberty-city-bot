@@ -165,40 +165,6 @@ async function main(): Promise<void> {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.info(`🎉 Bot is ready! Took ${elapsed}s`);
     persist(`READY in ${elapsed}s guilds=${client.guilds.cache.size}`);
-
-    // 🎡 فحص مؤقت للعجلة على هذه البيئة — يكتب التوقيت في wheel-selftest.log ثم يُزال
-    try {
-      if ((process.env.WHEEL_SELFTEST || 'true').toLowerCase() !== 'false') {
-        const fsb = require('fs') as any;
-        const pathMod = require('path') as any;
-        const logPath = pathMod.join(process.cwd(), 'wheel-selftest.log');
-        const probe = (line: string) => {
-          const msg = `[${new Date().toISOString()}] ${line}`;
-          try { fsb.appendFileSync(logPath, msg + '\n'); } catch { /* تجاهل */ }
-          logger.info(`🎡 selftest: ${line}`);
-        };
-        void (async () => {
-          const mk = (n: number, labelFn: (i: number) => string) =>
-            Array.from({ length: n }, (_, i) => ({ label: labelFn(i) }));
-          for (const [name, segs] of [
-            ['latin25', mk(25, (i) => `p${i}`)],
-            ['arabic25', mk(25, (i) => `لاعب رقم ${i}`)],
-          ] as Array<[string, any[]]>) {
-            const t0 = Date.now();
-            try {
-              const { renderWheelInWorker } = await import('./utils/wheelWorker');
-              const gif = await renderWheelInWorker(
-                { title: 'روليت', subtitle: 'دور', segments: segs, winnerIndex: 3, hubText: 'OMNI', width: 360, orientation: 'portrait', format: 'gif', resultLabel: 'عليه الدور', frames: 4, delayMs: 55 } as any,
-                60000
-              );
-              probe(`${name}: ${gif ? `OK bytes=${gif.length} time=${Date.now() - t0}ms` : 'NULL'}`);
-            } catch (e: any) {
-              probe(`${name}: EXCEPTION ${String(e?.message || e).slice(0, 250)}`);
-            }
-          }
-        })();
-      }
-    } catch { /* تجاهل */ }
     logger.info(`📊 Logged in as: ${client.user?.tag}`);
     logger.info(`🏠 Serving ${client.guilds.cache.size} guilds`);
     logger.info(`👥 Serving ${client.users.cache.size} users`);

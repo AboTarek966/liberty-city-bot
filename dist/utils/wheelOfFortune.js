@@ -8,6 +8,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.wheelLatin = wheelLatin;
 exports.isLikelyImage = isLikelyImage;
 exports.renderWheelOfFortuneGif = renderWheelOfFortuneGif;
 exports.fetchAvatarBuffer = fetchAvatarBuffer;
@@ -102,6 +103,14 @@ const PALETTE = [
     '#0ea5e9', '#7c3aed', '#db2777', '#14b8a6',
 ];
 const TAU = Math.PI * 2;
+/** نص آمن للرسّام: أحرف لاتينية فقط — استضافة البوت تتعطل على نصوص عربية في العجلة */
+function wheelLatin(s, fallback) {
+    const latin = String(s || '')
+        .replace(/[^a-zA-Z0-9 .#_\-]/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    return latin ? latin.slice(0, 10) : fallback;
+}
 /** فحص بسيط للبايتات السحرية — يستبعد أي buffer ليس صورة حقيقية (يحمي الـ canvas من الـ segfault) */
 function isLikelyImage(buf) {
     if (!buf || buf.length < 12)
@@ -452,8 +461,14 @@ async function renderWheelOfFortuneGif(opts) {
             ctx.font = `bold ${fontSize}px ${fontFor(label)}`;
             let drawLabel = label;
             const maxTextW = SEG_R * (n <= 4 ? 0.38 : n <= 6 ? 0.32 : 0.26);
-            while (ctx.measureText(drawLabel).width > maxTextW && drawLabel.length > 2)
-                drawLabel = drawLabel.slice(0, -1) + '…';
+            let labelTruncated = false;
+            // ⚡ القص يجب أن يقلّص النص فعلياً (slice دون إضافة) — النسخة القديمة كانت تضيف … كل جولة وتعلّق إلى الأبد
+            while (ctx.measureText(drawLabel).width > maxTextW && drawLabel.length > 2) {
+                drawLabel = drawLabel.slice(0, -1);
+                labelTruncated = true;
+            }
+            if (labelTruncated)
+                drawLabel += '…';
             const textW = ctx.measureText(drawLabel).width;
             const gap = Math.max(4, avatarR * 0.25);
             const totalW = avatarR * 2 + gap + textW;

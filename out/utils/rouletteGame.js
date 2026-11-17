@@ -36,13 +36,9 @@ const COLOR = 0xed4245;
 function playerDisplay(p) {
     return p.isBot ? `**${(0, helpers_1.escapeMarkdown)(p.username)}** 🤖` : `<@${p.id}>`;
 }
-/** إزالة الإيموجي ورموز الزخرفة — رسّام العجلة (native) ينهار على بعض الرموز — نعرض الاسم فقط */
-function wheelSafeLabel(s) {
-    const cleaned = String(s || '')
-        .replace(/[^\p{L}\p{N} #@.\-_]/gu, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-    return cleaned.slice(0, 12) || 'لاعب';
+/** نص آمن للعجلة — أحرف لاتينية فقط على الاستضافة (نفس أسماء العجلة في /wheel) */
+function wheelSafeLabel(s, index = 0) {
+    return (0, wheelOfFortune_1.wheelLatin)(s, `W${index + 1}`);
 }
 /** سطر مرقّم لكل لاعب — أوضح من خط واحد مليء بالفواصل */
 function playerLine(p, i) {
@@ -207,7 +203,7 @@ async function runRouletteRound(client, game) {
     const WANT_WHEEL = (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
         (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
     const segments = game.players.map((p, i) => ({
-        label: wheelSafeLabel(p.username),
+        label: wheelSafeLabel(p.username, i),
         image: game.avatarBuffers?.[i],
     }));
     let gif = null;
@@ -215,15 +211,15 @@ async function runRouletteRound(client, game) {
         const t0 = Date.now();
         try {
             gif = await (0, wheelWorker_1.renderWheelInWorker)({
-                title: 'روليت',
-                subtitle: 'دور — وادفع مين يُطرَد',
+                title: 'ROULETTE',
+                subtitle: 'SPIN TO PICK',
                 segments,
                 winnerIndex,
                 hubText: 'OMNI',
                 width: 360,
                 format: 'gif',
                 orientation: 'portrait',
-                resultLabel: 'عليه الدور',
+                resultLabel: 'OUT',
                 frames: 10,
                 delayMs: 55,
             }, 40000);
@@ -240,15 +236,15 @@ async function runRouletteRound(client, game) {
             const plainSegments = segments.map((s) => ({ label: s.label }));
             try {
                 gif = await (0, wheelWorker_1.renderWheelInWorker)({
-                    title: 'روليت',
-                    subtitle: 'دور — وادفع مين يُطرَد',
+                    title: 'ROULETTE',
+                    subtitle: 'SPIN TO PICK',
                     segments: plainSegments,
                     winnerIndex,
                     hubText: 'OMNI',
                     width: 360,
                     format: 'gif',
                     orientation: 'portrait',
-                    resultLabel: 'عليه الدور',
+                    resultLabel: 'OUT',
                     frames: 8,
                     delayMs: 55,
                 }, 40000);

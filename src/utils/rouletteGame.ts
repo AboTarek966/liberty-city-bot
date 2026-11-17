@@ -14,7 +14,7 @@ import {
   ComponentType,
   EmbedBuilder,
 } from 'discord.js';
-import { fetchAvatarBuffer, WheelSegmentInput } from './wheelOfFortune';
+import { fetchAvatarBuffer, WheelSegmentInput, wheelLatin } from './wheelOfFortune';
 import { renderWheelInWorker } from './wheelWorker';
 import { createLogger, sleep, escapeMarkdown } from './helpers';
 
@@ -63,13 +63,9 @@ function playerDisplay(p: RoulettePlayer): string {
   return p.isBot ? `**${escapeMarkdown(p.username)}** 🤖` : `<@${p.id}>`;
 }
 
-/** إزالة الإيموجي ورموز الزخرفة — رسّام العجلة (native) ينهار على بعض الرموز — نعرض الاسم فقط */
-export function wheelSafeLabel(s: string): string {
-  const cleaned = String(s || '')
-    .replace(/[^\p{L}\p{N} #@.\-_]/gu, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  return cleaned.slice(0, 12) || 'لاعب';
+/** نص آمن للعجلة — أحرف لاتينية فقط على الاستضافة (نفس أسماء العجلة في /wheel) */
+export function wheelSafeLabel(s: string, index = 0): string {
+  return wheelLatin(s, `W${index + 1}`);
 }
 
 /** سطر مرقّم لكل لاعب — أوضح من خط واحد مليء بالفواصل */
@@ -260,7 +256,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
 
   const segments: WheelSegmentInput[] = game.players.map((p, i) => ({
-    label: wheelSafeLabel(p.username),
+    label: wheelSafeLabel(p.username, i),
     image: game.avatarBuffers?.[i],
   }));
 
@@ -270,15 +266,15 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     try {
       gif = await renderWheelInWorker(
         {
-          title: 'روليت',
-          subtitle: 'دور — وادفع مين يُطرَد',
+          title: 'ROULETTE',
+          subtitle: 'SPIN TO PICK',
           segments,
           winnerIndex,
           hubText: 'OMNI',
           width: 360,
           format: 'gif',
           orientation: 'portrait',
-          resultLabel: 'عليه الدور',
+          resultLabel: 'OUT',
           frames: 10,
           delayMs: 55,
         },
@@ -299,15 +295,15 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
       try {
         gif = await renderWheelInWorker(
           {
-            title: 'روليت',
-            subtitle: 'دور — وادفع مين يُطرَد',
+            title: 'ROULETTE',
+            subtitle: 'SPIN TO PICK',
             segments: plainSegments,
             winnerIndex,
             hubText: 'OMNI',
             width: 360,
             format: 'gif',
             orientation: 'portrait',
-            resultLabel: 'عليه الدور',
+            resultLabel: 'OUT',
             frames: 8,
             delayMs: 55,
           },
