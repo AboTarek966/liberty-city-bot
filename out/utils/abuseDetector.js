@@ -371,18 +371,13 @@ function matchArabicTerm(term, parts) {
     // عبارة من كلمتين أو أكثر
     if (norm.includes(' ')) {
         const joined = tokens.join(' ');
-        const minCompact = spaced ? 3 : 4;
+        const joinedCollapsed = tokens.map(collapseRepeats).join(' ');
         for (const phrase of phraseVariants(norm)) {
-            if (` ${joined} `.includes(` ${phrase} `)) {
+            if (` ${joined} `.includes(` ${phrase} `) || ` ${joinedCollapsed} `.includes(` ${phrase} `)) {
                 return { term: term.text, normalized: norm, kind: 'phrase' };
             }
             if (!isArabicTerm)
                 continue;
-            const phraseCompact = collapseRepeats(phrase.replace(/\s+/g, ''));
-            if (phraseCompact.length >= minCompact &&
-                (compact.includes(phraseCompact) || collapsedCompact.includes(phraseCompact))) {
-                return { term: term.text, normalized: norm, kind: 'phrase' };
-            }
         }
         return null;
     }
@@ -400,12 +395,8 @@ function matchArabicTerm(term, parts) {
         }
     }
     // التمويه بالمسافات/الرموز: "ك س م ك" أو "ك.س.م.ك"
-    // نسمح بجذور من 3 حروف فقط عند وجود تباعد حرفي واضح
-    // (ولا نطبقها على الكلمات اللاتينية حتى لا يتحول retardant إلى retard)
-    const minCompact = spaced ? 3 : 4;
-    if (isArabicTerm &&
-        normCollapsed.length >= minCompact &&
-        (compact.includes(normCollapsed) || collapsedCompact.includes(normCollapsed))) {
+    // يكون فقط لرسالة متباعدة الحروف ويُتطابق كاملًا — بدون ذلك كانت لقطة "ميزانيه" (كتبت زانيه) تنفجر
+    if (isArabicTerm && spaced && (compact === norm || collapsedCompact === normCollapsed)) {
         return { term: term.text, normalized: norm, kind: 'arabic' };
     }
     return null;
