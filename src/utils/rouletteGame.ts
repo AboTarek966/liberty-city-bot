@@ -179,8 +179,12 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
   const WANT_WHEEL =
     (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
     (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
+  // 🎡 الآفاتارات بحد أقصى 6 ثوانٍ — لأعلى صورة واضحة، وإن تأخرت السيرفرات الخارجية نكمل بالأسماء
   game.avatarBuffers = WANT_WHEEL
-    ? await fetchAvatarsInBatches(game.players, 6)
+    ? await Promise.race([
+        fetchAvatarsInBatches(game.players, 6),
+        new Promise<(Buffer | null)[]>((resolve) => setTimeout(() => resolve([]), 6000)),
+      ])
     : [];
 
   // أعلن انطلاق اللعبة، ثم انتظر 5 ثوانٍ قبل أول دورة
@@ -232,71 +236,77 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
   const winnerIndex = Math.floor(Math.random() * game.players.length);
   const chosen = game.players[winnerIndex];
 
-  // 🎡 نرسل إمبد العجلة فوراً — ثم تُبنى GIF داخل Worker وتُلحق بالرسالة حين تكتمل
-  //    (اللاعب لا ينتظر الرندر، والبوت ما يتجمد أبداً)
+  // 🎡 نبني GIF أولاً ثم نرسل رسالة واحدة فيها العجلة متحركة —
+  //    (لا اعتماد على التعديل اللاحق: لو ديسكورد عطل المرفقات نfallback للنص فوراً)
   const WANT_WHEEL =
     (process.env.ROULETTE_DISABLE_WHEEL || '').toLowerCase() !== 'true' &&
     (process.env.ROULETTE_RENDER_WHEEL || 'true').toLowerCase() !== 'false';
 
-  const spinEmbed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle('🎡 العجلة تدور...')
-    .setDescription(`👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
-    .setFooter({ text: 'جاري تحديد عليه الدور...' })
-    .setTimestamp();
+  const segments: WheelSegmentInput[] = game.players.map((p, i) => ({
+    label: (p.username || '?').slice(0, 12),
+    image: game.avatarBuffers?.[i],
+  }));
+
+  let gif: Buffer | null = null;
+  if (WANT_WHEEL) {
+    const t0 = Date.now();
+    try {
+      gif = await renderWheelInWorker(
+        {
+          title: 'روليت',
+          subtitle: 'دور — وادفع مين يُطرَد',
+          segments,
+          winnerIndex,
+          hubText: 'OMNI',
+          width: 640,
+          format: 'gif',
+          orientation: 'landscape',
+          resultLabel: 'عليه الدور',
+          frames: 12,
+          delayMs: 55,
+        },
+        60000
+      );
+      logger.info(
+        `🎡 wheel pre-render: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t0}ms` : 'FAILED/timeout'}`
+      );
+    } catch (err: any) {
+      logger.warn(`wheel pre-render failed: ${err?.message || err}`);
+      gif = null;
+    }
+  }
+
+  const playerListText = `👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`;
+  const buildSpinEmbed = (withImage: boolean) => {
+    const e = new EmbedBuilder()
+      .setColor(COLOR)
+      .setTitle('🎡 العجلة تدور...')
+      .setDescription(playerListText)
+      .setFooter({ text: 'شوف العجلة تلف — ومن تقف عليه عنده 30 ثانية يختار' })
+      .setTimestamp();
+    if (withImage) e.setImage('attachment://roulette.gif');
+    return e;
+  };
 
   game.choiceTimer && clearTimeout(game.choiceTimer);
-  const spinMessage = await channel.send({ embeds: [spinEmbed] }).catch(() => null);
 
-  if (WANT_WHEEL && spinMessage) {
-    const segments: WheelSegmentInput[] = game.players.map((p, i) => ({
-      label: (p.username || '?').slice(0, 12),
-      image: game.avatarBuffers[i],
-    }));
-    // الرندر في الخلفية — الإمبد لا يعتمد على اكتمالها
-    void (async () => {
-      try {
-        const gif = await renderWheelInWorker(
-          {
-            title: 'روليت',
-            subtitle: 'دور — وادفع مين يُطرَد',
-            segments,
-            winnerIndex,
-            hubText: 'OMNI',
-            width: 640,
-            format: 'gif',
-            orientation: 'landscape',
-            resultLabel: 'عليه الدور',
-            frames: 12,
-            delayMs: 55,
-          },
-          90000
-        );
-        if (!gif) {
-          logger.warn('wheel GIF render skipped (worker/timeout/canvas)');
-          return;
-        }
-        if (game.phase === 'done') return;
-        const arrivedEmbed = new EmbedBuilder()
-          .setColor(COLOR)
-          .setTitle('🎡 العجلة وصلت!')
-          .setDescription(`👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
-          .setImage('attachment://roulette.gif')
-          .setFooter({ text: 'وقفت العجلة — الدور الجاي للّي اتشارد' })
-          .setTimestamp();
-        try {
-          await spinMessage.edit({
-            embeds: [arrivedEmbed],
-            files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })],
-          });
-          logger.info(`🎡 wheel GIF attached to spin message (${gif.length} bytes)`);
-        } catch (editErr: any) {
-          logger.warn(`🎡 wheel GIF edit failed: ${String(editErr?.message || editErr).slice(0, 200)}`);
-        }
-      } catch (err: any) {
-        logger.warn(`wheel render failed: ${err?.message || err}`);
-      }
-    })();
+  let spinMessage: any = null;
+  if (gif) {
+    // المحاولة الأولى: الإمبد + الـGIF مضمن جوه + المرفق
+    spinMessage = await channel
+      .send({ embeds: [buildSpinEmbed(true)], files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })] })
+      .catch((sendErr: any) => {
+        logger.warn(`🎡 wheel send-with-gif failed: ${String(sendErr?.message || sendErr).slice(0, 200)}`);
+        return null;
+      });
+    if (!spinMessage) {
+      // المحاولة الثانية: إمبد بدون صورة (تجنّب embed.image يشير لمرفق غير موجود)
+      spinMessage = await channel.send({ embeds: [buildSpinEmbed(false)] }).catch(() => null);
+      // المحاولة الثالثة: الـGIF كرسالة منفصلة إن كانت المرفقات تعمل
+      await channel.send({ content: '🎡', files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })] }).catch(() => null);
+    }
+  } else {
+    spinMessage = await channel.send({ embeds: [buildSpinEmbed(false)] }).catch(() => null);
   }
 
   // بعد اللف (لحد ما تقف العجلة) — انتظر ٥ ثوانٍ ثم نوقف على اللي اختارته

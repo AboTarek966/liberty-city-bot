@@ -648,7 +648,7 @@ async function fetchAvatarBuffer(url) {
             const axios = require('axios');
             const res = await axios.get(key, {
                 responseType: 'arraybuffer',
-                timeout: 8000,
+                timeout: 4000,
                 maxContentLength: 4 * 1024 * 1024,
                 maxBodyLength: 4 * 1024 * 1024,
             });
