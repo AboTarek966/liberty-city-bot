@@ -27,12 +27,14 @@ export declare function formatCredits(n: number): string;
 export declare function formatShort(n: number): string;
 /** سطر سعر كامل: 10,000,000 (10M) */
 export declare function priceLine(n: number): string;
+/** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
+export declare function buildTransferCommand(payeeId: string, amount: number): string;
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */
 export declare function parsePrice(input: string): number | null;
 /** معرّف قصير للطلب/البروجيكت (مرتبط بروابط الأزرار) */
 export declare function shortId(len?: number): string;
-/** يعقص أوامر التحويل / ويمنع تسجيل أوامر وهمية */
-export declare function isProbotCommandLike(text: string, prefix: string): boolean;
+/** يتحقق إن النص يشبه أمر تحويل كريديت */
+export declare function isProbotCommandLike(text: string, _prefix: string): boolean;
 /** بناء إمبد المتجر (العرض الرئيسي) */
 export declare function buildStoreEmbed(store: IStore): EmbedBuilder;
 /** بناء قائمة الاختيار (select) للمشاريع المفعّلة */

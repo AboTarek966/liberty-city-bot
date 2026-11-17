@@ -90,6 +90,11 @@ export function priceLine(n: number): string {
   return `\`${formatCredits(n)}\` (${formatShort(n)})`;
 }
 
+/** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
+export function buildTransferCommand(payeeId: string, amount: number): string {
+  return `credit ${payeeId} ${Math.max(0, Math.floor(amount))}#`;
+}
+
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */
 export function parsePrice(input: string): number | null {
   const raw = String(input || '').trim().toLowerCase().replace(/[,،\s_']/g, '');
@@ -114,10 +119,10 @@ export function shortId(len = 6): string {
   return crypto.randomBytes(Math.ceil(len / 2)).toString('hex').slice(0, len);
 }
 
-/** يعقص أوامر التحويل / ويمنع تسجيل أوامر وهمية */
-export function isProbotCommandLike(text: string, prefix: string): boolean {
-  const t = String(text || '').trim();
-  return t.startsWith(`${prefix}pay`) || /^pay\s/.test(t);
+/** يتحقق إن النص يشبه أمر تحويل كريديت */
+export function isProbotCommandLike(text: string, _prefix: string): boolean {
+  const t = String(text || '').trim().toLowerCase();
+  return /^(?:#?credit)\s+\d+\s+\d+#?$/.test(t) || /^!pay\b/i.test(t) || /^pay\s/i.test(t);
 }
 
 /** بناء إمبد المتجر (العرض الرئيسي) */
@@ -142,11 +147,11 @@ export function buildStoreEmbed(store: IStore): EmbedBuilder {
         lines +
         '\n\n' +
         `> 💸 **الأسعار موضع طلب تحويل صافي** — ProBot يديق **${tax}%** من كل تحويل، ` +
-        'ولهذا بنعرض لك أمر التحويل **بالمبلغ اللازم** حتى يوصلك البائع** السعر الصافي كامل**.\n' +
-        (payee ? `> 💳 **الدفع يروح لـ <@${payee}>** عبر \`${prefix}pay\`.\n` : '') +
+        'ولهذا بنعرض لك أمر التحويل **بالمبلغ اللازم** حتى يوصلك البائع السعر الصافي كامل**.\n' +
+        (payee ? `> 💳 **الدفع يروح لـ <@${payee}>** عبر أمر \`credit\`.\n` : '') +
         `> ⚡ بعد ما تدفع، دوس \`دفعت\` داخل شاشة التأكيد ونوصلك إيصال فور التسليم.`
     )
-    .setFooter({ text: `Omni Store • ProBot ${prefix}pay` })
+    .setFooter({ text: `Omni Store • credit` })
     .setTimestamp();
 }
 

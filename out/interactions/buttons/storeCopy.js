@@ -19,13 +19,12 @@ const handler = {
             return;
         }
         const store = await (0, store_1.getStore)(false);
-        const prefix = order.probotPrefix || store?.probotPrefix || '!';
         const payeeId = order.payeeId || store?.payeeId;
         if (!payeeId) {
             await interaction.reply({ content: '❌ المتجر غير مهيأ — أبلغ البائع', ephemeral: true });
             return;
         }
-        const transferCommand = `${prefix}pay <@${payeeId}> ${order.amount}`;
+        const transferCommand = (0, store_1.buildTransferCommand)(payeeId, order.amount);
         await interaction.reply({
             content: '📋 **انسخ أمر الدفع حرفيًا ثم الصقه في الشات:**\n' +
                 '```\n' + transferCommand + '\n```\n' +

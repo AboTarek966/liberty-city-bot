@@ -4,7 +4,7 @@
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { getStore, formatCredits } from '../../utils/store';
+import { getStore, formatCredits, buildTransferCommand } from '../../utils/store';
 import { StoreOrder } from '../../models';
 
 const handler: ButtonHandler = {
@@ -23,7 +23,6 @@ const handler: ButtonHandler = {
     }
 
     const store = await getStore(false);
-    const prefix = order.probotPrefix || store?.probotPrefix || '!';
     const payeeId = order.payeeId || store?.payeeId;
 
     if (!payeeId) {
@@ -31,7 +30,7 @@ const handler: ButtonHandler = {
       return;
     }
 
-    const transferCommand = `${prefix}pay <@${payeeId}> ${order.amount}`;
+    const transferCommand = buildTransferCommand(payeeId, order.amount);
 
     await interaction.reply({
       content:

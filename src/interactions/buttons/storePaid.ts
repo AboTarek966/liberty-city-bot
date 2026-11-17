@@ -10,11 +10,11 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { getStore, priceLine, formatCredits } from '../../utils/store';
+import { getStore, priceLine, formatCredits, buildTransferCommand } from '../../utils/store';
 import { StoreOrder } from '../../models';
 
 /** بناء بطاقة الطلب المرسلة للبائع/قناة السجل */
-function buildOrderCard(order: any, prefix: string, payeeId: string | undefined): EmbedBuilder {
+function buildOrderCard(order: any, _prefix: string, payeeId: string | undefined): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle(`🛒 طلب شراء جديد — #${order.orderId}`)
@@ -24,7 +24,7 @@ function buildOrderCard(order: any, prefix: string, payeeId: string | undefined)
         `👤 **المشتري:** <@${order.buyerId}> (\`${order.buyerId}\`)`,
         `💰 **السعر الصافي:** ${formatCredits(order.price)}`,
         `🧾 **المطلوب تحويله:** ${formatCredits(order.amount)} (بعد خصم ProBot ${order.taxPercent ?? 5}%)`,
-        payeeId ? `💳 **أمر الدفع:** \`${prefix}pay @${payeeId} ${order.amount}\`` : null,
+        payeeId ? `💳 **أمر الدفع:** \`${buildTransferCommand(payeeId, order.amount)}\`` : null,
         '',
         '> 🔔 العميل يؤكد أنه دفع — راجع التحويل، وبعد ما يصلك الصافي اضغط **تم التسليم والاستلام**.',
       ]
@@ -105,7 +105,7 @@ const handler: ButtonHandler = {
           `🧾 **الطلب:** #${order.orderId}`,
           '',
           `💳 أمر الدفع (إن لم تكن نفذته بعد):`,
-          `\`\`\`${prefix}pay ${payeeId ? `<@${payeeId}> ` : ''}${order.amount}\`\`\``,
+          `\`\`\`${payeeId ? buildTransferCommand(payeeId, order.amount) : 'غير متوفر'}\`\`\``,
           '',
           `> 💰 المبلغ **${formatCredits(order.amount)}** كريديت — يصل لصافي **${formatCredits(order.price)}** بعد خصم ProBot ${tax}%`,
           deliveredToSeller

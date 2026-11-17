@@ -17,6 +17,7 @@ exports.computeTransferAmount = computeTransferAmount;
 exports.formatCredits = formatCredits;
 exports.formatShort = formatShort;
 exports.priceLine = priceLine;
+exports.buildTransferCommand = buildTransferCommand;
 exports.parsePrice = parsePrice;
 exports.shortId = shortId;
 exports.isProbotCommandLike = isProbotCommandLike;
@@ -109,6 +110,10 @@ function formatShort(n) {
 function priceLine(n) {
     return `\`${formatCredits(n)}\` (${formatShort(n)})`;
 }
+/** بناء أمر تحويل الكريديت (ProBot/Credit) — الصيغة المطلوبة */
+function buildTransferCommand(payeeId, amount) {
+    return `credit ${payeeId} ${Math.max(0, Math.floor(amount))}#`;
+}
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */
 function parsePrice(input) {
     const raw = String(input || '').trim().toLowerCase().replace(/[,،\s_']/g, '');
@@ -136,10 +141,10 @@ function parsePrice(input) {
 function shortId(len = 6) {
     return crypto_1.default.randomBytes(Math.ceil(len / 2)).toString('hex').slice(0, len);
 }
-/** يعقص أوامر التحويل / ويمنع تسجيل أوامر وهمية */
-function isProbotCommandLike(text, prefix) {
-    const t = String(text || '').trim();
-    return t.startsWith(`${prefix}pay`) || /^pay\s/.test(t);
+/** يتحقق إن النص يشبه أمر تحويل كريديت */
+function isProbotCommandLike(text, _prefix) {
+    const t = String(text || '').trim().toLowerCase();
+    return /^(?:#?credit)\s+\d+\s+\d+#?$/.test(t) || /^!pay\b/i.test(t) || /^pay\s/i.test(t);
 }
 /** بناء إمبد المتجر (العرض الرئيسي) */
 function buildStoreEmbed(store) {
@@ -160,10 +165,10 @@ function buildStoreEmbed(store) {
         lines +
         '\n\n' +
         `> 💸 **الأسعار موضع طلب تحويل صافي** — ProBot يديق **${tax}%** من كل تحويل، ` +
-        'ولهذا بنعرض لك أمر التحويل **بالمبلغ اللازم** حتى يوصلك البائع** السعر الصافي كامل**.\n' +
-        (payee ? `> 💳 **الدفع يروح لـ <@${payee}>** عبر \`${prefix}pay\`.\n` : '') +
+        'ولهذا بنعرض لك أمر التحويل **بالمبلغ اللازم** حتى يوصلك البائع السعر الصافي كامل**.\n' +
+        (payee ? `> 💳 **الدفع يروح لـ <@${payee}>** عبر أمر \`credit\`.\n` : '') +
         `> ⚡ بعد ما تدفع، دوس \`دفعت\` داخل شاشة التأكيد ونوصلك إيصال فور التسليم.`)
-        .setFooter({ text: `Omni Store • ProBot ${prefix}pay` })
+        .setFooter({ text: `Omni Store • credit` })
         .setTimestamp();
 }
 /** بناء قائمة الاختيار (select) للمشاريع المفعّلة */

@@ -18,6 +18,7 @@ import {
   shortId,
   priceLine,
   formatCredits,
+  buildTransferCommand,
 } from '../../utils/store';
 import { StoreOrder } from '../../models';
 
@@ -45,7 +46,6 @@ const handler: ButtonHandler = {
     }
 
     const tax = Number(store.taxPercent ?? 5);
-    const prefix = store.probotPrefix || '!';
     const amount = computeTransferAmount(project.price, tax);
 
     // ♻︎ منع تكرار طلبات مفتوحة لنفس المشروع ونفس المشتري خلال 15 دقيقة
@@ -67,12 +67,12 @@ const handler: ButtonHandler = {
         amount,
         taxPercent: tax,
         payeeId: store.payeeId,
-        probotPrefix: prefix,
+        probotPrefix: store.probotPrefix || '!',
         buyerId: interaction.user.id,
         guildId: interaction.guildId ?? undefined,
       }));
 
-    const transferCommand = `${prefix}pay <@${store.payeeId}> ${amount}`;
+    const transferCommand = buildTransferCommand(store.payeeId, amount);
 
     const embed = new EmbedBuilder()
       .setColor(0x57f287)
@@ -89,7 +89,7 @@ const handler: ButtonHandler = {
           '**📋 أمر التحويل (انسخه حرفيًا):**',
           `\`\`\`${transferCommand}\`\`\``,
           '',
-          '> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ الـ ProBot — مثلاً: `!pay @البائع 10526316`',
+          `> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ البوت — الصيغة: \`credit ${store.payeeId} ${amount}#\``,
           '> 💡 المبلغ مظبوط يصلك **صافي** على سعر البروجيكت بعد خصم ProBot.',
         ].join('\n')
       )

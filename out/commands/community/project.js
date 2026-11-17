@@ -145,10 +145,13 @@ const command = {
                 createdBy: interaction.user.id,
             });
             await store.save();
+            const transferPreview = store.payeeId
+                ? (0, store_1.buildTransferCommand)(store.payeeId, (0, store_1.computeTransferAmount)(price, store.taxPercent ?? 5))
+                : `credit <payee_id> ${(0, store_1.computeTransferAmount)(price, store.taxPercent ?? 5)}#`;
             await interaction.reply({
                 content: `✅ تمت إضافة **${name}** إلى المتجر\n` +
                     `> 💰 السعر الصافي: ${(0, store_1.priceLine)(price)} كريديت\n` +
-                    `> 🧾 أمر التحويل الذي سيظهر للمشتري: اطلب منه \`!pay <@${store.payeeId || 'أنت'}> ${(0, store_1.computeTransferAmount)(price, store.taxPercent ?? 5).toLocaleString('en-US')}\` (بعد خصم ProBot ${store.taxPercent ?? 5}% يصلك الصافي كامل)\n` +
+                    `> 🧾 أمر التحويل الذي سيظهر للمشتري: \`${transferPreview}\` (بعد خصم ProBot ${store.taxPercent ?? 5}% يصلك الصافي كامل)\n` +
                     'الظهور للمشترين: `/store` أو اختصار علياس.',
                 ephemeral: true,
             });

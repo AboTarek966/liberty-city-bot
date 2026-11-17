@@ -19,6 +19,7 @@ import {
   parsePrice,
   shortId,
   formatShort,
+  buildTransferCommand,
 } from '../../utils/store';
 
 const command: Command = {
@@ -213,11 +214,14 @@ const command: Command = {
         createdBy: interaction.user.id,
       });
       await store.save();
+      const transferPreview = store.payeeId
+        ? buildTransferCommand(store.payeeId, computeTransferAmount(price, store.taxPercent ?? 5))
+        : `credit <payee_id> ${computeTransferAmount(price, store.taxPercent ?? 5)}#`;
       await interaction.reply({
         content:
           `✅ تمت إضافة **${name}** إلى المتجر\n` +
           `> 💰 السعر الصافي: ${priceLine(price)} كريديت\n` +
-          `> 🧾 أمر التحويل الذي سيظهر للمشتري: اطلب منه \`!pay <@${store.payeeId || 'أنت'}> ${computeTransferAmount(price, store.taxPercent ?? 5).toLocaleString('en-US')}\` (بعد خصم ProBot ${store.taxPercent ?? 5}% يصلك الصافي كامل)\n` +
+          `> 🧾 أمر التحويل الذي سيظهر للمشتري: \`${transferPreview}\` (بعد خصم ProBot ${store.taxPercent ?? 5}% يصلك الصافي كامل)\n` +
           'الظهور للمشترين: `/store` أو اختصار علياس.',
         ephemeral: true,
       });

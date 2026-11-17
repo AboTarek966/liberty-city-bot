@@ -30,7 +30,6 @@ const handler = {
             return;
         }
         const tax = Number(store.taxPercent ?? 5);
-        const prefix = store.probotPrefix || '!';
         const amount = (0, store_1.computeTransferAmount)(project.price, tax);
         // ♻︎ منع تكرار طلبات مفتوحة لنفس المشروع ونفس المشتري خلال 15 دقيقة
         const since = new Date(Date.now() - 15 * 60_000);
@@ -49,11 +48,11 @@ const handler = {
                 amount,
                 taxPercent: tax,
                 payeeId: store.payeeId,
-                probotPrefix: prefix,
+                probotPrefix: store.probotPrefix || '!',
                 buyerId: interaction.user.id,
                 guildId: interaction.guildId ?? undefined,
             }));
-        const transferCommand = `${prefix}pay <@${store.payeeId}> ${amount}`;
+        const transferCommand = (0, store_1.buildTransferCommand)(store.payeeId, amount);
         const embed = new discord_js_1.EmbedBuilder()
             .setColor(0x57f287)
             .setTitle('💳 أمر الدفع جاهز — انسخه ونفذه في الشات')
@@ -68,7 +67,7 @@ const handler = {
             '**📋 أمر التحويل (انسخه حرفيًا):**',
             `\`\`\`${transferCommand}\`\`\``,
             '',
-            '> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ الـ ProBot — مثلاً: `!pay @البائع 10526316`',
+            `> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ البوت — الصيغة: \`credit ${store.payeeId} ${amount}#\``,
             '> 💡 المبلغ مظبوط يصلك **صافي** على سعر البروجيكت بعد خصم ProBot.',
         ].join('\n'))
             .setFooter({ text: 'Omni Store • انتظر تأكيد البائع من بلوك الإيصال' })

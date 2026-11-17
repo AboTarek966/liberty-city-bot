@@ -7,7 +7,7 @@ const discord_js_1 = require("discord.js");
 const store_1 = require("../../utils/store");
 const models_1 = require("../../models");
 /** بناء بطاقة الطلب المرسلة للبائع/قناة السجل */
-function buildOrderCard(order, prefix, payeeId) {
+function buildOrderCard(order, _prefix, payeeId) {
     return new discord_js_1.EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle(`🛒 طلب شراء جديد — #${order.orderId}`)
@@ -16,7 +16,7 @@ function buildOrderCard(order, prefix, payeeId) {
         `👤 **المشتري:** <@${order.buyerId}> (\`${order.buyerId}\`)`,
         `💰 **السعر الصافي:** ${(0, store_1.formatCredits)(order.price)}`,
         `🧾 **المطلوب تحويله:** ${(0, store_1.formatCredits)(order.amount)} (بعد خصم ProBot ${order.taxPercent ?? 5}%)`,
-        payeeId ? `💳 **أمر الدفع:** \`${prefix}pay @${payeeId} ${order.amount}\`` : null,
+        payeeId ? `💳 **أمر الدفع:** \`${(0, store_1.buildTransferCommand)(payeeId, order.amount)}\`` : null,
         '',
         '> 🔔 العميل يؤكد أنه دفع — راجع التحويل، وبعد ما يصلك الصافي اضغط **تم التسليم والاستلام**.',
     ]
@@ -86,7 +86,7 @@ const handler = {
             `🧾 **الطلب:** #${order.orderId}`,
             '',
             `💳 أمر الدفع (إن لم تكن نفذته بعد):`,
-            `\`\`\`${prefix}pay ${payeeId ? `<@${payeeId}> ` : ''}${order.amount}\`\`\``,
+            `\`\`\`${payeeId ? (0, store_1.buildTransferCommand)(payeeId, order.amount) : 'غير متوفر'}\`\`\``,
             '',
             `> 💰 المبلغ **${(0, store_1.formatCredits)(order.amount)}** كريديت — يصل لصافي **${(0, store_1.formatCredits)(order.price)}** بعد خصم ProBot ${tax}%`,
             deliveredToSeller
