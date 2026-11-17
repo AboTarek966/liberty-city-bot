@@ -259,7 +259,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
           90000
         );
         if (!gif) {
-          logger.warn('wheel GIF render skipped (worker/timeout)');
+          logger.warn('wheel GIF render skipped (worker/timeout/canvas)');
           return;
         }
         if (game.phase === 'done') return;
@@ -267,14 +267,18 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
           .setColor(COLOR)
           .setTitle('🎡 العجلة وصلت!')
           .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+          .setImage('attachment://roulette.gif')
           .setFooter({ text: 'وقفت العجلة — الدور الجاي للّي اتشارد' })
           .setTimestamp();
-        await spinMessage
-          .edit({
+        try {
+          await spinMessage.edit({
             embeds: [arrivedEmbed],
             files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })],
-          })
-          .catch(() => {});
+          });
+          logger.info(`🎡 wheel GIF attached to spin message (${gif.length} bytes)`);
+        } catch (editErr: any) {
+          logger.warn(`🎡 wheel GIF edit failed: ${String(editErr?.message || editErr).slice(0, 200)}`);
+        }
       } catch (err: any) {
         logger.warn(`wheel render failed: ${err?.message || err}`);
       }

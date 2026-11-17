@@ -206,7 +206,7 @@ async function runRouletteRound(client, game) {
                     delayMs: 55,
                 }, 90000);
                 if (!gif) {
-                    logger.warn('wheel GIF render skipped (worker/timeout)');
+                    logger.warn('wheel GIF render skipped (worker/timeout/canvas)');
                     return;
                 }
                 if (game.phase === 'done')
@@ -215,14 +215,19 @@ async function runRouletteRound(client, game) {
                     .setColor(COLOR)
                     .setTitle('🎡 العجلة وصلت!')
                     .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+                    .setImage('attachment://roulette.gif')
                     .setFooter({ text: 'وقفت العجلة — الدور الجاي للّي اتشارد' })
                     .setTimestamp();
-                await spinMessage
-                    .edit({
-                    embeds: [arrivedEmbed],
-                    files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })],
-                })
-                    .catch(() => { });
+                try {
+                    await spinMessage.edit({
+                        embeds: [arrivedEmbed],
+                        files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })],
+                    });
+                    logger.info(`🎡 wheel GIF attached to spin message (${gif.length} bytes)`);
+                }
+                catch (editErr) {
+                    logger.warn(`🎡 wheel GIF edit failed: ${String(editErr?.message || editErr).slice(0, 200)}`);
+                }
             }
             catch (err) {
                 logger.warn(`wheel render failed: ${err?.message || err}`);
