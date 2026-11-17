@@ -65,11 +65,14 @@ export async function handleApplicationIntent(message: Message): Promise<boolean
     appCmd.uses = (appCmd.uses || 0) + 1;
     await (settings as any).save?.().catch(() => {});
 
-    const adminRoles: string[] =
-      (settings as any).tickets?.adminRoleIds?.length
-        ? (settings as any).tickets.adminRoleIds
-        : (settings as any).tickets?.supportRoleIds || [];
-    const mention = adminRoles.map((r: string) => `<@&${r}>`).join(' ');
+    const adminRoleIds: string[] = Array.isArray((settings as any).tickets?.adminRoleIds)
+      ? (settings as any).tickets.adminRoleIds
+      : [];
+    const supportRoleIds: string[] = Array.isArray((settings as any).tickets?.supportRoleIds)
+      ? (settings as any).tickets.supportRoleIds
+      : [];
+    const staffRoleIds = [...new Set([...adminRoleIds, ...supportRoleIds].filter(Boolean))];
+    const mention = staffRoleIds.map((r: string) => `<@&${r}>`).join(' ');
 
     const embed = new EmbedBuilder()
       .setTitle('📝 نموذج التقديم على الإدارة')
@@ -87,7 +90,7 @@ export async function handleApplicationIntent(message: Message): Promise<boolean
       .reply({
         content: mention ? `${mention} — ${isOwner ? 'وصل طلب تقديم جديد' : 'تم طلب نموذج التقديم'} 📥` : undefined,
         embeds: [embed],
-        allowedMentions: { roles: adminRoles },
+        allowedMentions: { roles: staffRoleIds },
       })
       .catch(() => {});
     logger.info(`📝 طلب/نموذج تقديم إدارة من ${message.author.tag} داخل تذكرة ${message.channel.id}`);

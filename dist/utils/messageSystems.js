@@ -66,10 +66,14 @@ async function handleApplicationIntent(message) {
             .replace(/\{server\}/g, message.guild.name);
         appCmd.uses = (appCmd.uses || 0) + 1;
         await settings.save?.().catch(() => { });
-        const adminRoles = settings.tickets?.adminRoleIds?.length
+        const adminRoleIds = Array.isArray(settings.tickets?.adminRoleIds)
             ? settings.tickets.adminRoleIds
-            : settings.tickets?.supportRoleIds || [];
-        const mention = adminRoles.map((r) => `<@&${r}>`).join(' ');
+            : [];
+        const supportRoleIds = Array.isArray(settings.tickets?.supportRoleIds)
+            ? settings.tickets.supportRoleIds
+            : [];
+        const staffRoleIds = [...new Set([...adminRoleIds, ...supportRoleIds].filter(Boolean))];
+        const mention = staffRoleIds.map((r) => `<@&${r}>`).join(' ');
         const embed = new discord_js_1.EmbedBuilder()
             .setTitle('📝 نموذج التقديم على الإدارة')
             .setColor(embeds_1.Colors.primary)
@@ -83,7 +87,7 @@ async function handleApplicationIntent(message) {
             .reply({
             content: mention ? `${mention} — ${isOwner ? 'وصل طلب تقديم جديد' : 'تم طلب نموذج التقديم'} 📥` : undefined,
             embeds: [embed],
-            allowedMentions: { roles: adminRoles },
+            allowedMentions: { roles: staffRoleIds },
         })
             .catch(() => { });
         logger.info(`📝 طلب/نموذج تقديم إدارة من ${message.author.tag} داخل تذكرة ${message.channel.id}`);
