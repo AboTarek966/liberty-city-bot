@@ -7,7 +7,7 @@
 
 import { GuildMember, TextChannel, ChannelType, EmbedBuilder } from 'discord.js';
 import { OmniClient } from '../OmniClient';
-import { createLogger } from '../utils/helpers';
+import { createLogger, mapWithConcurrency } from '../utils/helpers';
 import {
   getGuildSettings,
   MemberReturnRecord,
@@ -229,17 +229,18 @@ export class ReturnTrackerHandler {
           c.type === ChannelType.GuildVoice ||
           c.type === ChannelType.GuildCategory
       );
+      const channelList = [...channels.values()].filter((c: any) => c.id !== jailChannelId);
 
-      for (const channel of channels.values()) {
-        if ((channel as any).id === jailChannelId) continue;
-        await (channel as any).permissionOverwrites
+      // ⚡ إعادة السجن بالتزامن المحدود (10) — أسرع بكثير من التسلسل
+      await mapWithConcurrency(channelList, 10, async (channel: any) => {
+        await channel.permissionOverwrites
           .edit(
             member,
             { ViewChannel: false, SendMessages: false, Connect: false },
             { reason: 'Omni - إعادة سجن تلقائية' }
           )
           .catch(() => {});
-      }
+      });
 
       const jailChannel = jailChannelId ? guild.channels.cache.get(jailChannelId) : null;
       if (jailChannel) {

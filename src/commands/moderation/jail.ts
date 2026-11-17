@@ -16,7 +16,7 @@ import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings } from '../../models';
-import { createLogger } from '../../utils/helpers';
+import { createLogger, mapWithConcurrency } from '../../utils/helpers';
 
 const logger = createLogger('JailCommand');
 
@@ -195,23 +195,25 @@ const command: Command = {
       const allChannels = guild.channels.cache.filter(
         c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildCategory
       );
+      const channelList = [...allChannels.values()].filter(c => c.id !== targetJailChannel.id);
 
-      let failedChannels: string[] = [];
+      // ⚡ التعديل على القنوات بحد أقصى 10 استدعاءات متزامنة (نفس مفهوم ديسكورد — أسرع بكثير من التسلسل)
+      const denyResults = await mapWithConcurrency(channelList, 10, async (channel) => {
+        await channel.permissionOverwrites.edit(member as any, {
+          ViewChannel: false,
+          SendMessages: false,
+          Connect: false,
+        }, { reason: `سجن ${member.user.tag}` });
+      });
+
+      const failedChannels: string[] = [];
       let successCount = 0;
-
-      for (const channel of allChannels.values()) {
-        if (channel.id === targetJailChannel.id) continue;
-
-        try {
-          await channel.permissionOverwrites.edit(member, {
-            ViewChannel: false,
-            SendMessages: false,
-            Connect: false,
-          }, { reason: `سجن ${member.user.tag}` });
+      for (let i = 0; i < channelList.length; i++) {
+        if (denyResults[i].status === 'fulfilled') {
           successCount++;
-        } catch (e) {
-          failedChannels.push(`${channel.name} (${channel.id})`);
-          logger.warn(`Failed to set jail overwrite for ${channel.name}:`, e);
+        } else {
+          failedChannels.push(`${channelList[i].name} (${channelList[i].id})`);
+          logger.warn(`Failed to set jail overwrite for ${channelList[i].name}:`, (denyResults[i] as PromiseRejectedResult).reason);
         }
       }
 
@@ -232,22 +234,8 @@ const command: Command = {
         return;
       }
 
-      // محاولة تطبيق صلاحيات الرول أيضاً (احتياطي — إن لم يُحذف الرول من البوots)
-      try {
-        for (const channel of allChannels.values()) {
-          if (channel.id === targetJailChannel.id) continue;
-          await channel.permissionOverwrites.edit(jailRole, {
-            ViewChannel: false,
-            SendMessages: false,
-            Connect: false,
-          }, { reason: `سجن ${member.user.tag}` }).catch(() => {});
-        }
-        await targetJailChannel.permissionOverwrites.edit(jailRole, {
-          ViewChannel: true,
-          SendMessages: true,
-          ReadMessageHistory: true,
-        }, { reason: `سجن ${member.user.tag}` }).catch(() => {});
-      } catch {}
+      // ملاحظة: لا نضيف role overwrites تكرارية — member overwrites تغطي كل القنوات
+      // وهي الأقوى (حتى لو حذف NaZahaBot رول السجن) وتخلي الأمر أسرع بمرتين تقريباً
 
       // تسجيل القنوات التي فشلت (للتشخيص)
       if (failedChannels.length > 0) {

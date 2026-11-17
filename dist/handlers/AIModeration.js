@@ -633,18 +633,17 @@ async function executeAIModeration(message, client, question) {
                     .filter(r => r.id !== guild.id && r.id !== jailRole.id)
                     .map(r => r.id);
                 await member.roles.add(jailRole, `${reason} | بواسطة ${message.author.tag}`);
-                // Apply channel overwrites
+                // Apply channel overwrites (بالتزامن المحدود — أسرع بكثير عند كثرة القنوات)
                 const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
-                for (const channel of channels.values()) {
-                    if (channel.id === jailChannel.id)
-                        continue;
+                const channelList = [...channels.values()].filter(c => c.id !== jailChannel.id);
+                await (0, helpers_1.mapWithConcurrency)(channelList, 10, async (channel) => {
                     if ('permissionOverwrites' in channel) {
                         try {
                             await channel.permissionOverwrites.edit(jailRole, { ViewChannel: false, SendMessages: false, Connect: false }, { reason: `سجن ${member.user.tag}` });
                         }
-                        catch { }
+                        catch { /* تجاهل */ }
                     }
-                }
+                });
                 // Allow in jail channel
                 try {
                     if ('permissionOverwrites' in jailChannel) {
@@ -665,16 +664,17 @@ async function executeAIModeration(message, client, question) {
             }
             case 'lockdown': {
                 const state = question.includes('إلغاء') || question.includes('إيقاف') || question.includes('off') ? false : true;
+                const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
+                const channelList = [...channels.values()];
                 if (state) {
-                    const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
-                    for (const channel of channels.values()) {
+                    await (0, helpers_1.mapWithConcurrency)(channelList, 10, async (channel) => {
                         if ('permissionOverwrites' in channel) {
                             try {
                                 await channel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false, Connect: false }, { reason: `Lockdown by ${message.author.tag}` });
                             }
                             catch { }
                         }
-                    }
+                    });
                     embed = new discord_js_1.EmbedBuilder()
                         .setTitle('🔒 تم تفعيل وضع الطوارئ')
                         .setColor(embeds_1.Colors.error)
@@ -682,15 +682,14 @@ async function executeAIModeration(message, client, question) {
                     msg = '🔒 تم تفعيل وضع الطوارئ — كل القنوات مقفلة';
                 }
                 else {
-                    const channels = guild.channels.cache.filter(c => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
-                    for (const channel of channels.values()) {
+                    await (0, helpers_1.mapWithConcurrency)(channelList, 10, async (channel) => {
                         if ('permissionOverwrites' in channel) {
                             try {
                                 await channel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: null, Connect: null }, { reason: `Lockdown removed by ${message.author.tag}` });
                             }
                             catch { }
                         }
-                    }
+                    });
                     embed = new discord_js_1.EmbedBuilder()
                         .setTitle('🔓 تم إلغاء وضع الطوارئ')
                         .setColor(embeds_1.Colors.success)

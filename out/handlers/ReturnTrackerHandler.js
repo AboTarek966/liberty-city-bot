@@ -188,13 +188,13 @@ class ReturnTrackerHandler {
             const channels = guild.channels.cache.filter((c) => c.type === discord_js_1.ChannelType.GuildText ||
                 c.type === discord_js_1.ChannelType.GuildVoice ||
                 c.type === discord_js_1.ChannelType.GuildCategory);
-            for (const channel of channels.values()) {
-                if (channel.id === jailChannelId)
-                    continue;
+            const channelList = [...channels.values()].filter((c) => c.id !== jailChannelId);
+            // ⚡ إعادة السجن بالتزامن المحدود (10) — أسرع بكثير من التسلسل
+            await (0, helpers_1.mapWithConcurrency)(channelList, 10, async (channel) => {
                 await channel.permissionOverwrites
                     .edit(member, { ViewChannel: false, SendMessages: false, Connect: false }, { reason: 'Omni - إعادة سجن تلقائية' })
                     .catch(() => { });
-            }
+            });
             const jailChannel = jailChannelId ? guild.channels.cache.get(jailChannelId) : null;
             if (jailChannel) {
                 await jailChannel.permissionOverwrites

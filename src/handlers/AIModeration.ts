@@ -9,7 +9,7 @@
 
 import { Message, Guild, GuildMember, User, PermissionFlagsBits, EmbedBuilder, ChannelType, TextChannel, ColorResolvable } from 'discord.js';
 import { OmniClient } from '../OmniClient';
-import { createLogger } from '../utils/helpers';
+import { createLogger, mapWithConcurrency } from '../utils/helpers';
 import { getGuildSettings } from '../models';
 import { Colors } from '../utils/embeds';
 import { canManageTarget } from '../utils/rolePicker';
@@ -699,16 +699,16 @@ export async function executeAIModeration(
         
         await member.roles.add(jailRole, `${reason} | بواسطة ${message.author.tag}`);
         
-        // Apply channel overwrites
+        // Apply channel overwrites (بالتزامن المحدود — أسرع بكثير عند كثرة القنوات)
         const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
-        for (const channel of channels.values()) {
-          if (channel.id === jailChannel.id) continue;
+        const channelList = [...channels.values()].filter(c => c.id !== jailChannel.id);
+        await mapWithConcurrency(channelList, 10, async (channel) => {
           if ('permissionOverwrites' in channel) {
             try {
               await channel.permissionOverwrites.edit(jailRole, { ViewChannel: false, SendMessages: false, Connect: false }, { reason: `سجن ${member.user.tag}` });
-            } catch {}
+            } catch { /* تجاهل */ }
           }
-        }
+        });
         
         // Allow in jail channel
         try {
@@ -740,29 +740,29 @@ export async function executeAIModeration(
       case 'lockdown': {
         const state = question.includes('إلغاء') || question.includes('إيقاف') || question.includes('off') ? false : true;
         
+        const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
+        const channelList = [...channels.values()];
         if (state) {
-          const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
-          for (const channel of channels.values()) {
+          await mapWithConcurrency(channelList, 10, async (channel) => {
             if ('permissionOverwrites' in channel) {
               try {
                 await channel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false, Connect: false }, { reason: `Lockdown by ${message.author.tag}` });
               } catch {}
             }
-          }
+          });
           embed = new EmbedBuilder()
             .setTitle('🔒 تم تفعيل وضع الطوارئ')
             .setColor(Colors.error)
             .setDescription('تم قفل جميع القنوات — لا يستطيع الأعضاء إرسال رسائل أو دخول الغرف الصوتية');
           msg = '🔒 تم تفعيل وضع الطوارئ — كل القنوات مقفلة';
         } else {
-          const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice);
-          for (const channel of channels.values()) {
+          await mapWithConcurrency(channelList, 10, async (channel) => {
             if ('permissionOverwrites' in channel) {
               try {
                 await channel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: null, Connect: null }, { reason: `Lockdown removed by ${message.author.tag}` });
               } catch {}
             }
-          }
+          });
           embed = new EmbedBuilder()
             .setTitle('🔓 تم إلغاء وضع الطوارئ')
             .setColor(Colors.success)

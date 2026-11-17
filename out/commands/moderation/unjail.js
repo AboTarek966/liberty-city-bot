@@ -38,9 +38,10 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
-const embeds_1 = require("../../utils/embeds");
 const helpers_1 = require("../../utils/helpers");
-const logger = (0, helpers_1.createLogger)('UnjailCommand');
+const embeds_1 = require("../../utils/embeds");
+const helpers_2 = require("../../utils/helpers");
+const logger = (0, helpers_2.createLogger)('UnjailCommand');
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('unjail')
@@ -103,30 +104,30 @@ const command = {
             // هذه هي الصلاحيات الأساسية التي تمنع العضو من رؤية الرومات
             const { ChannelType } = await Promise.resolve().then(() => __importStar(require('discord.js')));
             const allChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildCategory);
-            let removedOverwrites = 0;
-            for (const channel of allChannels.values()) {
+            const channelList = [...allChannels.values()];
+            // ⚡ حذف member overwrites لكل القنوات بالتزامن المحدود (10) — أسرع بكثير من التسلسل
+            await (0, helpers_1.mapWithConcurrency)(channelList, 10, async (channel) => {
                 try {
                     if (channel.permissionOverwrites?.cache?.has(member.id)) {
                         await channel.permissionOverwrites.delete(member, reason).catch(() => { });
-                        removedOverwrites++;
                     }
                 }
-                catch { }
-            }
+                catch { /* تجاهل */ }
+            });
             // حذف صلاحيات رول السجن أيضاً (إن بقيت)
             if (jailRole) {
-                for (const channel of allChannels.values()) {
+                await (0, helpers_1.mapWithConcurrency)(channelList, 10, async (channel) => {
                     try {
                         if (channel.permissionOverwrites?.cache?.has(jailRole.id)) {
                             await channel.permissionOverwrites.delete(jailRole, reason).catch(() => { });
                         }
                     }
-                    catch { }
-                }
+                    catch { /* تجاهل */ }
+                });
             }
-            // استعادة الرولات السابقة
+            // استعادة الرولات السابقة (بالتزامن المحدود — أسرع عند كثرة الرولات)
             const previousRoles = jailData.previousRoles || [];
-            for (const roleId of previousRoles) {
+            await (0, helpers_1.mapWithConcurrency)(previousRoles, 10, async (roleId) => {
                 const role = guild.roles.cache.get(roleId);
                 if (role && !member.roles.cache.has(roleId)) {
                     try {
@@ -134,7 +135,7 @@ const command = {
                     }
                     catch { }
                 }
-            }
+            });
             // تنظيف بيانات السجن
             await JailData.findOneAndDelete({ guildId: guild.id, userId: member.id });
             // الرد — رسالة نصية بسيطة

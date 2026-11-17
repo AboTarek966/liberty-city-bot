@@ -138,6 +138,39 @@ export function roundTo(num: number, decimals: number): number {
 }
 
 // --------------------------------------------
+// Concurrency Helpers
+// --------------------------------------------
+/**
+ * تنفيذ عمليات مصفوفة بحد أقصى من التزامن — يحافظ على ترتيب النتائج
+ * (Promise.allSettled لكل عنصر) بدون كسر معدل ديسكورد للطلبات.
+ * تستدعي كل عنصر بالدالة { item, index } وترجع مصفوفة نتائج settled.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<Array<PromiseSettledResult<R>>> {
+  const results: Array<PromiseSettledResult<R>> = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, limit), items.length) },
+    async () => {
+      while (true) {
+        const index = cursor++;
+        if (index >= items.length) return;
+        try {
+          results[index] = { status: 'fulfilled', value: await fn(items[index], index) };
+        } catch (reason) {
+          results[index] = { status: 'rejected', reason };
+        }
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+// --------------------------------------------
 // Array Helpers
 // --------------------------------------------
 export function chunkArray<T>(array: T[], size: number): T[][] {

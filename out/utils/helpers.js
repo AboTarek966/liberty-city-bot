@@ -21,6 +21,7 @@ exports.formatNumber = formatNumber;
 exports.randomInt = randomInt;
 exports.clamp = clamp;
 exports.roundTo = roundTo;
+exports.mapWithConcurrency = mapWithConcurrency;
 exports.chunkArray = chunkArray;
 exports.shuffleArray = shuffleArray;
 exports.uniqueArray = uniqueArray;
@@ -182,6 +183,33 @@ function clamp(num, min, max) {
 function roundTo(num, decimals) {
     const factor = Math.pow(10, decimals);
     return Math.round(num * factor) / factor;
+}
+// --------------------------------------------
+// Concurrency Helpers
+// --------------------------------------------
+/**
+ * تنفيذ عمليات مصفوفة بحد أقصى من التزامن — يحافظ على ترتيب النتائج
+ * (Promise.allSettled لكل عنصر) بدون كسر معدل ديسكورد للطلبات.
+ * تستدعي كل عنصر بالدالة { item, index } وترجع مصفوفة نتائج settled.
+ */
+async function mapWithConcurrency(items, limit, fn) {
+    const results = new Array(items.length);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(Math.max(1, limit), items.length) }, async () => {
+        while (true) {
+            const index = cursor++;
+            if (index >= items.length)
+                return;
+            try {
+                results[index] = { status: 'fulfilled', value: await fn(items[index], index) };
+            }
+            catch (reason) {
+                results[index] = { status: 'rejected', reason };
+            }
+        }
+    });
+    await Promise.all(workers);
+    return results;
 }
 // --------------------------------------------
 // Array Helpers

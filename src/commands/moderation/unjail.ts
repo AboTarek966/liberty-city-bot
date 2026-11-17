@@ -12,6 +12,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { getGuildSettings } from '../../models';
+import { mapWithConcurrency } from '../../utils/helpers';
 import { Colors } from '../../utils/embeds';
 import { createLogger } from '../../utils/helpers';
 
@@ -98,36 +99,38 @@ const command: Command = {
       const allChannels = guild.channels.cache.filter(
         c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildCategory
       );
-      let removedOverwrites = 0;
-      for (const channel of allChannels.values()) {
+      const channelList = [...allChannels.values()];
+
+      // ⚡ حذف member overwrites لكل القنوات بالتزامن المحدود (10) — أسرع بكثير من التسلسل
+      await mapWithConcurrency(channelList, 10, async (channel) => {
         try {
           if ((channel as any).permissionOverwrites?.cache?.has(member.id)) {
             await (channel as any).permissionOverwrites.delete(member, reason).catch(() => {});
-            removedOverwrites++;
           }
-        } catch {}
-      }
+        } catch { /* تجاهل */ }
+      });
+
       // حذف صلاحيات رول السجن أيضاً (إن بقيت)
       if (jailRole) {
-        for (const channel of allChannels.values()) {
+        await mapWithConcurrency(channelList, 10, async (channel) => {
           try {
             if ((channel as any).permissionOverwrites?.cache?.has(jailRole.id)) {
               await (channel as any).permissionOverwrites.delete(jailRole, reason).catch(() => {});
             }
-          } catch {}
-        }
+          } catch { /* تجاهل */ }
+        });
       }
 
-      // استعادة الرولات السابقة
+      // استعادة الرولات السابقة (بالتزامن المحدود — أسرع عند كثرة الرولات)
       const previousRoles = jailData.previousRoles || [];
-      for (const roleId of previousRoles) {
+      await mapWithConcurrency(previousRoles, 10, async (roleId) => {
         const role = guild.roles.cache.get(roleId);
         if (role && !member.roles.cache.has(roleId)) {
           try {
             await member.roles.add(role, reason);
           } catch {}
         }
-      }
+      });
 
       // تنظيف بيانات السجن
       await JailData.findOneAndDelete({ guildId: guild.id, userId: member.id });
