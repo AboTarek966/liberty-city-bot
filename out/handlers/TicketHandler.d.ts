@@ -85,7 +85,7 @@ export declare class TicketHandler {
     constructor(client: OmniClient);
     /** 🛡️ هل العضو من فريق الدعم/الإدارة؟ (إغلاق/حذف التذاكر مقصور عليهم) */
     isStaff(member: GuildMember): Promise<boolean>;
-    buildTicketControls(claimed: boolean, claimedByBot?: boolean): ActionRowBuilder<any>[];
+    buildTicketControls(claimed: boolean, claimedByBot?: boolean, buyEnabled?: boolean): ActionRowBuilder<any>[];
     /** 🔒 يُنادى عند حذف قناة — لو كانت قناة تذكرة نُحدّها «خصافة محذوفة» حتى ما تحتسب مستقبلاً */
     cleanupTicketByDeletedChannel(channelId: string, guildId?: string): Promise<void>;
     createTicketCategory(guild: Guild, name: string): Promise<CategoryChannel>;

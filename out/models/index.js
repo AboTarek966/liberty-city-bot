@@ -382,6 +382,7 @@ const GuildSettingsSchema = new mongoose_1.Schema({
         adminRoleIds: { type: [String], default: [] },
         lockUntilClaim: { type: Boolean, default: false },
         welcomeEnabled: { type: Boolean, default: false },
+        buyButtonEnabled: { type: Boolean, default: false },
         welcomeMessage: { type: String },
         claimStats: { type: Map, of: Number, default: {} },
         claimLog: {

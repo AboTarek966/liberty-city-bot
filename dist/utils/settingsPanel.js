@@ -879,6 +879,7 @@ function buildTickets(guild, s) {
         `> 🏷️ **أنواع التذاكر** (اسم الخيار = اسم قناة التذكرة):\n${typesLine}\n` +
         `> 🎫 **رسالة الترحيب:** ${on(t.welcomeEnabled)} ${t.welcomeEnabled ? 'تُرسل عند فتح التذكرة' : 'معطّلة (أزرار فقط)'}\n` +
         `> ✏️ **نص الترحيب:** ${t.welcomeMessage ? 'مخصص (زر ✏️ للتعديل)' : 'الافتراضي (زر ✏️ للتعديل)'}\n` +
+        `> 🛒 **زر الشراء للعضو:** ${on(t.buyButtonEnabled)} ${t.buyButtonEnabled ? 'يظهر لصاحب التذكرة — والرسالة تظهر للكل' : 'معطّل'}\n` +
         `> 🔒 **قفل حتى الاستلام:** ${on(t.lockUntilClaim)} ${t.lockUntilClaim ? 'صاحب التذكرة لا يكتب حتى يستلمها إداري' : 'صاحب التذكرة يكتب مباشرة'}\n` +
         `> ⏳ **الإغلاق التلقائي:** ${t.autoCloseHours > 0 ? `\`${t.autoCloseHours}\` ساعة بدون نشاط` : '🔴 معطّل'} *(اضبطه: \`/ticket idle\`)*\n` +
         `> ⭐ **استبيان الرضا:** ${on(t.surveyEnabled)} ${t.surveyEnabled ? 'يُرسل لصاحب التذكرة بعد الإغلاق' : 'معطّل'}\n\n` +
@@ -916,7 +917,7 @@ function buildTickets(guild, s) {
         confidenceThreshold: 70,
         notifyAdminsOnFailure: true
     };
-    const rowAITicket = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:tickets:ai', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_btn:tickets:types', 'أنواع التذاكر', discord_js_1.ButtonStyle.Primary, '🏷️'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
+    const rowAITicket = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:tickets:ai', `🤖 AI: ${aiTicket.enabled ? '🟢' : '🔴'}`, aiTicket.enabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🤖'), btn('settings_btn:tickets:types', 'أنواع التذاكر', discord_js_1.ButtonStyle.Primary, '🏷️'), btn('settings_tog:tickets:buy', `شراء: ${t.buyButtonEnabled ? '🟢' : '🔴'}`, t.buyButtonEnabled ? discord_js_1.ButtonStyle.Success : discord_js_1.ButtonStyle.Secondary, '🛒'), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '↩️'));
     return { embeds: [embed], components: [categorySelect, logSelect, roleSelect, rowBtns, rowAITicket] };
 }
 // --------------------------------------------

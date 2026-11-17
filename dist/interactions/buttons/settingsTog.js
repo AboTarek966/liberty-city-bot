@@ -298,6 +298,10 @@ const handler = {
                     settings.tickets.welcomeEnabled = !settings.tickets.welcomeEnabled;
                     break;
                 }
+                if (field === 'buy') {
+                    settings.tickets.buyButtonEnabled = !settings.tickets.buyButtonEnabled;
+                    break;
+                }
                 // 🤖 AI Ticket Assistant toggles
                 // ملاحظة: الـ schema يحفظ aiTicketAssistant داخل protection (وليس الجذر)
                 const prot0 = settings.protection;
@@ -432,6 +436,30 @@ const handler = {
             if (!settings.protection.aiAutoMod) {
                 settings.protection.aiAutoMod = { enabled: true };
                 await settings.save();
+            }
+        }
+        // 🛒 عند تبديل زر الشراء — حدّث أزرار التذاكر المفتوحة فوراً (يظهر/يختفي الزر بدون فتح تذكرة جديدة)
+        if (section === 'tickets' && field === 'buy') {
+            try {
+                const client = interaction.client;
+                const open = await models_1.Ticket.find({
+                    guildId: interaction.guild.id,
+                    status: { $in: ['open', 'claimed', 'waiting'] },
+                })
+                    .select('channelId status claimedBy')
+                    .limit(25)
+                    .lean();
+                for (const t of open) {
+                    const ch = interaction.guild.channels.cache.get(t.channelId);
+                    if (!ch?.isTextBased?.())
+                        continue;
+                    const claimed = !!t.claimedBy;
+                    const botClaim = claimed && t.claimedBy === client.user?.id;
+                    await client.ticketHandler?.updateTicketButtons(ch, claimed, botClaim).catch(() => { });
+                }
+            }
+            catch {
+                /* تجاهل — التذاكر الجديدة هي اللي هتستفيد من الزر */
             }
         }
         if (section === 'welcome' && field === 'card') {

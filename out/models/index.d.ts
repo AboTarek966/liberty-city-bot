@@ -273,6 +273,8 @@ export interface IGuildSettings extends Document {
         lockUntilClaim: boolean;
         /** 🎫 إرسال رسالة الترحيب داخل التذكرة (الزرار والخيارات) */
         welcomeEnabled: boolean;
+        /** 🛒 زر «شراء بروجيكت» داخل التذكرة — يظهر للعضو صاحب التذكرة، والرسالة تظهر للكل */
+        buyButtonEnabled: boolean;
         /** ✏️ نص رسالة الترحيب المخصص — يدعم {user} {ticket} {type} {server} */
         welcomeMessage?: string;
         /** 📊 إحصائيات استلام التذاكر لكل إداري (userId → عدد التذاكر المستلمة) */

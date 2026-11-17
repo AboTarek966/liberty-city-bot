@@ -110,7 +110,7 @@ class TicketHandler {
     // بناء عناصر التحكم داخل التذكرة:
     // قائمة خيارات (Options) + زر استلام سريع
     // --------------------------------------------
-    buildTicketControls(claimed, claimedByBot = false) {
+    buildTicketControls(claimed, claimedByBot = false, buyEnabled = false) {
         const claimOptions = [];
         if (!claimed) {
             claimOptions.push({
@@ -208,7 +208,16 @@ class TicketHandler {
                 .setStyle(discord_js_1.ButtonStyle.Danger)
                 .setEmoji('↩️'));
         }
-        return [selectRow, claimRow];
+        // 🛒 زر الشراء — يظهر لو الأدمن فعّله من إعدادات التذاكر
+        const buyRow = [];
+        if (buyEnabled) {
+            buyRow.push(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+                .setCustomId('ticket_buy')
+                .setLabel('شراء بروجيكت')
+                .setStyle(discord_js_1.ButtonStyle.Success)
+                .setEmoji('🛒')));
+        }
+        return [selectRow, claimRow, ...buyRow];
     }
     // --------------------------------------------
     // Create Ticket Category
@@ -423,6 +432,8 @@ class TicketHandler {
         const pingContent = supportRoles.length > 0
             ? supportRoles.map(r => `<@&${r.id}>`).join(' ')
             : user.toString();
+        // 🛒 هل زر الشراء مفعّل للتذاكر؟
+        const ticketBuyEnabled = settings.tickets?.buyButtonEnabled === true;
         // 🎫 رسالة الترحيب — يمكن تفعيلها/تعطيلها من الإعدادات (الافتراضي: معطّلة)
         if (settings.tickets.welcomeEnabled) {
             const template = (settings.tickets.welcomeMessage || '').trim() || ticketMessages_1.DEFAULT_TICKET_WELCOME_MESSAGE;
@@ -436,14 +447,14 @@ class TicketHandler {
             const safeWelcome = welcomeMessage.slice(0, Math.max(0, 1990 - pingContent.length));
             await channel.send({
                 content: `${pingContent}\n\n${safeWelcome}`.trimEnd(),
-                components: this.buildTicketControls(false),
+                components: this.buildTicketControls(false, false, ticketBuyEnabled),
             });
         }
         else {
             // بدون رسالة ترحيب — أرسل فقط أزرار التحكم
             await channel.send({
                 content: pingContent,
-                components: this.buildTicketControls(false),
+                components: this.buildTicketControls(false, false, ticketBuyEnabled),
             });
         }
         // 🤖 AI Ticket Assistant — استلام/تحليل التذكرة تلقائياً
@@ -1068,11 +1079,13 @@ class TicketHandler {
     // --------------------------------------------
     async updateTicketButtons(channel, claimed, claimedByBot = false) {
         try {
+            const settingsNow = await (0, models_1.getGuildSettings)(channel.guild.id).catch(() => null);
+            const buyEnabled = settingsNow?.tickets?.buyButtonEnabled === true;
             const messages = await channel.messages.fetch({ limit: 10 });
             // Find the last message with components (the ticket action message)
             const actionMessage = messages.find(m => m.components.length > 0 && m.author.id === this.client.user.id);
             if (actionMessage) {
-                await actionMessage.edit({ components: this.buildTicketControls(claimed, claimedByBot) });
+                await actionMessage.edit({ components: this.buildTicketControls(claimed, claimedByBot, buyEnabled) });
             }
         }
         catch (error) {

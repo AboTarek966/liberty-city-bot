@@ -5,7 +5,7 @@
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { buildPanel, checkSettingsAccess, buildSettingsPasswordModal, buildVerificationPanel, buildShop, sendWelcomeCardPanel, buildTicketAIPanel, buildProtectionChannelOverridePanel, SettingsCategory } from '../../utils/settingsPanel';
-import { getGuildSettings, invalidateGuildSettings, AIConfig } from '../../models';
+import { getGuildSettings, invalidateGuildSettings, AIConfig, Ticket } from '../../models';
 import { OmniClient } from '../../OmniClient';
 import { setLockdown } from '../../utils/lockdown';
 import { gateProtectionOff } from '../../utils/ownerApproval';
@@ -295,6 +295,10 @@ const handler: ButtonHandler = {
           settings.tickets.welcomeEnabled = !settings.tickets.welcomeEnabled;
           break;
         }
+        if (field === 'buy') {
+          settings.tickets.buyButtonEnabled = !(settings.tickets as any).buyButtonEnabled;
+          break;
+        }
         // 🤖 AI Ticket Assistant toggles
         // ملاحظة: الـ schema يحفظ aiTicketAssistant داخل protection (وليس الجذر)
         const prot0 = (settings as any).protection;
@@ -424,6 +428,29 @@ const handler: ButtonHandler = {
       if (!(settings.protection as any).aiAutoMod) {
         (settings.protection as any).aiAutoMod = { enabled: true };
         await settings.save();
+      }
+    }
+
+    // 🛒 عند تبديل زر الشراء — حدّث أزرار التذاكر المفتوحة فوراً (يظهر/يختفي الزر بدون فتح تذكرة جديدة)
+    if (section === 'tickets' && field === 'buy') {
+      try {
+        const client = interaction.client as any;
+        const open = await Ticket.find({
+          guildId: interaction.guild.id,
+          status: { $in: ['open', 'claimed', 'waiting'] },
+        })
+          .select('channelId status claimedBy')
+          .limit(25)
+          .lean();
+        for (const t of open as any[]) {
+          const ch = interaction.guild.channels.cache.get(t.channelId) as any;
+          if (!ch?.isTextBased?.()) continue;
+          const claimed = !!t.claimedBy;
+          const botClaim = claimed && t.claimedBy === client.user?.id;
+          await client.ticketHandler?.updateTicketButtons(ch, claimed, botClaim).catch(() => {});
+        }
+      } catch {
+        /* تجاهل — التذاكر الجديدة هي اللي هتستفيد من الزر */
       }
     }
 

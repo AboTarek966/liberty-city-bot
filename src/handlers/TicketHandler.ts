@@ -198,7 +198,7 @@ export class TicketHandler {
   // بناء عناصر التحكم داخل التذكرة:
   // قائمة خيارات (Options) + زر استلام سريع
   // --------------------------------------------
-  buildTicketControls(claimed: boolean, claimedByBot: boolean = false): ActionRowBuilder<any>[] {
+  buildTicketControls(claimed: boolean, claimedByBot: boolean = false, buyEnabled: boolean = false): ActionRowBuilder<any>[] {
     const claimOptions: Array<{ label: string; value: string; description: string; emoji: string }> = [];
     if (!claimed) {
       claimOptions.push({
@@ -305,7 +305,21 @@ export class TicketHandler {
       );
     }
 
-    return [selectRow, claimRow];
+    // 🛒 زر الشراء — يظهر لو الأدمن فعّله من إعدادات التذاكر
+    const buyRow: ActionRowBuilder<ButtonBuilder>[] = [];
+    if (buyEnabled) {
+      buyRow.push(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId('ticket_buy')
+            .setLabel('شراء بروجيكت')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🛒')
+        )
+      );
+    }
+
+    return [selectRow, claimRow, ...buyRow];
   }
 
   // --------------------------------------------
@@ -548,6 +562,9 @@ export class TicketHandler {
       ? supportRoles.map(r => `<@&${r.id}>`).join(' ')
       : user.toString();
 
+    // 🛒 هل زر الشراء مفعّل للتذاكر؟
+    const ticketBuyEnabled = (settings.tickets as any)?.buyButtonEnabled === true;
+
     // 🎫 رسالة الترحيب — يمكن تفعيلها/تعطيلها من الإعدادات (الافتراضي: معطّلة)
     if (settings.tickets.welcomeEnabled) {
       const template =
@@ -563,13 +580,13 @@ export class TicketHandler {
 
       await channel.send({
         content: `${pingContent}\n\n${safeWelcome}`.trimEnd(),
-        components: this.buildTicketControls(false),
+        components: this.buildTicketControls(false, false, ticketBuyEnabled),
       });
     } else {
       // بدون رسالة ترحيب — أرسل فقط أزرار التحكم
       await channel.send({
         content: pingContent,
-        components: this.buildTicketControls(false),
+        components: this.buildTicketControls(false, false, ticketBuyEnabled),
       });
     }
 
@@ -1348,6 +1365,8 @@ export class TicketHandler {
   // --------------------------------------------
   async updateTicketButtons(channel: TextChannel, claimed: boolean, claimedByBot: boolean = false): Promise<void> {
     try {
+      const settingsNow = await getGuildSettings(channel.guild.id).catch(() => null);
+      const buyEnabled = (settingsNow as any)?.tickets?.buyButtonEnabled === true;
       const messages = await channel.messages.fetch({ limit: 10 });
       // Find the last message with components (the ticket action message)
       const actionMessage = messages.find(
@@ -1355,7 +1374,7 @@ export class TicketHandler {
       );
 
       if (actionMessage) {
-        await actionMessage.edit({ components: this.buildTicketControls(claimed, claimedByBot) });
+        await actionMessage.edit({ components: this.buildTicketControls(claimed, claimedByBot, buyEnabled) });
       }
     } catch (error) {
       logger.warn('Failed to update ticket buttons:', error);
