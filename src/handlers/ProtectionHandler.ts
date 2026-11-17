@@ -439,8 +439,18 @@ export class ProtectionHandler {
   // --------------------------------------------
   // Anti-Explicit (محظور: اباحي) — حظر فوري بدون نظام التحذير
   // --------------------------------------------
-  /** قائمة صارمة عمداً — كل الكلمات هنا إباحية/صريحة، بدون أي كلمة عربية بريئة تطابق كـ substring */
-  private static readonly EXPLICIT_RE = /(?:اباحي|اباحية|اباحيات|سكس|نيك|ككس|كس|بظر|hentai|pornhub|xvideos|xnxx|xhamster|redtube|youporn|eporner|chaturbate|livejasmin|stripchat|rule34|nhentai|\.(?:xxx|porn|sex|adult|hentai)(?:[\/?#\s]|$))/i;
+  /** كلمات إباحية/صريحة صريحة — مطابقة على مستوى الكلمة كاملة (لا تلتقط "كس" داخل "روبلوكس") */
+  private static readonly EXPLICIT_WORDS = [
+    // عربي
+    'اباحي', 'اباحية', 'اباحيات',
+    'سكس', 'ككس', 'كس', 'نيك', 'بظر',
+    // إنجليزي
+    'hentai', 'pornhub', 'xvideos', 'xnxx', 'xhamster', 'redtube', 'youporn',
+    'eporner', 'chaturbate', 'livejasmin', 'stripchat', 'rule34', 'nhentai',
+  ];
+  /** نطاقات إباحية صريحة — اللاحقة وحدها تكفي هنا */
+  private static readonly EXPLICIT_DOMAIN_RE =
+    /(?:^|[\s./?#])(?:[a-z0-9-]+\.)*(?:xxx|porn|sex|adult|hentai)(?:[\/?#\s]|$)/i;
 
   private async checkAntiExplicit(message: Message, settings: any): Promise<ProtectionAction | null> {
     const cfg = settings?.protection?.antiExplicit;
@@ -461,7 +471,9 @@ export class ProtectionHandler {
       .toLowerCase();
 
     const hay = `${content} ${embedText} ${attachmentText}`;
-    if (!ProtectionHandler.EXPLICIT_RE.test(hay)) return null;
+    // فحص كلمات صريحة بحدود الكلمة (لا تلتقط لواحق بريئة) + نطاقات إباحية صريحة
+    const explicitWord = findBadWord(hay, ProtectionHandler.EXPLICIT_WORDS);
+    if (!explicitWord && !ProtectionHandler.EXPLICIT_DOMAIN_RE.test(hay)) return null;
 
     return {
       type: (cfg.action ?? 'ban') as ProtectionAction['type'],

@@ -27,8 +27,10 @@ export declare class ProtectionHandler {
     private checkAntiEmoji;
     private checkAutoMod;
     private checkZalgo;
-    /** قائمة صارمة عمداً — كل الكلمات هنا إباحية/صريحة، بدون أي كلمة عربية بريئة تطابق كـ substring */
-    private static readonly EXPLICIT_RE;
+    /** كلمات إباحية/صريحة صريحة — مطابقة على مستوى الكلمة كاملة (لا تلتقط "كس" داخل "روبلوكس") */
+    private static readonly EXPLICIT_WORDS;
+    /** نطاقات إباحية صريحة — اللاحقة وحدها تكفي هنا */
+    private static readonly EXPLICIT_DOMAIN_RE;
     private checkAntiExplicit;
     private executeAction;
     private executeUserAction;
