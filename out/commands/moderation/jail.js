@@ -110,7 +110,7 @@ const command = {
                 }
             }
             if (!targetJailChannel) {
-                await interaction.editReply({ content: '❌ لم يتم تحديد روم السجن. استخدم الخيار `jail_channel` أو أضف روم سجن في الإعدادات (`/settings` → الترحيب/السجن)' });
+                await interaction.editReply({ content: '❌ لم يتم تحديد روم السجن. استخدم الخيار `jail_channel` أو حدّده في الإعدادات (`/settings` → 🛡️ الحماية → «🎯 القنوات والسجن»)' });
                 return;
             }
             // التحقق من أن البوت يستطيع إدارة روم السجن

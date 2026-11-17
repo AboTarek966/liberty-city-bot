@@ -386,12 +386,13 @@ function buildProtection(guild, s) {
         `> ${on(s.honeypot?.enabled)} **قناة الطعم 🍯** — أي رسالة فيها = عقوبة فورية (\`/honeypot\`)\n` +
         `> ${on(p.ownerApproval !== false)} **موافقة المالك 👑 عند الإطفاء** — إطفاء أي حماية يحتاج نقرة مالك السيرفر (التاج)\n` +
         `> ${on(p.antiBotAbuse?.enabled)} **مكافحة الإساءة للبوت 🤖** — حذف + تحذير ← سحب كل الرولات القابلة للإزالة ← حظر\n` +
-        `> ${on(p.punishmentTracker?.enabled !== false)} **تتبع العقوبات 🔄** — يمنع تجاوز العقوبات بالمغادرة والعودة (يُعيد السجن/الكتم تلقائياً)\n\n` +
+        `> ${on(p.punishmentTracker?.enabled !== false)} **تتبع العقوبات 🔄** — يمنع تجاوز العقوبات بالمغادرة والعودة (يُعيد السجن/الكتم تلقائياً)\n` +
+        `> ${on(s.jail?.channelId)} **🔒 روم السجن** — ${s.jail?.channelId ? `<#${s.jail.channelId}>` : 'غير محدد'} — العضو المسجون يشوف هذا الروم فقط (تحديده من «🎯 القنوات والسجن»)\n\n` +
         `⚙️ *إعدادات متقدمة (Anti-Alt, Invite Tracker, Scanner, AI):* \`/protection\` • \`/backup\``);
     const row1 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiRaid', 'رويد', '🛡️', p.antiRaid.enabled), toggleBtn('protection', 'antiSpam', 'سبام', '🚫', p.antiSpam.enabled), toggleBtn('protection', 'antiLink', 'روابط', '🔗', p.antiLink.enabled), toggleBtn('protection', 'antiInvite', 'دعوات', '📨', p.antiInvite.enabled), toggleBtn('protection', 'antiExplicit', 'إباحي', '🔞', !!p.antiExplicit?.enabled));
     const row2 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiMention', 'منشنز', '📣', p.antiMention.enabled), toggleBtn('protection', 'antiCaps', 'كابس', '🔠', p.antiCaps.enabled), toggleBtn('protection', 'antiEmoji', 'إيموجي', '😀', p.antiEmoji.enabled), toggleBtn('protection', 'punishmentTracker', 'تتبع العقوبات', '🔄', !!p.punishmentTracker?.enabled), btn('settings_cat:home', 'رجوع', discord_js_1.ButtonStyle.Secondary, '🏠'));
     const row3 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'antiNuke', 'أنتينوك', '💣', !!p.antiNuke?.enabled), toggleBtn('protection', 'antiBot', 'مضاد البوتات', '🤖', !!p.antiBot?.enabled), toggleBtn('protection', 'antiAdmin', 'مراقبة أدمن', '⚠️', !!p.antiAdmin?.enabled), toggleBtn('protection', 'autoBackup', 'نسخ تلقائي', '💾', !!p.autoBackup?.enabled), toggleBtn('protection', 'antiBotAbuse', 'مكافحة الإساءة للبوت', '🚫', !!p.antiBotAbuse?.enabled));
-    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true), btn('settings_btn:protection:channels', 'قنوات الحماية', discord_js_1.ButtonStyle.Primary, '🎯'), toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false));
+    const row4 = new discord_js_1.ActionRowBuilder().addComponents(toggleBtn('protection', 'lockdown', p.lockdown ? 'إلغاء الطوارئ' : 'وضع الطوارئ', p.lockdown ? '🔓' : '🔒', !!p.lockdown), toggleBtn('protection', 'ownerApproval', 'موافقة المالك', '👑', p.ownerApproval !== false), toggleBtn('protection', 'silentAlerts', 'الإشعارات الأمنية', '🔔', p.silentSecurityAlerts !== true), btn('settings_btn:protection:channels', 'القنوات والسجن', discord_js_1.ButtonStyle.Primary, '🎯'), toggleBtn('protection', 'blocknames', 'مسح الاسم المشبوه', '☢️', p.blockMaliciousNames !== false));
     // Row 5: Protection log channel selection
     const protectionLogChannelSelect = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:protection:logChannel')
@@ -1581,10 +1582,13 @@ function buildProtectionChannelsPanel(guild, s) {
         })
             .join('\n')
         : '> لا توجد استثناءات خاصة — الحماية مفعّلة في كل القنوات';
+    const jailId = s.jail?.channelId ? String(s.jail.channelId) : null;
+    const jailMention = jailId && guild.channels.cache.get(jailId) ? `<#${jailId}>` : jailId ? `\`${jailId}\`` : 'غير محدد';
     const embed = categoryEmbed('protection', guild, `تحكّم دقيق في الحماية لكل قناة على حدة\n\n` +
         `**🙈 قنوات مستثناة من كل الحماية:**\n> ${ignoredText}\n\n` +
         `**🎯 استثناءات لكل قناة:**\n${overrideLines}\n\n` +
-        `اختر قناة من القائمة لإدارة الحمايات المعطّلة داخلها فقط.`);
+        `**🔒 روم السجن المحفوظ:**\n> ${jailMention} — يستخدم تلقائياً في \`/jail\` وفي سجن الـ AI حتى بدون منشن روم\n\n` +
+        `اختر قناة من القوائم — **القائمة الأخيرة** تختار روم السجن، والباقي للحماية حسب كل قناة.`);
     const ignoredRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
         .setCustomId('settings_sel:protection:ignored_channels')
         .setPlaceholder('🙈 قنوات بدون أي حماية (اتركها فارغة للإلغاء)')
@@ -1601,8 +1605,19 @@ function buildProtectionChannelsPanel(guild, s) {
         .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
         .setMinValues(1)
         .setMaxValues(1));
+    const jailRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ChannelSelectMenuBuilder()
+        .setCustomId('settings_sel:jail:channel')
+        .setPlaceholder('🔒 اختر روم السجن (اتركه فارغاً للمسح)')
+        .setChannelTypes(discord_js_1.ChannelType.GuildText, discord_js_1.ChannelType.GuildAnnouncement)
+        .setMinValues(0)
+        .setMaxValues(1)
+        .setDefaultChannels(jailId &&
+        (guild.channels.cache.get(jailId)?.type === discord_js_1.ChannelType.GuildText ||
+            guild.channels.cache.get(jailId)?.type === discord_js_1.ChannelType.GuildAnnouncement)
+        ? [jailId]
+        : []));
     const buttons = new discord_js_1.ActionRowBuilder().addComponents(btn('settings_btn:protection:clear_overrides', 'مسح كل الاستثناءات', discord_js_1.ButtonStyle.Danger, '🧹'), btn('settings_btn:protection:channels_back', 'رجوع للحماية', discord_js_1.ButtonStyle.Secondary, '↩️'));
-    return { embeds: [embed], components: [ignoredRow, overrideRow, buttons] };
+    return { embeds: [embed], components: [ignoredRow, overrideRow, jailRow, buttons] };
 }
 function buildProtectionChannelOverridePanel(guild, s, channelId) {
     const entry = channelOverrideEntry(s, channelId);

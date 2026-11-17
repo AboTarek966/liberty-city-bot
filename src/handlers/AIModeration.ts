@@ -676,7 +676,7 @@ export async function executeAIModeration(
         if (!jailChannel && settings.jail?.channelId) {
           jailChannel = guild.channels.cache.get(settings.jail.channelId) as TextChannel;
         }
-        if (!jailChannel) throw new Error('لم يتم تحديد روم السجن — منشن الروم أو اضبطه في الإعدادات');
+        if (!jailChannel) throw new Error('لم يتم تحديد روم السجن — منشن الروم أو حدّده في الإعدادات (`/settings` → 🛡️ الحماية → «🎯 القنوات والسجن»)');
         
         let jailRole = guild.roles.cache.find(r => r.name === '🔒 جايـل' || r.name === 'Jail');
         if (!jailRole) {
