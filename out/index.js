@@ -2,39 +2,6 @@
 // ============================================
 // Omni Bot - Main Entry Point
 // ============================================
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -208,35 +175,6 @@ async function main() {
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
         logger.info(`🎉 Bot is ready! Took ${elapsed}s`);
         persist(`READY in ${elapsed}s guilds=${client.guilds.cache.size}`);
-        // 🎡 فحص مؤقت: قياس زمن رندر عجلة 400px على هذه البيئة — يُزال بعد التحقق
-        try {
-            if ((process.env.WHEEL_SELFTEST || 'true').toLowerCase() !== 'false') {
-                const fsb = require('fs');
-                const pathMod = require('path');
-                const logPath = pathMod.join(process.cwd(), 'wheel-selftest.log');
-                const probe = (line) => {
-                    const msg = `[${new Date().toISOString()}] ${line}`;
-                    try {
-                        fsb.appendFileSync(logPath, msg + '\n');
-                    }
-                    catch { /* تجاهل */ }
-                    logger.info(`🎡 selftest: ${line}`);
-                };
-                void (async () => {
-                    const t0 = Date.now();
-                    try {
-                        const { renderWheelInWorker } = await Promise.resolve().then(() => __importStar(require('./utils/wheelWorker')));
-                        const segments = Array.from({ length: 8 }, (_, i) => ({ label: `p${i}` }));
-                        const gif = await renderWheelInWorker({ title: 'test', segments, winnerIndex: 3, hubText: 'OMNI', width: 360, orientation: 'portrait', format: 'gif', resultLabel: 'x', frames: 10, delayMs: 55 }, 45000);
-                        probe(gif ? `wheel360p: OK bytes=${gif.length} time=${Date.now() - t0}ms` : 'wheel360p: NULL');
-                    }
-                    catch (e) {
-                        probe(`wheel400: EXCEPTION ${String(e?.message || e).slice(0, 250)}`);
-                    }
-                })();
-            }
-        }
-        catch { /* تجاهل */ }
         logger.info(`📊 Logged in as: ${client.user?.tag}`);
         logger.info(`🏠 Serving ${client.guilds.cache.size} guilds`);
         logger.info(`👥 Serving ${client.users.cache.size} users`);
