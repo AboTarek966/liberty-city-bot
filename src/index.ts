@@ -165,6 +165,52 @@ async function main(): Promise<void> {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.info(`🎉 Bot is ready! Took ${elapsed}s`);
     persist(`READY in ${elapsed}s guilds=${client.guilds.cache.size}`);
+
+    // 🎡 فحص ذاتي لعجلة الحظ على هذه البيئة (worker/canvas) — يكتب لـ wheel-selftest.log
+    try {
+      if ((process.env.WHEEL_SELFTEST || 'true').toLowerCase() !== 'false') {
+        const fsb = require('fs') as any;
+        const pathMod = require('path') as any;
+        const logPath = pathMod.join(process.cwd(), 'wheel-selftest.log');
+        const probe = (line: string) => {
+          const msg = `[${new Date().toISOString()}] ${line}`;
+          try { fsb.appendFileSync(logPath, msg + '\n'); } catch { /* تجاهل */ }
+          logger.info(`🎡 selftest: ${line}`);
+        };
+        void (async () => {
+          const t0 = Date.now();
+          try {
+            const { createCanvas } = require('@napi-rs/canvas');
+            const c = createCanvas(16, 16);
+            c.getContext('2d');
+            probe('canvas: OK');
+          } catch (e: any) {
+            probe(`canvas: FAIL: ${String(e?.message || e).slice(0, 250)}`);
+          }
+          try {
+            const { renderWheelInWorker } = await import('./utils/wheelWorker');
+            const gif = await renderWheelInWorker(
+              {
+                title: 'test',
+                segments: [{ label: 'A' }, { label: 'B' }],
+                winnerIndex: 0,
+                width: 240,
+                orientation: 'landscape',
+                frames: 6,
+                delayMs: 55,
+                hubText: 'OMNI',
+                format: 'gif',
+                resultLabel: 'x',
+              } as any,
+              45000
+            );
+            probe(gif ? `worker: OK bytes=${gif.length} time=${Date.now() - t0}ms` : 'worker: NULL (timeout/spawn fail)');
+          } catch (e: any) {
+            probe(`worker: EXCEPTION ${String(e?.message || e).slice(0, 250)}`);
+          }
+        })();
+      }
+    } catch { /* تجاهل */ }
     logger.info(`📊 Logged in as: ${client.user?.tag}`);
     logger.info(`🏠 Serving ${client.guilds.cache.size} guilds`);
     logger.info(`👥 Serving ${client.users.cache.size} users`);

@@ -165,7 +165,7 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   const isLandscape = opts.orientation === 'landscape';
   const W = opts.width || (isLandscape ? 1280 : 440);
   const H = isLandscape ? Math.round(W * 0.5625) : Math.round(W * 1.18); // 16:9 أو عمودي
-  const frames = Math.max(20, opts.frames || (isLandscape ? 30 : 34));
+  const frames = Math.max(8, opts.frames || (isLandscape ? 30 : 34));
   const delayMs = opts.delayMs ?? 46;
   const holdMs = opts.holdMs ?? 850;
   const hubText = opts.hubText || 'OMNI';
