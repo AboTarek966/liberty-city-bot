@@ -11,7 +11,7 @@ const handler = {
         const select = interaction;
         if (!select.guild)
             return;
-        await select.deferReply({ ephemeral: true });
+        await select.deferReply({ ephemeral: false });
         const projectId = select.values?.[0];
         const store = await (0, store_1.getStore)();
         const project = store && projectId ? (0, store_1.findProject)(store, projectId) : undefined;
@@ -36,14 +36,14 @@ const handler = {
             `💳 **المطلوب تحويله:** ${(0, store_1.priceLine)(amount)} كريديت`,
             payee ? `👤 **المستلم:** <@${payee}>` : '👤 **المستلم:** غير مهيأ بعد — أبلغ البائع',
             '',
-            '> بعد التأكيد بنعرض لك **أمر الدفع الجاهز** تنسخه وتلصقه في الشات.',
+            '> بعد التأكيد بنعرض للكل ملخص الطلب — وأمر الدفع يفضل ظاهر بس للمشتري عبر الزر 📋.',
         ]
             .filter(Boolean)
             .join('\n'))
             .setFooter({ text: 'Omni Store • التأكيد قبل الدفع' })
             .setTimestamp();
         const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
-            .setCustomId(`store:confirm:${project.id}`)
+            .setCustomId(`store:confirm:${project.id}:${select.user.id}`)
             .setLabel('تأكيد الشراء')
             .setStyle(discord_js_1.ButtonStyle.Success)
             .setEmoji('✅'), new discord_js_1.ButtonBuilder()

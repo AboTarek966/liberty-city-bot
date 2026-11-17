@@ -27,8 +27,17 @@ import { StoreOrder } from '../../models';
 const handler: ButtonHandler = {
   id: 'store:confirm',
   async execute(interaction: ButtonInteraction) {
-    const projectId = interaction.customId.split(':')[2];
+    const parts = interaction.customId.split(':');
+    const projectId = parts[2];
+    const ownerId = parts[3];
     if (!projectId) return;
+    if (ownerId && ownerId !== interaction.user.id) {
+      await interaction.reply({
+        content: '⛔ هذا الاختيار لصاحب الطلب فقط — اكتب `/store` واختر بروجيكتك الخاص.',
+        ephemeral: true,
+      });
+      return;
+    }
 
     const store = await getStore();
     const project = store && findProject(store, projectId);
@@ -81,7 +90,7 @@ const handler: ButtonHandler = {
 
     const embed = new EmbedBuilder()
       .setColor(0x57f287)
-      .setTitle('💳 أمر الدفع جاهز — انسخه ونفذه في الشات')
+      .setTitle('💳 تفاصيل طلب الشراء — ظاهرة للكل')
       .setDescription(
         [
           `📦 **البروجيكت:** ${project.name}`,
@@ -94,11 +103,10 @@ const handler: ButtonHandler = {
           `🧾 **خصم ProBot:** ${tax}% من كل تحويل`,
           `💳 **المطلوب تحويله:** ${formatCredits(amount)} كريديت`,
           '',
-          '**📋 أمر التحويل (انسخه حرفيًا):**',
+          '**📋 أمر التحويل (للكل يشوفه):**',
           `\`\`\`${transferCommand}\`\`\``,
           '',
-          `> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ البوت — الصيغة: \`#credit ${store.payeeId} ${amount}\``,
-          '> 💡 المبلغ مظبوط يصلك **صافي** على سعر البروجيكت بعد خصم ProBot.',
+          '> ⬆️ المشتري يدوس **دفعت — طلب التسليم** بعد ما يدفع.',
         ]
           .filter(Boolean)
           .join('\n')

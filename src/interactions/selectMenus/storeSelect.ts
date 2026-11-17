@@ -18,7 +18,7 @@ const handler: SelectMenuHandler = {
     const select = interaction as StringSelectMenuInteraction;
     if (!select.guild) return;
 
-    await select.deferReply({ ephemeral: true });
+    await select.deferReply({ ephemeral: false });
 
     const projectId = select.values?.[0];
     const store = await getStore();
@@ -48,7 +48,7 @@ const handler: SelectMenuHandler = {
           `💳 **المطلوب تحويله:** ${priceLine(amount)} كريديت`,
           payee ? `👤 **المستلم:** <@${payee}>` : '👤 **المستلم:** غير مهيأ بعد — أبلغ البائع',
           '',
-          '> بعد التأكيد بنعرض لك **أمر الدفع الجاهز** تنسخه وتلصقه في الشات.',
+          '> بعد التأكيد بنعرض للكل ملخص الطلب — وأمر الدفع يفضل ظاهر بس للمشتري عبر الزر 📋.',
         ]
           .filter(Boolean)
           .join('\n')
@@ -58,7 +58,7 @@ const handler: SelectMenuHandler = {
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(`store:confirm:${project.id}`)
+        .setCustomId(`store:confirm:${project.id}:${select.user.id}`)
         .setLabel('تأكيد الشراء')
         .setStyle(ButtonStyle.Success)
         .setEmoji('✅'),

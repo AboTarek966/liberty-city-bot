@@ -10,9 +10,18 @@ const models_1 = require("../../models");
 const handler = {
     id: 'store:confirm',
     async execute(interaction) {
-        const projectId = interaction.customId.split(':')[2];
+        const parts = interaction.customId.split(':');
+        const projectId = parts[2];
+        const ownerId = parts[3];
         if (!projectId)
             return;
+        if (ownerId && ownerId !== interaction.user.id) {
+            await interaction.reply({
+                content: '⛔ هذا الاختيار لصاحب الطلب فقط — اكتب `/store` واختر بروجيكتك الخاص.',
+                ephemeral: true,
+            });
+            return;
+        }
         const store = await (0, store_1.getStore)();
         const project = store && (0, store_1.findProject)(store, projectId);
         if (!store || !project || !project.enabled) {
@@ -58,7 +67,7 @@ const handler = {
         const transferCommand = (0, store_1.buildTransferCommand)(store.payeeId, amount);
         const embed = new discord_js_1.EmbedBuilder()
             .setColor(0x57f287)
-            .setTitle('💳 أمر الدفع جاهز — انسخه ونفذه في الشات')
+            .setTitle('💳 تفاصيل طلب الشراء — ظاهرة للكل')
             .setDescription([
             `📦 **البروجيكت:** ${project.name}`,
             `🧾 **الطلب:** #${order.orderId}`,
@@ -70,11 +79,10 @@ const handler = {
             `🧾 **خصم ProBot:** ${tax}% من كل تحويل`,
             `💳 **المطلوب تحويله:** ${(0, store_1.formatCredits)(amount)} كريديت`,
             '',
-            '**📋 أمر التحويل (انسخه حرفيًا):**',
+            '**📋 أمر التحويل (للكل يشوفه):**',
             `\`\`\`${transferCommand}\`\`\``,
             '',
-            `> ⬆️ انسخ الأمر وأرسله في أي روم يقرأ البوت — الصيغة: \`#credit ${store.payeeId} ${amount}\``,
-            '> 💡 المبلغ مظبوط يصلك **صافي** على سعر البروجيكت بعد خصم ProBot.',
+            '> ⬆️ المشتري يدوس **دفعت — طلب التسليم** بعد ما يدفع.',
         ]
             .filter(Boolean)
             .join('\n'))
