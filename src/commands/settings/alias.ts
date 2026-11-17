@@ -232,13 +232,14 @@ const command: Command = {
         .addStringOption(o =>
           o
             .setName('extra3')
-            .setDescription('📦 أوامر إدارية + رولات + حماية متقدمة')
+            .setDescription('🛍️ المتجر + إدارة + رولات + حماية متقدمة')
             .setRequired(false)
             .addChoices(
+              { name: '🛍️ متجر البروجيكتات (للمشترين)', value: 'store' },
+              { name: '🛠️ إدارة المتجر', value: 'project' },
               { name: '⚙️ إعدادات', value: 'settings' },
               { name: '⌨️ علياس', value: 'alias' },
               { name: '🧹 فصل إدارة', value: 'dismiss' },
-              { name: '🛍️ متجر البروجيكتات', value: 'store' },
               { name: '🎭 رول منيو', value: 'rolemenu' },
               { name: '➕ أوتو رول', value: 'autorole' },
               { name: '➕ رول أدد', value: 'roleadd' },

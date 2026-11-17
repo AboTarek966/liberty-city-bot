@@ -119,9 +119,9 @@ const command = {
         .addChoices({ name: '🕵️ سنايب', value: 'snipe' }, { name: '💾 باك أب', value: 'backup' }, { name: '🎫 تذاكر', value: 'ticket' }, { name: '🏆 توب التفاعل', value: 'leaderboard' }, { name: '🛡️ توب كلانات', value: 'clantop' }, { name: '🤖 AI', value: 'ai' }, { name: '🎮 ألعاب', value: 'games' }, { name: '🎮 لعبة', value: 'game' }, { name: '🛑 إيقاف الروليت', value: 'roulette_stop' }))
         .addStringOption(o => o
         .setName('extra3')
-        .setDescription('📦 أوامر إدارية + رولات + حماية متقدمة')
+        .setDescription('🛍️ المتجر + إدارة + رولات + حماية متقدمة')
         .setRequired(false)
-        .addChoices({ name: '⚙️ إعدادات', value: 'settings' }, { name: '⌨️ علياس', value: 'alias' }, { name: '🧹 فصل إدارة', value: 'dismiss' }, { name: '🛍️ متجر البروجيكتات', value: 'store' }, { name: '🎭 رول منيو', value: 'rolemenu' }, { name: '➕ أوتو رول', value: 'autorole' }, { name: '➕ رول أدد', value: 'roleadd' }, { name: '➖ رول ريموف', value: 'roleremove' }, { name: '🏆 الفائز (إعلان يدوي)', value: 'winner' }, { name: '📊 توب تذاكر', value: 'ticket_top' }, { name: '📊 تذكرة ستات', value: 'ticket_mystats' }, { name: '💤 AFK', value: 'afk' })))
+        .addChoices({ name: '🛍️ متجر البروجيكتات (للمشترين)', value: 'store' }, { name: '🛠️ إدارة المتجر', value: 'project' }, { name: '⚙️ إعدادات', value: 'settings' }, { name: '⌨️ علياس', value: 'alias' }, { name: '🧹 فصل إدارة', value: 'dismiss' }, { name: '🎭 رول منيو', value: 'rolemenu' }, { name: '➕ أوتو رول', value: 'autorole' }, { name: '➕ رول أدد', value: 'roleadd' }, { name: '➖ رول ريموف', value: 'roleremove' }, { name: '🏆 الفائز (إعلان يدوي)', value: 'winner' }, { name: '📊 توب تذاكر', value: 'ticket_top' }, { name: '📊 تذكرة ستات', value: 'ticket_mystats' }, { name: '💤 AFK', value: 'afk' })))
         .addSubcommand(sub => sub
         .setName('remove')
         .setDescription('حذف اختصار')
