@@ -16,7 +16,7 @@ import {
 } from 'discord.js';
 import { fetchAvatarBuffer, WheelSegmentInput } from './wheelOfFortune';
 import { renderWheelInWorker } from './wheelWorker';
-import { createLogger, sleep } from './helpers';
+import { createLogger, sleep, escapeMarkdown } from './helpers';
 
 const logger = createLogger('Roulette');
 
@@ -56,6 +56,20 @@ export const ROULETTE_DELAY_MS = 5000;
 
 const COLOR = 0xed4245;
 
+/** عرض آمن للاعب — المنشن للأعضاء الحقيقيين، وأسماء البوتات الوهمية بولد وإيموجي 🤖 */
+function playerDisplay(p: RoulettePlayer): string {
+  return p.isBot ? `**${escapeMarkdown(p.username)}** 🤖` : `<@${p.id}>`;
+}
+
+/** سطر مرقّم لكل لاعب — أوضح من خط واحد مليء بالفواصل */
+function playerLine(p: RoulettePlayer, i: number): string {
+  return `\`${String(i + 1).padStart(2, ' ')}·\` ${playerDisplay(p)}`;
+}
+
+function playerBlock(players: RoulettePlayer[]): string {
+  return players.map(playerLine).join('\n');
+}
+
 /** 🖼️ تحميل الآفاتارات على دفعات (٦ في المرة) بدل كل اللاعبين دفعة واحدة — أقل ضغطاً على الاستضافة */
 async function fetchAvatarsInBatches(players: RoulettePlayer[], batch = 6): Promise<(Buffer | null)[]> {
   const out: (Buffer | null)[] = new Array(players.length).fill(null);
@@ -75,7 +89,7 @@ async function fetchAvatarsInBatches(players: RoulettePlayer[], batch = 6): Prom
 
 export function lobbyEmbed(game: RouletteGame, startText = 'تبدأ اللعبة خلال 60 ثانية'): EmbedBuilder {
   const names = game.players.length
-    ? game.players.map((p, i) => `\`${i + 1}.\` <@${p.id}> \`${p.username.slice(0, 32)}\``).join('\n')
+    ? game.players.map((p, i) => playerLine(p, i)).join('\n')
     : 'لا أحد انضم بعد — اضغط **دخول اللعبة**!';
   return new EmbedBuilder()
     .setColor(COLOR)
@@ -177,7 +191,7 @@ export async function startRouletteGame(client: OmniClient, gameId: string): Pro
           new EmbedBuilder()
             .setColor(COLOR)
             .setTitle('🎮 انطلقت اللعبة!')
-            .setDescription(`⚔️ اللاعبون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+            .setDescription(`⚔️ **اللاعبون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
             .setFooter({ text: 'استعدّوا — العجلة تدور الآن' })
             .setTimestamp(),
         ],
@@ -227,7 +241,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
   const spinEmbed = new EmbedBuilder()
     .setColor(COLOR)
     .setTitle('🎡 العجلة تدور...')
-    .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+    .setDescription(`👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
     .setFooter({ text: 'جاري تحديد عليه الدور...' })
     .setTimestamp();
 
@@ -266,7 +280,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
         const arrivedEmbed = new EmbedBuilder()
           .setColor(COLOR)
           .setTitle('🎡 العجلة وصلت!')
-          .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+          .setDescription(`👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
           .setImage('attachment://roulette.gif')
           .setFooter({ text: 'وقفت العجلة — الدور الجاي للّي اتشارد' })
           .setTimestamp();
@@ -332,24 +346,27 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
   game.chooserId = chooserId;
   game.phase = 'choosing';
 
+  const chooser = game.players.find((p) => p.id === chooserId);
+  const chooserDisplay = chooser ? playerDisplay(chooser) : '**لاعب**';
+
   try {
     const embed = new EmbedBuilder()
       .setColor(COLOR)
       .setTitle('🎯 وقعت على...')
       .setDescription(
-        `**<@${chooserId}>** — العجلة اختارتك! 💫\n` +
+        `${chooserDisplay} — العجلة اختارتك! 💫\n` +
           `اضغط زر أي لاعب من الباقين لطرده من اللعبة.\n` +
           `⏳ لديك **30 ثانية** — إن لم تختر، فأنت المطرود!`
       )
       .addFields({
         name: `👥 المتبقون (${game.players.length})`,
-        value: game.players.map((p, i) => `\`${i + 1}.\` <@${p.id}>`).join('\n').slice(0, 1024),
+        value: game.players.map((p, i) => playerLine(p, i)).join('\n').slice(0, 1024),
       })
       .setFooter({ text: '30 ثانية فقط — من يختار بسرعة ينجو' })
       .setTimestamp();
 
     const msg = await channel.send({
-      content: `🎮 <@${chooserId}> — حان دورك!`,
+      content: `🎮 ${chooserDisplay} — حان دورك!`,
       embeds: [embed],
       components: kickButtonRows(game, chooserId),
     });
@@ -357,7 +374,6 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
     game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
 
     // 🤖 لو العجلة وقفت على بوت — يختار فوراً بعد ٥ ثوانٍ
-    const chooser = game.players.find((p) => p.id === chooserId);
     if (chooser?.isBot) {
       clearTimeout(game.choiceTimer);
       const others = game.players.filter((p) => p.id !== chooserId);
@@ -429,23 +445,28 @@ export async function eliminatePlayer(
   // انتظر خمس ثوانٍ قبل إعلان الطرد (يعطي شعوراً درامياً بالتسلسل)
   await sleep(ROULETTE_DELAY_MS);
 
-  const chooserMention = game.chooserId ? `<@${game.chooserId}>` : 'العجلة';
-  const targetMention = `<@${targetId}>`;
+  // المنشن الآمن: الحقيقي يرى منشن، الوهمي يرى اسمه بولد — بدون `<@fake_...>` مشوّهة
+  const chooserPlayer = game.chooserId ? game.players.find((p) => p.id === game.chooserId) : null;
+  const chooserMention = chooserPlayer ? playerDisplay(chooserPlayer) : 'العجلة';
+  const targetPlayer = game.players.find((p) => p.id === targetId);
+  const targetMention = targetPlayer ? playerDisplay(targetPlayer) : 'العضو المطرود';
   const reasonText =
     reason === 'timeout'
       ? 'لم يختر أحداً خلال 30 ثانية 💀'
       : `${chooserMention} اختاره للطرد 🔫`;
 
-  // DM للمطرود
-  try {
-    const user = await client.users.fetch(targetId);
-    await user
-      .send(
-        `🎢 تم طردك من لعبة الروليت في **${guild.name}**.\n${reasonText}\n\nيمكنك الانضمام للعبة المقبلة من جديد!`
-      )
-      .catch(() => {});
-  } catch {
-    /* DM مغلق — تجاهل */
+  // DM للمطرود (اللاعبون الوهميون ليس لهم حسابات حقيقية — نتخطاهم)
+  if (!targetId.startsWith('fake_')) {
+    try {
+      const user = await client.users.fetch(targetId);
+      await user
+        .send(
+          `🎢 تم طردك من لعبة الروليت في **${guild.name}**.\n${reasonText}\n\nيمكنك الانضمام للعبة المقبلة من جديد!`
+        )
+        .catch(() => {});
+    } catch {
+      /* DM مغلق — تجاهل */
+    }
   }
 
   const idx = game.players.findIndex((p) => p.id === targetId);
@@ -511,7 +532,7 @@ async function endRouletteGame(client: OmniClient, game: RouletteGame): Promise<
           .setColor(0x57f287)
           .setTitle('👑 الفائز في لعبة الروليت!')
           .setDescription(
-            `🎉 مبروك **${winner?.id ? `<@${winner.id}>` : 'لا أحد'}** — الناجي الأخير من الروليت! 👑🥁`
+            `🎉 مبروك ${winner ? playerDisplay(winner) : 'لا أحد'} — الناجي الأخير من الروليت! 👑🥁`
           )
           .setTimestamp(),
       ],
@@ -553,7 +574,7 @@ export async function cleanupStoppedGame(client: OmniClient, game: RouletteGame)
             .setDescription(
               `اللعبة أُوقفت بواسطة مدير السيرفر.\n` +
                 (winner
-                  ? `كان متبقياً: <@${winner.id}> (${winner.username}) — اللعبة لا تُكمل بهذا الأمر.`
+                  ? `كان متبقياً: ${playerDisplay(winner)} (${winner.username}) — اللعبة لا تُكمل بهذا الأمر.`
                   : 'لم يُحدد فائز.')
             )
             .setTimestamp(),

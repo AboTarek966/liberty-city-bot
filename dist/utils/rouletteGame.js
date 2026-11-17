@@ -31,6 +31,17 @@ const CHOICE_SECONDS = 30;
 /** فاصل ٥ ثوانٍ بين كل حدث ورسالة في اللعبة — أفضل للتسلسل الطبيعي */
 exports.ROULETTE_DELAY_MS = 5000;
 const COLOR = 0xed4245;
+/** عرض آمن للاعب — المنشن للأعضاء الحقيقيين، وأسماء البوتات الوهمية بولد وإيموجي 🤖 */
+function playerDisplay(p) {
+    return p.isBot ? `**${(0, helpers_1.escapeMarkdown)(p.username)}** 🤖` : `<@${p.id}>`;
+}
+/** سطر مرقّم لكل لاعب — أوضح من خط واحد مليء بالفواصل */
+function playerLine(p, i) {
+    return `\`${String(i + 1).padStart(2, ' ')}·\` ${playerDisplay(p)}`;
+}
+function playerBlock(players) {
+    return players.map(playerLine).join('\n');
+}
 /** 🖼️ تحميل الآفاتارات على دفعات (٦ في المرة) بدل كل اللاعبين دفعة واحدة — أقل ضغطاً على الاستضافة */
 async function fetchAvatarsInBatches(players, batch = 6) {
     const out = new Array(players.length).fill(null);
@@ -45,7 +56,7 @@ async function fetchAvatarsInBatches(players, batch = 6) {
 // ---------- واجهة اللوبي ----------
 function lobbyEmbed(game, startText = 'تبدأ اللعبة خلال 60 ثانية') {
     const names = game.players.length
-        ? game.players.map((p, i) => `\`${i + 1}.\` <@${p.id}> \`${p.username.slice(0, 32)}\``).join('\n')
+        ? game.players.map((p, i) => playerLine(p, i)).join('\n')
         : 'لا أحد انضم بعد — اضغط **دخول اللعبة**!';
     return new discord_js_1.EmbedBuilder()
         .setColor(COLOR)
@@ -134,7 +145,7 @@ async function startRouletteGame(client, gameId) {
                 new discord_js_1.EmbedBuilder()
                     .setColor(COLOR)
                     .setTitle('🎮 انطلقت اللعبة!')
-                    .setDescription(`⚔️ اللاعبون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+                    .setDescription(`⚔️ **اللاعبون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
                     .setFooter({ text: 'استعدّوا — العجلة تدور الآن' })
                     .setTimestamp(),
             ],
@@ -179,7 +190,7 @@ async function runRouletteRound(client, game) {
     const spinEmbed = new discord_js_1.EmbedBuilder()
         .setColor(COLOR)
         .setTitle('🎡 العجلة تدور...')
-        .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+        .setDescription(`👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
         .setFooter({ text: 'جاري تحديد عليه الدور...' })
         .setTimestamp();
     game.choiceTimer && clearTimeout(game.choiceTimer);
@@ -214,7 +225,7 @@ async function runRouletteRound(client, game) {
                 const arrivedEmbed = new discord_js_1.EmbedBuilder()
                     .setColor(COLOR)
                     .setTitle('🎡 العجلة وصلت!')
-                    .setDescription(`👥 المتبقون: ${game.players.map((p) => `<@${p.id}>`).join(' • ')}`)
+                    .setDescription(`👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`)
                     .setImage('attachment://roulette.gif')
                     .setFooter({ text: 'وقفت العجلة — الدور الجاي للّي اتشارد' })
                     .setTimestamp();
@@ -271,28 +282,29 @@ async function openKickMenu(client, gameId, chooserId) {
     }
     game.chooserId = chooserId;
     game.phase = 'choosing';
+    const chooser = game.players.find((p) => p.id === chooserId);
+    const chooserDisplay = chooser ? playerDisplay(chooser) : '**لاعب**';
     try {
         const embed = new discord_js_1.EmbedBuilder()
             .setColor(COLOR)
             .setTitle('🎯 وقعت على...')
-            .setDescription(`**<@${chooserId}>** — العجلة اختارتك! 💫\n` +
+            .setDescription(`${chooserDisplay} — العجلة اختارتك! 💫\n` +
             `اضغط زر أي لاعب من الباقين لطرده من اللعبة.\n` +
             `⏳ لديك **30 ثانية** — إن لم تختر، فأنت المطرود!`)
             .addFields({
             name: `👥 المتبقون (${game.players.length})`,
-            value: game.players.map((p, i) => `\`${i + 1}.\` <@${p.id}>`).join('\n').slice(0, 1024),
+            value: game.players.map((p, i) => playerLine(p, i)).join('\n').slice(0, 1024),
         })
             .setFooter({ text: '30 ثانية فقط — من يختار بسرعة ينجو' })
             .setTimestamp();
         const msg = await channel.send({
-            content: `🎮 <@${chooserId}> — حان دورك!`,
+            content: `🎮 ${chooserDisplay} — حان دورك!`,
             embeds: [embed],
             components: kickButtonRows(game, chooserId),
         });
         game.choiceMessageId = msg.id;
         game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
         // 🤖 لو العجلة وقفت على بوت — يختار فوراً بعد ٥ ثوانٍ
-        const chooser = game.players.find((p) => p.id === chooserId);
         if (chooser?.isBot) {
             clearTimeout(game.choiceTimer);
             const others = game.players.filter((p) => p.id !== chooserId);
@@ -353,20 +365,25 @@ async function eliminatePlayer(client, game, targetId, reason) {
     }
     // انتظر خمس ثوانٍ قبل إعلان الطرد (يعطي شعوراً درامياً بالتسلسل)
     await (0, helpers_1.sleep)(exports.ROULETTE_DELAY_MS);
-    const chooserMention = game.chooserId ? `<@${game.chooserId}>` : 'العجلة';
-    const targetMention = `<@${targetId}>`;
+    // المنشن الآمن: الحقيقي يرى منشن، الوهمي يرى اسمه بولد — بدون `<@fake_...>` مشوّهة
+    const chooserPlayer = game.chooserId ? game.players.find((p) => p.id === game.chooserId) : null;
+    const chooserMention = chooserPlayer ? playerDisplay(chooserPlayer) : 'العجلة';
+    const targetPlayer = game.players.find((p) => p.id === targetId);
+    const targetMention = targetPlayer ? playerDisplay(targetPlayer) : 'العضو المطرود';
     const reasonText = reason === 'timeout'
         ? 'لم يختر أحداً خلال 30 ثانية 💀'
         : `${chooserMention} اختاره للطرد 🔫`;
-    // DM للمطرود
-    try {
-        const user = await client.users.fetch(targetId);
-        await user
-            .send(`🎢 تم طردك من لعبة الروليت في **${guild.name}**.\n${reasonText}\n\nيمكنك الانضمام للعبة المقبلة من جديد!`)
-            .catch(() => { });
-    }
-    catch {
-        /* DM مغلق — تجاهل */
+    // DM للمطرود (اللاعبون الوهميون ليس لهم حسابات حقيقية — نتخطاهم)
+    if (!targetId.startsWith('fake_')) {
+        try {
+            const user = await client.users.fetch(targetId);
+            await user
+                .send(`🎢 تم طردك من لعبة الروليت في **${guild.name}**.\n${reasonText}\n\nيمكنك الانضمام للعبة المقبلة من جديد!`)
+                .catch(() => { });
+        }
+        catch {
+            /* DM مغلق — تجاهل */
+        }
     }
     const idx = game.players.findIndex((p) => p.id === targetId);
     game.players.splice(idx, 1);
@@ -420,7 +437,7 @@ async function endRouletteGame(client, game) {
                 new discord_js_1.EmbedBuilder()
                     .setColor(0x57f287)
                     .setTitle('👑 الفائز في لعبة الروليت!')
-                    .setDescription(`🎉 مبروك **${winner?.id ? `<@${winner.id}>` : 'لا أحد'}** — الناجي الأخير من الروليت! 👑🥁`)
+                    .setDescription(`🎉 مبروك ${winner ? playerDisplay(winner) : 'لا أحد'} — الناجي الأخير من الروليت! 👑🥁`)
                     .setTimestamp(),
             ],
         });
@@ -457,7 +474,7 @@ async function cleanupStoppedGame(client, game) {
                         .setTitle('🛑 تم إيقاف اللعبة')
                         .setDescription(`اللعبة أُوقفت بواسطة مدير السيرفر.\n` +
                         (winner
-                            ? `كان متبقياً: <@${winner.id}> (${winner.username}) — اللعبة لا تُكمل بهذا الأمر.`
+                            ? `كان متبقياً: ${playerDisplay(winner)} (${winner.username}) — اللعبة لا تُكمل بهذا الأمر.`
                             : 'لم يُحدد فائز.'))
                         .setTimestamp(),
                 ],
