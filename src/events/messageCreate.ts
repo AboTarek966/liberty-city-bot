@@ -1254,13 +1254,23 @@ async function runAliasCommand(
       const userId = parseUserId(args[0]);
       if (!userId) return usage('<@المستخدم / ID>');
       const reason = args.slice(1).join(' ') || 'إلغاء حظر';
+      // 🔍 نتحقق أولاً من قائمة المحظورين — undefined = فشل الجلب (صاحية؟)، null = غير محظور
+      const existing = await guild.bans.fetch(userId).catch(() => undefined as unknown);
+      if (existing === null) {
+        return respond(message, 'ℹ️ هذا المستخدم غير محظور أصلاً — لا حاجة لإلغاء الحظر');
+      }
       try {
-        await guild.members.unban(userId, reason).catch(() => {
-          return respond(message, '❌ فشل إلغاء الحظر — المستخدم غير محظور أو صلاحيات البوت');
-        });
+        await guild.members.unban(userId, reason);
         return respond(message, `✅ **تم إلغاء الحظر** عن \`${userId}\``);
-      } catch {
-        return respond(message, '❌ فشل إلغاء الحظر');
+      } catch (error: any) {
+        const raw = String(error?.message || error);
+        const hint = /10026|unknown ban|404/i.test(raw)
+          ? 'المستخدم غير محظور أصلاً'
+          : /50013|Missing Permissions/i.test(raw)
+            ? 'البوت يحتاج صلاحية Ban Members'
+            : raw.slice(0, 150);
+        logger.warn(`Unban failed for ${userId}: ${raw.slice(0, 200)}`);
+        return respond(message, `❌ فشل إلغاء الحظر — ${hint}`);
       }
     }
 
