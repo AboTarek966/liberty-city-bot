@@ -16,6 +16,8 @@ export interface RouletteGame {
     phase: RoulettePhase;
     players: RoulettePlayer[];
     avatarBuffers: (Buffer | null)[];
+    /** آخر GIF بُني للجولة الحالية — نعرضها مرة ثانية في رسالة الطرد عشان تظهر أكيد */
+    lastWheelGif?: Buffer | null;
     chooserId?: string;
     choiceMessageId?: string;
     choiceTimer?: NodeJS.Timeout;

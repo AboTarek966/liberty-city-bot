@@ -38,6 +38,8 @@ export interface RouletteGame {
   phase: RoulettePhase;
   players: RoulettePlayer[];
   avatarBuffers: (Buffer | null)[];
+  /** آخر GIF بُني للجولة الحالية — نعرضها مرة ثانية في رسالة الطرد عشان تظهر أكيد */
+  lastWheelGif?: Buffer | null;
   chooserId?: string;
   choiceMessageId?: string;
   choiceTimer?: NodeJS.Timeout;
@@ -276,6 +278,9 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     }
   }
 
+  // نُخزّنها على بيانات اللعبة — رسالة الطرد التالية ستعرضها أيضاً (تأكيد إضافي أنها أمام اللاعب)
+  game.lastWheelGif = gif;
+
   const playerListText = `👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`;
   const buildSpinEmbed = (withImage: boolean) => {
     const e = new EmbedBuilder()
@@ -359,8 +364,12 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
   const chooser = game.players.find((p) => p.id === chooserId);
   const chooserDisplay = chooser ? playerDisplay(chooser) : '**لاعب**';
 
-  try {
-    const embed = new EmbedBuilder()
+  // 🎡 الـGIF اللي بتنتظرها — نفس العجلة تظهر جوه رسالة الطرد (مضمونة أمام اللاعب أثناء الاختيار)
+  const wheelGif = game.lastWheelGif || null;
+  game.lastWheelGif = undefined;
+
+  const buildKickEmbed = (withImage: boolean) => {
+    const e = new EmbedBuilder()
       .setColor(COLOR)
       .setTitle('🎯 وقعت على...')
       .setDescription(
@@ -374,12 +383,42 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
       })
       .setFooter({ text: '30 ثانية فقط — من يختار بسرعة ينجو' })
       .setTimestamp();
+    if (withImage && wheelGif) e.setImage('attachment://roulette.gif');
+    return e;
+  };
 
-    const msg = await channel.send({
-      content: `🎮 ${chooserDisplay} — حان دورك!`,
-      embeds: [embed],
-      components: kickButtonRows(game, chooserId),
-    });
+  try {
+    const content = `🎮 ${chooserDisplay} — حان دورك!`;
+    const components = kickButtonRows(game, chooserId);
+    let msg: any = null;
+    if (wheelGif) {
+      msg = await channel
+        .send({
+          content,
+          embeds: [buildKickEmbed(true)],
+          components,
+          files: [new AttachmentBuilder(wheelGif, { name: 'roulette.gif' })],
+        })
+        .catch((sendErr: any) => {
+          logger.warn(`🎯 kick menu wheel send failed: ${String(sendErr?.message || sendErr).slice(0, 200)}`);
+          return null;
+        });
+      if (!msg) {
+        // استرجاع: رسالة الطرد بدون صورة (عشان اللعبة تكمل بأي حال)
+        msg = await channel
+          .send({ content, embeds: [buildKickEmbed(false)], components })
+          .catch(() => null);
+      }
+    } else {
+      msg = await channel
+        .send({ content, embeds: [buildKickEmbed(false)], components })
+        .catch(() => null);
+    }
+    if (!msg) {
+      logger.warn('🎯 kick menu message could not be sent');
+      cleanup(game);
+      return;
+    }
     game.choiceMessageId = msg.id;
     game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
 
@@ -560,6 +599,7 @@ function cleanup(game: RouletteGame): void {
   game.choiceMessageId = undefined;
   game.choiceTimer = undefined;
   game.startTimer = undefined;
+  game.lastWheelGif = undefined;
   rouletteGames.delete(game.id);
 }
 

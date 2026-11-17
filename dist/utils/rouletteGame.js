@@ -219,6 +219,8 @@ async function runRouletteRound(client, game) {
             gif = null;
         }
     }
+    // نُخزّنها على بيانات اللعبة — رسالة الطرد التالية ستعرضها أيضاً (تأكيد إضافي أنها أمام اللاعب)
+    game.lastWheelGif = gif;
     const playerListText = `👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`;
     const buildSpinEmbed = (withImage) => {
         const e = new discord_js_1.EmbedBuilder()
@@ -290,8 +292,11 @@ async function openKickMenu(client, gameId, chooserId) {
     game.phase = 'choosing';
     const chooser = game.players.find((p) => p.id === chooserId);
     const chooserDisplay = chooser ? playerDisplay(chooser) : '**لاعب**';
-    try {
-        const embed = new discord_js_1.EmbedBuilder()
+    // 🎡 الـGIF اللي بتنتظرها — نفس العجلة تظهر جوه رسالة الطرد (مضمونة أمام اللاعب أثناء الاختيار)
+    const wheelGif = game.lastWheelGif || null;
+    game.lastWheelGif = undefined;
+    const buildKickEmbed = (withImage) => {
+        const e = new discord_js_1.EmbedBuilder()
             .setColor(COLOR)
             .setTitle('🎯 وقعت على...')
             .setDescription(`${chooserDisplay} — العجلة اختارتك! 💫\n` +
@@ -303,11 +308,43 @@ async function openKickMenu(client, gameId, chooserId) {
         })
             .setFooter({ text: '30 ثانية فقط — من يختار بسرعة ينجو' })
             .setTimestamp();
-        const msg = await channel.send({
-            content: `🎮 ${chooserDisplay} — حان دورك!`,
-            embeds: [embed],
-            components: kickButtonRows(game, chooserId),
-        });
+        if (withImage && wheelGif)
+            e.setImage('attachment://roulette.gif');
+        return e;
+    };
+    try {
+        const content = `🎮 ${chooserDisplay} — حان دورك!`;
+        const components = kickButtonRows(game, chooserId);
+        let msg = null;
+        if (wheelGif) {
+            msg = await channel
+                .send({
+                content,
+                embeds: [buildKickEmbed(true)],
+                components,
+                files: [new discord_js_1.AttachmentBuilder(wheelGif, { name: 'roulette.gif' })],
+            })
+                .catch((sendErr) => {
+                logger.warn(`🎯 kick menu wheel send failed: ${String(sendErr?.message || sendErr).slice(0, 200)}`);
+                return null;
+            });
+            if (!msg) {
+                // استرجاع: رسالة الطرد بدون صورة (عشان اللعبة تكمل بأي حال)
+                msg = await channel
+                    .send({ content, embeds: [buildKickEmbed(false)], components })
+                    .catch(() => null);
+            }
+        }
+        else {
+            msg = await channel
+                .send({ content, embeds: [buildKickEmbed(false)], components })
+                .catch(() => null);
+        }
+        if (!msg) {
+            logger.warn('🎯 kick menu message could not be sent');
+            cleanup(game);
+            return;
+        }
         game.choiceMessageId = msg.id;
         game.choiceTimer = setTimeout(() => void onKickTimeout(client, game.id), CHOICE_SECONDS * 1000);
         // 🤖 لو العجلة وقفت على بوت — يختار فوراً بعد ٥ ثوانٍ
@@ -460,6 +497,7 @@ function cleanup(game) {
     game.choiceMessageId = undefined;
     game.choiceTimer = undefined;
     game.startTimer = undefined;
+    game.lastWheelGif = undefined;
     exports.rouletteGames.delete(game.id);
 }
 /** ⏹️ يقطع اللعبة الحالية فوراً — يعلن عن نهاية اللعب ويحذف كل حالتها */
