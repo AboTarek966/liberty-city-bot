@@ -671,8 +671,10 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
   } catch {
     gifenc = require('gifenc');
   }
+  // لوحة الألوان تتبع حجم الصورة — ألوان أقل على الاستضافات الضعيفة = أسرع ترميز بكثير
+  const quantizeColors = W <= 420 ? 160 : 224;
   const { GIFEncoder, quantize, applyPalette } = gifenc;
-  const palette = quantize(sampleData as any, 224);
+  const palette = quantize(sampleData as any, quantizeColors);
 
   const gif = GIFEncoder();
   for (let i = 0; i < frameCount; i++) {

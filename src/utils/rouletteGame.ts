@@ -258,14 +258,14 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
           segments,
           winnerIndex,
           hubText: 'OMNI',
-          width: 640,
+          width: 360,
           format: 'gif',
-          orientation: 'landscape',
+          orientation: 'portrait',
           resultLabel: 'عليه الدور',
-          frames: 12,
+          frames: 10,
           delayMs: 55,
         },
-        60000
+        45000
       );
       logger.info(
         `🎡 wheel pre-render: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t0}ms` : 'FAILED/timeout'}`
