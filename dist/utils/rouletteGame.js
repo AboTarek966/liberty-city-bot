@@ -92,7 +92,13 @@ function lobbyRow(game) {
         .setLabel('🤖 إضافة بوتات')
         .setStyle(discord_js_1.ButtonStyle.Secondary)
         .setEmoji('🤖');
-    return [new discord_js_1.ActionRowBuilder().addComponents(join, leave, addBots)];
+    // ⚡ بداية فورية — لمنشئ اللعبة أو إدارة السيرفر (بدون انتظار ٦٠ ثانية)
+    const startNow = new discord_js_1.ButtonBuilder()
+        .setCustomId(`roulette:start:${game.id}`)
+        .setLabel('ابدأ الآن')
+        .setStyle(discord_js_1.ButtonStyle.Primary)
+        .setEmoji('⚡');
+    return [new discord_js_1.ActionRowBuilder().addComponents(join, leave, addBots, startNow)];
 }
 // ---------- بدء اللعبة ----------
 async function startRouletteGame(client, gameId) {

@@ -4,6 +4,7 @@
 
 import { ButtonInteraction, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
+import { PermissionFlagsBits } from 'discord.js';
 import {
   rouletteGames,
   addToRouletteLobby,
@@ -11,6 +12,8 @@ import {
   lobbyEmbed,
   lobbyRow,
   resolveKick,
+  startRouletteGame,
+  MIN_ROULETTE_PLAYERS,
 } from '../../utils/rouletteGame';
 import { OmniClient } from '../../OmniClient';
 
@@ -82,6 +85,39 @@ const handler: ButtonHandler = {
         components: [row],
         ephemeral: true,
       });
+      return;
+    }
+
+    // ========== ⚡ ابدأ الآن — بداية فورية بدون انتظار ٦٠ ثانية ==========
+    if (action === 'start') {
+      if (game.phase !== 'lobby') {
+        await interaction.reply({ content: '❌ بدأت اللعبة بالفعل — استمتع بالجولة!', ephemeral: true });
+        return;
+      }
+      const member = interaction.member as any;
+      const perms = member?.permissions;
+      const isCreator = game.players[0]?.id === interaction.user.id;
+      const isAdmin =
+        interaction.guild!.ownerId === interaction.user.id ||
+        perms?.has?.(PermissionFlagsBits.ManageGuild) ||
+        perms?.has?.(PermissionFlagsBits.Administrator);
+      if (!isCreator && !isAdmin) {
+        await interaction.reply({
+          content: '⛔ الزر ده لمنشئ اللعبة أو لإدارة السيرفر فقط.',
+          ephemeral: true,
+        });
+        return;
+      }
+      if (game.players.length < MIN_ROULETTE_PLAYERS) {
+        await interaction.reply({
+          content: `⚠️ لازم عدد **${MIN_ROULETTE_PLAYERS}** لاعبين على الأقل للبداية — اظغط **🤖 إضافة بوتات** أو انتظر دخول البقية.`,
+          ephemeral: true,
+        });
+        return;
+      }
+      await interaction.reply({ content: '⚡ **بدأت اللعبة الآن!** — العجلة الجاهزة تدور...', ephemeral: true });
+      // نفس مسار المؤقّت — لكن فوراً (وفي حال اكتمل العدد نكمل نفس الخطوات)
+      await startRouletteGame(interaction.client as OmniClient, game.id);
       return;
     }
 

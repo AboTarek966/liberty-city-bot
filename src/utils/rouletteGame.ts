@@ -130,7 +130,13 @@ export function lobbyRow(game: RouletteGame): ActionRowBuilder<ButtonBuilder>[] 
     .setLabel('🤖 إضافة بوتات')
     .setStyle(ButtonStyle.Secondary)
     .setEmoji('🤖');
-  return [new ActionRowBuilder<ButtonBuilder>().addComponents(join, leave, addBots)];
+  // ⚡ بداية فورية — لمنشئ اللعبة أو إدارة السيرفر (بدون انتظار ٦٠ ثانية)
+  const startNow = new ButtonBuilder()
+    .setCustomId(`roulette:start:${game.id}`)
+    .setLabel('ابدأ الآن')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('⚡');
+  return [new ActionRowBuilder<ButtonBuilder>().addComponents(join, leave, addBots, startNow)];
 }
 
 // ---------- بدء اللعبة ----------

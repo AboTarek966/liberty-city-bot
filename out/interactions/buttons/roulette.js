@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const discord_js_2 = require("discord.js");
 const rouletteGame_1 = require("../../utils/rouletteGame");
 function playerFromMember(member) {
     return {
@@ -67,6 +68,37 @@ const handler = {
                 components: [row],
                 ephemeral: true,
             });
+            return;
+        }
+        // ========== ⚡ ابدأ الآن — بداية فورية بدون انتظار ٦٠ ثانية ==========
+        if (action === 'start') {
+            if (game.phase !== 'lobby') {
+                await interaction.reply({ content: '❌ بدأت اللعبة بالفعل — استمتع بالجولة!', ephemeral: true });
+                return;
+            }
+            const member = interaction.member;
+            const perms = member?.permissions;
+            const isCreator = game.players[0]?.id === interaction.user.id;
+            const isAdmin = interaction.guild.ownerId === interaction.user.id ||
+                perms?.has?.(discord_js_2.PermissionFlagsBits.ManageGuild) ||
+                perms?.has?.(discord_js_2.PermissionFlagsBits.Administrator);
+            if (!isCreator && !isAdmin) {
+                await interaction.reply({
+                    content: '⛔ الزر ده لمنشئ اللعبة أو لإدارة السيرفر فقط.',
+                    ephemeral: true,
+                });
+                return;
+            }
+            if (game.players.length < rouletteGame_1.MIN_ROULETTE_PLAYERS) {
+                await interaction.reply({
+                    content: `⚠️ لازم عدد **${rouletteGame_1.MIN_ROULETTE_PLAYERS}** لاعبين على الأقل للبداية — اظغط **🤖 إضافة بوتات** أو انتظر دخول البقية.`,
+                    ephemeral: true,
+                });
+                return;
+            }
+            await interaction.reply({ content: '⚡ **بدأت اللعبة الآن!** — العجلة الجاهزة تدور...', ephemeral: true });
+            // نفس مسار المؤقّت — لكن فوراً (وفي حال اكتمل العدد نكمل نفس الخطوات)
+            await (0, rouletteGame_1.startRouletteGame)(interaction.client, game.id);
             return;
         }
         // ========== خروج من اللعبة ==========
