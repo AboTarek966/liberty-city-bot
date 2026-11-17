@@ -275,10 +275,11 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
           format: 'gif',
           orientation: 'portrait',
           resultLabel: 'OUT',
-          frames: 10,
-          delayMs: 55,
+          frames: 16,
+          delayMs: 60,
+          holdMs: 1200,
         },
-        40000
+        45000
       );
       logger.info(
         `🎡 wheel pre-render: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t0}ms` : 'FAILED/timeout'}`
@@ -304,10 +305,11 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
             format: 'gif',
             orientation: 'portrait',
             resultLabel: 'OUT',
-            frames: 8,
-            delayMs: 55,
+            frames: 12,
+            delayMs: 60,
+            holdMs: 1000,
           },
-          40000
+          45000
         );
         logger.info(
           `🎡 wheel retry: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t1}ms` : 'FAILED/timeout'}`
@@ -319,7 +321,7 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
     }
   }
 
-  // نُخزّنها على بيانات اللعبة — رسالة الطرد التالية ستعرضها أيضاً (تأكيد إضافي أنها أمام اللاعب)
+  // نُخزّنها على بيانات اللعبة — رسالة الطرد والزر التفاعلي يعيدان استخدامها
   game.lastWheelGif = gif;
 
   const playerListText = `👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`;
@@ -336,20 +338,40 @@ export async function runRouletteRound(client: OmniClient, game: RouletteGame): 
 
   game.choiceTimer && clearTimeout(game.choiceTimer);
 
+  const viewWheelRow = gif
+    ? [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`roulette:wheel:${game.id}`)
+            .setLabel('شاهد العجلة')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('🎡')
+        ),
+      ]
+    : [];
+
   let spinMessage: any = null;
   if (gif) {
     // المحاولة الأولى: الإمبد + الـGIF مضمن جوه + المرفق
     spinMessage = await channel
-      .send({ embeds: [buildSpinEmbed(true)], files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })] })
+      .send({
+        embeds: [buildSpinEmbed(true)],
+        files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })],
+        components: viewWheelRow,
+      })
       .catch((sendErr: any) => {
         logger.warn(`🎡 wheel send-with-gif failed: ${String(sendErr?.message || sendErr).slice(0, 200)}`);
         return null;
       });
     if (!spinMessage) {
       // المحاولة الثانية: إمبد بدون صورة (تجنّب embed.image يشير لمرفق غير موجود)
-      spinMessage = await channel.send({ embeds: [buildSpinEmbed(false)] }).catch(() => null);
+      spinMessage = await channel
+        .send({ embeds: [buildSpinEmbed(false)], components: viewWheelRow })
+        .catch(() => null);
       // المحاولة الثالثة: الـGIF كرسالة منفصلة إن كانت المرفقات تعمل
-      await channel.send({ content: '🎡', files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })] }).catch(() => null);
+      await channel
+        .send({ content: '🎡', files: [new AttachmentBuilder(gif, { name: 'roulette.gif' })] })
+        .catch(() => null);
     }
   } else {
     spinMessage = await channel.send({ embeds: [buildSpinEmbed(false)] }).catch(() => null);
@@ -407,7 +429,6 @@ async function openKickMenu(client: OmniClient, gameId: string, chooserId: strin
 
   // 🎡 الـGIF اللي بتنتظرها — نفس العجلة تظهر جوه رسالة الطرد (مضمونة أمام اللاعب أثناء الاختيار)
   const wheelGif = game.lastWheelGif || null;
-  game.lastWheelGif = undefined;
 
   const buildKickEmbed = (withImage: boolean) => {
     const e = new EmbedBuilder()

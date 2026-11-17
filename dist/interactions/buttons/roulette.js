@@ -101,6 +101,23 @@ const handler = {
             await (0, rouletteGame_1.startRouletteGame)(interaction.client, game.id);
             return;
         }
+        // ========== 🎡 مشاهدة العجلة (تفاعلي) ==========
+        if (action === 'wheel') {
+            const gif = game.lastWheelGif;
+            if (!gif) {
+                await interaction.reply({
+                    content: '🎡 العجلة لهذه الجولة غير متاحة حالياً — انتظر الجولة التالية.',
+                    ephemeral: true,
+                });
+                return;
+            }
+            await interaction.reply({
+                content: '🎡 **عجلة الروليت — الجولة الحالية**',
+                files: [new discord_js_1.AttachmentBuilder(Buffer.from(gif), { name: 'roulette.gif' })],
+                ephemeral: true,
+            });
+            return;
+        }
         // ========== خروج من اللعبة ==========
         if (action === 'leave') {
             if (game.phase !== 'lobby') {

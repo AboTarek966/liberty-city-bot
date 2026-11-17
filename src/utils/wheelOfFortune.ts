@@ -723,7 +723,12 @@ export async function renderWheelOfFortuneGif(opts: WheelOfFortuneOptions): Prom
 
     const { data } = ctx.getImageData(0, 0, W, H);
     const index = applyPalette(data as any, palette);
-    gif.writeFrame(index, W, H, { palette, delay: isFinal ? holdMs : delayMs, transparent: false });
+    gif.writeFrame(index, W, H, {
+      palette,
+      delay: isFinal ? holdMs : delayMs,
+      transparent: false,
+      repeat: 0, // تكرار لا نهائي — حركة مستمرة بدون الحاجة للتمرير بالماوس
+    });
 
     // إعطاء مجال لـ event loop بين الإطارات لتقليل تجميد البوت
     if (!isFinal && i % 2 === 1) {

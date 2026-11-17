@@ -220,9 +220,10 @@ async function runRouletteRound(client, game) {
                 format: 'gif',
                 orientation: 'portrait',
                 resultLabel: 'OUT',
-                frames: 10,
-                delayMs: 55,
-            }, 40000);
+                frames: 16,
+                delayMs: 60,
+                holdMs: 1200,
+            }, 45000);
             logger.info(`🎡 wheel pre-render: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t0}ms` : 'FAILED/timeout'}`);
         }
         catch (err) {
@@ -245,9 +246,10 @@ async function runRouletteRound(client, game) {
                     format: 'gif',
                     orientation: 'portrait',
                     resultLabel: 'OUT',
-                    frames: 8,
-                    delayMs: 55,
-                }, 40000);
+                    frames: 12,
+                    delayMs: 60,
+                    holdMs: 1000,
+                }, 45000);
                 logger.info(`🎡 wheel retry: ${gif ? `${Math.round(gif.length / 1024)}KB in ${Date.now() - t1}ms` : 'FAILED/timeout'}`);
             }
             catch (err) {
@@ -256,7 +258,7 @@ async function runRouletteRound(client, game) {
             }
         }
     }
-    // نُخزّنها على بيانات اللعبة — رسالة الطرد التالية ستعرضها أيضاً (تأكيد إضافي أنها أمام اللاعب)
+    // نُخزّنها على بيانات اللعبة — رسالة الطرد والزر التفاعلي يعيدان استخدامها
     game.lastWheelGif = gif;
     const playerListText = `👥 **المتبقون (${game.players.length})**\n${playerBlock(game.players).slice(0, 3500)}`;
     const buildSpinEmbed = (withImage) => {
@@ -271,20 +273,37 @@ async function runRouletteRound(client, game) {
         return e;
     };
     game.choiceTimer && clearTimeout(game.choiceTimer);
+    const viewWheelRow = gif
+        ? [
+            new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+                .setCustomId(`roulette:wheel:${game.id}`)
+                .setLabel('شاهد العجلة')
+                .setStyle(discord_js_1.ButtonStyle.Secondary)
+                .setEmoji('🎡')),
+        ]
+        : [];
     let spinMessage = null;
     if (gif) {
         // المحاولة الأولى: الإمبد + الـGIF مضمن جوه + المرفق
         spinMessage = await channel
-            .send({ embeds: [buildSpinEmbed(true)], files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })] })
+            .send({
+            embeds: [buildSpinEmbed(true)],
+            files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })],
+            components: viewWheelRow,
+        })
             .catch((sendErr) => {
             logger.warn(`🎡 wheel send-with-gif failed: ${String(sendErr?.message || sendErr).slice(0, 200)}`);
             return null;
         });
         if (!spinMessage) {
             // المحاولة الثانية: إمبد بدون صورة (تجنّب embed.image يشير لمرفق غير موجود)
-            spinMessage = await channel.send({ embeds: [buildSpinEmbed(false)] }).catch(() => null);
+            spinMessage = await channel
+                .send({ embeds: [buildSpinEmbed(false)], components: viewWheelRow })
+                .catch(() => null);
             // المحاولة الثالثة: الـGIF كرسالة منفصلة إن كانت المرفقات تعمل
-            await channel.send({ content: '🎡', files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })] }).catch(() => null);
+            await channel
+                .send({ content: '🎡', files: [new discord_js_1.AttachmentBuilder(gif, { name: 'roulette.gif' })] })
+                .catch(() => null);
         }
     }
     else {
@@ -331,7 +350,6 @@ async function openKickMenu(client, gameId, chooserId) {
     const chooserDisplay = chooser ? playerDisplay(chooser) : '**لاعب**';
     // 🎡 الـGIF اللي بتنتظرها — نفس العجلة تظهر جوه رسالة الطرد (مضمونة أمام اللاعب أثناء الاختيار)
     const wheelGif = game.lastWheelGif || null;
-    game.lastWheelGif = undefined;
     const buildKickEmbed = (withImage) => {
         const e = new discord_js_1.EmbedBuilder()
             .setColor(COLOR)

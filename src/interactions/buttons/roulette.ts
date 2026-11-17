@@ -2,7 +2,7 @@
 // Omni Bot - 🔫 أزرار لعبة الروليت (اللوبي + اختيار الطرد)
 // ============================================
 
-import { ButtonInteraction, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
+import { ButtonInteraction, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { PermissionFlagsBits } from 'discord.js';
 import {
@@ -118,6 +118,24 @@ const handler: ButtonHandler = {
       await interaction.reply({ content: '⚡ **بدأت اللعبة الآن!** — العجلة الجاهزة تدور...', ephemeral: true });
       // نفس مسار المؤقّت — لكن فوراً (وفي حال اكتمل العدد نكمل نفس الخطوات)
       await startRouletteGame(interaction.client as OmniClient, game.id);
+      return;
+    }
+
+    // ========== 🎡 مشاهدة العجلة (تفاعلي) ==========
+    if (action === 'wheel') {
+      const gif = game.lastWheelGif;
+      if (!gif) {
+        await interaction.reply({
+          content: '🎡 العجلة لهذه الجولة غير متاحة حالياً — انتظر الجولة التالية.',
+          ephemeral: true,
+        });
+        return;
+      }
+      await interaction.reply({
+        content: '🎡 **عجلة الروليت — الجولة الحالية**',
+        files: [new AttachmentBuilder(Buffer.from(gif), { name: 'roulette.gif' })],
+        ephemeral: true,
+      });
       return;
     }
 
