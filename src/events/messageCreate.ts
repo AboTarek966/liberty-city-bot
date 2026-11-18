@@ -383,13 +383,15 @@ const event: Event = {
 // --------------------------------------------
 // Alias / Prefix Command Handler
 // --------------------------------------------
-/** دمج الاختصارات المدمجة مع اختصارات السيرفر */
+/** دمج الاختصارات المدمجة مع اختصارات السيرفر — المدمج له الأولوية المطلقة ويستبدل أي اختصار للسيرفر بنفس المفتاح */
 function mergeWithBuiltins(allAliases: Map<string, any[]>, guildId: string): Map<string, any[]> {
   if (BUILTIN_ALIASES.size === 0) return allAliases;
   const merged = new Map(allAliases);
   for (const [shortcut] of BUILTIN_ALIASES) {
     const builtin = makeBuiltinAlias(guildId, shortcut);
-    if (builtin) merged.set(shortcut, [...(merged.get(shortcut) || []), builtin]);
+    // المدمج يفرض نفسه: ما يُضم مع اختصار للسيرفر بنفس المفتاح
+    // (لو انضم سيظهر picker menu بين «تنتيل → demote» و«تنتيل → شيء-ثان» وكان مضلل للمدير)
+    if (builtin) merged.set(shortcut, [builtin]);
   }
   return merged;
 }
