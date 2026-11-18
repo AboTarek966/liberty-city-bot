@@ -32,7 +32,8 @@ const handler = {
         const who = isBotAdmin ? 'مالك البوت' : 'صاحب أعلى رول';
         const parts = interaction.customId.split(':'); // [ownappr, yes|no, field]
         const verdict = parts[1];
-        const field = parts[2];
+        // الحقل قد يحتوي نقطتين (مثل chan:<id>:<check> أو path:...) — نأخذ الباقي كاملاً
+        const field = parts.slice(2).join(':');
         const label = (0, ownerApproval_1.protectionFieldLabel)(field);
         const pending = (0, ownerApproval_1.takePending)(interaction.guild.id, field);
         if (!pending) {
@@ -124,6 +125,8 @@ const handler = {
                         node = node[p];
                     }
                     node[parts[parts.length - 1]] = false;
+                    // 🧩 حقول Mixed (مثل securityModules.modules) لا يكتشفها Mongoose تلقائياً
+                    settings.markModified('protection');
                 }
             }
             else {

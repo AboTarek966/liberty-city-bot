@@ -53,6 +53,8 @@ export declare class SecurityHandler {
     private messageRate;
     private createTracker;
     private actionTracker;
+    private trustedAllowanceTracker;
+    private trustedAllowanceDecisions;
     private slowActionTracker;
     private handledTargets;
     private botGuardTimers;
@@ -185,6 +187,18 @@ export declare class SecurityHandler {
     ensureHierarchyAlert(guild: Guild): Promise<HierarchyStatus>;
     private isWhitelisted;
     private isTrustedExecutor;
+    /** هل العضو في الوايت ليست الموثوقة؟ (يفحص البوتات أيضاً) */
+    private isTrustedWhitelisted;
+    /**
+     * استهلاك مساحة الوايت ليست الموثوقة.
+     * @returns true = مسموح لهذه المرة (بدون عقوبة)، false = تجاوز الحد → تُترك الحماية العادية
+     */
+    private consumeTrustedAllowance;
+    /**
+     * 🛡️ تنفيذ وحدات الحماية الموسّعة من سجل التدقيق.
+     * @returns true = تمّت معالجة الحدث (لا تُكمِل بقية فحوصات anti-nuke)
+     */
+    private handleExtendedSecurityModule;
     /** هل المنفّذ بوت؟ — يعمل حتى لو كان كائن المستخدم جزئياً (من سجلات التدقيق) */
     private executorIsBot;
     /** اسم مقروء للمنفّذ حتى لو كان جزئياً */

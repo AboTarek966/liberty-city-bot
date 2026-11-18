@@ -243,6 +243,36 @@ export interface IGuildSettings extends Document {
       maxLength: number;
       logChannel?: string;
     };
+    /** 🛡️ وحدات الحماية الموسّعة — عشرات الأنواع الإضافية من سجلات التدقيق */
+    securityModules?: {
+      enabled: boolean;
+      /** مفتاح الوحدة → إعداداتها (الافتراضي من سجل utils/securityModules) */
+      modules: Record<
+        string,
+        {
+          enabled?: boolean;
+          limit?: number;
+          windowSeconds?: number;
+          action?: 'alert' | 'kick' | 'ban' | 'strip';
+        }
+      >;
+      logChannel?: string;
+    };
+    /** 👑 الوايت ليست الموثوقة — مالك السيرفر فقط، ومساحة محدودة تحت الحماية */
+    trustedWhitelist?: {
+      enabled: boolean;
+      userIds: string[];
+      entries?: Array<{ userId: string; addedBy: string; addedAt: Date }>;
+      /** عدد الإجراءات الخفيفة المسموحة داخل النافذة */
+      minorActions: number;
+      minorWindowSeconds: number;
+      /** عدد الإجراءات الحساسة المسموحة داخل النافذة */
+      criticalActions: number;
+      criticalWindowSeconds: number;
+      /** هل يُسمح أصلاً بإجراء حساس واحد؟ (الافتراضي نعم — واحد فقط) */
+      allowDestructive: boolean;
+      logChannel?: string;
+    };
     /** 📋 Whitelist — استثناء من الحظر الوقائي فقط، والهجوم السريع يُعاقب */
     whitelist?: {
       enabled: boolean;
@@ -1154,6 +1184,28 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
       ignoredRoles: [{ type: String }],
       showOriginal: { type: Boolean, default: true },
       maxLength: { type: Number, default: 2000 },
+      logChannel: { type: String },
+    },
+    securityModules: {
+      enabled: { type: Boolean, default: true },
+      // مفاتيح الوحدات وإعداداتها — Mixed حتى لا نحتاج migration لكل وحدة جديدة
+      modules: { type: Schema.Types.Mixed, default: {} },
+      logChannel: { type: String },
+    },
+    trustedWhitelist: {
+      enabled: { type: Boolean, default: true },
+      userIds: [{ type: String }],
+      entries: [{
+        _id: false,
+        userId: { type: String, required: true },
+        addedBy: { type: String },
+        addedAt: { type: Date, default: Date.now },
+      }],
+      minorActions: { type: Number, default: 3, min: 0, max: 50 },
+      minorWindowSeconds: { type: Number, default: 300, min: 10, max: 86400 },
+      criticalActions: { type: Number, default: 1, min: 0, max: 10 },
+      criticalWindowSeconds: { type: Number, default: 600, min: 30, max: 86400 },
+      allowDestructive: { type: Boolean, default: false },
       logChannel: { type: String },
     },
     whitelist: {

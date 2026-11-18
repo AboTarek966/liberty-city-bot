@@ -25,6 +25,18 @@ import { Colors } from '../utils/embeds';
 import { globalThreat } from '../utils/threatScore';
 import { isMaliciousSecurityName } from '../utils/securityNames';
 import { securityAlertsSilent } from '../utils/securityAlerts';
+import {
+  getSecurityModule,
+  securityModulesForEvent,
+  type SecurityAction,
+  type SecurityModuleDefinition,
+} from '../utils/securityModules';
+import {
+  auditEventAllowanceKind,
+  auditEventLabel,
+  getTrustedWhitelistConfig,
+  isTrustedWhitelistMember,
+} from '../utils/trustedWhitelist';
 
 const logger = createLogger('SecurityHandler');
 
@@ -64,7 +76,8 @@ type TrackActionKind =
   | 'guild'
   | 'overwrite'
   | 'member-role'
-  | 'role-update';
+  | 'role-update'
+  | `mod:${string}`;
 
 /** عضو طُرد — نحتفظ به حتى نرسله رابط الدعوة لاستعادته */
 interface KickedEntry {
@@ -244,6 +257,10 @@ export class SecurityHandler {
 
   // 📈 معدل الحظر/الطرد لكل منفّذ — لا نخلط بين مشرفين مختلفين
   private actionTracker: Map<string, number[]> = new Map();
+
+  // 👑 الوايت ليست الموثوقة: عدّاد المساحة المحدودة + قرارات مكرّرة لكل هدف
+  private trustedAllowanceTracker: Map<string, number[]> = new Map();
+  private trustedAllowanceDecisions: Map<string, { allowed: boolean; at: number }> = new Map();
 
   // 🐢 حارس النيوك البطيء (تراكمي 10 دقائق) — يمنع التدمير التدريجي
   private slowActionTracker: Map<string, number[]> = new Map();
@@ -452,6 +469,8 @@ export class SecurityHandler {
     for (const key of this.rapidBanKickTracker.keys()) if (key.startsWith(`${guildId}:`)) this.rapidBanKickTracker.delete(key);
     for (const key of this.rapidBanKickLocks.keys()) if (key.startsWith(`${guildId}:`)) this.rapidBanKickLocks.delete(key);
     for (const key of this.actionTracker.keys()) if (key.startsWith(`${guildId}:`)) this.actionTracker.delete(key);
+    for (const key of this.trustedAllowanceTracker.keys()) if (key.startsWith(`${guildId}:`)) this.trustedAllowanceTracker.delete(key);
+    for (const key of this.trustedAllowanceDecisions.keys()) if (key.startsWith(`${guildId}:`)) this.trustedAllowanceDecisions.delete(key);
     for (const key of this.strikeRegistry.keys()) if (key.startsWith(`${guildId}:`)) this.strikeRegistry.delete(key);
     logger.info(`🧹 Cleared all per-guild resources for ${guildId}`);
   }
@@ -516,6 +535,14 @@ export class SecurityHandler {
       const fresh = arr.filter(t => now - t <= 60000);
       if (fresh.length) this.actionTracker.set(key, fresh);
       else this.actionTracker.delete(key);
+    }
+    for (const [key, arr] of this.trustedAllowanceTracker) {
+      const fresh = arr.filter(t => now - t <= 60 * 60 * 1000);
+      if (fresh.length) this.trustedAllowanceTracker.set(key, fresh);
+      else this.trustedAllowanceTracker.delete(key);
+    }
+    for (const [key, decision] of this.trustedAllowanceDecisions) {
+      if (now - decision.at > 60000) this.trustedAllowanceDecisions.delete(key);
     }
     for (const [key, arr] of this.rapidBanKickTracker) {
       const fresh = arr.filter(t => now - t <= 10000);
@@ -1131,8 +1158,28 @@ export class SecurityHandler {
     settings: any,
     cfg: any,
     label: string,
-    opts: { forceBan?: boolean; targetId?: string; deleteTargetKind?: 'channel' | 'role' } = {}
+    opts: {
+      forceBan?: boolean;
+      targetId?: string;
+      deleteTargetKind?: 'channel' | 'role';
+      /** مفتاح منع احتساب المساحة الموثوقة مرتين لنفس الوحدة */
+      allowanceKey?: string;
+    } = {}
   ): Promise<void> {
+    // 👑 الوايت ليست الموثوقة: مساحة محدودة قبل أي عقوبة
+    if (
+      await this.consumeTrustedAllowance(
+        guild,
+        executor,
+        settings,
+        'critical',
+        opts.allowanceKey || `instant:${label}`,
+        opts.targetId,
+        label
+      )
+    ) {
+      return;
+    }
     const reason = `Omni — ${label} (Anti-Nuke — ردّ فوري)`;
     if (this.executorIsBot(guild, executor) && (opts.forceBan || cfg?.mode !== 'react')) {
       void this.blacklistBot(executor.id, `instant violation: ${label}`, guild.id);
@@ -1572,14 +1619,37 @@ export class SecurityHandler {
 
       const settings = await getGuildSettings(guild.id);
       const cfg = settings.protection?.antiNuke;
-      if (!cfg?.enabled) return; // 🛑 احترام إطفاء مضاد النيوك
 
       // 📋 Role/Channel whitelist for anti-nuke
-      if (entry.targetId && Array.isArray(cfg.whitelistedChannels) && cfg.whitelistedChannels.includes(entry.targetId)) return;
-      if (entry.targetId && Array.isArray(cfg.whitelistedRoles) && cfg.whitelistedRoles.includes(entry.targetId)) return;
+      if (entry.targetId && Array.isArray(cfg?.whitelistedChannels) && cfg.whitelistedChannels.includes(entry.targetId)) return;
+      if (entry.targetId && Array.isArray(cfg?.whitelistedRoles) && cfg.whitelistedRoles.includes(entry.targetId)) return;
+
+      const action = entry.action as AuditLogEvent;
+
+      // 🛡️ وحدات الحماية الموسّعة (35+ نوعاً إضافياً) — مستقلة عن مفتاح antiNuke
+      //    وهي تستهلك مساحة الوايت ليست الموثوقة بنفسها حسب تصنيف الوحدة
+      if (await this.handleExtendedSecurityModule(guild, executor, settings, entry)) return;
+
+      // 🛑 احترام إطفاء مضاد النيوك الأساسي (الوحدات تعمل أعلاه باستقلال)
+      if (!cfg?.enabled) return;
+
+      // 👑 الوايت ليست الموثوقة: مساحة محدودة لبقية أحداث الحماية الأساسية
+      //    (تُستهلك مرة واحدة لكل هدف، وأي تجاوز يُكمل إلى الحماية العادية)
+      if (await this.isTrustedWhitelisted(guild, settings, executor.id)) {
+        const allowanceKind = auditEventAllowanceKind(action);
+        const allowed = await this.consumeTrustedAllowance(
+          guild,
+          executor,
+          settings,
+          allowanceKind,
+          `audit:${action}`,
+          entry.targetId,
+          auditEventLabel(action)
+        );
+        if (allowed) return;
+      }
 
       const isBot = this.executorIsBot(guild, executor);
-      const action = entry.action as AuditLogEvent;
       const bot = isBot;
       // 👑 القائمة البيضاء = استثناء وقائي فقط (وليس من عقوبة الهجوم السريع)
       const preWhitelisted = this.isPreemptivelyWhitelisted(settings, executor.id);
@@ -2366,6 +2436,257 @@ export class SecurityHandler {
     return false;
   }
 
+  // --------------------------------------------
+  // 👑 الوايت ليست الموثوقة — مساحة محدودة تحت الحماية
+  //    • مالك السيرفر فقط يضيف/يزيل (من الأمر /trusted)
+  //    • البوتات ممنوعة دائماً — لا حصانة لأي بوت
+  //    • ليست حصانة: تجاوز الحد = عقوبة عادية
+  // --------------------------------------------
+
+  /** هل العضو في الوايت ليست الموثوقة؟ (يفحص البوتات أيضاً) */
+  private async isTrustedWhitelisted(
+    guild: Guild,
+    settings: any,
+    userId: string
+  ): Promise<boolean> {
+    if (!userId) return false;
+    if (!isTrustedWhitelistMember(settings, userId)) return false;
+    if (userId === this.client.user?.id) return false;
+    const member = guild.members.cache.get(userId);
+    if (member) return member.user.bot !== true;
+    const cached = this.client.users.cache.get(userId);
+    if (cached) return cached.bot !== true;
+    const user = await this.client.users.fetch(userId).catch(() => null);
+    return !!user && !user.bot;
+  }
+
+  /**
+   * استهلاك مساحة الوايت ليست الموثوقة.
+   * @returns true = مسموح لهذه المرة (بدون عقوبة)، false = تجاوز الحد → تُترك الحماية العادية
+   */
+  private async consumeTrustedAllowance(
+    guild: Guild,
+    executor: User,
+    settings: any,
+    kind: 'minor' | 'critical',
+    actionKey: string,
+    targetId: string | undefined,
+    label: string
+  ): Promise<boolean> {
+    try {
+      if (!executor) return false;
+      if (executor.id === guild.ownerId) return false; // المالك حر أصلاً
+      if (this.executorIsBot(guild, executor)) return false; // لا وايت ليست للبوتات
+      if (!(await this.isTrustedWhitelisted(guild, settings, executor.id))) return false;
+
+      const cfg = getTrustedWhitelistConfig(settings);
+      const limit =
+        kind === 'minor'
+          ? cfg.minorActions
+          : cfg.allowDestructive
+            ? cfg.criticalActions
+            : 0;
+      if (limit <= 0) return false;
+
+      const windowMs =
+        (kind === 'minor' ? cfg.minorWindowSeconds : cfg.criticalWindowSeconds) * 1000;
+
+      // نفس الهدف خلال 30 ثانية = نفس القرار (يمنع احتساب الحدث وسجل التدقيق مرتين)
+      const dedupeKey = `${guild.id}:trusted-decision:${executor.id}:${kind}:${
+        targetId || actionKey
+      }`;
+      const previous = this.trustedAllowanceDecisions.get(dedupeKey);
+      if (previous && Date.now() - previous.at < 30_000) return previous.allowed;
+
+      const trackerKey = `${guild.id}:trusted:${executor.id}:${kind}`;
+      const now = Date.now();
+      const arr = (this.trustedAllowanceTracker.get(trackerKey) || []).filter(
+        (t) => now - t <= windowMs
+      );
+      const allowed = arr.length < limit;
+      if (allowed) arr.push(now);
+      this.trustedAllowanceTracker.set(trackerKey, arr);
+      this.trustedAllowanceDecisions.set(dedupeKey, { allowed, at: now });
+
+      const logKey = `${guild.id}:trusted-log:${executor.id}:${kind}`;
+      if (!this.markHandled(logKey)) {
+        const ch = await this.getAlertChannel(
+          guild,
+          settings,
+          cfg.logChannel || settings?.protection?.logChannel
+        );
+        ch
+          ?.send({
+            content: allowed
+              ? `👑 **مساحة موثوقة** — ${executor} (\`${executor.id}\`) استخدم إذن **${label}**\n` +
+                `📊 ${kind === 'minor' ? 'خفيف' : 'حساس'}: **${arr.length}/${limit}** خلال ${Math.round(
+                  windowMs / 1000
+                )} ثانية — الحماية ما زالت مفعّلة عليه.`
+              : `⛔ **تجاوز مساحة موثوقة** — ${executor} (\`${executor.id}\`) حاول **${label}** بعد استهلاك الحد (${limit}).\n` +
+                `🛡️ ستُطبَّق الحماية والعقوبة العادية الآن.`,
+          })
+          .catch(() => {});
+      }
+
+      logger.info(
+        `👑 Trusted whitelist: ${executor.id} ${allowed ? 'allowed' : 'exceeded'} ${kind} (${label}) in ${guild.name} — ${arr.length}/${limit}`
+      );
+      return allowed;
+    } catch (error: any) {
+      logger.warn(`consumeTrustedAllowance error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * 🛡️ تنفيذ وحدات الحماية الموسّعة من سجل التدقيق.
+   * @returns true = تمّت معالجة الحدث (لا تُكمِل بقية فحوصات anti-nuke)
+   */
+  private async handleExtendedSecurityModule(
+    guild: Guild,
+    executor: User,
+    settings: any,
+    entry: any
+  ): Promise<boolean> {
+    const action = Number(entry?.action) as AuditLogEvent;
+    const modules = securityModulesForEvent(action);
+    if (!modules.length) return false;
+
+    const cfg = settings?.protection?.securityModules;
+    if (cfg?.enabled === false) return false; // نظام الوحدات مطفأ — تبقى الحماية الأساسية
+
+    for (const mod of modules) {
+      if (typeof mod.match === 'function' && !mod.match(entry)) continue;
+
+      const override = cfg?.modules?.[mod.key];
+      if (override?.enabled === false) continue;
+
+      const limit = Math.max(
+        1,
+        Number(override?.limit ?? mod.defaultLimit) || mod.defaultLimit
+      );
+      const windowMs =
+        Math.max(
+          5,
+          Number(override?.windowSeconds ?? mod.defaultWindowSeconds) ||
+            mod.defaultWindowSeconds
+        ) * 1000;
+      const configuredAction = (override?.action ?? mod.defaultAction) as SecurityAction;
+      const isBot = this.executorIsBot(guild, executor);
+      const preWhitelistedBot = isBot && this.isPreemptivelyWhitelisted(settings, executor.id);
+      // 🤖 أي بوت غير مصرّح = صفر تسامح: أول عملية تُعاقب فوراً
+      const zeroToleranceBot = isBot && !preWhitelistedBot;
+      const effectiveLimit = zeroToleranceBot ? 1 : limit;
+
+      const kind: TrackActionKind = `mod:${mod.key}`;
+      const count = this.trackActionOnce(
+        guild.id,
+        executor.id,
+        kind,
+        entry.targetId,
+        windowMs
+      );
+      // تحت الحد: لا نُغلق الطريق على مضاد النيوك الأساسي — طبقات الحماية تتكامل
+      if (count < effectiveLimit) continue;
+
+      // 👑 الوايت ليست الموثوقة: مساحة محدودة قبل العقوبة (البوتات ممنوعة دائماً)
+      if (
+        !isBot &&
+        (await this.consumeTrustedAllowance(
+          guild,
+          executor,
+          settings,
+          mod.minor ? 'minor' : 'critical',
+          `module:${mod.key}`,
+          entry.targetId,
+          mod.name
+        ))
+      ) {
+        return true;
+      }
+
+      const label = `${mod.name} (${auditEventLabel(action)})`;
+      const forceBan = zeroToleranceBot || configuredAction === 'ban';
+
+      // 🤖 بوت غير مصرّح: تحييد فوري بغض النظر عن عقوبة الوحدة
+      if (zeroToleranceBot) {
+        await this.handleInstantViolation(
+          guild,
+          executor,
+          settings,
+          {
+            ...(settings?.protection?.antiNuke || {}),
+            action: 'ban',
+            mode: 'prevent',
+            logChannel: cfg?.logChannel || settings?.protection?.antiNuke?.logChannel,
+          },
+          label,
+          { forceBan: true, targetId: entry.targetId, allowanceKey: `module:${mod.key}` }
+        );
+        return true;
+      }
+
+      // 📢 تنبيه فقط — لا عقوبة
+      if (configuredAction === 'alert') {
+        const ch = await this.getAlertChannel(
+          guild,
+          settings,
+          cfg?.logChannel || settings?.protection?.logChannel
+        );
+        ch
+          ?.send({
+            content:
+              `🛡️ **${mod.emoji} ${mod.name}** — تجاوز الحد (${count}/${effectiveLimit} خلال ${Math.round(
+                windowMs / 1000
+              )}ث)\n👤 المنفّذ: ${executor} (\`${executor.id}\`)\n${mod.description}`,
+          })
+          .catch(() => {});
+      } else if (configuredAction === 'strip') {
+        const stripped = await this.stripRolesById(
+          guild,
+          executor.id,
+          `Omni — ${mod.name} (حماية موسّعة)`
+        ).catch(() => false);
+        const ch = await this.getAlertChannel(
+          guild,
+          settings,
+          cfg?.logChannel || settings?.protection?.logChannel
+        );
+        ch
+          ?.send({
+            content:
+              `🛡️ **${mod.emoji} ${mod.name}** — تجاوز الحد (${count}/${effectiveLimit})\n` +
+              `👤 المنفّذ: ${executor} (\`${executor.id}\`)\n` +
+              `${stripped ? '🗡️ سُحبت رولاته' : '⚠️ تعذّر سحب الرولات — تحقّق من الهرمية'}`,
+          })
+          .catch(() => {});
+      } else {
+        await this.handleInstantViolation(
+          guild,
+          executor,
+          settings,
+          {
+            ...(settings?.protection?.antiNuke || {}),
+            action: configuredAction,
+            mode: forceBan ? 'prevent' : 'react',
+            logChannel: cfg?.logChannel || settings?.protection?.antiNuke?.logChannel,
+          },
+          label,
+          { forceBan, targetId: entry.targetId, allowanceKey: `module:${mod.key}` }
+        );
+      }
+
+      logger.warn(
+        `🛡️ Security module [${mod.key}]: ${label} in ${guild.name} | executor=${this.userLabel(
+          executor
+        )} | ${count}/${effectiveLimit}`
+      );
+      return true;
+    }
+
+    return false;
+  }
+
   /** هل المنفّذ بوت؟ — يعمل حتى لو كان كائن المستخدم جزئياً (من سجلات التدقيق) */
   private executorIsBot(guild: Guild, executor: any): boolean {
     if (!executor) return false;
@@ -3087,13 +3408,25 @@ export class SecurityHandler {
         if (count < Math.max(2, antiNuke.threshold ?? 2)) return;
       }
       const preventMode = antiNuke.mode !== 'react';
-      const punishText = await this.neutralizeById(
+      // 👑 الوايت ليست الموثوقة: قد يُسمح بإعطاء رول خطير واحد قبل العقوبة
+      const trustedFree = await this.consumeTrustedAllowance(
         guild,
         executor,
-        antiNuke,
-        'Omni Anti-Nuke: إعطاء رولات خطيرة بدون تصريح',
-        executorIsBot || preventMode
+        settings,
+        'critical',
+        'member-role',
+        newMember.id,
+        'إعطاء رول خطير'
       );
+      const punishText = trustedFree
+        ? '👑 مساحة موثوقة — استُرجعت الرولات بدون عقوبة (المخالفة القادمة تُعاقب)'
+        : await this.neutralizeById(
+            guild,
+            executor,
+            antiNuke,
+            'Omni Anti-Nuke: إعطاء رولات خطيرة بدون تصريح',
+            executorIsBot || preventMode
+          );
       await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
 
       const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
@@ -3182,13 +3515,25 @@ export class SecurityHandler {
       // 2️⃣ العقوبة — حظر فوري بالمعرّف (ولو فشل: سحب كل الرولات)
       const isBot = this.executorIsBot(guild, entry.executor);
       const prevent = antiNuke.mode !== 'react';
-      const text = await this.neutralizeById(
+      // 👑 الوايت ليست الموثوقة: قد يُسمح بتجاوز واحد مع إرجاع الصلاحيات دائماً
+      const trustedFree = await this.consumeTrustedAllowance(
         guild,
         entry.executor,
-        antiNuke,
-        'Omni — منح @everyone صلاحيات خطيرة (Anti-Nuke)',
-        isBot || prevent
+        settings,
+        'critical',
+        'channel-overwrite',
+        newChannel.id,
+        'منح @everyone صلاحيات خطيرة'
       );
+      const text = trustedFree
+        ? '👑 مساحة موثوقة — أُرجعت الصلاحيات بدون عقوبة (التكرار يُعاقب)'
+        : await this.neutralizeById(
+            guild,
+            entry.executor,
+            antiNuke,
+            'Omni — منح @everyone صلاحيات خطيرة (Anti-Nuke)',
+            isBot || prevent
+          );
 
       // 3️⃣ تنبيه أحمر
       const alert = await this.getAlertChannel(guild, settings, antiNuke.logChannel);
@@ -3352,12 +3697,23 @@ export class SecurityHandler {
       // عقوبة المنفّذ
       let actionText = '⚠️ تعذّر تحديد المنفّذ';
       if (executor) {
-        actionText = await this.punish(
+        const trustedFree = await this.consumeTrustedAllowance(
           guild,
           executor,
-          cfg.action ?? 'ban',
-          `Omni Anti-Nuke: حذف جماعي للرسائل (${messages.size} رسالة)`
+          settings,
+          'critical',
+          'message-bulk',
+          channel.id,
+          'حذف جماعي للرسائل'
         );
+        actionText = trustedFree
+          ? '👑 مساحة موثوقة — استُعيدت الرسائل بدون عقوبة (التكرار يُعاقب)'
+          : await this.punish(
+              guild,
+              executor,
+              cfg.action ?? 'ban',
+              `Omni Anti-Nuke: حذف جماعي للرسائل (${messages.size} رسالة)`
+            );
       }
 
       // تنبيه
@@ -3847,6 +4203,22 @@ export class SecurityHandler {
     // تصرفات المالك/المطوّر شرعية — لا عقوبة ولا استعادة ولا تنبيه
     if (executor && trusted) return;
 
+    // 👑 الوايت ليست الموثوقة: مساحة محدودة (حذف/حظر واحد مثلاً) ثم تعود الحماية كاملة
+    if (
+      executor &&
+      (await this.consumeTrustedAllowance(
+        guild,
+        executor,
+        settings,
+        'critical',
+        `mass:${type}`,
+        targetId,
+        labels[type].label
+      ))
+    ) {
+      return;
+    }
+
     // 👑 القائمة البيضاء: استثناء وقائي فقط — عملية واحدة مسموحة، والانفجار السريع = هجوم
     const preWhitelisted = executor ? this.isPreemptivelyWhitelisted(settings, executor.id) : false;
     const burstWindow = cfg.timeWindow ?? 10000;
@@ -4183,7 +4555,19 @@ export class SecurityHandler {
           // 2️⃣ العقوبة — وضع المنع: حجر الصلاحيات ثم حظر فوري
           let punishText = 'تنبيه فقط';
           const executorMember = guild.members.cache.get(executor.id);
-          if (executorMember && preventMode) {
+          // 👑 الوايت ليست الموثوقة: تُحتسب المساحة قبل أي عقوبة (البوتات ممنوعة)
+          const trustedFree = executorMember
+            ? await this.consumeTrustedAllowance(
+                guild,
+                executor,
+                settings,
+                'critical',
+                'role-permissions',
+                newRole.id,
+                'منح صلاحيات خطيرة'
+              )
+            : false;
+          if (executorMember && preventMode && !trustedFree) {
             await executorMember.roles
               .set([], 'Omni Anti-Nuke: وضع المنع — حجر الصلاحيات')
               .catch(() => {});
@@ -4192,12 +4576,14 @@ export class SecurityHandler {
             const act: 'alert' | 'kick' | 'ban' | 'strip' = preventMode
               ? 'ban'
               : ((nukeCfg?.action ?? 'kick') as 'alert' | 'kick' | 'ban' | 'strip');
-            punishText = await this.punish(
-              guild,
-              executor,
-              act,
-              'Omni Permission Guard: منح صلاحيات خطيرة (حاجز الصلاحيات)'
-            );
+            punishText = trustedFree
+              ? '👑 مساحة موثوقة — أُرجعت الصلاحيات بدون عقوبة (التكرار يُعاقب)'
+              : await this.punish(
+                  guild,
+                  executor,
+                  act,
+                  'Omni Permission Guard: منح صلاحيات خطيرة (حاجز الصلاحيات)'
+                );
           }
 
           // 3️⃣ تقرير أمني
@@ -4244,6 +4630,17 @@ export class SecurityHandler {
       const executorMember = guild.members.cache.get(executor.id);
       if (!executorMember) return;
 
+      // 👑 الوايت ليست الموثوقة: منح Administrator واحد قد يُمرّ مع إرجاع الصلاحية دائماً
+      const trustedFree = await this.consumeTrustedAllowance(
+        guild,
+        executor,
+        settings,
+        'critical',
+        'role-admin',
+        newRole.id,
+        'منح صلاحية Administrator'
+      );
+
       // 🛡️ فحص التسلسل الهرمي
       const hierarchy = this.checkHierarchy(guild);
       if (!hierarchy.ok) {
@@ -4282,9 +4679,13 @@ export class SecurityHandler {
 
       // 2️⃣ العقوبة حسب الإعداد
       // 🛡️ الجدار الوقائي: أول مخالفة أثناء منح Administrator = عزل وسحب فقط (بدون طرد/حظر)
-      const antiAdminFirst = action !== 'alert' && this.takeStrike(guild.id, executor.id) === 'first';
+      const antiAdminFirst = !trustedFree && action !== 'alert' && this.takeStrike(guild.id, executor.id) === 'first';
       if (action === 'kick' && canKick && executorMember) {
-        if (antiAdminFirst) {
+        if (trustedFree) {
+          logger.info(
+            `👑 Trusted whitelist: Administrator granted by ${executor.tag} in ${guild.name} — permission reverted, no punishment`
+          );
+        } else if (antiAdminFirst) {
           await executorMember.roles.set([], 'Omni Anti-Nuke: وضع المنع — حجر الصلاحيات').catch(() => {});
           logger.warn(`🛡️ Shield: Anti-Admin first offense for ${executor.tag} in ${guild.name} — quarantine only`);
         } else {
@@ -4308,6 +4709,9 @@ export class SecurityHandler {
         msg += `🔔 الإجراء: تنبيه فقط (حسب إعدادات antiAdmin)`;
       } else {
         msg += `🛡️ العقوبة (${action}): ${punished ? `✅ ${punishType}` : '❌ فشل — تحقق من الصلاحيات/الهرمية'}`;
+      }
+      if (trustedFree) {
+        msg += `\n👑 **مساحة موثوقة:** أُرجعت صلاحية Administrator بدون عقوبة — التكرار يُعاقب.`;
       }
       alert?.send({ content: msg }).catch(() => {});
 
