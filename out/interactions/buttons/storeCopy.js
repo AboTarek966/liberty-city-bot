@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر نسخ أمر الدفع)
+// Omni Bot - 🛍️ متجر Omni (زر نسخ أمر الدفع)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const store_1 = require("../../utils/store");

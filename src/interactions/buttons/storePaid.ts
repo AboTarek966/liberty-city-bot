@@ -1,5 +1,5 @@
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر / دفعت وطلب التسليم)
+// Omni Bot - 🛍️ متجر Omni (زر / دفعت وطلب التسليم)
 // ============================================
 
 import {
@@ -10,17 +10,20 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { getStore, priceLine, formatCredits, buildTransferCommand } from '../../utils/store';
+import { getStore, formatCredits, buildTransferCommand, storeTypeMeta } from '../../utils/store';
 import { StoreOrder } from '../../models';
 
 /** بناء بطاقة الطلب المرسلة للبائع/قناة السجل */
 function buildOrderCard(order: any, _prefix: string, payeeId: string | undefined): EmbedBuilder {
+  const meta = storeTypeMeta(order.itemType);
+  const emoji = order.itemEmoji || meta.emoji;
   return new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle(`🛒 طلب شراء جديد — #${order.orderId}`)
     .setDescription(
       [
-        `📦 **البروجيكت:** ${order.projectName}`,
+        `${emoji} **العنصر:** ${order.projectName}`,
+        `🏷️ **النوع:** ${meta.emoji} ${meta.label}`,
         `👤 **المشتري:** <@${order.buyerId}> (\`${order.buyerId}\`)`,
         `💰 **السعر الصافي:** ${formatCredits(order.price)}`,
         `🧾 **المطلوب تحويله:** ${formatCredits(order.amount)} (بعد خصم ProBot ${order.taxPercent ?? 5}%)`,
@@ -58,6 +61,8 @@ const handler: ButtonHandler = {
     const prefix = order.probotPrefix || store?.probotPrefix || '!';
     const payeeId = order.payeeId || store?.payeeId;
     const tax = order.taxPercent ?? 5;
+    const meta = storeTypeMeta(order.itemType);
+    const emoji = order.itemEmoji || meta.emoji;
 
     // إرسال إيصال الطلب للبائع/القناة — بدون ما يرى المشتري التفاصيل الخاصة بك
     const card = buildOrderCard(order, prefix, payeeId);
@@ -101,7 +106,7 @@ const handler: ButtonHandler = {
       .setTitle('✅ تم تسجيل طلبك — بانتظار البائع 🤝')
       .setDescription(
         [
-          `📦 **البروجيكت:** ${order.projectName}`,
+          `${emoji} **العنصر:** ${order.projectName} (${meta.label})`,
           `🧾 **الطلب:** #${order.orderId}`,
           '',
           `💳 أمر الدفع (إن لم تكن نفذته بعد):`,
@@ -109,7 +114,7 @@ const handler: ButtonHandler = {
           '',
           `> 💰 المبلغ **${formatCredits(order.amount)}** كريديت — يصل لصافي **${formatCredits(order.price)}** بعد خصم ProBot ${tax}%`,
           deliveredToSeller
-            ? '> 📲 البائع وصله إشعار — بمجرد تأكيده سيصلك البروجيكت وإيصال الدفع.'
+            ? '> 📲 البائع وصله إشعار — بمجرد تأكيده سيصلك العنصر وإيصال الدفع.'
             : '> 📲 تعذر إيصال الإشعار الآن — إذا تأخر التسليم تواصل مع البائع مباشرة.',
         ].join('\n')
       )

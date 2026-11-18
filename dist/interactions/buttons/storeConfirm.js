@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر تأكيد الشراء)
+// Omni Bot - 🛍️ متجر Omni (زر تأكيد الشراء)
 // ينشئ الطلب ويعرض أمر الدفع بالكريديت
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -17,7 +17,7 @@ const handler = {
             return;
         if (ownerId && ownerId !== interaction.user.id) {
             await interaction.reply({
-                content: '⛔ هذا الاختيار لصاحب الطلب فقط — اكتب `/store` واختر بروجيكتك الخاص.',
+                content: '⛔ هذا الاختيار لصاحب الطلب فقط — اكتب `/store` واختر عنصرك الخاص.',
                 ephemeral: true,
             });
             return;
@@ -26,7 +26,14 @@ const handler = {
         const project = store && (0, store_1.findProject)(store, projectId);
         if (!store || !project || !project.enabled) {
             await interaction.reply({
-                content: '❌ هذا البروجيكت غير متاح حالياً.',
+                content: '❌ هذا العنصر غير متاح حالياً.',
+                ephemeral: true,
+            });
+            return;
+        }
+        if (!(0, store_1.isItemInStock)(project)) {
+            await interaction.reply({
+                content: `⛔ **${project.name}** نفدت كميته حالياً — جرّب عنصراً آخر.`,
                 ephemeral: true,
             });
             return;
@@ -43,7 +50,9 @@ const handler = {
         const basePrice = Math.max(1, Math.floor(Number(project.price) || 0));
         const netPrice = (0, store_1.getEffectivePrice)(project);
         const amount = (0, store_1.computeTransferAmount)(netPrice, tax);
-        // ♻︎ منع تكرار طلبات مفتوحة لنفس المشروع ونفس المشتري خلال 15 دقيقة
+        const meta = (0, store_1.storeTypeMeta)(project.type);
+        const emoji = (0, store_1.storeItemEmoji)(project);
+        // ♻︎ منع تكرار طلبات مفتوحة لنفس العنصر ونفس المشتري خلال 15 دقيقة
         const since = new Date(Date.now() - 15 * 60_000);
         const existing = await models_1.StoreOrder.findOne({
             buyerId: interaction.user.id,
@@ -56,6 +65,9 @@ const handler = {
                 orderId: (0, store_1.shortId)(6),
                 projectId: project.id,
                 projectName: project.name,
+                itemType: project.type,
+                itemEmoji: project.emoji,
+                itemDeliveryNote: project.deliveryNote,
                 price: netPrice,
                 amount,
                 taxPercent: tax,
@@ -66,10 +78,11 @@ const handler = {
             }));
         const transferCommand = (0, store_1.buildTransferCommand)(store.payeeId, amount);
         const embed = new discord_js_1.EmbedBuilder()
-            .setColor(0x57f287)
+            .setColor(meta.color)
             .setTitle('💳 تفاصيل طلب الشراء — ظاهرة للكل')
             .setDescription([
-            `📦 **البروجيكت:** ${project.name}`,
+            `${emoji} **العنصر:** ${project.name}`,
+            `🏷️ **النوع:** ${meta.emoji} ${meta.label}`,
             `🧾 **الطلب:** #${order.orderId}`,
             '',
             discount
@@ -78,6 +91,7 @@ const handler = {
             discount ? `🏷️ **خصم:** ${discount}% — **السعر بعد الخصم:** ${(0, store_1.priceLine)(netPrice)} كريديت` : null,
             `🧾 **خصم ProBot:** ${tax}% من كل تحويل`,
             `💳 **المطلوب تحويله:** ${(0, store_1.formatCredits)(amount)} كريديت`,
+            project.deliveryNote?.trim() ? `📬 **التسليم:** ${project.deliveryNote.trim().slice(0, 180)}` : null,
             '',
             '**📋 أمر التحويل (للكل يشوفه):**',
             `\`\`\`${transferCommand}\`\`\``,
@@ -88,6 +102,8 @@ const handler = {
             .join('\n'))
             .setFooter({ text: 'Omni Store • انتظر تأكيد البائع من بلوك الإيصال' })
             .setTimestamp();
+        if (project.imageUrl)
+            embed.setThumbnail(project.imageUrl);
         const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
             .setCustomId(`store:copy:${order.orderId}`)
             .setLabel('نسخ أمر الدفع')
@@ -98,7 +114,7 @@ const handler = {
             .setStyle(discord_js_1.ButtonStyle.Success)
             .setEmoji('✅'), new discord_js_1.ButtonBuilder()
             .setCustomId('store:back')
-            .setLabel('رجوع')
+            .setLabel('رجوع للمتجر')
             .setStyle(discord_js_1.ButtonStyle.Secondary)
             .setEmoji('↩️'));
         await interaction.update({ embeds: [embed], components: [row] });

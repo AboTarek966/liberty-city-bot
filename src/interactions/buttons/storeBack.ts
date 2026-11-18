@@ -1,10 +1,14 @@
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر رجوع للمتجر)
+// Omni Bot - 🛍️ متجر Omni (زر رجوع للمتجر)
 // ============================================
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
-import { getStore, buildStoreEmbed, buildStoreSelect } from '../../utils/store';
+import {
+  getStore,
+  buildStoreEmbed,
+  buildStoreComponents,
+} from '../../utils/store';
 
 const handler: ButtonHandler = {
   id: 'store:back',
@@ -17,7 +21,7 @@ const handler: ButtonHandler = {
       });
       return;
     }
-    const components = buildStoreSelect(store) ?? [];
+    const components = buildStoreComponents(store);
     const embed = buildStoreEmbed(store);
     await interaction.update({ embeds: [embed], components });
   },

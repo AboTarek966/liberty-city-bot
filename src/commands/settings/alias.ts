@@ -235,7 +235,7 @@ const command: Command = {
             .setDescription('🛍️ المتجر + إدارة + رولات + حماية متقدمة')
             .setRequired(false)
             .addChoices(
-              { name: '🛍️ متجر البروجيكتات (للمشترين)', value: 'store' },
+              { name: '🛍️ المتجر (للمشترين)', value: 'store' },
               { name: '🛠️ إدارة المتجر', value: 'project' },
               { name: '⚙️ إعدادات', value: 'settings' },
               { name: '⌨️ علياس', value: 'alias' },

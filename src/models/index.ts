@@ -293,7 +293,7 @@ export interface IGuildSettings extends Document {
     lockUntilClaim: boolean;
     /** 🎫 إرسال رسالة الترحيب داخل التذكرة (الزرار والخيارات) */
     welcomeEnabled: boolean;
-    /** 🛒 زر «شراء بروجيكت» داخل التذكرة — يظهر للعضو صاحب التذكرة، والرسالة تظهر للكل */
+    /** 🛒 زر «الشراء» داخل التذكرة — يظهر للعضو صاحب التذكرة، والرسالة تظهر للكل */
     buyButtonEnabled: boolean;
     /** ✏️ نص رسالة الترحيب المخصص — يدعم {user} {ticket} {type} {server} */
     welcomeMessage?: string;
@@ -1697,7 +1697,16 @@ export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';
 export { AITicketApproval, IAITicketApproval } from './AITicketApproval';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';
-export { Store, StoreOrder, IStore, IStoreProject, IStoreOrder, StoreOrderStatus } from './Store';
+export {
+  Store,
+  StoreOrder,
+  IStore,
+  IStoreProject,
+  IStoreOrder,
+  StoreOrderStatus,
+  StoreItemType,
+  STORE_ITEM_TYPE_VALUES,
+} from './Store';
 
 // --------------------------------------------
 // Helper Functions

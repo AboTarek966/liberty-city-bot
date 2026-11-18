@@ -312,7 +312,7 @@ export class TicketHandler {
         new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()
             .setCustomId('ticket_buy')
-            .setLabel('شراء بروجيكت')
+            .setLabel('شراء')
             .setStyle(ButtonStyle.Success)
             .setEmoji('🛒')
         )

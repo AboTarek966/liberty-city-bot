@@ -1,10 +1,50 @@
-import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
-import { IStore, IStoreProject } from '../models';
+import { ActionRowBuilder, EmbedBuilder, StringSelectMenuBuilder } from 'discord.js';
+import { IStore, IStoreProject, StoreItemType } from '../models';
 export declare const STORE_KEY = "main";
 export declare const DEFAULT_TAX_PERCENT = 5;
 export declare const DEFAULT_PROBOT_PREFIX = "!";
+export declare const DEFAULT_STORE_NAME = "\u0645\u062A\u062C\u0631 Omni";
 /** المستلم الافتراضي لتحويلات ProBot (مالك المتجر) — يقدر يتغير من /project config payee */
 export declare const DEFAULT_PAYEE_ID: string;
+/** عدد العناصر في كل صفحة داخل المتجر */
+export declare const STORE_PAGE_SIZE = 20;
+export type StoreFilter = StoreItemType | 'all';
+export interface StoreTypeMeta {
+    key: StoreItemType;
+    /** الاسم المفرد */
+    label: string;
+    /** الاسم الجمع (يُستخدم كعنوان قسم) */
+    plural: string;
+    emoji: string;
+    color: number;
+    aliases: string[];
+}
+export declare const STORE_TYPES: StoreTypeMeta[];
+/** كل الأنواع كخيارات جاهزة لأوامر السلاش */
+export declare const STORE_TYPE_CHOICES: {
+    name: string;
+    value: StoreItemType;
+}[];
+/** تحويل أي نص/قيمة إلى نوع عنصر صالح (الافتراضي project للعناصر القديمة) */
+export declare function normalizeStoreType(value: unknown, fallback?: StoreItemType): StoreItemType;
+/** تحويل فلتر المتجر (all أو نوع محدد) */
+export declare function normalizeStoreFilter(value: unknown): StoreFilter;
+/** ميتاداتا نوع العنصر */
+export declare function storeTypeMeta(type: unknown): StoreTypeMeta;
+/** نص نوع العنصر مع الإيموجي: 🛠️ بروجيكت */
+export declare function storeTypeLabel(type: unknown): string;
+/** تنقية إيموجي العنصر — يقبل unicode أو <:name:id> */
+export declare function normalizeItemEmoji(input: unknown): string | undefined;
+/** إيموجي العنصر المعروض (المخصص أو إيموجي النوع) */
+export declare function storeItemEmoji(item: Pick<IStoreProject, 'emoji' | 'type'>): string;
+/** تنقية رابط الصورة — undefined = فارغ • null = رابط غير صالح */
+export declare function normalizeImageUrl(input: unknown): string | null | undefined;
+/** تنقية الكمية: غير محدد = غير محدود */
+export declare function normalizeStock(value: unknown): number | undefined;
+/** سطر الكمية (فراغ لو غير محدودة) */
+export declare function stockSuffix(item: Pick<IStoreProject, 'stock'>): string;
+/** هل العنصر متوفر للبيع؟ */
+export declare function isItemInStock(item: Pick<IStoreProject, 'stock'>): boolean;
 /** قراءة وثيقة المتجر (تنشئها عند أول استخدام) مع تحديث الإعدادات الافتراضية */
 export declare function getStore(createIfMissing?: boolean): Promise<IStore | null>;
 /** نفس القراءة لكن كـ lean (للقوائم السريعة) — قد ترجع null */
@@ -29,7 +69,7 @@ export declare function formatShort(n: number): string;
 export declare function priceLine(n: number): string;
 /** نسبة خصم صالحة (0 = بدون خصم) */
 export declare function normalizeDiscountPercent(value: unknown): number;
-/** السعر الصافي الفعلي للمشروع بعد خصم العرض (إن وجد) */
+/** السعر الصافي الفعلي للعنصر بعد خصم العرض (إن وجد) */
 export declare function getEffectivePrice(project: Pick<IStoreProject, 'price' | 'discountPercent'>): number;
 /** سطر عرض السعر مع الخصم إن وجد */
 export declare function projectPriceLine(project: Pick<IStoreProject, 'price' | 'discountPercent'>): string;
@@ -39,16 +79,52 @@ export declare function parseDiscountPercent(input: string): number | null;
 export declare function buildTransferCommand(payeeId: string, amount: number): string;
 /** يحوّل نص سعر إلى رقم: 10m / 500k / 10 مليون / 10,000,000 */
 export declare function parsePrice(input: string): number | null;
-/** معرّف قصير للطلب/البروجيكت (مرتبط بروابط الأزرار) */
+/** معرّف قصير للطلب/العنصر (مرتبط بروابط الأزرار) */
 export declare function shortId(len?: number): string;
 /** يتحقق إن النص يشبه أمر تحويل كريديت */
 export declare function isProbotCommandLike(text: string, _prefix: string): boolean;
+export interface StoreViewOptions {
+    /** all أو نوع محدد */
+    type?: unknown;
+    /** رقم الصفحة (يبدأ من 0) */
+    page?: unknown;
+}
+export interface StoreView {
+    filter: StoreFilter;
+    /** كل العناصر المفعّلة */
+    all: IStoreProject[];
+    /** العناصر بعد التصفية */
+    filtered: IStoreProject[];
+    /** عناصر الصفحة الحالية */
+    items: IStoreProject[];
+    page: number;
+    totalPages: number;
+    pageSize: number;
+}
+/** حساب حالة العرض (تصفية + تقسيم صفحات) */
+export declare function computeStoreView(store: IStore, opts?: StoreViewOptions): StoreView;
+/** اسم المتجر المعروض */
+export declare function getStoreName(store: IStore): string;
 /** بناء إمبد المتجر (العرض الرئيسي) */
-export declare function buildStoreEmbed(store: IStore): EmbedBuilder;
-/** بناء قائمة الاختيار (select) للمشاريع المفعّلة */
-export declare function buildStoreSelect(store: IStore): ActionRowBuilder<StringSelectMenuBuilder>[] | null;
-/** إيجاد البروجيكت بالمعرّف (غير حساس لحالة الأحرف) */
+export declare function buildStoreEmbed(store: IStore, opts?: StoreViewOptions): EmbedBuilder;
+/** بناء قائمة الاختيار (select) لعناصر الصفحة الحالية */
+export declare function buildStoreSelect(store: IStore, opts?: StoreViewOptions): ActionRowBuilder<StringSelectMenuBuilder>[] | null;
+/**
+ * كل مكونات واجهة المتجر:
+ * قائمة الاختيار + أزرار الأقسام (بوت/أداة/رتبة...) + أزرار التنقل بين الصفحات
+ */
+export declare function buildStoreComponents(store: IStore, opts?: StoreViewOptions): ActionRowBuilder<any>[];
+/** إيجاد العنصر بالمعرّف */
 export declare function findProject(store: IStore, projectId: string): IStoreProject | undefined;
-/** عدد البروجيكتات المضافة (فعّالة + معطلة) */
+/** إيجاد العنصر بالاسم (غير حساس لحالة الأحرف) */
+export declare function findProjectByName(store: IStore, name: string): IStoreProject | undefined;
+/** عدد العناصر المضافة (فعّالة + معطلة) */
 export declare function projectCount(store: IStore): number;
+/** إحصائيات حسب النوع */
+export declare function storeTypeStats(store: IStore): Array<{
+    meta: StoreTypeMeta;
+    total: number;
+    enabled: number;
+    sales: number;
+}>;
 //# sourceMappingURL=store.d.ts.map

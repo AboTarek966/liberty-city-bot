@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر إلغاء الطلب)
+// Omni Bot - 🛍️ متجر Omni (زر إلغاء الطلب)
 // المشتري (طلبه) أو البائع/مدير المتجر يقدر يلغي
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -36,7 +36,7 @@ const handler = {
             .setColor(0xed4245)
             .setTitle('❌ تم إلغاء الطلب')
             .setDescription([
-            `📦 **البروجيكت:** ${order.projectName}`,
+            `📦 **العنصر:** ${order.projectName}`,
             `🧾 **الطلب:** #${order.orderId} — أُلغي بواسطة <@${interaction.user.id}>`,
             `💰 **المبلغ:** ${(0, store_1.formatCredits)(order.amount)} كريديت (لم يتم خصم أي شيء بعد التأكيد)`,
         ].join('\n'))

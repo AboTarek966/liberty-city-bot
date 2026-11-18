@@ -541,7 +541,7 @@ const ALIAS_LABELS: Record<string, string> = {
   roleadd: '➕ إضافة رول', roleremove: '➖ إزالة رول', promote: '⬆️ ترقية',
   jail: '🔒 سجن', unjail: '🔓 إلغاء سجن', lockdown: '🚨 وضع الطوارئ', settings: '⚙️ إعدادات',
   afk: '💤 AFK', snipe: '🕵️ سنايب', ping: '🏓 بينج', speak: '🗣️ السماح بالكلام',
-  store: '🛍️ متجر البروجيكتات', project: '🛠️ إدارة المتجر', dismiss: '🧹 فصل إدارة',
+  store: '🛍️ المتجر', project: '🛠️ إدارة المتجر', dismiss: '🧹 فصل إدارة',
   rolemenu: '🎭 رول منيو', autorole: '➕ أوتو رول', ticket: '🎫 تذاكر',
   // 🎵 الموسيقى
   music: '🎵 تشغيل موسيقى',

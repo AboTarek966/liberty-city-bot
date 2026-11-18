@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر / دفعت وطلب التسليم)
+// Omni Bot - 🛍️ متجر Omni (زر / دفعت وطلب التسليم)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
@@ -8,11 +8,14 @@ const store_1 = require("../../utils/store");
 const models_1 = require("../../models");
 /** بناء بطاقة الطلب المرسلة للبائع/قناة السجل */
 function buildOrderCard(order, _prefix, payeeId) {
+    const meta = (0, store_1.storeTypeMeta)(order.itemType);
+    const emoji = order.itemEmoji || meta.emoji;
     return new discord_js_1.EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle(`🛒 طلب شراء جديد — #${order.orderId}`)
         .setDescription([
-        `📦 **البروجيكت:** ${order.projectName}`,
+        `${emoji} **العنصر:** ${order.projectName}`,
+        `🏷️ **النوع:** ${meta.emoji} ${meta.label}`,
         `👤 **المشتري:** <@${order.buyerId}> (\`${order.buyerId}\`)`,
         `💰 **السعر الصافي:** ${(0, store_1.formatCredits)(order.price)}`,
         `🧾 **المطلوب تحويله:** ${(0, store_1.formatCredits)(order.amount)} (بعد خصم ProBot ${order.taxPercent ?? 5}%)`,
@@ -46,6 +49,8 @@ const handler = {
         const prefix = order.probotPrefix || store?.probotPrefix || '!';
         const payeeId = order.payeeId || store?.payeeId;
         const tax = order.taxPercent ?? 5;
+        const meta = (0, store_1.storeTypeMeta)(order.itemType);
+        const emoji = order.itemEmoji || meta.emoji;
         // إرسال إيصال الطلب للبائع/القناة — بدون ما يرى المشتري التفاصيل الخاصة بك
         const card = buildOrderCard(order, prefix, payeeId);
         const cardRow = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
@@ -82,7 +87,7 @@ const handler = {
             .setColor(0x5865f2)
             .setTitle('✅ تم تسجيل طلبك — بانتظار البائع 🤝')
             .setDescription([
-            `📦 **البروجيكت:** ${order.projectName}`,
+            `${emoji} **العنصر:** ${order.projectName} (${meta.label})`,
             `🧾 **الطلب:** #${order.orderId}`,
             '',
             `💳 أمر الدفع (إن لم تكن نفذته بعد):`,
@@ -90,7 +95,7 @@ const handler = {
             '',
             `> 💰 المبلغ **${(0, store_1.formatCredits)(order.amount)}** كريديت — يصل لصافي **${(0, store_1.formatCredits)(order.price)}** بعد خصم ProBot ${tax}%`,
             deliveredToSeller
-                ? '> 📲 البائع وصله إشعار — بمجرد تأكيده سيصلك البروجيكت وإيصال الدفع.'
+                ? '> 📲 البائع وصله إشعار — بمجرد تأكيده سيصلك العنصر وإيصال الدفع.'
                 : '> 📲 تعذر إيصال الإشعار الآن — إذا تأخر التسليم تواصل مع البائع مباشرة.',
         ].join('\n'))
             .setFooter({ text: 'Omni Store • الاحتفاظ بالطلب حتى تأكيد البائع' })

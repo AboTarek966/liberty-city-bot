@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Omni Bot - متجر البروجيكتات (زر رجوع للمتجر)
+// Omni Bot - 🛍️ متجر Omni (زر رجوع للمتجر)
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const store_1 = require("../../utils/store");
@@ -15,7 +15,7 @@ const handler = {
             });
             return;
         }
-        const components = (0, store_1.buildStoreSelect)(store) ?? [];
+        const components = (0, store_1.buildStoreComponents)(store);
         const embed = (0, store_1.buildStoreEmbed)(store);
         await interaction.update({ embeds: [embed], components });
     },

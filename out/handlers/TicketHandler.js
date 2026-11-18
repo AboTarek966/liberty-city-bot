@@ -213,7 +213,7 @@ class TicketHandler {
         if (buyEnabled) {
             buyRow.push(new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
                 .setCustomId('ticket_buy')
-                .setLabel('شراء بروجيكت')
+                .setLabel('شراء')
                 .setStyle(discord_js_1.ButtonStyle.Success)
                 .setEmoji('🛒')));
         }

@@ -1,12 +1,12 @@
 // ============================================
-// Omni Bot - زر شراء بروجيكت داخل التذكرة
+// Omni Bot - زر الشراء داخل التذكرة
 // متاح لصاحب التذكرة فقط — لكن الرد يكون ظاهر للكل في قناة التذكرة
 // ============================================
 
 import { ButtonInteraction } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings, Ticket } from '../../models';
-import { getStore, buildStoreEmbed, buildStoreSelect } from '../../utils/store';
+import { getStore, buildStoreEmbed, buildStoreComponents } from '../../utils/store';
 
 const handler: ButtonHandler = {
   id: 'ticket_buy',
@@ -58,18 +58,18 @@ const handler: ButtonHandler = {
       return;
     }
 
-    const components = buildStoreSelect(store) ?? [];
+    const components = buildStoreComponents(store);
     const embed = buildStoreEmbed(store);
 
     if (!components.length) {
       await interaction.editReply({
-        content: '🛍️ **المتجر فارغ حالياً** — ما في بروجيكتات متاحة للبيع الآن.',
+        content: '🛍️ **المتجر فارغ حالياً** — ما في عناصر متاحة للبيع الآن.',
         embeds: [embed],
       });
       return;
     }
 
-    embed.setFooter({ text: 'Omni Store • اختر البروجيكت من القائمة — الرد ظاهر للكل' });
+    embed.setFooter({ text: 'Omni Store • اختر العنصر من القائمة — الرد ظاهر للكل' });
     await interaction.editReply({ embeds: [embed], components });
   },
 };

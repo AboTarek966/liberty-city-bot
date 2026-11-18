@@ -1,5 +1,5 @@
 // ============================================
-// Omni Bot - متجر البروجيكتات (القائمة المنسدلة)
+// Omni Bot - 🛍️ متجر Omni (القائمة المنسدلة)
 // ============================================
 
 import {
@@ -8,9 +8,20 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
-import { getStore, findProject, computeTransferAmount, priceLine, formatCredits } from '../../utils/store';
+import {
+  getStore,
+  findProject,
+  computeTransferAmount,
+  priceLine,
+  normalizeDiscountPercent,
+  getEffectivePrice,
+  storeTypeMeta,
+  storeItemEmoji,
+  isItemInStock,
+} from '../../utils/store';
 
 const handler: SelectMenuHandler = {
   id: 'store:select',
@@ -18,7 +29,9 @@ const handler: SelectMenuHandler = {
     const select = interaction as StringSelectMenuInteraction;
     if (!select.guild) return;
 
-    await select.deferReply({ ephemeral: false });
+    // 🧪 لو القائمة جاية من معاينة خاصة (ephemeral) نخلي تفاصيل الطلب خاصة برضه
+    const fromEphemeral = Boolean(select.message?.flags?.has(MessageFlags.Ephemeral));
+    await select.deferReply({ ephemeral: fromEphemeral });
 
     const projectId = select.values?.[0];
     const store = await getStore();
@@ -26,24 +39,40 @@ const handler: SelectMenuHandler = {
 
     if (!store || !project || !project.enabled) {
       await select.editReply({
-        content: '❌ هذا البروجيكت غير متاح حالياً — ربما أُزيل من المتجر أو أُوقف مؤقتاً.',
+        content: '❌ هذا العنصر غير متاح حالياً — ربما أُزيل من المتجر أو أُوقف مؤقتاً.',
       });
       return;
     }
 
+    if (!isItemInStock(project)) {
+      await select.editReply({
+        content: `⛔ **${project.name}** نفدت كميته حالياً — جرّب عنصراً آخر أو تواصل مع البائع.`,
+      });
+      return;
+    }
+
+    const meta = storeTypeMeta(project.type);
+    const emoji = storeItemEmoji(project);
     const tax = Number(store.taxPercent ?? 5);
-    const amount = computeTransferAmount(project.price, tax);
+    const discount = normalizeDiscountPercent(project.discountPercent);
+    const effectivePrice = getEffectivePrice(project);
+    const amount = computeTransferAmount(effectivePrice, tax);
     const payee = store.payeeId;
 
     const embed = new EmbedBuilder()
-      .setColor(0xf59e0b)
+      .setColor(meta.color)
       .setTitle('🛒 تأكيد طلب الشراء')
       .setDescription(
         [
-          `📦 **البروجيكت:** ${project.name}`,
+          `${emoji} **العنصر:** ${project.name}`,
+          `🏷️ **النوع:** ${meta.emoji} ${meta.label}`,
           project.description?.trim() ? `📝 ${project.description.trim()}` : null,
+          project.stock !== undefined ? `📦 **المتاح:** ${project.stock}` : null,
           '',
-          `💰 **السعر الصافي:** ${priceLine(project.price)} كريديت`,
+          discount
+            ? `💰 **السعر الأساسي:** ~~${priceLine(project.price)}~~ كريديت`
+            : `💰 **السعر الصافي:** ${priceLine(effectivePrice)} كريديت`,
+          discount ? `🏷️ **خصم ${discount}%** — السعر بعد الخصم: ${priceLine(effectivePrice)} كريديت` : null,
           `🧾 **خصم ProBot:** ${tax}% على التحويلات`,
           `💳 **المطلوب تحويله:** ${priceLine(amount)} كريديت`,
           payee ? `👤 **المستلم:** <@${payee}>` : '👤 **المستلم:** غير مهيأ بعد — أبلغ البائع',
@@ -56,6 +85,8 @@ const handler: SelectMenuHandler = {
       .setFooter({ text: 'Omni Store • التأكيد قبل الدفع' })
       .setTimestamp();
 
+    if (project.imageUrl) embed.setImage(project.imageUrl);
+
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`store:confirm:${project.id}:${select.user.id}`)
@@ -64,7 +95,7 @@ const handler: SelectMenuHandler = {
         .setEmoji('✅'),
       new ButtonBuilder()
         .setCustomId('store:back')
-        .setLabel('رجوع')
+        .setLabel('رجوع للمتجر')
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('↩️')
     );

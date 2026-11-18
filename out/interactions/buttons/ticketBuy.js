@@ -1,6 +1,6 @@
 "use strict";
 // ============================================
-// Omni Bot - زر شراء بروجيكت داخل التذكرة
+// Omni Bot - زر الشراء داخل التذكرة
 // متاح لصاحب التذكرة فقط — لكن الرد يكون ظاهر للكل في قناة التذكرة
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -49,16 +49,16 @@ const handler = {
             });
             return;
         }
-        const components = (0, store_1.buildStoreSelect)(store) ?? [];
+        const components = (0, store_1.buildStoreComponents)(store);
         const embed = (0, store_1.buildStoreEmbed)(store);
         if (!components.length) {
             await interaction.editReply({
-                content: '🛍️ **المتجر فارغ حالياً** — ما في بروجيكتات متاحة للبيع الآن.',
+                content: '🛍️ **المتجر فارغ حالياً** — ما في عناصر متاحة للبيع الآن.',
                 embeds: [embed],
             });
             return;
         }
-        embed.setFooter({ text: 'Omni Store • اختر البروجيكت من القائمة — الرد ظاهر للكل' });
+        embed.setFooter({ text: 'Omni Store • اختر العنصر من القائمة — الرد ظاهر للكل' });
         await interaction.editReply({ embeds: [embed], components });
     },
 };
