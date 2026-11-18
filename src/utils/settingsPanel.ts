@@ -1506,6 +1506,8 @@ async function buildAI(guild: Guild, s: any): Promise<BuiltPanel> {
     : (aiConfig?.aiModel || ai.model || 'افتراضي');
   const maxTokensLabel = aiConfig?.maxTokens ?? ai.maxTokens ?? 1600;
   const temperatureLabel = aiConfig?.temperature ?? ai.temperature ?? 0.7;
+  const mentionOn = aiConfig?.replyOnMention !== false;
+  const replyOn = aiConfig?.replyOnReply !== false;
 
   const embed = categoryEmbed(
     'ai',
@@ -1515,7 +1517,8 @@ async function buildAI(guild: Guild, s: any): Promise<BuiltPanel> {
     `> 💬 **لغة الردود:** ${ai.responseLanguage === 'en' ? '🇺🇸 English' : ai.responseLanguage === 'both' ? '🌐 كلاهما' : '🇸🇦 العربية'}\n` +
     `> 🔌 **API مخصص:** ${cpEnabled ? `✅ ${cp.label || 'مخصص'} — \`${cp.model}\`` : 'معطّل — استخدم أي API (OpenAI/Groq/Together/محلي/...) من زر «API مخصص»'}\n` +
     `> 🧠 **المزود:** ${providerLabel} • **الموديل:** \`${modelLabel}\`\n` +
-    `> 🎛️ **الحد الأقصى:** ${maxTokensLabel} توكن • **الإبداع:** ${temperatureLabel}\n\n` +
+    `> 🎛️ **الحد الأقصى:** ${maxTokensLabel} توكن • **الإبداع:** ${temperatureLabel}\n` +
+    `> 📣 **طريقة الاستدعاء:** المنشن ${on(mentionOn)} ${mentionOn ? 'البوت يرد لو ذكرته' : 'البوت ما يردش على المنشن'} • الرد ${on(replyOn)} ${replyOn ? 'البوت يرد لو عملت Reply على رسالته' : 'البوت ما يردش على الردود'}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `> 🌐 **AI Translator:** ${on(tEnabled)} ${tEnabled ? `مفعّل (افتراضي: ${SUPPORTED_LANGUAGES[tDefault]?.flag || '🌐'} ${SUPPORTED_LANGUAGES[tDefault]?.name || 'Auto'})` : 'معطّل'}\n` +
     `> 📊 **تحليل المزاج:** ${on(insights.moodEnabled)} ${insights.moodEnabled ? 'مفعّل — /mood' : 'معطّل'}\n` +
@@ -1554,7 +1557,12 @@ async function buildAI(guild: Guild, s: any): Promise<BuiltPanel> {
     toggleBtn('aiInsights', 'summarize', '🔗 تلخيص الروابط', '🔗', !!insights.summarizeEnabled),
   );
 
-  return { embeds: [embed], components: [row1, row2, langSelect, row3] };
+  const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    toggleBtn('ai', 'mention', '📣 المنشن', '📣', mentionOn),
+    toggleBtn('ai', 'reply', '↩️ الرد على البوت', '↩️', replyOn),
+  );
+
+  return { embeds: [embed], components: [row1, row2, langSelect, row3, row4] };
 }
 
 // --------------------------------------------

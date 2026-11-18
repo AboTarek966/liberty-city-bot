@@ -18,6 +18,10 @@ export interface IAIConfig extends Document {
     aiModel?: string;
     systemPrompt?: string;
     autoReplyOnMention: boolean;
+    /** 🔔 هل يرد الذكاء الاصطناعي عند المنشن؟ (افتراضي: مفعّل) */
+    replyOnMention: boolean;
+    /** ↩️ هل يرد الذكاء الاصطناعي عند الرد على رسالته؟ (افتراضي: مفعّل) */
+    replyOnReply: boolean;
     mentionChannels: string[];
     allowedChannels: string[];
     allowedRoles: string[];

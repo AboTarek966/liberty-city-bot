@@ -24,6 +24,10 @@ export interface IAIConfig extends Document {
   aiModel?: string;
   systemPrompt?: string;
   autoReplyOnMention: boolean;      // رد تلقائي عند المنشن
+  /** 🔔 هل يرد الذكاء الاصطناعي عند المنشن؟ (افتراضي: مفعّل) */
+  replyOnMention: boolean;
+  /** ↩️ هل يرد الذكاء الاصطناعي عند الرد على رسالته؟ (افتراضي: مفعّل) */
+  replyOnReply: boolean;
   mentionChannels: string[];        // قنوات محددة (فارغ = جميع القنوات)
   allowedChannels: string[];        // قنوات مسموح بها (فارغ = الكل)
   allowedRoles: string[];           // رولات مسموح لها (فارغ = الكل)
@@ -67,6 +71,8 @@ const AIConfigSchema = new Schema<IAIConfig>({
   aiModel: { type: String, default: '' },
   systemPrompt: { type: String, default: '' },
   autoReplyOnMention: { type: Boolean, default: true },
+  replyOnMention: { type: Boolean, default: true },
+  replyOnReply: { type: Boolean, default: true },
   mentionChannels: [{ type: String }],
   allowedChannels: [{ type: String }],
   allowedRoles: [{ type: String }],

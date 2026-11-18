@@ -55,6 +55,8 @@ const AIConfigSchema = new mongoose_1.Schema({
     aiModel: { type: String, default: '' },
     systemPrompt: { type: String, default: '' },
     autoReplyOnMention: { type: Boolean, default: true },
+    replyOnMention: { type: Boolean, default: true },
+    replyOnReply: { type: Boolean, default: true },
     mentionChannels: [{ type: String }],
     allowedChannels: [{ type: String }],
     allowedRoles: [{ type: String }],

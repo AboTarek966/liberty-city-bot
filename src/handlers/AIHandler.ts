@@ -399,7 +399,10 @@ export class AIHandler {
 
       // Check if should respond (command usage, mention or reply to bot)
       // في DMs: يرد على أي رسالة مباشرة (بدون حاجة لمنشن/رد)
-      const shouldRespond = fromCommand || isMention || repliedToBot || !guildId || (guildId && await this.shouldAutoReply(guildId, channelId, message));
+      const allowMention = aiConfig?.replyOnMention !== false;
+      const allowReply = aiConfig?.replyOnReply !== false;
+      const triggerRespond = (isMention && allowMention) || (repliedToBot && allowReply);
+      const shouldRespond = fromCommand || triggerRespond || !guildId || (guildId && await this.shouldAutoReply(guildId, channelId, message));
       if (!shouldRespond) return null;
 
       // ⏱️ الكولداون بعد التأكد أن الرد مطلوب فعلاً — لا تستهلكه رسائل عادية في الشات

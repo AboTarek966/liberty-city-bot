@@ -272,8 +272,19 @@ const handler = {
                 break;
             }
             case 'ai': {
-                // 🧠 الاعتماد على AIConfig (مصدر الحقيقة) في تحديد الحالة الحالية
+                // 🔔 طريقة الاستدعاء: منشن فقط / رد فقط / الاثنين
                 const aiDoc = await models_1.AIConfig.findOne({ guildId: interaction.guild.id }).catch(() => null);
+                if (field === 'mention') {
+                    const current = aiDoc?.replyOnMention !== false;
+                    await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { $set: { replyOnMention: !current } }, { upsert: true, setDefaultsOnInsert: true }).catch(() => { });
+                    break;
+                }
+                if (field === 'reply') {
+                    const current = aiDoc?.replyOnReply !== false;
+                    await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { $set: { replyOnReply: !current } }, { upsert: true, setDefaultsOnInsert: true }).catch(() => { });
+                    break;
+                }
+                // 🧠 الاعتماد على AIConfig (مصدر الحقيقة) في تحديد الحالة الحالية
                 const currentEnabled = typeof aiDoc?.enabled === 'boolean' ? aiDoc.enabled : settings.ai.enabled;
                 settings.ai.enabled = !currentEnabled;
                 await models_1.AIConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { enabled: settings.ai.enabled }, { upsert: true, setDefaultsOnInsert: true }).catch(() => { });
