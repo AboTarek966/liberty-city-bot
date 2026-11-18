@@ -832,6 +832,7 @@ export async function executeAliasCommand(
     const chName = ch?.name ? `#${ch.name}` : 'القناة الحالية';
 
     let delivered = false;
+    let dmError: string | null = null;
     try {
       await target.send({
         content:
@@ -839,14 +840,38 @@ export async function executeAliasCommand(
           `> اضغط على القناة أعلاه لفتحها والرد عليه — هو بانتظارك.`,
       });
       delivered = true;
-    } catch {
+    } catch (error: any) {
+      dmError = error?.message || String(error);
+      logger.warn(`call DM → ${targetId}: ${dmError}`);
       delivered = false;
     }
 
     if (delivered) {
       await respond(message, `✅ تم إبلاغ ${target} — هو بانتظارك في ${ch}`);
     } else {
-      await respond(message, `⚠️ تعذر مراسلة ${target} — خاصه مغلق أو رفض رسائلك. أخبره بنفسك إنه مطلوب في ${ch}.`);
+      // 🔔 تعذر الخاص → نبلغه داخل القناة بـping مضمون الوصول
+      const chan: any = message.channel;
+      const fallback = await chan
+        .send({
+          content:
+            `<@${target.id}> 📢 **تم استدعاؤك** — العضو ${message.author} يريدك في هذه القناة — بإمكانك أن تتجاوبه هنا.`,
+          allowedMentions: { users: [target.id] },
+        } as any)
+        .catch((err: any) => {
+          logger.warn(`call fallback ping failed: ${err?.message || err}`);
+          return null;
+        });
+      if (fallback) {
+        await respond(
+          message,
+          `⚠️ تعذر مراسلة ${target} بالخاص (مقاضياته مغلقة أو رفض رسائلك) — **بلغناه في القناة بـping** وشاهده في ${ch}.`
+        );
+      } else {
+        await respond(
+          message,
+          `⚠️ تعذر مراسلة ${target} بالخاص وتعذر ذكره في القناة (مذكوره/الخصوصية).\nℹ️ السبب الفعلي: \`${dmError || 'خطأ غير معروف'}\``
+        );
+      }
     }
     return;
   }

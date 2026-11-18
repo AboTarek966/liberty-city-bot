@@ -741,6 +741,7 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
         const ch = message.channel;
         const chName = ch?.name ? `#${ch.name}` : 'القناة الحالية';
         let delivered = false;
+        let dmError = null;
         try {
             await target.send({
                 content: `📢 **لديك طلب استدعاء** — العضو ${message.author} يريدك في القناة ${ch} (**${chName}**) في سيرفر **${message.guild.name}**\n` +
@@ -748,14 +749,32 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
             });
             delivered = true;
         }
-        catch {
+        catch (error) {
+            dmError = error?.message || String(error);
+            logger.warn(`call DM → ${targetId}: ${dmError}`);
             delivered = false;
         }
         if (delivered) {
             await respond(message, `✅ تم إبلاغ ${target} — هو بانتظارك في ${ch}`);
         }
         else {
-            await respond(message, `⚠️ تعذر مراسلة ${target} — خاصه مغلق أو رفض رسائلك. أخبره بنفسك إنه مطلوب في ${ch}.`);
+            // 🔔 تعذر الخاص → نبلغه داخل القناة بـping مضمون الوصول
+            const chan = message.channel;
+            const fallback = await chan
+                .send({
+                content: `<@${target.id}> 📢 **تم استدعاؤك** — العضو ${message.author} يريدك في هذه القناة — بإمكانك أن تتجاوبه هنا.`,
+                allowedMentions: { users: [target.id] },
+            })
+                .catch((err) => {
+                logger.warn(`call fallback ping failed: ${err?.message || err}`);
+                return null;
+            });
+            if (fallback) {
+                await respond(message, `⚠️ تعذر مراسلة ${target} بالخاص (مقاضياته مغلقة أو رفض رسائلك) — **بلغناه في القناة بـping** وشاهده في ${ch}.`);
+            }
+            else {
+                await respond(message, `⚠️ تعذر مراسلة ${target} بالخاص وتعذر ذكره في القناة (مذكوره/الخصوصية).\nℹ️ السبب الفعلي: \`${dmError || 'خطأ غير معروف'}\``);
+            }
         }
         return;
     }
