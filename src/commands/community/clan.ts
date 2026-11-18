@@ -40,6 +40,25 @@ const clanEmoji = (name: string): string => {
   return emojis[hash % emojis.length];
 };
 
+/**
+ * تطبيع اسم العشيرة:
+ *   ١) الأرقام العربية/الفارسية → أرقام لاتينية (٠٧ → 07) حتى لا تصبح الصورة ملخبطة
+ *   ٢) ضغط المسافات وإزالة القاذورات الصامتة (مثل LRM/RLM)
+ */
+const ARABIC_DIGITS: Record<string, string> = {
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+  '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+  '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+};
+function normalizeClanName(name: unknown): string {
+  return String(name ?? '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/[٠-٩۰-۹]/g, (d) => ARABIC_DIGITS[d] ?? d)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function parseMemberIds(input: string, guild: any): string[] {
   const ids = new Set<string>();
   const mention = /<@!?(\d{17,20})>/g;
@@ -250,7 +269,7 @@ const command: Command = {
     // ===== create =====
     if (sub === 'create') {
       await interaction.deferReply({ ephemeral: false });
-      const name = (interaction.options.getString('name', true) || '').trim();
+      const name = normalizeClanName(interaction.options.getString('name', true));
       if (!name || name.length > 32) {
         await interaction.editReply({ content: '❌ اسم العشيرة غير صالح (حد 32 حرفاً)' });
         return;
@@ -317,7 +336,7 @@ const command: Command = {
     // ===== addmember =====
     if (sub === 'addmember') {
       await interaction.deferReply({ ephemeral: true });
-      const name = interaction.options.getString('name', true).trim();
+      const name = normalizeClanName(interaction.options.getString('name', true));
       const membersInput = interaction.options.getString('members', true);
       const clan = await Clan.findOne({ guildId: guild.id, name, active: true });
       if (!clan) {
@@ -351,7 +370,7 @@ const command: Command = {
     // ===== removemember =====
     if (sub === 'removemember') {
       await interaction.deferReply({ ephemeral: true });
-      const name = interaction.options.getString('name', true).trim();
+      const name = normalizeClanName(interaction.options.getString('name', true));
       const membersInput = interaction.options.getString('members', true);
       const clan = await Clan.findOne({ guildId: guild.id, name, active: true });
       if (!clan) {
@@ -374,7 +393,7 @@ const command: Command = {
     // ===== delete =====
     if (sub === 'delete') {
       await interaction.deferReply({ ephemeral: true });
-      const name = interaction.options.getString('name', true).trim();
+      const name = normalizeClanName(interaction.options.getString('name', true));
       const clan = await Clan.findOne({ guildId: guild.id, name, active: true });
       if (!clan) {
         await interaction.editReply({ content: `❌ لا توجد عشيرة باسم «${name}»` });
@@ -498,7 +517,7 @@ const command: Command = {
     // ===== info =====
     if (sub === 'info') {
       await interaction.deferReply({ ephemeral: false });
-      const name = interaction.options.getString('name', true).trim();
+      const name = normalizeClanName(interaction.options.getString('name', true));
       const clan = await Clan.findOne({ guildId: guild.id, name, active: true }).lean();
       if (!clan) {
         await interaction.editReply({ content: `❌ لا توجد عشيرة باسم «${name}»` });
@@ -566,11 +585,14 @@ const command: Command = {
       const clansStr = (interaction.options.getString('clans', true) || '').trim();
       const days = interaction.options.getInteger('days', true);
       const channel = interaction.options.getChannel('channel', true);
-      const nameInput = (interaction.options.getString('name') || '').trim();
+      const nameInput = normalizeClanName(interaction.options.getString('name') || '');
       const battleName = nameInput || 'مسابقة عشائرية';
 
-      // parse clans by name (comma or Arabic comma)
-      const rawNames = clansStr.split(/[,،]\s*/).map(s => s.trim()).filter(Boolean);
+      // parse clans by name (comma or Arabic comma) — تطبيع نفس ما هو في /clan
+      const rawNames = clansStr
+        .split(/[,،]\s*/)
+        .map((s) => normalizeClanName(s))
+        .filter(Boolean);
       if (rawNames.length < 2) {
         await interaction.editReply({ content: '❌ اكتب عشيرتين على الأقل مفصولة بفاصلة' });
         return;

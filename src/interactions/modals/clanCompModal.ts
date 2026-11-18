@@ -13,6 +13,20 @@ import { createLogger } from '../../utils/helpers';
 const logger = createLogger('ClanCompModal');
 const DEFAULT_COLOR = 0x3498db;
 
+/** تطبيع الأسماء: إزالة القاذورات + تحويل أرقام عربية/فارسية إلى لاتينية */
+const ARABIC_DIGITS: Record<string, string> = {
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+  '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+  '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+};
+const normalizeName = (s: unknown): string =>
+  String(s ?? '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/[٠-٩۰-۹]/g, (d) => ARABIC_DIGITS[d] ?? d)
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const handler: ModalHandler = {
   id: 'clancomp',
   async execute(interaction: ModalSubmitInteraction) {
@@ -31,9 +45,9 @@ const handler: ModalHandler = {
 
     await interaction.deferReply({ ephemeral: false });
 
-    const clansStr = (interaction.fields.getTextInputValue('clans') || '').trim();
+    const clansStr = normalizeName(interaction.fields.getTextInputValue('clans'));
     const daysRaw = (interaction.fields.getTextInputValue('days') || '').trim();
-    const nameInput = (interaction.fields.getTextInputValue('name') || '').trim();
+    const nameInput = normalizeName(interaction.fields.getTextInputValue('name'));
 
     const days = parseInt(daysRaw, 10);
     if (Number.isNaN(days) || days < 1 || days > 30) {
@@ -41,7 +55,7 @@ const handler: ModalHandler = {
       return;
     }
 
-    const rawNames = clansStr.split(/[,،]\s*/).map((s) => s.trim()).filter(Boolean);
+    const rawNames = clansStr.split(/[,،]\s*/).map((s) => normalizeName(s)).filter(Boolean);
     if (rawNames.length < 2) {
       await interaction.editReply({ content: '❌ اكتب عشيرتين على الأقل مفصولة بفاصلة' });
       return;
