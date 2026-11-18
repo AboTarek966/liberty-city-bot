@@ -112,13 +112,13 @@ const handler: ButtonHandler = {
     if (`${section}:${action}` === 'tickets:aiPersona') {
       const aiTicketCfg =
         (settings as any).protection?.aiTicketAssistant ?? (settings as any).aiTicketAssistant ?? {};
-      const current = String(aiTicketCfg.customPersonality || '').substring(0, 2000);
+      const current = String(aiTicketCfg.customPersonality || '').substring(0, 4000);
 
       const personaInput = new TextInputBuilder()
         .setCustomId('value')
         .setLabel('شخصية مساعد التذاكر — الدور والوضع')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(2000)
+        .setMaxLength(4000)
         .setRequired(false)
         // 🛟 حد ديسكورد = 100 حرف فقط للـplaceholder — أطول من ذلك يجعل المودال يفشل كاملاً
         .setPlaceholder(
@@ -457,7 +457,7 @@ const handler: ButtonHandler = {
             'شخصية الذكاء العامة (كل الأعضاء)',
             'الدور + الوضع + طريقة الرد — يلتزم بها حرفياً. مثال: مساعد سعودي مهذب، ردود قصيرة بلهجة أهل السيرفر.',
             TextInputStyle.Paragraph,
-            2000,
+            4000,
             aiConfig?.customPersonality || ''
           );
         }

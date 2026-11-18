@@ -120,7 +120,7 @@ export class AITicketAssistant {
     if (!persona) return '';
     return (
       `\n\n**🎭 شخصية وتعليمات السيرفر المخصصة لمساعد التذاكر — التزم بها حرفياً ولا تخالفها مهما حدث (لها الأولوية على أي تعليمات أسلوب أخرى):**\n` +
-      `${persona.slice(0, 2000)}\n`
+      `${persona.slice(0, 4000)}\n`
     );
   }
 

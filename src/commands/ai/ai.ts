@@ -76,8 +76,8 @@ const command: Command = {
         .addStringOption(opt =>
           opt
             .setName('system_prompt')
-            .setDescription('موجه النظام للبوت')
-            .setMaxLength(1000)
+            .setDescription('موجه النظام للبوت (الشخصية العامة)')
+            .setMaxLength(4000)
         )
         .addNumberOption(opt =>
           opt

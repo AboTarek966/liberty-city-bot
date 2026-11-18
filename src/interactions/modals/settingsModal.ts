@@ -659,7 +659,7 @@ const handler: ModalHandler = {
         if (!prot.aiTicketAssistant) {
           prot.aiTicketAssistant = { enabled: false, customPersonality: '' };
         }
-        prot.aiTicketAssistant.customPersonality = value.substring(0, 2000);
+        prot.aiTicketAssistant.customPersonality = value.substring(0, 4000);
         await settings.save();
         invalidateGuildSettings(guildId);
 

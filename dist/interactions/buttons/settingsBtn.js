@@ -78,12 +78,12 @@ const handler = {
         // 🎭 مودال خاص: شخصية AI التكتات (خاص بالتذاكر فقط — يلتزم بها المساعد حرفياً)
         if (`${section}:${action}` === 'tickets:aiPersona') {
             const aiTicketCfg = settings.protection?.aiTicketAssistant ?? settings.aiTicketAssistant ?? {};
-            const current = String(aiTicketCfg.customPersonality || '').substring(0, 2000);
+            const current = String(aiTicketCfg.customPersonality || '').substring(0, 4000);
             const personaInput = new discord_js_1.TextInputBuilder()
                 .setCustomId('value')
                 .setLabel('شخصية مساعد التذاكر — الدور والوضع')
                 .setStyle(discord_js_1.TextInputStyle.Paragraph)
-                .setMaxLength(2000)
+                .setMaxLength(4000)
                 .setRequired(false)
                 // 🛟 حد ديسكورد = 100 حرف فقط للـplaceholder — أطول من ذلك يجعل المودال يفشل كاملاً
                 .setPlaceholder('مثال: موظف دعم رسمي مهذب — ردود واضحة، اشرح خطوة بخطوة، واقترح الحل قبل التحويل للإدارة.')
@@ -322,7 +322,7 @@ const handler = {
                     return openModal('الكلمات المحظورة', 'اكتب كل كلمة في سطر جديد:\nكلمة1\nكلمة2\nكلمة3', discord_js_1.TextInputStyle.Paragraph, 1000);
                 case 'ai:personality': {
                     const aiConfig = await models_1.AIConfig.findOne({ guildId }).catch(() => null);
-                    return openModal('شخصية الذكاء العامة (كل الأعضاء)', 'الدور + الوضع + طريقة الرد — يلتزم بها حرفياً. مثال: مساعد سعودي مهذب، ردود قصيرة بلهجة أهل السيرفر.', discord_js_1.TextInputStyle.Paragraph, 2000, aiConfig?.customPersonality || '');
+                    return openModal('شخصية الذكاء العامة (كل الأعضاء)', 'الدور + الوضع + طريقة الرد — يلتزم بها حرفياً. مثال: مساعد سعودي مهذب، ردود قصيرة بلهجة أهل السيرفر.', discord_js_1.TextInputStyle.Paragraph, 4000, aiConfig?.customPersonality || '');
                 }
                 case 'ai:custom': {
                     const aiConfig = await models_1.AIConfig.findOne({ guildId }).catch(() => null);

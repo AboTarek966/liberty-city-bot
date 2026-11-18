@@ -48,8 +48,8 @@ const command = {
         .setDescription('تفعيل أو تعطيل'))
         .addStringOption(opt => opt
         .setName('system_prompt')
-        .setDescription('موجه النظام للبوت')
-        .setMaxLength(1000))
+        .setDescription('موجه النظام للبوت (الشخصية العامة)')
+        .setMaxLength(4000))
         .addNumberOption(opt => opt
         .setName('temperature')
         .setDescription('درجة الإبداع (0.0 - 2.0)')
