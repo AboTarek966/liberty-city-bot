@@ -822,10 +822,7 @@ export async function executeAliasCommand(
       await respond(message, '❌ هذا العضو غير موجود في السيرفر.');
       return;
     }
-    if (target.id === message.author.id) {
-      await respond(message, '😄 لا يمكنك استدعاء نفسك — استخدم منشن عضو آخر.');
-      return;
-    }
+    // 🤭 مسموح لو استدعيت نفسك — يتصل بك البوت بنفس الرسالة (للاختبار أو التذكير)
     if (target.user.bot) {
       await respond(message, '🤖 البوتات ما تستلم الإشعارات — حدد عضواً حقيقياً.');
       return;
