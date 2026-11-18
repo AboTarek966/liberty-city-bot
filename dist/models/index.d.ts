@@ -884,7 +884,7 @@ export { KnowledgeEntry, IKnowledgeEntry } from './KnowledgeEntry';
 export { MemberReturnRecord, IMemberReturnRecord } from './MemberReturnRecord';
 export { AITicketApproval, IAITicketApproval } from './AITicketApproval';
 export { ModuleSetting, AutoModRule, LevelingConfig, WelcomeConfig, LeaveConfig, LoggingConfig, BackupConfig } from './AdvancedSettings';
-export { Store, StoreOrder, IStore, IStoreProject, IStoreOrder, StoreOrderStatus, StoreItemType, STORE_ITEM_TYPE_VALUES, } from './Store';
+export { Store, StoreOrder, IStore, IStoreProject, IStoreOrder, StoreOrderStatus, StoreItemType, STORE_ITEM_TYPE_VALUES, IStoreDeliveryFile, } from './Store';
 export declare function getGuildSettings(guildId: string): Promise<IGuildSettings>;
 /** إجبار إعادة الجلب من قاعدة البيانات (بعد تعديل خارجي مباشر) */
 export declare function invalidateGuildSettings(guildId: string): void;

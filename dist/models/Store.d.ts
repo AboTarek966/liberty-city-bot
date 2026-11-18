@@ -1,6 +1,15 @@
 import mongoose, { Document } from 'mongoose';
 export type StoreItemType = 'project' | 'bot' | 'tool' | 'role' | 'service' | 'other';
 export declare const STORE_ITEM_TYPE_VALUES: StoreItemType[];
+/** ملف تسليم مرتبط بعنصر (اختياري) — يُخزَّن على القرص ويُرسل للمشتري بعد تأكيد الدفع */
+export interface IStoreDeliveryFile {
+    /** اسم الملف المعروض عند الإرسال */
+    name?: string;
+    /** حجم الملف بالبايت عند الرفع */
+    size?: number;
+    /** مسار الملف على القرص (relative to cwd) */
+    path?: string;
+}
 export interface IStoreProject {
     /** معرّف قصير فريد داخل المتجر (٦ أحرف) — يُستخدم في الأزرار */
     id: string;
@@ -22,6 +31,8 @@ export interface IStoreProject {
     stock?: number;
     /** ملاحظات التسليم — تظهر للمشتري في إيصال التسليم (مثال: البوت يوصلك في الخاص) */
     deliveryNote?: string;
+    /** 📁 ملفات/بوت أو بروجيكت يتسلمه المشتري تلقائياً (حتى ٥ ملفات) — اختياري */
+    deliveryFiles?: IStoreDeliveryFile[];
     enabled: boolean;
     sales: number;
     createdBy?: string;
@@ -65,9 +76,13 @@ export interface IStoreOrder extends Document {
     probotPrefix?: string;
     buyerId: string;
     guildId?: string;
+    /** قناة التذكرة/مكان الشراء عند إنشاء الطلب (لإرسال الملفات في التكت نفسه) */
+    channelId?: string;
     status: StoreOrderStatus;
     paidBy?: string;
     paidAt?: Date;
+    /** حالة تسليم الملفات: pending (بانتظار قرار البائع) | sent | cancelled */
+    filesStatus?: 'pending' | 'sent' | 'cancelled';
 }
 export declare const StoreOrder: mongoose.Model<any, {}, {}, {}, any, any>;
 //# sourceMappingURL=Store.d.ts.map

@@ -14,7 +14,7 @@ import {
   EmbedBuilder,
   StringSelectMenuBuilder,
 } from 'discord.js';
-import { Store, IStore, IStoreProject, StoreItemType } from '../models';
+import { Store, IStore, IStoreProject, StoreItemType, IStoreDeliveryFile } from '../models';
 import { isBotOwner } from './botOwner';
 
 export const STORE_KEY = 'main';
@@ -155,6 +155,24 @@ export function normalizeItemEmoji(input: unknown): string | undefined {
 /** إيموجي العنصر المعروض (المخصص أو إيموجي النوع) */
 export function storeItemEmoji(item: Pick<IStoreProject, 'emoji' | 'type'>): string {
   return normalizeItemEmoji(item.emoji) || storeTypeMeta(item.type).emoji;
+}
+
+/** ملخص الملفات المرفقة للعرض في الرسائل — الاسم + الحجم */
+export function deliveryFilesSummary(files: IStoreDeliveryFile[] | undefined): string {
+  const list = Array.isArray(files) ? files.filter((f) => f?.path) : [];
+  if (!list.length) return 'بدون ملفات';
+  const fmt = (b?: number) => {
+    if (!b) return '';
+    if (b >= 1024 * 1024) return ` (${(b / 1024 / 1024).toFixed(1)}MB)`;
+    if (b >= 1024) return ` (${Math.round(b / 1024)}KB)`;
+    return ` (${b}B)`;
+  };
+  return list.map((f, i) => `> ${i + 1}. ${f?.name || 'ملف'}${fmt(f?.size)}`).join('\n');
+}
+
+/** هل يوجد ملفات مرفقة بالعنصر؟ */
+export function hasDeliveryFiles(item: Pick<IStoreProject, 'deliveryFiles'> | undefined): boolean {
+  return !!item && Array.isArray(item.deliveryFiles) && item.deliveryFiles.some((f) => f?.path);
 }
 
 /** تنقية رابط الصورة — undefined = فارغ • null = رابط غير صالح */

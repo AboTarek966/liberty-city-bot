@@ -1758,6 +1758,7 @@ export {
   StoreOrderStatus,
   StoreItemType,
   STORE_ITEM_TYPE_VALUES,
+  IStoreDeliveryFile,
 } from './Store';
 
 // --------------------------------------------

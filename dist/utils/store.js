@@ -17,6 +17,8 @@ exports.storeTypeMeta = storeTypeMeta;
 exports.storeTypeLabel = storeTypeLabel;
 exports.normalizeItemEmoji = normalizeItemEmoji;
 exports.storeItemEmoji = storeItemEmoji;
+exports.deliveryFilesSummary = deliveryFilesSummary;
+exports.hasDeliveryFiles = hasDeliveryFiles;
 exports.normalizeImageUrl = normalizeImageUrl;
 exports.normalizeStock = normalizeStock;
 exports.stockSuffix = stockSuffix;
@@ -166,6 +168,26 @@ function normalizeItemEmoji(input) {
 /** إيموجي العنصر المعروض (المخصص أو إيموجي النوع) */
 function storeItemEmoji(item) {
     return normalizeItemEmoji(item.emoji) || storeTypeMeta(item.type).emoji;
+}
+/** ملخص الملفات المرفقة للعرض في الرسائل — الاسم + الحجم */
+function deliveryFilesSummary(files) {
+    const list = Array.isArray(files) ? files.filter((f) => f?.path) : [];
+    if (!list.length)
+        return 'بدون ملفات';
+    const fmt = (b) => {
+        if (!b)
+            return '';
+        if (b >= 1024 * 1024)
+            return ` (${(b / 1024 / 1024).toFixed(1)}MB)`;
+        if (b >= 1024)
+            return ` (${Math.round(b / 1024)}KB)`;
+        return ` (${b}B)`;
+    };
+    return list.map((f, i) => `> ${i + 1}. ${f?.name || 'ملف'}${fmt(f?.size)}`).join('\n');
+}
+/** هل يوجد ملفات مرفقة بالعنصر؟ */
+function hasDeliveryFiles(item) {
+    return !!item && Array.isArray(item.deliveryFiles) && item.deliveryFiles.some((f) => f?.path);
 }
 /** تنقية رابط الصورة — undefined = فارغ • null = رابط غير صالح */
 function normalizeImageUrl(input) {

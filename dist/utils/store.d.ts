@@ -1,5 +1,5 @@
 import { ActionRowBuilder, EmbedBuilder, StringSelectMenuBuilder } from 'discord.js';
-import { IStore, IStoreProject, StoreItemType } from '../models';
+import { IStore, IStoreProject, StoreItemType, IStoreDeliveryFile } from '../models';
 export declare const STORE_KEY = "main";
 export declare const DEFAULT_TAX_PERCENT = 5;
 export declare const DEFAULT_PROBOT_PREFIX = "!";
@@ -47,6 +47,10 @@ export declare function storeTypeLabel(type: unknown): string;
 export declare function normalizeItemEmoji(input: unknown): string | undefined;
 /** إيموجي العنصر المعروض (المخصص أو إيموجي النوع) */
 export declare function storeItemEmoji(item: Pick<IStoreProject, 'emoji' | 'type'>): string;
+/** ملخص الملفات المرفقة للعرض في الرسائل — الاسم + الحجم */
+export declare function deliveryFilesSummary(files: IStoreDeliveryFile[] | undefined): string;
+/** هل يوجد ملفات مرفقة بالعنصر؟ */
+export declare function hasDeliveryFiles(item: Pick<IStoreProject, 'deliveryFiles'> | undefined): boolean;
 /** تنقية رابط الصورة — undefined = فارغ • null = رابط غير صالح */
 export declare function normalizeImageUrl(input: unknown): string | null | undefined;
 /** تنقية الكمية: غير محدد = غير محدود */

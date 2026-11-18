@@ -23,6 +23,16 @@ export const STORE_ITEM_TYPE_VALUES: StoreItemType[] = [
 // --------------------------------------------
 // عنصر داخل المتجر (بروجيكت / بوت / أداة / رتبة / خدمة / أخرى)
 // --------------------------------------------
+/** ملف تسليم مرتبط بعنصر (اختياري) — يُخزَّن على القرص ويُرسل للمشتري بعد تأكيد الدفع */
+export interface IStoreDeliveryFile {
+  /** اسم الملف المعروض عند الإرسال */
+  name?: string;
+  /** حجم الملف بالبايت عند الرفع */
+  size?: number;
+  /** مسار الملف على القرص (relative to cwd) */
+  path?: string;
+}
+
 export interface IStoreProject {
   /** معرّف قصير فريد داخل المتجر (٦ أحرف) — يُستخدم في الأزرار */
   id: string;
@@ -44,6 +54,8 @@ export interface IStoreProject {
   stock?: number;
   /** ملاحظات التسليم — تظهر للمشتري في إيصال التسليم (مثال: البوت يوصلك في الخاص) */
   deliveryNote?: string;
+  /** 📁 ملفات/بوت أو بروجيكت يتسلمه المشتري تلقائياً (حتى ٥ ملفات) — اختياري */
+  deliveryFiles?: IStoreDeliveryFile[];
   enabled: boolean;
   sales: number;
   createdBy?: string;
@@ -86,6 +98,15 @@ const StoreProjectSchema = new Schema<IStoreProject>(
     /** غير محدد = كميات غير محدودة */
     stock: { type: Number, min: 0 },
     deliveryNote: { type: String },
+    /** 📁 ملفات مرفقة يتسلمه المشتري تلقائياً بعد الدفع — اختياري */
+    deliveryFiles: [
+      {
+        _id: false,
+        name: { type: String, trim: true },
+        size: { type: Number },
+        path: { type: String, trim: true },
+      },
+    ],
     enabled: { type: Boolean, default: true },
     sales: { type: Number, default: 0, min: 0 },
     createdBy: { type: String },
@@ -136,9 +157,13 @@ export interface IStoreOrder extends Document {
   probotPrefix?: string;
   buyerId: string;
   guildId?: string;
+  /** قناة التذكرة/مكان الشراء عند إنشاء الطلب (لإرسال الملفات في التكت نفسه) */
+  channelId?: string;
   status: StoreOrderStatus;
   paidBy?: string;
   paidAt?: Date;
+  /** حالة تسليم الملفات: pending (بانتظار قرار البائع) | sent | cancelled */
+  filesStatus?: 'pending' | 'sent' | 'cancelled';
 }
 
 const StoreOrderSchema = new Schema<IStoreOrder>(
@@ -156,9 +181,12 @@ const StoreOrderSchema = new Schema<IStoreOrder>(
     probotPrefix: { type: String },
     buyerId: { type: String, required: true, index: true },
     guildId: { type: String },
+    channelId: { type: String },
     status: { type: String, enum: ['pending', 'paid', 'cancelled'], default: 'pending', index: true },
     paidBy: { type: String },
     paidAt: { type: Date },
+    /** حالة تسليم الملفات المرفقة بالعنصر */
+    filesStatus: { type: String, enum: ['pending', 'sent', 'cancelled'] },
   },
   { timestamps: true }
 );

@@ -60,6 +60,11 @@ const handler = {
             status: 'pending',
             createdAt: { $gte: since },
         });
+        if (existing && !existing.channelId) {
+            // 🔗 إكمال رابط قناة التذكرة — حتى يتسلم المشتري الملفات داخل التكت نفسه
+            await models_1.StoreOrder.updateOne({ _id: existing._id }, { $set: { channelId: interaction.channelId } }).catch(() => { });
+            existing.channelId = interaction.channelId;
+        }
         const order = existing ??
             (await models_1.StoreOrder.create({
                 orderId: (0, store_1.shortId)(6),
@@ -75,6 +80,7 @@ const handler = {
                 probotPrefix: store.probotPrefix || '!',
                 buyerId: interaction.user.id,
                 guildId: interaction.guildId ?? undefined,
+                channelId: interaction.channelId ?? undefined,
             }));
         const transferCommand = (0, store_1.buildTransferCommand)(store.payeeId, amount);
         const embed = new discord_js_1.EmbedBuilder()

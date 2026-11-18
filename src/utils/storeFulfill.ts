@@ -4,7 +4,14 @@
 // التلقائي للتحويل (#credit <payeeId> <amount>).
 // ============================================
 
-import { Client, EmbedBuilder, Guild } from 'discord.js';
+import {
+  Client,
+  EmbedBuilder,
+  Guild,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from 'discord.js';
 import { createLogger } from './helpers';
 import { StoreOrder } from '../models';
 import {
@@ -27,6 +34,7 @@ export interface FulfillSummary {
   stockLine?: string | null;
   roleLine?: string | null;
   projectIncluded?: boolean;
+  filesRequested?: boolean;
 }
 
 interface FulfillInput {
@@ -114,6 +122,69 @@ export async function fulfillStoreOrder(
           roleLine = `⚠️ رول المشتري: <@&${deliveryRoleId}> — تعذر منحه (رتبة البوت/الصلاحيات أو الرول غير موجود)`;
         }
       }
+    }
+  }
+
+  // 📎 الملفات: لو العنصر فيه ملفات مرفقة ← اسأل البائع (المالك) في التكت — يرد ✅ يرسل البوت الملفات فوراً
+  let filesRequested = false;
+  const deliveryFiles = (Array.isArray(project?.deliveryFiles) ? project!.deliveryFiles! : []).filter(
+    (f: any) => f?.path
+  );
+  if (deliveryFiles.length && client && input.mode) {
+    const payeeId = (order.payeeId || store?.payeeId || '') as string;
+    const targetId = order.channelId || store?.logChannelId;
+    let sendTarget: any = null;
+
+    // 1) حاول قناة التذكرة (أو قناة السجل الاحتياطية)
+    if (targetId) {
+      sendTarget =
+        (input.guild?.channels?.cache?.get(targetId) as any) ??
+        (await client.channels.fetch(targetId).catch(() => null));
+      if (!sendTarget?.isTextBased?.()) sendTarget = null;
+    }
+    // 2) لو تعذر — الخاص بالبائع
+    if (!sendTarget && payeeId) {
+      const payee = await client.users.fetch(payeeId).catch(() => null);
+      sendTarget = payee?.dmChannel ?? (await payee?.createDM().catch(() => null)) ?? null;
+    }
+
+    if (sendTarget) {
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`store:files:send:${order.orderId}`)
+          .setLabel('أرسل الملفات للمشتري')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✅'),
+        new ButtonBuilder()
+          .setCustomId(`store:files:cancel:${order.orderId}`)
+          .setLabel('لا ترسلها الآن')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('⛔')
+      );
+
+      const fmtSize = (b?: number) => {
+        if (!b) return '';
+        if (b >= 1024 * 1024) return ` (${(b / 1024 / 1024).toFixed(1)}MB)`;
+        if (b >= 1024) return ` (${Math.round(b / 1024)}KB)`;
+        return ` (${b}B)`;
+      };
+      const list = deliveryFiles
+        .map((f: any, i: number) => `> ${i + 1}. ${f?.name || 'ملف'}${fmtSize(f?.size)}`)
+        .join('\n');
+
+      await sendTarget
+        .send({
+          content:
+            `${payeeId ? `<@${payeeId}> ` : ''}💸 **دفع المشتري** <@${order.buyerId}> عن «**${order.projectName}**» — تم تأكيد الدفع تلقائياً ✅\n` +
+            `> 📁 العنصر يحتوي **${deliveryFiles.length} ${deliveryFiles.length === 1 ? 'ملف' : 'ملفات'}** مرتبطة بالتسليم:\n${list}\n` +
+            `> 📤 **تبي أرسل الملفات للمشتري داخل التكت الآن؟**`,
+          components: [row],
+        })
+        .catch(() => {});
+      await StoreOrder.updateOne({ orderId: order.orderId }, { $set: { filesStatus: 'pending' } }).catch(
+        () => {}
+      );
+      filesRequested = true;
     }
   }
 
@@ -209,5 +280,5 @@ export async function fulfillStoreOrder(
     );
   }
 
-  return { claimed: true, totalSales, stockLine, roleLine, projectIncluded };
+  return { claimed: true, totalSales, stockLine, roleLine, projectIncluded, filesRequested };
 }

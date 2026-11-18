@@ -77,6 +77,60 @@ async function fulfillStoreOrder(client, input) {
             }
         }
     }
+    // 📎 الملفات: لو العنصر فيه ملفات مرفقة ← اسأل البائع (المالك) في التكت — يرد ✅ يرسل البوت الملفات فوراً
+    let filesRequested = false;
+    const deliveryFiles = (Array.isArray(project?.deliveryFiles) ? project.deliveryFiles : []).filter((f) => f?.path);
+    if (deliveryFiles.length && client && input.mode) {
+        const payeeId = (order.payeeId || store?.payeeId || '');
+        const targetId = order.channelId || store?.logChannelId;
+        let sendTarget = null;
+        // 1) حاول قناة التذكرة (أو قناة السجل الاحتياطية)
+        if (targetId) {
+            sendTarget =
+                input.guild?.channels?.cache?.get(targetId) ??
+                    (await client.channels.fetch(targetId).catch(() => null));
+            if (!sendTarget?.isTextBased?.())
+                sendTarget = null;
+        }
+        // 2) لو تعذر — الخاص بالبائع
+        if (!sendTarget && payeeId) {
+            const payee = await client.users.fetch(payeeId).catch(() => null);
+            sendTarget = payee?.dmChannel ?? (await payee?.createDM().catch(() => null)) ?? null;
+        }
+        if (sendTarget) {
+            const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
+                .setCustomId(`store:files:send:${order.orderId}`)
+                .setLabel('أرسل الملفات للمشتري')
+                .setStyle(discord_js_1.ButtonStyle.Success)
+                .setEmoji('✅'), new discord_js_1.ButtonBuilder()
+                .setCustomId(`store:files:cancel:${order.orderId}`)
+                .setLabel('لا ترسلها الآن')
+                .setStyle(discord_js_1.ButtonStyle.Danger)
+                .setEmoji('⛔'));
+            const fmtSize = (b) => {
+                if (!b)
+                    return '';
+                if (b >= 1024 * 1024)
+                    return ` (${(b / 1024 / 1024).toFixed(1)}MB)`;
+                if (b >= 1024)
+                    return ` (${Math.round(b / 1024)}KB)`;
+                return ` (${b}B)`;
+            };
+            const list = deliveryFiles
+                .map((f, i) => `> ${i + 1}. ${f?.name || 'ملف'}${fmtSize(f?.size)}`)
+                .join('\n');
+            await sendTarget
+                .send({
+                content: `${payeeId ? `<@${payeeId}> ` : ''}💸 **دفع المشتري** <@${order.buyerId}> عن «**${order.projectName}**» — تم تأكيد الدفع تلقائياً ✅\n` +
+                    `> 📁 العنصر يحتوي **${deliveryFiles.length} ${deliveryFiles.length === 1 ? 'ملف' : 'ملفات'}** مرتبطة بالتسليم:\n${list}\n` +
+                    `> 📤 **تبي أرسل الملفات للمشتري داخل التكت الآن؟**`,
+                components: [row],
+            })
+                .catch(() => { });
+            await models_1.StoreOrder.updateOne({ orderId: order.orderId }, { $set: { filesStatus: 'pending' } }).catch(() => { });
+            filesRequested = true;
+        }
+    }
     // 📲 إيصال الدفع للمشتري في الخاص
     try {
         if (client) {
@@ -159,6 +213,6 @@ async function fulfillStoreOrder(client, input) {
     if (mode === 'auto') {
         logger.info(`🤖 Auto-fulfilled order #${order.orderId} (${order.projectName}) | buyer=${order.buyerId} | amount=${order.amount} | sales=${totalSales ?? 'n/a'}`);
     }
-    return { claimed: true, totalSales, stockLine, roleLine, projectIncluded };
+    return { claimed: true, totalSales, stockLine, roleLine, projectIncluded, filesRequested };
 }
 //# sourceMappingURL=storeFulfill.js.map

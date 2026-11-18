@@ -83,6 +83,12 @@ const handler: ButtonHandler = {
       createdAt: { $gte: since },
     });
 
+    if (existing && !existing.channelId) {
+      // 🔗 إكمال رابط قناة التذكرة — حتى يتسلم المشتري الملفات داخل التكت نفسه
+      await StoreOrder.updateOne({ _id: existing._id }, { $set: { channelId: interaction.channelId } }).catch(() => {});
+      (existing as any).channelId = interaction.channelId;
+    }
+
     const order =
       existing ??
       (await StoreOrder.create({
@@ -99,6 +105,7 @@ const handler: ButtonHandler = {
         probotPrefix: store.probotPrefix || '!',
         buyerId: interaction.user.id,
         guildId: interaction.guildId ?? undefined,
+        channelId: interaction.channelId ?? undefined,
       }));
 
     const transferCommand = buildTransferCommand(store.payeeId, amount);

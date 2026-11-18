@@ -8,6 +8,7 @@ export interface FulfillSummary {
     stockLine?: string | null;
     roleLine?: string | null;
     projectIncluded?: boolean;
+    filesRequested?: boolean;
 }
 interface FulfillInput {
     /** 'auto' = ورد من وكيل الاكتشاف التلقائي • 'manual' = زر البائع */

@@ -8,10 +8,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const botOwner_1 = require("../../utils/botOwner");
 const store_1 = require("../../utils/store");
+const deliveryFiles_1 = require("../../utils/deliveryFiles");
 /** سطر تعريف نوع العنصر */
 function typeLine(type) {
     const meta = (0, store_1.storeTypeMeta)(type);
     return `${meta.emoji} ${meta.label}`;
+}
+/** التقاط مرفقات الملفات من خيارات الأمر (file1 … file5) وحفظها على القرص */
+async function collectAndSaveDeliveryFiles(interaction, 
+/** معرّف العنصر — يحدد مجلد الحفظ */
+key) {
+    const attachments = [];
+    for (let i = 1; i <= 5; i++) {
+        const att = interaction.options.getAttachment(`file${i}`);
+        if (!att)
+            continue;
+        attachments.push({ name: att.name, url: att.url, size: att.size });
+    }
+    if (!attachments.length)
+        return { saved: [], failed: [] };
+    return (0, deliveryFiles_1.saveDeliveryAttachments)(key, attachments);
 }
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -37,7 +53,12 @@ const command = {
         .addStringOption((o) => o.setName('image').setDescription('رابط صورة/بانر للعنصر (اختياري)').setRequired(false).setMaxLength(400))
         .addIntegerOption((o) => o.setName('stock').setDescription('الكمية المتاحة (اتركها فارغة = غير محدود)').setRequired(false).setMinValue(0).setMaxValue(999999))
         .addRoleOption((o) => o.setName('role').setDescription('رول يتمنح للمشتري تلقائياً عند تأكيد التسليم (اختياري)').setRequired(false))
-        .addStringOption((o) => o.setName('delivery-note').setDescription('ملاحظة تسليم تظهر للمشتري في الإيصال (اختياري)').setRequired(false).setMaxLength(200)))
+        .addStringOption((o) => o.setName('delivery-note').setDescription('ملاحظة تسليم تظهر للمشتري في الإيصال (اختياري)').setRequired(false).setMaxLength(200))
+        .addAttachmentOption((o) => o.setName('file1').setDescription('📁 ملف يتسلمه المشتري بعد تأكيد الدفع (اختياري — حتى ٥ ملفات)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file2').setDescription('📎 ملف ثانٍ يتسلمه المشتري (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file3').setDescription('📎 ملف ثالث يتسلمه المشتري (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file4').setDescription('📎 ملف رابع يتسلمه المشتري (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file5').setDescription('📎 ملف خامس يتسلمه المشتري (اختياري)').setRequired(false)))
         .addSubcommand((s) => s
         .setName('setprice')
         .setDescription('تعديل سعر عنصر')
@@ -73,6 +94,12 @@ const command = {
         .addBooleanOption((o) => o.setName('clear-description').setDescription('مسح الوصف الحالي').setRequired(false))
         .addStringOption((o) => o.setName('delivery-note').setDescription('ملاحظة تسليم جديدة تظهر للمشتري').setRequired(false).setMaxLength(200))
         .addBooleanOption((o) => o.setName('clear-delivery-note').setDescription('مسح ملاحظة التسليم').setRequired(false))
+        .addBooleanOption((o) => o.setName('clear-files').setDescription('صح = مسح كل الملفات المرفقة بالعنصر').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file1').setDescription('📁 ملف يتسلمه المشتري بعد الدفع — يستبدل الملفات السابقة (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file2').setDescription('📎 ملف ثانٍ (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file3').setDescription('📎 ملف ثالث (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file4').setDescription('📎 ملف رابع (اختياري)').setRequired(false))
+        .addAttachmentOption((o) => o.setName('file5').setDescription('📎 ملف خامس (اختياري)').setRequired(false))
         .addBooleanOption((o) => o.setName('enabled').setDescription('صحيح = تفعيل • خطأ = إيقاف مؤقت').setRequired(false)))
         .addSubcommand((s) => s
         .setName('duplicate')
@@ -221,6 +248,8 @@ const command = {
                 return;
             }
             const id = (0, store_1.shortId)(6);
+            // 📁 تنزيل الملفات المرفقة وحفظها على القرص — حتى تبقى متاحة دائماً عند التسليم
+            const { saved: deliveryFiles, failed: failedFiles } = await collectAndSaveDeliveryFiles(interaction, id);
             store.projects.push({
                 id,
                 name,
@@ -233,6 +262,7 @@ const command = {
                 stock,
                 deliveryRoleId: role?.id,
                 deliveryNote,
+                ...(deliveryFiles.length ? { deliveryFiles } : {}),
                 enabled: true,
                 sales: 0,
                 createdBy: interaction.user.id,
@@ -248,6 +278,12 @@ const command = {
                     `> 💰 السعر الصافي: ${(0, store_1.priceLine)(price)} كريديت\n` +
                     (stock !== undefined ? `> 📦 الكمية: **${stock}**${stock === 0 ? ' (نفدت — المشترون مش هيقدروا يطلبوه)' : ''}\n` : '> 📦 الكمية: غير محدودة\n') +
                     (role ? `> 🏷️ رول التسليم: <@&${role.id}> (يتمنح تلقائياً عند تأكيد التسليم)\n` : '') +
+                    (deliveryFiles.length
+                        ? `> 📁 الملفات المرفقة (${deliveryFiles.length} — يتسلمها المشتري بعد تأكيد الدفع):\n${deliveryFiles.map((f, i) => `> ${i + 1}. ${f.name}${f.size ? ` (${Math.round((f.size || 0) / 1024)}KB)` : ''}`).join('\n')}\n`
+                        : '') +
+                    (failedFiles.length
+                        ? `> ⚠️ تعذر حفظ ${failedFiles.length} ملف(ات): **${failedFiles.join('، ')}** — تأكد أن الملف < 25MB وحاول مجدداً عبر \`/project edit\`\n`
+                        : '') +
                     `> 🧾 أمر التحويل الذي سيظهر للمشتري: \`${transferPreview}\` (بعد خصم ProBot ${store.taxPercent ?? 5}% يصلك الصافي كامل)\n` +
                     `> 🔑 المعرّف: \`${id}\`\n` +
                     '> 🏷️ لإضافة خصم لاحقاً: `/project edit name:... discount:25`\n' +
@@ -298,6 +334,8 @@ const command = {
             const clearDescription = interaction.options.getBoolean('clear-description') ?? false;
             const deliveryNote = interaction.options.getString('delivery-note')?.trim();
             const clearDeliveryNote = interaction.options.getBoolean('clear-delivery-note') ?? false;
+            const clearFiles = interaction.options.getBoolean('clear-files') ?? false;
+            const wantsFiles = [1, 2, 3, 4, 5].some((i) => interaction.options.getAttachment(`file${i}`) != null);
             const enabled = interaction.options.getBoolean('enabled');
             const project = (0, store_1.findProjectByName)(store, name);
             if (!project) {
@@ -403,6 +441,24 @@ const command = {
                 project.deliveryNote = deliveryNote;
                 changes.push('ملاحظة التسليم: حُدّثت');
             }
+            if (wantsFiles) {
+                // 📁 احفظ الملفات الجديدة أولاً — لو فشل ما نخسر ملفات القديمة
+                const { saved, failed } = await collectAndSaveDeliveryFiles(interaction, project.id);
+                if (saved.length) {
+                    await (0, deliveryFiles_1.deleteDeliveryFiles)(project.deliveryFiles);
+                    project.deliveryFiles = saved;
+                    changes.push(`📁 الملفات المرفقة: حُدّثت — ${saved.length} ملف` +
+                        (failed.length ? ` (⚠️ تعذر حفظ: ${failed.join('، ')})` : ''));
+                }
+                else if (failed.length) {
+                    changes.push(`📁 الملفات: لم تُحفظ (${failed.join('، ')}) — الملفات القديمة كما هي`);
+                }
+            }
+            else if (clearFiles) {
+                await (0, deliveryFiles_1.deleteDeliveryFiles)(project.deliveryFiles);
+                project.deliveryFiles = undefined;
+                changes.push('📁 الملفات المرفقة: مُسحت');
+            }
             if (enabled !== null) {
                 project.enabled = enabled;
                 changes.push(`الحالة: ${enabled ? 'مفعّل ✅' : 'موقوف ⏸️'}`);
@@ -471,6 +527,8 @@ const command = {
                 return;
             }
             const [removed] = store.projects.splice(idx, 1);
+            // 📁 احذف الملفات المرفقة بالعنصر من القرص — لا نترك بقايا
+            await (0, deliveryFiles_1.deleteDeliveryFiles)(removed?.deliveryFiles).catch(() => 0);
             await store.save();
             await interaction.reply({
                 content: `🗑️ تم حذف **${removed.name}** من المتجر\n` +
@@ -497,7 +555,8 @@ const command = {
                     const priceText = discount ? (0, store_1.projectPriceLine)(p) : (0, store_1.priceLine)((0, store_1.getEffectivePrice)(p));
                     const stockText = p.stock === undefined ? '♾️' : p.stock === 0 ? '⛔ 0' : `📦 ${p.stock}`;
                     sections.push(`> ${p.enabled ? '🟢' : '⏸️'} ${(0, store_1.storeItemEmoji)(p)} **${p.name}** — 💰 ${priceText} | 📊 ${p.sales || 0} | ${stockText} | 🔑 \`${p.id}\`` +
-                        (p.deliveryRoleId ? ` | 🏷️ <@&${p.deliveryRoleId}>` : ''));
+                        (p.deliveryRoleId ? ` | 🏷️ <@&${p.deliveryRoleId}>` : '') +
+                        (Array.isArray(p.deliveryFiles) && p.deliveryFiles.length ? ` | 📁 ${p.deliveryFiles.length}` : ''));
                 }
             }
             const perType = (0, store_1.storeTypeStats)(store)

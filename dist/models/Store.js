@@ -66,6 +66,15 @@ const StoreProjectSchema = new mongoose_1.Schema({
     /** غير محدد = كميات غير محدودة */
     stock: { type: Number, min: 0 },
     deliveryNote: { type: String },
+    /** 📁 ملفات مرفقة يتسلمه المشتري تلقائياً بعد الدفع — اختياري */
+    deliveryFiles: [
+        {
+            _id: false,
+            name: { type: String, trim: true },
+            size: { type: Number },
+            path: { type: String, trim: true },
+        },
+    ],
     enabled: { type: Boolean, default: true },
     sales: { type: Number, default: 0, min: 0 },
     createdBy: { type: String },
@@ -96,9 +105,12 @@ const StoreOrderSchema = new mongoose_1.Schema({
     probotPrefix: { type: String },
     buyerId: { type: String, required: true, index: true },
     guildId: { type: String },
+    channelId: { type: String },
     status: { type: String, enum: ['pending', 'paid', 'cancelled'], default: 'pending', index: true },
     paidBy: { type: String },
     paidAt: { type: Date },
+    /** حالة تسليم الملفات المرفقة بالعنصر */
+    filesStatus: { type: String, enum: ['pending', 'sent', 'cancelled'] },
 }, { timestamps: true });
 exports.StoreOrder = mongoose_1.default.models.StoreOrder || mongoose_1.default.model('StoreOrder', StoreOrderSchema);
 //# sourceMappingURL=Store.js.map
