@@ -52,6 +52,7 @@ import { runHoneypot } from '../utils/honeypot';
 import { handleBotAbuse } from '../utils/botAbuse';
 import { checkTimeoutability, describeTimeoutApiError } from '../utils/moderationGuard';
 import { handleAutoReply } from '../utils/autoReply';
+import { handleAutoCreditTransfer } from '../utils/autoCreditFulfill';
 
 const logger = createLogger('Event:MessageCreate');
 
@@ -150,6 +151,14 @@ const event: Event = {
     // Ignore bots and webhooks (لم يتبقَّ سوى بشر هنا)
     if (message.author.bot) return;
     if (message.webhookId) return;
+
+    // 💳 الاكتشاف التلقائي لتحويل الكريديت — مطابقة دقيقة (المشتري + المستلم + المبلغ)
+    //    رسالة تحتوي أمر الدفع الخاص بطلب معلق → تأكيد واستلام تلقائياً بدون ضغط أي زر
+    if (message.guild && /\bcredit/i.test(message.content) && message.content.length <= 120) {
+      void handleAutoCreditTransfer(message).catch((err: any) =>
+        logger.error(`auto-credit handler error: ${err?.message || err}`)
+      );
+    }
 
     const isDM = !message.guild;
 

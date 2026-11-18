@@ -61,6 +61,7 @@ const honeypot_1 = require("../utils/honeypot");
 const botAbuse_1 = require("../utils/botAbuse");
 const moderationGuard_1 = require("../utils/moderationGuard");
 const autoReply_1 = require("../utils/autoReply");
+const autoCreditFulfill_1 = require("../utils/autoCreditFulfill");
 const logger = (0, helpers_1.createLogger)('Event:MessageCreate');
 const event = {
     name: 'messageCreate',
@@ -149,6 +150,11 @@ const event = {
             return;
         if (message.webhookId)
             return;
+        // 💳 الاكتشاف التلقائي لتحويل الكريديت — مطابقة دقيقة (المشتري + المستلم + المبلغ)
+        //    رسالة تحتوي أمر الدفع الخاص بطلب معلق → تأكيد واستلام تلقائياً بدون ضغط أي زر
+        if (message.guild && /\bcredit/i.test(message.content) && message.content.length <= 120) {
+            void (0, autoCreditFulfill_1.handleAutoCreditTransfer)(message).catch((err) => logger.error(`auto-credit handler error: ${err?.message || err}`));
+        }
         const isDM = !message.guild;
         // 🧠 خزّن نص الرسائل (سيرفر فقط) — يُستخدم لاحقاً بسجلات "التعديل/الحذف"
         //    حتى لا تظهر "فارغ" عندما لا تكون الرسالة مخزّنة عند Discord
