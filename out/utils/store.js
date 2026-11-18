@@ -10,7 +10,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STORE_TYPE_CHOICES = exports.STORE_TYPES = exports.STORE_PAGE_SIZE = exports.DEFAULT_PAYEE_ID = exports.DEFAULT_STORE_NAME = exports.DEFAULT_PROBOT_PREFIX = exports.DEFAULT_TAX_PERCENT = exports.STORE_KEY = void 0;
+exports.VISIBLE_STORE_TYPE_CHOICES = exports.VISIBLE_STORE_TYPES = exports.STORE_TYPE_CHOICES = exports.STORE_TYPES = exports.STORE_PAGE_SIZE = exports.DEFAULT_PAYEE_ID = exports.DEFAULT_STORE_NAME = exports.DEFAULT_PROBOT_PREFIX = exports.DEFAULT_TAX_PERCENT = exports.STORE_KEY = void 0;
 exports.normalizeStoreType = normalizeStoreType;
 exports.normalizeStoreFilter = normalizeStoreFilter;
 exports.storeTypeMeta = storeTypeMeta;
@@ -112,6 +112,18 @@ exports.STORE_TYPE_CHOICES = exports.STORE_TYPES.map((t) => ({
     name: `${t.emoji} ${t.label}`,
     value: t.key,
 }));
+/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب */
+exports.VISIBLE_STORE_TYPES = [
+    { key: 'project', shortPlural: 'بروجيكتات' },
+    { key: 'bot', shortPlural: 'بوتات' },
+    { key: 'tool', shortPlural: 'أدوات' },
+    { key: 'role', shortPlural: 'رتب' },
+];
+/** خيارات /store — الأقسام الأربعة فقط (بلا خدمة/أخرى) */
+exports.VISIBLE_STORE_TYPE_CHOICES = exports.VISIBLE_STORE_TYPES.map(({ key }) => {
+    const meta = exports.STORE_TYPES.find((t) => t.key === key);
+    return { name: `${meta.emoji} ${meta.plural.replace(/^ال/, '')}`, value: meta.key };
+});
 /** تحويل أي نص/قيمة إلى نوع عنصر صالح (الافتراضي project للعناصر القديمة) */
 function normalizeStoreType(value, fallback = 'project') {
     const raw = String(value ?? '').trim().toLowerCase();
@@ -345,9 +357,10 @@ function isProbotCommandLike(text, _prefix) {
     const t = String(text || '').trim().toLowerCase();
     return /^(?:#?credit)\s+\d+\s+\d+#?$/.test(t) || /^!pay\b/i.test(t) || /^pay\s/i.test(t);
 }
-/** حساب حالة العرض (تصفية + تقسيم صفحات) */
+/** حساب حالة العرض (تصفية + تقسيم صفحات) — الوضع الافتراضي: بروجيكتات */
 function computeStoreView(store, opts = {}) {
-    const filter = normalizeStoreFilter(opts.type);
+    const raw = String(opts.type ?? '').trim().toLowerCase();
+    const filter = (!raw ? 'project' : normalizeStoreFilter(opts.type));
     const all = (store.projects || []).filter((p) => p.enabled);
     const typeOrder = new Map(exports.STORE_TYPES.map((t, i) => [t.key, i]));
     const sortByType = (a, b) => (typeOrder.get(normalizeStoreType(a.type)) ?? 99) - (typeOrder.get(normalizeStoreType(b.type)) ?? 99);
@@ -460,17 +473,13 @@ function buildStoreComponents(store, opts = {}) {
     const select = buildStoreSelect(store, opts);
     if (select?.length)
         rows.push(...select);
-    // 🔎 أزرار تصفية الأنواع (تظهر الأنواع اللي فيها عناصر فقط + الكل)
+    // 🔎 أزرار الفلترة — ٤ أقسام ثابتة فقط (بروجيكتات ← بوتات ← أدوات ← رتب) — بلا زر «الكل»
     if (view.all.length) {
-        const filters = [
-            { key: 'all', label: `الكل (${view.all.length})`, emoji: '🛍️' },
-            ...exports.STORE_TYPES.map((meta) => {
-                const count = view.all.filter((p) => normalizeStoreType(p.type) === meta.key).length;
-                return { key: meta.key, label: `${meta.label} (${count})`, emoji: meta.emoji, count };
-            })
-                .filter((f) => f.count > 0)
-                .map(({ key, label, emoji }) => ({ key, label, emoji })),
-        ];
+        const filters = exports.VISIBLE_STORE_TYPES.map(({ key, shortPlural }) => {
+            const meta = exports.STORE_TYPES.find((t) => t.key === key);
+            const count = view.all.filter((p) => normalizeStoreType(p.type) === key).length;
+            return { key: key, label: `${shortPlural} (${count})`, emoji: meta.emoji, count };
+        });
         for (let i = 0; i < filters.length; i += 5) {
             const row = new discord_js_1.ActionRowBuilder();
             for (const f of filters.slice(i, i + 5)) {
@@ -478,7 +487,8 @@ function buildStoreComponents(store, opts = {}) {
                     .setCustomId(`store:nav:${f.key}:0`)
                     .setLabel(f.label.slice(0, 80))
                     .setEmoji(f.emoji)
-                    .setStyle(view.filter === f.key ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary));
+                    .setStyle(view.filter === f.key ? discord_js_1.ButtonStyle.Primary : discord_js_1.ButtonStyle.Secondary)
+                    .setDisabled(f.count === 0));
             }
             rows.push(row);
         }

@@ -99,6 +99,20 @@ export const STORE_TYPE_CHOICES = STORE_TYPES.map((t) => ({
   value: t.key,
 }));
 
+/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب */
+export const VISIBLE_STORE_TYPES: Array<{ key: StoreItemType; shortPlural: string }> = [
+  { key: 'project', shortPlural: 'بروجيكتات' },
+  { key: 'bot', shortPlural: 'بوتات' },
+  { key: 'tool', shortPlural: 'أدوات' },
+  { key: 'role', shortPlural: 'رتب' },
+];
+
+/** خيارات /store — الأقسام الأربعة فقط (بلا خدمة/أخرى) */
+export const VISIBLE_STORE_TYPE_CHOICES = VISIBLE_STORE_TYPES.map(({ key }) => {
+  const meta = STORE_TYPES.find((t) => t.key === key)!;
+  return { name: `${meta.emoji} ${meta.plural.replace(/^ال/, '')}`, value: meta.key };
+});
+
 /** تحويل أي نص/قيمة إلى نوع عنصر صالح (الافتراضي project للعناصر القديمة) */
 export function normalizeStoreType(value: unknown, fallback: StoreItemType = 'project'): StoreItemType {
   const raw = String(value ?? '').trim().toLowerCase();
@@ -347,9 +361,10 @@ export interface StoreView {
   pageSize: number;
 }
 
-/** حساب حالة العرض (تصفية + تقسيم صفحات) */
+/** حساب حالة العرض (تصفية + تقسيم صفحات) — الوضع الافتراضي: بروجيكتات */
 export function computeStoreView(store: IStore, opts: StoreViewOptions = {}): StoreView {
-  const filter = normalizeStoreFilter(opts.type);
+  const raw = String(opts.type ?? '').trim().toLowerCase();
+  const filter = (!raw ? 'project' : normalizeStoreFilter(opts.type)) as StoreFilter;
   const all = (store.projects || []).filter((p) => p.enabled);
   const typeOrder = new Map(STORE_TYPES.map((t, i) => [t.key as string, i]));
   const sortByType = (a: IStoreProject, b: IStoreProject) =>
@@ -480,17 +495,13 @@ export function buildStoreComponents(store: IStore, opts: StoreViewOptions = {})
   const select = buildStoreSelect(store, opts);
   if (select?.length) rows.push(...select);
 
-  // 🔎 أزرار تصفية الأنواع (تظهر الأنواع اللي فيها عناصر فقط + الكل)
+  // 🔎 أزرار الفلترة — ٤ أقسام ثابتة فقط (بروجيكتات ← بوتات ← أدوات ← رتب) — بلا زر «الكل»
   if (view.all.length) {
-    const filters: Array<{ key: StoreFilter; label: string; emoji: string }> = [
-      { key: 'all', label: `الكل (${view.all.length})`, emoji: '🛍️' },
-      ...STORE_TYPES.map((meta) => {
-        const count = view.all.filter((p) => normalizeStoreType(p.type) === meta.key).length;
-        return { key: meta.key as StoreFilter, label: `${meta.label} (${count})`, emoji: meta.emoji, count };
-      })
-        .filter((f) => f.count > 0)
-        .map(({ key, label, emoji }) => ({ key, label, emoji })),
-    ];
+    const filters = VISIBLE_STORE_TYPES.map(({ key, shortPlural }) => {
+      const meta = STORE_TYPES.find((t) => t.key === key)!;
+      const count = view.all.filter((p) => normalizeStoreType(p.type) === key).length;
+      return { key: key as StoreFilter, label: `${shortPlural} (${count})`, emoji: meta.emoji, count };
+    });
 
     for (let i = 0; i < filters.length; i += 5) {
       const row = new ActionRowBuilder<ButtonBuilder>();
@@ -501,6 +512,7 @@ export function buildStoreComponents(store: IStore, opts: StoreViewOptions = {})
             .setLabel(f.label.slice(0, 80))
             .setEmoji(f.emoji)
             .setStyle(view.filter === f.key ? ButtonStyle.Primary : ButtonStyle.Secondary)
+            .setDisabled(f.count === 0)
         );
       }
       rows.push(row);

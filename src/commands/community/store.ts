@@ -1,6 +1,6 @@
 // ============================================
 // Omni Bot - 🛍️ متجر Omni
-// بروجيكتات • بوتات • أدوات • رتب • خدمات — الدفع بالكريديت عبر ProBot
+// بروجيكتات • بوتات • أدوات • رتب — الدفع بالكريديت عبر ProBot
 // ============================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
@@ -9,21 +9,21 @@ import {
   getStore,
   buildStoreEmbed,
   buildStoreComponents,
-  STORE_TYPE_CHOICES,
+  VISIBLE_STORE_TYPE_CHOICES,
   normalizeStoreFilter,
 } from '../../utils/store';
 
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName('store')
-    .setDescription('🛍️ متجر Omni — بروجيكتات وبوتات وأدوات ورتب وخدمات بالكريديت')
+    .setDescription('🛍️ متجر Omni — بروجيكتات وبوتات وأدوات ورتب بالكريديت')
     .setDMPermission(false)
     .addStringOption((o) =>
       o
         .setName('type')
-        .setDescription('افتح المتجر على قسم معيّن (اختياري)')
+        .setDescription('افتح المتجر على قسم معيّن (الافتراضي: بروجيكتات)')
         .setRequired(false)
-        .addChoices(...STORE_TYPE_CHOICES)
+        .addChoices(...VISIBLE_STORE_TYPE_CHOICES)
     ),
 
   cooldown: 3,
@@ -40,7 +40,7 @@ const command: Command = {
       return;
     }
 
-    const type = interaction.options.getString('type') || 'all';
+    const type = interaction.options.getString('type') || 'project';
     const view = { type: normalizeStoreFilter(type), page: 0 };
     const components = buildStoreComponents(store, view);
     const embed = buildStoreEmbed(store, view);

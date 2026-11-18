@@ -25,6 +25,16 @@ export declare const STORE_TYPE_CHOICES: {
     name: string;
     value: StoreItemType;
 }[];
+/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب */
+export declare const VISIBLE_STORE_TYPES: Array<{
+    key: StoreItemType;
+    shortPlural: string;
+}>;
+/** خيارات /store — الأقسام الأربعة فقط (بلا خدمة/أخرى) */
+export declare const VISIBLE_STORE_TYPE_CHOICES: {
+    name: string;
+    value: StoreItemType;
+}[];
 /** تحويل أي نص/قيمة إلى نوع عنصر صالح (الافتراضي project للعناصر القديمة) */
 export declare function normalizeStoreType(value: unknown, fallback?: StoreItemType): StoreItemType;
 /** تحويل فلتر المتجر (all أو نوع محدد) */
@@ -101,7 +111,7 @@ export interface StoreView {
     totalPages: number;
     pageSize: number;
 }
-/** حساب حالة العرض (تصفية + تقسيم صفحات) */
+/** حساب حالة العرض (تصفية + تقسيم صفحات) — الوضع الافتراضي: بروجيكتات */
 export declare function computeStoreView(store: IStore, opts?: StoreViewOptions): StoreView;
 /** اسم المتجر المعروض */
 export declare function getStoreName(store: IStore): string;
