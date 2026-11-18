@@ -9,6 +9,7 @@
  */
 export const BUILTIN_ALIASES: Map<string, { command: string; description: string }> = new Map([
   ['استدعاء', { command: 'call', description: '📢 استدعاء عضو — يرسل البوت له رسالة بأنه مطلوب في القناة' }],
+  ['تنتيل', { command: 'demote', description: '⬇️ تنزيل ترقية — إسقاط أعلى رول إدارة من عضو (يبقي الرولات الأدنى)' }],
 ]);
 
 /** اختصار واحد أم أكثر (يشمل المدمج) */

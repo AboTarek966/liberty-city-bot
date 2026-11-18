@@ -13,6 +13,7 @@ exports.builtinAliasesForDisplay = builtinAliasesForDisplay;
  */
 exports.BUILTIN_ALIASES = new Map([
     ['استدعاء', { command: 'call', description: '📢 استدعاء عضو — يرسل البوت له رسالة بأنه مطلوب في القناة' }],
+    ['تنتيل', { command: 'demote', description: '⬇️ تنزيل ترقية — إسقاط أعلى رول إدارة من عضو (يبقي الرولات الأدنى)' }],
 ]);
 /** اختصار واحد أم أكثر (يشمل المدمج) */
 const isBuiltinAlias = (shortcut) => exports.BUILTIN_ALIASES.has(String(shortcut).toLowerCase().trim());

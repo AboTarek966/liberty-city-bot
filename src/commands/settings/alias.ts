@@ -241,6 +241,7 @@ const command: Command = {
               { name: '⚙️ إعدادات', value: 'settings' },
               { name: '⌨️ علياس', value: 'alias' },
               { name: '🧹 فصل إدارة', value: 'dismiss' },
+              { name: '⬇️ تنزيل ترقية', value: 'demote' },
               { name: '🎭 رول منيو', value: 'rolemenu' },
               { name: '➕ أوتو رول', value: 'autorole' },
               { name: '➕ رول أدد', value: 'roleadd' },
