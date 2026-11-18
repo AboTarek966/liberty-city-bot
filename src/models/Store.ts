@@ -9,7 +9,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 // --------------------------------------------
 // أنواع العناصر المتاحة في المتجر
 // --------------------------------------------
-export type StoreItemType = 'project' | 'bot' | 'tool' | 'role' | 'service' | 'other';
+export type StoreItemType = 'project' | 'bot' | 'tool' | 'role' | 'service' | 'other' | 'ad';
 
 export const STORE_ITEM_TYPE_VALUES: StoreItemType[] = [
   'project',
@@ -18,6 +18,7 @@ export const STORE_ITEM_TYPE_VALUES: StoreItemType[] = [
   'role',
   'service',
   'other',
+  'ad',
 ];
 
 // --------------------------------------------
@@ -164,6 +165,16 @@ export interface IStoreOrder extends Document {
   paidAt?: Date;
   /** حالة تسليم الملفات: pending (بانتظار قرار البائع) | sent | cancelled */
   filesStatus?: 'pending' | 'sent' | 'cancelled';
+  /** نص الإعلان المُرسل من المشتري (عنصر إعلان) */
+  adText?: string;
+  /** رابط دعوة سيرفر المشتري */
+  adLink?: string;
+  /** حالة الإعلان: awaiting (بانتظار كتابته) | submitted (بانتظار قرار البائع) | approved | rejected */
+  adStatus?: 'awaiting' | 'submitted' | 'approved' | 'rejected';
+  /** سبب الرفض (اختياري) */
+  adReason?: string;
+  // حفظ اسم سيرفر المشتري وقت الاعتماد (لتظهر في القائمة)
+  adGuildName?: string;
 }
 
 const StoreOrderSchema = new Schema<IStoreOrder>(
@@ -187,6 +198,12 @@ const StoreOrderSchema = new Schema<IStoreOrder>(
     paidAt: { type: Date },
     /** حالة تسليم الملفات المرفقة بالعنصر */
     filesStatus: { type: String, enum: ['pending', 'sent', 'cancelled'] },
+    /** إعلان: نص الإعلان ورابط الدعوة وحالة الاعتماد */
+    adText: { type: String },
+    adLink: { type: String },
+    adStatus: { type: String, enum: ['awaiting', 'submitted', 'approved', 'rejected'] },
+    adReason: { type: String },
+    adGuildName: { type: String },
   },
   { timestamps: true }
 );

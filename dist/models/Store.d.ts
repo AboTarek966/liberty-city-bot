@@ -1,5 +1,5 @@
 import mongoose, { Document } from 'mongoose';
-export type StoreItemType = 'project' | 'bot' | 'tool' | 'role' | 'service' | 'other';
+export type StoreItemType = 'project' | 'bot' | 'tool' | 'role' | 'service' | 'other' | 'ad';
 export declare const STORE_ITEM_TYPE_VALUES: StoreItemType[];
 /** ملف تسليم مرتبط بعنصر (اختياري) — يُخزَّن على القرص ويُرسل للمشتري بعد تأكيد الدفع */
 export interface IStoreDeliveryFile {
@@ -83,6 +83,15 @@ export interface IStoreOrder extends Document {
     paidAt?: Date;
     /** حالة تسليم الملفات: pending (بانتظار قرار البائع) | sent | cancelled */
     filesStatus?: 'pending' | 'sent' | 'cancelled';
+    /** نص الإعلان المُرسل من المشتري (عنصر إعلان) */
+    adText?: string;
+    /** رابط دعوة سيرفر المشتري */
+    adLink?: string;
+    /** حالة الإعلان: awaiting (بانتظار كتابته) | submitted (بانتظار قرار البائع) | approved | rejected */
+    adStatus?: 'awaiting' | 'submitted' | 'approved' | 'rejected';
+    /** سبب الرفض (اختياري) */
+    adReason?: string;
+    adGuildName?: string;
 }
 export declare const StoreOrder: mongoose.Model<any, {}, {}, {}, any, any>;
 //# sourceMappingURL=Store.d.ts.map

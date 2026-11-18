@@ -108,18 +108,27 @@ exports.STORE_TYPES = [
         color: 0x95a5a6,
         aliases: ['other', 'misc', 'أخرى', 'اخرى', 'متنوع', 'متنوعات', 'أخري'],
     },
+    {
+        key: 'ad',
+        label: 'إعلان',
+        plural: 'الإعلانات',
+        emoji: '📢',
+        color: 0xe74c3c,
+        aliases: ['ad', 'ads', 'advert', 'إعلان', 'اعلان', 'إعلانات', 'اعلانات'],
+    },
 ];
 /** كل الأنواع كخيارات جاهزة لأوامر السلاش */
 exports.STORE_TYPE_CHOICES = exports.STORE_TYPES.map((t) => ({
     name: `${t.emoji} ${t.label}`,
     value: t.key,
 }));
-/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب */
+/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب ← إعلانات */
 exports.VISIBLE_STORE_TYPES = [
     { key: 'project', shortPlural: 'بروجيكتات' },
     { key: 'bot', shortPlural: 'بوتات' },
     { key: 'tool', shortPlural: 'أدوات' },
     { key: 'role', shortPlural: 'رتب' },
+    { key: 'ad', shortPlural: 'إعلانات' },
 ];
 /** خيارات /store — الأقسام الأربعة فقط (بلا خدمة/أخرى) */
 exports.VISIBLE_STORE_TYPE_CHOICES = exports.VISIBLE_STORE_TYPES.map(({ key }) => {

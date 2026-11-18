@@ -125,12 +125,45 @@ export async function fulfillStoreOrder(
     }
   }
 
+  // 📢 إعلان: بدلاً من الملفات → نطلب من المشتري يكتب إعلانه (زر داخل التكت)
+  const isAd = (order.itemType ?? project?.type) === 'ad';
+  if (isAd && client) {
+    const targetId = order.channelId || store?.logChannelId;
+    let sendTarget: any = null;
+    if (targetId) {
+      sendTarget =
+        (input.guild?.channels?.cache?.get(targetId) as any) ??
+        (await client.channels.fetch(targetId).catch(() => null));
+      if (!sendTarget?.isTextBased?.()) sendTarget = null;
+    }
+    if (sendTarget) {
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`store:ad:compose:${order.orderId}`)
+          .setLabel('اكتب إعلانك الآن')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📢')
+      );
+      await sendTarget
+        .send({
+          content:
+            `<@${order.buyerId}> 📢 **اشتريت إعلانك لـ«${order.projectName}»** — تم تأكيد الدفع ✅\n` +
+            `> اضغط الزر بالأسفل واكتب **نص إعلانك** و**رابط دعوة سيرفرك** — وبنرسله للبائع للاعتماد مباشرة.`,
+          components: [row],
+        })
+        .catch(() => {});
+      await StoreOrder.updateOne({ orderId: order.orderId }, { $set: { adStatus: 'awaiting' } }).catch(
+        () => {}
+      );
+    }
+  }
+
   // 📎 الملفات: لو العنصر فيه ملفات مرفقة ← اسأل البائع (المالك) في التكت — يرد ✅ يرسل البوت الملفات فوراً
   let filesRequested = false;
   const deliveryFiles = (Array.isArray(project?.deliveryFiles) ? project!.deliveryFiles! : []).filter(
     (f: any) => f?.path
   );
-  if (deliveryFiles.length && client && input.mode) {
+  if (!isAd && deliveryFiles.length && client && input.mode) {
     const payeeId = (order.payeeId || store?.payeeId || '') as string;
     const targetId = order.channelId || store?.logChannelId;
     let sendTarget: any = null;

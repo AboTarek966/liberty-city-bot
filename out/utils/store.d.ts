@@ -25,7 +25,7 @@ export declare const STORE_TYPE_CHOICES: {
     name: string;
     value: StoreItemType;
 }[];
-/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب */
+/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب ← إعلانات */
 export declare const VISIBLE_STORE_TYPES: Array<{
     key: StoreItemType;
     shortPlural: string;

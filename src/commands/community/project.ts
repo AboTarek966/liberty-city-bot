@@ -458,6 +458,9 @@ const command: Command = {
           (deliveryFiles.length
             ? `> 📁 الملفات المرفقة (${deliveryFiles.length} — يتسلمها المشتري بعد تأكيد الدفع):\n${deliveryFiles.map((f, i) => `> ${i + 1}. ${f.name}${f.size ? ` (${Math.round((f.size || 0) / 1024)}KB)` : ''}`).join('\n')}\n`
             : '') +
+          (type === 'ad'
+            ? '> 📢 **نوع إعلان:** بعد الدفع المشتري يكتب إعلانه ورابط سيرفره — توصله لك لاعتماده ثم تنشره أنت\n'
+            : '') +
           (failedFiles.length
             ? `> ⚠️ تعذر حفظ ${failedFiles.length} ملف(ات): **${failedFiles.join('، ')}** — تأكد أن الملف < 25MB وحاول مجدداً عبر \`/project edit\`\n`
             : '') +

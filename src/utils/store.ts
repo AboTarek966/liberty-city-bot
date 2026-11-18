@@ -91,6 +91,14 @@ export const STORE_TYPES: StoreTypeMeta[] = [
     color: 0x95a5a6,
     aliases: ['other', 'misc', 'أخرى', 'اخرى', 'متنوع', 'متنوعات', 'أخري'],
   },
+  {
+    key: 'ad',
+    label: 'إعلان',
+    plural: 'الإعلانات',
+    emoji: '📢',
+    color: 0xe74c3c,
+    aliases: ['ad', 'ads', 'advert', 'إعلان', 'اعلان', 'إعلانات', 'اعلانات'],
+  },
 ];
 
 /** كل الأنواع كخيارات جاهزة لأوامر السلاش */
@@ -99,12 +107,13 @@ export const STORE_TYPE_CHOICES = STORE_TYPES.map((t) => ({
   value: t.key,
 }));
 
-/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب */
+/** الأقسام الظاهرة في واجهة المتجر — بترتيب الأزرار: بروجيكتات ← بوتات ← أدوات ← رتب ← إعلانات */
 export const VISIBLE_STORE_TYPES: Array<{ key: StoreItemType; shortPlural: string }> = [
   { key: 'project', shortPlural: 'بروجيكتات' },
   { key: 'bot', shortPlural: 'بوتات' },
   { key: 'tool', shortPlural: 'أدوات' },
   { key: 'role', shortPlural: 'رتب' },
+  { key: 'ad', shortPlural: 'إعلانات' },
 ];
 
 /** خيارات /store — الأقسام الأربعة فقط (بلا خدمة/أخرى) */

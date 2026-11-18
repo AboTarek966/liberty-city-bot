@@ -47,6 +47,7 @@ exports.STORE_ITEM_TYPE_VALUES = [
     'role',
     'service',
     'other',
+    'ad',
 ];
 const StoreProjectSchema = new mongoose_1.Schema({
     id: { type: String, required: true },
@@ -111,6 +112,12 @@ const StoreOrderSchema = new mongoose_1.Schema({
     paidAt: { type: Date },
     /** حالة تسليم الملفات المرفقة بالعنصر */
     filesStatus: { type: String, enum: ['pending', 'sent', 'cancelled'] },
+    /** إعلان: نص الإعلان ورابط الدعوة وحالة الاعتماد */
+    adText: { type: String },
+    adLink: { type: String },
+    adStatus: { type: String, enum: ['awaiting', 'submitted', 'approved', 'rejected'] },
+    adReason: { type: String },
+    adGuildName: { type: String },
 }, { timestamps: true });
 exports.StoreOrder = mongoose_1.default.models.StoreOrder || mongoose_1.default.model('StoreOrder', StoreOrderSchema);
 //# sourceMappingURL=Store.js.map
