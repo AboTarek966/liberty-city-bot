@@ -21,13 +21,16 @@ export declare function clearPasswordVerified(userId: string): void;
  * الحصول على كلمة مرور الإعدادات من قاعدة البيانات (أو الافتراضية)
  */
 export declare function getSettingsPassword(guildId: string): Promise<string>;
+/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر فقط + الذين سمح لهم هو تحديداً */
 export declare function canManageSettings(interaction: ChatInputCommandInteraction | {
     member: any;
     user: any;
     guildId: string;
-}): boolean;
+}): Promise<boolean>;
 export type SettingsAccess = 'ok' | 'noperm' | 'needpassword';
-export declare function checkSettingsAccess(interaction: any): SettingsAccess;
+/** قائمة المخوّلين باستخدام الإعدادات — يقرؤها البوت من إعدادات السيرفر (المالك يملكها دائماً) */
+export declare function getSettingsAllowlist(guildId: string): Promise<string[]>;
+export declare function checkSettingsAccess(interaction: any): Promise<SettingsAccess>;
 export declare function buildSettingsPasswordModal(): ModalBuilder;
 export declare const ICONS: Record<SettingsCategory, string>;
 export declare const TITLES: Record<SettingsCategory, string>;

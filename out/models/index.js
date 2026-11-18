@@ -130,6 +130,8 @@ const GuildSettingsSchema = new mongoose_1.Schema({
     language: { type: String, default: 'ar' },
     timezone: { type: String, default: 'Asia/Riyadh' },
     settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
+    // 🔐 من يملك صلاحية استخدام لوحة الإعدادات — يتحكم به مالك السيرفر فقط عبر /settings-access
+    settingsAllowlist: { type: [String], default: [] },
     protection: {
         logChannel: { type: String },
         // 🙈 قنوات مستثناة من كل فحوصات الحماية

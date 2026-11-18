@@ -17,23 +17,23 @@ const handler = {
         const parts0 = interaction.customId.split(':');
         const section0 = parts0[1];
         const field0 = parts0[2];
-        // 🔐 مودال كلمة المرور: يتحقق فقط من صلاحية الإدارة (لا يشترط كلمة المرور بعد، فهي ما سيتحقق منها الآن)
+        // 🔐 مودال كلمة المرور: نفس بوابة الإعدادات — مالك السيرفر + من سمح له هو (لا أعلى رول)
         if (section0 === 'password') {
-            const member = interaction.member;
-            const perms = member?.permissions;
-            const hasAdminPerms = !!perms && (perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
-                perms.has(discord_js_1.PermissionFlagsBits.Administrator));
+            const s = await (0, models_1.getGuildSettings)(interaction.guild.id).catch(() => null);
+            const active = s && Array.isArray(s?.settingsAllowlist)
+                ? s.settingsAllowlist.map(String)
+                : [];
             const isOwner = interaction.user.id === interaction.guild.ownerId;
-            if (!hasAdminPerms && !isOwner) {
-                await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+            if (!isOwner && !active.includes(String(interaction.user.id))) {
+                await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
                 return;
             }
         }
         else {
             // 🔐 مودالات الإعدادات الأخرى: فحص الصلاحيات + الجلسة (رسالة مميزة لكل حالة)
-            const access = (0, settingsPanel_1.checkSettingsAccess)(interaction);
+            const access = await (0, settingsPanel_1.checkSettingsAccess)(interaction);
             if (access === 'noperm') {
-                await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+                await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
                 return;
             }
             if (access === 'needpassword') {

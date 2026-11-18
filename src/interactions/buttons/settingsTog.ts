@@ -17,9 +17,9 @@ const handler: ButtonHandler = {
       await interaction.reply({ content: '❌ يعمل في السيرفر فقط', ephemeral: true });
       return;
     }
-    const access = checkSettingsAccess(interaction);
+    const access = await checkSettingsAccess(interaction);
     if (access === 'noperm') {
-      await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+      await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
       return;
     }
     if (access === 'needpassword') {

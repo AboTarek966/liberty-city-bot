@@ -16,9 +16,9 @@ const handler: ButtonHandler = {
 
     // 🔐 فحص الوصول: الصلاحيات + جلسة كلمة المرور
     // (عند انتهاء الجلسة تُفتح نافذة كلمة المرور تلقائياً بدل خطأ ميت)
-    const access = checkSettingsAccess(interaction);
+    const access = await checkSettingsAccess(interaction);
     if (access === 'noperm') {
-      await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
+      await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
       return;
     }
     if (access === 'needpassword') {

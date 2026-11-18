@@ -43,6 +43,7 @@ exports.setPasswordVerified = setPasswordVerified;
 exports.clearPasswordVerified = clearPasswordVerified;
 exports.getSettingsPassword = getSettingsPassword;
 exports.canManageSettings = canManageSettings;
+exports.getSettingsAllowlist = getSettingsAllowlist;
 exports.checkSettingsAccess = checkSettingsAccess;
 exports.buildSettingsPasswordModal = buildSettingsPasswordModal;
 exports.buildPanel = buildPanel;
@@ -118,36 +119,33 @@ async function getSettingsPassword(guildId) {
 // --------------------------------------------
 // Permission helper
 // --------------------------------------------
-function canManageSettings(interaction) {
-    return checkSettingsAccess(interaction) === 'ok';
+/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر فقط + الذين سمح لهم هو تحديداً */
+async function canManageSettings(interaction) {
+    return (await checkSettingsAccess(interaction)) === 'ok';
 }
-function checkSettingsAccess(interaction) {
-    const member = interaction.member;
-    const perms = member?.permissions;
-    const guild = interaction.guild;
-    const isOwner = !!guild && interaction.user.id === guild.ownerId;
-    let hasAdminPerms = isOwner;
-    if (!hasAdminPerms) {
-        try {
-            if (perms && typeof perms.has === 'function') {
-                // PermissionsBitField طبيعي
-                hasAdminPerms =
-                    perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
-                        perms.has(discord_js_1.PermissionFlagsBits.Administrator);
-            }
-            else if (perms != null) {
-                // تفاعل خام — perms قد تكون string/bigint/number
-                const bitfield = new discord_js_1.PermissionsBitField(BigInt(perms));
-                hasAdminPerms =
-                    bitfield.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
-                        bitfield.has(discord_js_1.PermissionFlagsBits.Administrator);
-            }
-        }
-        catch {
-            hasAdminPerms = false;
-        }
+/** قائمة المخوّلين باستخدام الإعدادات — يقرؤها البوت من إعدادات السيرفر (المالك يملكها دائماً) */
+async function getSettingsAllowlist(guildId) {
+    try {
+        const s = await (0, models_1.getGuildSettings)(guildId);
+        const list = s?.settingsAllowlist;
+        return Array.isArray(list) ? list.map(String) : [];
     }
-    if (!hasAdminPerms)
+    catch {
+        return [];
+    }
+}
+async function checkSettingsAccess(interaction) {
+    const guild = interaction.guild;
+    const userId = interaction.user?.id;
+    if (!guild || !userId)
+        return 'noperm';
+    const isOwner = interaction.user.id === guild.ownerId;
+    let allowed = isOwner;
+    if (!allowed) {
+        const list = await getSettingsAllowlist(guild.id);
+        allowed = list.includes(String(userId));
+    }
+    if (!allowed)
         return 'noperm';
     if (!isPasswordVerified(interaction.user.id))
         return 'needpassword';

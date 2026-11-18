@@ -22,6 +22,8 @@ export interface IGuildSettings extends Document {
   
   // إعدادات الحماية بكلمة مرور
   settingsPassword?: string; // كلمة مرور لوحة الإعدادات (افتراضي: 7421)
+  /** 🔐 من يملك صلاحية استخدام لوحة الإعدادات — مالك السيرفر فقط يضيفهم (عداه ما أحد يقدر، حتى لا أعلى رول) */
+  settingsAllowlist?: string[];
   
   // Protection
   protection: {
@@ -976,6 +978,8 @@ const GuildSettingsSchema = new Schema<IGuildSettings>({
   language: { type: String, default: 'ar' },
   timezone: { type: String, default: 'Asia/Riyadh' },
   settingsPassword: { type: String }, // كلمة مرور لوحة الإعدادات
+  // 🔐 من يملك صلاحية استخدام لوحة الإعدادات — يتحكم به مالك السيرفر فقط عبر /settings-access
+  settingsAllowlist: { type: [String], default: [] },
   
   protection: {
     logChannel: { type: String },

@@ -10,6 +10,14 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { buildPanel } from '../../utils/settingsPanel';
+import { getGuildSettings } from '../../models';
+
+/** هل يملك هذا المستخدم صلاحية استخدام لوحة الإعدادات؟ — مالك السيرفر فقط + من سمح له */
+export function isSettingsAllowed(guild: any, userId: string, allowlist: string[]): boolean {
+  if (!guild || !userId) return false;
+  if (guild.ownerId === userId) return true;
+  return Array.isArray(allowlist) && allowlist.map(String).includes(String(userId));
+}
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -20,20 +28,19 @@ const command: Command = {
   cooldown: 3,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const member = interaction.member as any;
-    const perms = member?.permissions;
-    const hasAdminPerms = !!perms && (
-      perms.has(PermissionFlagsBits.ManageGuild) ||
-      perms.has(PermissionFlagsBits.Administrator)
-    );
+    const guild = interaction.guild!;
+    const settings = await getGuildSettings(guild.id).catch(() => null);
+    const allowlist: string[] =
+      settings && Array.isArray((settings as any)?.settingsAllowlist)
+        ? (settings as any).settingsAllowlist.map(String)
+        : [];
 
-    // المالك دائماً مسموح له (حتى لو لم تظهر له الصلاحية صراحةً)
-    const isOwner = interaction.user.id === interaction.guild?.ownerId;
-
-    // إذا لم يكن لديه صلاحيات إدارية ولا هو المالك → ارفض
-    if (!hasAdminPerms && !isOwner) {
+    // المالك دائماً مسموح له — غيره فقط من أضافه هو عبر /settings-access
+    if (!isSettingsAllowed(guild, interaction.user.id, allowlist)) {
       await interaction.reply({
-        content: '❌ تحتاج صلاحية **إدارة السيرفر** لفتح الإعدادات',
+        content:
+          '❌ **الإعدادات محصورة بمالك السيرفر فقط** — حتى لو كانت رتبتك أعلى رول في السيرفر.\n' +
+          '> 👑 المالك يملك السماح لك عبر الأمر `/settings-access add @أنت` ثم تفتح الإعدادات مرة أخرى.',
         ephemeral: true,
       });
       return;
@@ -41,7 +48,7 @@ const command: Command = {
 
     // فتح اللوحة مباشرة — كلمة المرور تُطلب تلقائياً عند الضغط على أي زر للتعديل
     // (الأزرار تعرض نافذة كلمة المرور، وهذا يعمل حتى لو فُتحت اللوحة من الاختصار)
-    const panel = await buildPanel('home', interaction.guild!, interaction.user.id);
+    const panel = await buildPanel('home', guild, interaction.user.id);
 
     await interaction.reply({
       embeds: panel.embeds,

@@ -101,47 +101,45 @@ export async function getSettingsPassword(guildId: string): Promise<string> {
 // --------------------------------------------
 // Permission helper
 // --------------------------------------------
-export function canManageSettings(
+/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر فقط + الذين سمح لهم هو تحديداً */
+export async function canManageSettings(
   interaction: ChatInputCommandInteraction | { member: any; user: any; guildId: string }
-): boolean {
-  return checkSettingsAccess(interaction as any) === 'ok';
+): Promise<boolean> {
+  return (await checkSettingsAccess(interaction as any)) === 'ok';
 }
 
 // --------------------------------------------
 // نتيجة فحص الوصول للوحة الإعدادات
 // - ok: مسموح (وتُمدَّد الجلسة تلقائياً أثناء الاستخدام)
-// - noperm: لا تملك صلاحية إدارة السيرفر
+// - noperm: ليس مالكاً ولا ضمن القائمة المصرح له — اعتُرض وصوله
 // - needpassword: انتهت جلسة كلمة المرور → أعد فتح النافذة بدل خطأ ميت
 // --------------------------------------------
 export type SettingsAccess = 'ok' | 'noperm' | 'needpassword';
 
-export function checkSettingsAccess(interaction: any): SettingsAccess {
-  const member = interaction.member;
-  const perms = member?.permissions;
-  const guild = interaction.guild;
-  const isOwner = !!guild && interaction.user.id === guild.ownerId;
+/** قائمة المخوّلين باستخدام الإعدادات — يقرؤها البوت من إعدادات السيرفر (المالك يملكها دائماً) */
+export async function getSettingsAllowlist(guildId: string): Promise<string[]> {
+  try {
+    const s = await getGuildSettings(guildId);
+    const list = (s as any)?.settingsAllowlist;
+    return Array.isArray(list) ? list.map(String) : [];
+  } catch {
+    return [];
+  }
+}
 
-  let hasAdminPerms = isOwner;
-  if (!hasAdminPerms) {
-    try {
-      if (perms && typeof perms.has === 'function') {
-        // PermissionsBitField طبيعي
-        hasAdminPerms =
-          perms.has(PermissionFlagsBits.ManageGuild) ||
-          perms.has(PermissionFlagsBits.Administrator);
-      } else if (perms != null) {
-        // تفاعل خام — perms قد تكون string/bigint/number
-        const bitfield = new PermissionsBitField(BigInt(perms));
-        hasAdminPerms =
-          bitfield.has(PermissionFlagsBits.ManageGuild) ||
-          bitfield.has(PermissionFlagsBits.Administrator);
-      }
-    } catch {
-      hasAdminPerms = false;
-    }
+export async function checkSettingsAccess(interaction: any): Promise<SettingsAccess> {
+  const guild = interaction.guild;
+  const userId = interaction.user?.id as string | undefined;
+  if (!guild || !userId) return 'noperm';
+
+  const isOwner = interaction.user.id === guild.ownerId;
+  let allowed = isOwner;
+  if (!allowed) {
+    const list = await getSettingsAllowlist(guild.id);
+    allowed = list.includes(String(userId));
   }
 
-  if (!hasAdminPerms) return 'noperm';
+  if (!allowed) return 'noperm';
   if (!isPasswordVerified(interaction.user.id)) return 'needpassword';
 
   // ⏱️ تمديد الجلسة أثناء الاستخدام النشط (نافذة منزلقة 30 دقيقة)

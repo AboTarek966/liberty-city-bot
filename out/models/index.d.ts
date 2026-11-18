@@ -5,6 +5,8 @@ export interface IGuildSettings extends Document {
     language: string;
     timezone: string;
     settingsPassword?: string;
+    /** 🔐 من يملك صلاحية استخدام لوحة الإعدادات — مالك السيرفر فقط يضيفهم (عداه ما أحد يقدر، حتى لا أعلى رول) */
+    settingsAllowlist?: string[];
     protection: {
         /** 📢 قناة التنبيهات العامة للحماية — تُستخدم كافتراضي عند عدم تحديد قناة في الوحدات الفرعية */
         logChannel?: string;
