@@ -13,7 +13,7 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import { gateProtectionOff } from '../../utils/ownerApproval';
-import { canManageBotWhitelist } from './whitelist';
+import { canManageWhitelist } from './whitelist';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -647,22 +647,33 @@ async function configureAntiBot(interaction: ChatInputCommandInteraction, settin
     if (!add.bot) {
       note = `ℹ️ \`${add.tag}\` ليس بوتاً — للبوتات استخدم /whitelist، وهذا الاستثناء الوقائي يشمل الأعضاء أيضاً`;
     }
-    // 🔒 إضافة بوت للاستثناء الوقائي لآلة مضاد البوتات = مالك البوت أو مالك السيرفر فقط
-    if (add.bot && !canManageBotWhitelist(interaction.guild!, interaction.user.id)) {
+    // 🔒 إضافة بشر للاستثناء الوقائي = مالك البوت أو صاحب أعلى رول في السيرفر فقط
+    //    🔒 إضافة **بوت** = مالك السيرفر صاحب التاج 👑 فقط — لا أحد غيره يقدر أبداً
+    const addAllowed = add.bot
+      ? interaction.guild?.ownerId === interaction.user.id
+      : await canManageWhitelist(interaction.client, interaction.guild!, interaction.user.id);
+    if (!addAllowed) {
       await interaction.editReply({
-        content:
-          '🔒 **إضافة بوت لهذه القائمة محصورة بمالك البوت ومالك السيرفر فقط**\n' +
-          'تواصل مع 👑 مالك السيرفر أو 🛠️ مالك البوت لإضافة أي بوت.',
+        content: add.bot
+          ? '⛔ **إضافة بوت للقائمة البيضاء الوقائية محصورة بمالك السيرفر صاحب التاج 👑 فقط** — حتى أعلى رول مو قادر.'
+          : '🔒 **إضافة أي عضو إلى هذه القائمة محصورة بمالك البوت وصاحب أعلى رول في السيرفر فقط**\n' +
+            'تواصل مع 👑 صاحب أعلى رول أو 🛠️ مالك البوت لإضافة أي شخص.',
       });
       return;
     }
     if (!wl.includes(add.id)) wl.push(add.id);
   }
   if (remove) {
-    // 🔒 إزالة بوت أيضاً محصورة بمالك البوت أو مالك السيرفر فقط
-    if (remove.bot && !canManageBotWhitelist(interaction.guild!, interaction.user.id)) {
+    // 🔒 إزالة بشر أيضاً محصورة بمالك البوت أو صاحب أعلى رول في السيرفر فقط
+    //    🔒 إزالة **بوت** = مالك السيرفر صاحب التاج 👑 فقط
+    const removeAllowed = remove.bot
+      ? interaction.guild?.ownerId === interaction.user.id
+      : await canManageWhitelist(interaction.client, interaction.guild!, interaction.user.id);
+    if (!removeAllowed) {
       await interaction.editReply({
-        content: '🔒 **إزالة بوت من هذه القائمة محصورة بمالك البوت أو مالك السيرفر فقط**',
+        content: remove.bot
+          ? '⛔ **إزالة بوت من القائمة البيضاء الوقائية محصورة بمالك السيرفر صاحب التاج 👑 فقط**'
+          : '🔒 **إزالة أي عضو من هذه القائمة محصورة بمالك البوت أو صاحب أعلى رول في السيرفر فقط**',
       });
       return;
     }
