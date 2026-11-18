@@ -20,8 +20,9 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { CommandAlias } from '../../models';
 import { invalidateAliasCache } from '../../utils/aliasCache';
+import { builtinAliasesForDisplay } from '../../utils/builtinAliases';
 
-const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats']);
+const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats', 'call']);
 
 // --------------------------------------------
 // تنظيف التكرارات الحرفية (alias + command)
@@ -247,6 +248,7 @@ const command: Command = {
               { name: '🏆 الفائز (إعلان يدوي)', value: 'winner' },
               { name: '📊 توب تذاكر', value: 'ticket_top' },
               { name: '📊 تذكرة ستات', value: 'ticket_mystats' },
+               { name: '📢 استدعاء عضو', value: 'call' },
               { name: '💤 AFK', value: 'afk' }
             )
         )
@@ -491,8 +493,9 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
   const removed = await removeExactDuplicates(guildId);
 
   const aliases = await CommandAlias.find({ guildId }).sort({ alias: 1 }).lean();
+  const builtins = builtinAliasesForDisplay();
 
-  if (!aliases.length) {
+  if (!aliases.length && !builtins.length) {
     await interaction.reply({ content: '📭 لا توجد اختصارات مضافة بعد', ephemeral: true });
     return;
   }
@@ -509,6 +512,11 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
   const entries = [...grouped.entries()];
   const lines: string[] = [];
   let omitted = 0;
+
+  // 🧩 الاختصارات المدمجة — تُضاف دائماً للقائمة (لا تُحذفها عدا بتقديم تحديث)
+  for (const b of builtins) {
+    lines.push(`> \`${b.alias}\` ← \`/${b.command}\` (مدمج)`);
+  }
 
   for (const [alias, commands] of entries) {
     const line = `> \`${alias}\` ← ${commands.join('، ')}`;
@@ -528,7 +536,8 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
     )
     .setFooter({
       text:
-        `${grouped.size} اختصار فريد • ${aliases.length} ارتباط` +
+        `${grouped.size + builtins.length} اختصار فريد • ${aliases.length} ارتباط` +
+        (builtins.length ? ` • 🧩 ${builtins.length} مدمج` : '') +
         (removed > 0 ? ` • 🧹 حُذف ${removed} تكرار` : ''),
     })
     .setTimestamp();

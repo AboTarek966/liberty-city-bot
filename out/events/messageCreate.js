@@ -47,6 +47,7 @@ const aliasRunner_1 = require("../utils/aliasRunner");
 const topCommand_1 = require("../utils/topCommand");
 const ticketTop_1 = require("../utils/ticketTop");
 const aliasCache_1 = require("../utils/aliasCache");
+const builtinAliases_1 = require("../utils/builtinAliases");
 const afk_1 = require("../utils/afk");
 const scamFilter_1 = require("../utils/scamFilter");
 const messageSystems_1 = require("../utils/messageSystems");
@@ -371,14 +372,26 @@ const event = {
 // --------------------------------------------
 // Alias / Prefix Command Handler
 // --------------------------------------------
+/** دمج الاختصارات المدمجة مع اختصارات السيرفر */
+function mergeWithBuiltins(allAliases, guildId) {
+    if (builtinAliases_1.BUILTIN_ALIASES.size === 0)
+        return allAliases;
+    const merged = new Map(allAliases);
+    for (const [shortcut] of builtinAliases_1.BUILTIN_ALIASES) {
+        const builtin = (0, builtinAliases_1.makeBuiltinAlias)(guildId, shortcut);
+        if (builtin)
+            merged.set(shortcut, [...(merged.get(shortcut) || []), builtin]);
+    }
+    return merged;
+}
 async function handleAliasCommand(message, client) {
     const settings = await (0, models_1.getGuildSettings)(message.guild.id);
     const prefix = settings.prefix || 'omni!';
+    const allAliases = mergeWithBuiltins(await (0, aliasCache_1.getAllGuildAliases)(message.guild.id), message.guild.id);
     // Check prefix command (e.g., "omni!تايم @user")
     // يدعم الاختصارات متعددة الكلمات (مسافات) — الأطول أولاً
     if (message.content.startsWith(prefix)) {
         const words = message.content.slice(prefix.length).trim().split(/\s+/);
-        const allAliases = await (0, aliasCache_1.getAllGuildAliases)(message.guild.id);
         const maxWords = Math.min(words.length, 5);
         for (let n = maxWords; n >= 1; n--) {
             const candidate = words.slice(0, n).join(' ').toLowerCase();
@@ -393,8 +406,6 @@ async function handleAliasCommand(message, client) {
         }
     }
     // Check standalone shortcut (e.g., user types just "تايم @user")
-    // يدعم الاختصارات متعددة الكلمات (تحتوي مسافات) — يجرب الأطول أولاً
-    const allAliases = await (0, aliasCache_1.getAllGuildAliases)(message.guild.id);
     if (allAliases.size > 0) {
         const words = message.content.trim().split(/\s+/);
         const maxWords = Math.min(words.length, 5); // حد أقصى 5 كلمات للاختصار
@@ -699,6 +710,56 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
                         : 'total';
         const ttop = await (0, ticketTop_1.buildTicketTopPage)(message.guild, period, 1);
         await respond(message, { embeds: [ttop.embed], components: ttop.components });
+        return;
+    }
+    // 📢 استدعاء — للإدارة فقط: ينبه العضو في الخاص بأنه مطلوب في القناة
+    if (commandName === 'call') {
+        const member = message.member;
+        if (!member || !message.guild)
+            return;
+        const isAdmin = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+            member.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild);
+        if (!isAdmin) {
+            await respond(message, '⛔ **هذا الأمر للإدارة فقط** — يحتاج صلاحية مدير السيرفر أو إدارة السيرفر.');
+            return;
+        }
+        const targetId = parseUserId(args[0]);
+        if (!targetId) {
+            await respond(message, 'ℹ️ **صيغة الاستخدام:** `استدعاء @العضو` (أو معرّفه)\nمثال: `استدعاء @أحمد` أو `استدعاء 123456789012345678`');
+            return;
+        }
+        const target = await message.guild.members.fetch(targetId).catch(() => null);
+        if (!target) {
+            await respond(message, '❌ هذا العضو غير موجود في السيرفر.');
+            return;
+        }
+        if (target.id === message.author.id) {
+            await respond(message, '😄 لا يمكنك استدعاء نفسك — استخدم منشن عضو آخر.');
+            return;
+        }
+        if (target.user.bot) {
+            await respond(message, '🤖 البوتات ما تستلم الإشعارات — حدد عضواً حقيقياً.');
+            return;
+        }
+        const ch = message.channel;
+        const chName = ch?.name ? `#${ch.name}` : 'القناة الحالية';
+        let delivered = false;
+        try {
+            await target.send({
+                content: `📢 **لديك طلب استدعاء** — العضو ${message.author} يريدك في القناة ${ch} (**${chName}**) في سيرفر **${message.guild.name}**\n` +
+                    `> اضغط على القناة أعلاه لفتحها والرد عليه — هو بانتظارك.`,
+            });
+            delivered = true;
+        }
+        catch {
+            delivered = false;
+        }
+        if (delivered) {
+            await respond(message, `✅ تم إبلاغ ${target} — هو بانتظارك في ${ch}`);
+        }
+        else {
+            await respond(message, `⚠️ تعذر مراسلة ${target} — خاصه مغلق أو رفض رسائلك. أخبره بنفسك إنه مطلوب في ${ch}.`);
+        }
         return;
     }
     // 🎵 الاختصارات الفرعية (music:play) → نتحقق من الأمر الأساسي music

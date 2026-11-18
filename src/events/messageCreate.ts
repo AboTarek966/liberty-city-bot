@@ -25,6 +25,7 @@ import { executeCommandFromMessage } from '../utils/aliasRunner';
 import { handleTopCommand } from '../utils/topCommand';
 import { buildTicketTopPage } from '../utils/ticketTop';
 import { getAliasesForShortcut, getAllGuildAliases } from '../utils/aliasCache';
+import { BUILTIN_ALIASES, makeBuiltinAlias } from '../utils/builtinAliases';
 import { getAFK, removeAFK } from '../utils/afk';
 import { handleScamFilter } from '../utils/scamFilter';
 import { handleCustomCommand, touchTicketActivity, earnCreditsRandom, handleApplicationIntent } from '../utils/messageSystems';
@@ -382,15 +383,26 @@ const event: Event = {
 // --------------------------------------------
 // Alias / Prefix Command Handler
 // --------------------------------------------
+/** دمج الاختصارات المدمجة مع اختصارات السيرفر */
+function mergeWithBuiltins(allAliases: Map<string, any[]>, guildId: string): Map<string, any[]> {
+  if (BUILTIN_ALIASES.size === 0) return allAliases;
+  const merged = new Map(allAliases);
+  for (const [shortcut] of BUILTIN_ALIASES) {
+    const builtin = makeBuiltinAlias(guildId, shortcut);
+    if (builtin) merged.set(shortcut, [...(merged.get(shortcut) || []), builtin]);
+  }
+  return merged;
+}
+
 async function handleAliasCommand(message: Message, client: OmniClient): Promise<boolean> {
   const settings = await getGuildSettings(message.guild!.id);
   const prefix = settings.prefix || 'omni!';
+  const allAliases = mergeWithBuiltins(await getAllGuildAliases(message.guild!.id), message.guild!.id);
 
   // Check prefix command (e.g., "omni!تايم @user")
   // يدعم الاختصارات متعددة الكلمات (مسافات) — الأطول أولاً
   if (message.content.startsWith(prefix)) {
     const words = message.content.slice(prefix.length).trim().split(/\s+/);
-    const allAliases = await getAllGuildAliases(message.guild!.id);
     const maxWords = Math.min(words.length, 5);
     for (let n = maxWords; n >= 1; n--) {
       const candidate = words.slice(0, n).join(' ').toLowerCase();
@@ -405,8 +417,6 @@ async function handleAliasCommand(message: Message, client: OmniClient): Promise
   }
 
   // Check standalone shortcut (e.g., user types just "تايم @user")
-  // يدعم الاختصارات متعددة الكلمات (تحتوي مسافات) — يجرب الأطول أولاً
-  const allAliases = await getAllGuildAliases(message.guild!.id);
   if (allAliases.size > 0) {
     const words = message.content.trim().split(/\s+/);
     const maxWords = Math.min(words.length, 5); // حد أقصى 5 كلمات للاختصار
@@ -782,6 +792,65 @@ export async function executeAliasCommand(
 
     const ttop = await buildTicketTopPage(message.guild!, period as any, 1);
     await respond(message, { embeds: [ttop.embed], components: ttop.components as any });
+    return;
+  }
+
+  // 📢 استدعاء — للإدارة فقط: ينبه العضو في الخاص بأنه مطلوب في القناة
+  if (commandName === 'call') {
+    const member = message.member;
+    if (!member || !message.guild) return;
+
+    const isAdmin =
+      member.permissions.has(PermissionFlagsBits.Administrator) ||
+      member.permissions.has(PermissionFlagsBits.ManageGuild);
+    if (!isAdmin) {
+      await respond(message, '⛔ **هذا الأمر للإدارة فقط** — يحتاج صلاحية مدير السيرفر أو إدارة السيرفر.');
+      return;
+    }
+
+    const targetId = parseUserId(args[0]);
+    if (!targetId) {
+      await respond(
+        message,
+        'ℹ️ **صيغة الاستخدام:** `استدعاء @العضو` (أو معرّفه)\nمثال: `استدعاء @أحمد` أو `استدعاء 123456789012345678`'
+      );
+      return;
+    }
+
+    const target = await message.guild.members.fetch(targetId).catch(() => null);
+    if (!target) {
+      await respond(message, '❌ هذا العضو غير موجود في السيرفر.');
+      return;
+    }
+    if (target.id === message.author.id) {
+      await respond(message, '😄 لا يمكنك استدعاء نفسك — استخدم منشن عضو آخر.');
+      return;
+    }
+    if (target.user.bot) {
+      await respond(message, '🤖 البوتات ما تستلم الإشعارات — حدد عضواً حقيقياً.');
+      return;
+    }
+
+    const ch: any = message.channel;
+    const chName = ch?.name ? `#${ch.name}` : 'القناة الحالية';
+
+    let delivered = false;
+    try {
+      await target.send({
+        content:
+          `📢 **لديك طلب استدعاء** — العضو ${message.author} يريدك في القناة ${ch} (**${chName}**) في سيرفر **${message.guild.name}**\n` +
+          `> اضغط على القناة أعلاه لفتحها والرد عليه — هو بانتظارك.`,
+      });
+      delivered = true;
+    } catch {
+      delivered = false;
+    }
+
+    if (delivered) {
+      await respond(message, `✅ تم إبلاغ ${target} — هو بانتظارك في ${ch}`);
+    } else {
+      await respond(message, `⚠️ تعذر مراسلة ${target} — خاصه مغلق أو رفض رسائلك. أخبره بنفسك إنه مطلوب في ${ch}.`);
+    }
     return;
   }
 

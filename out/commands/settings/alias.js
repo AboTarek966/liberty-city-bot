@@ -11,7 +11,8 @@ const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
 const aliasCache_1 = require("../../utils/aliasCache");
-const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats']);
+const builtinAliases_1 = require("../../utils/builtinAliases");
+const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats', 'call']);
 // --------------------------------------------
 // تنظيف التكرارات الحرفية (alias + command)
 // --------------------------------------------
@@ -121,7 +122,7 @@ const command = {
         .setName('extra3')
         .setDescription('🛍️ المتجر + إدارة + رولات + حماية متقدمة')
         .setRequired(false)
-        .addChoices({ name: '🛍️ المتجر (للمشترين)', value: 'store' }, { name: '🛠️ إدارة المتجر', value: 'project' }, { name: '⚙️ إعدادات', value: 'settings' }, { name: '⌨️ علياس', value: 'alias' }, { name: '🧹 فصل إدارة', value: 'dismiss' }, { name: '🎭 رول منيو', value: 'rolemenu' }, { name: '➕ أوتو رول', value: 'autorole' }, { name: '➕ رول أدد', value: 'roleadd' }, { name: '➖ رول ريموف', value: 'roleremove' }, { name: '🏆 الفائز (إعلان يدوي)', value: 'winner' }, { name: '📊 توب تذاكر', value: 'ticket_top' }, { name: '📊 تذكرة ستات', value: 'ticket_mystats' }, { name: '💤 AFK', value: 'afk' })))
+        .addChoices({ name: '🛍️ المتجر (للمشترين)', value: 'store' }, { name: '🛠️ إدارة المتجر', value: 'project' }, { name: '⚙️ إعدادات', value: 'settings' }, { name: '⌨️ علياس', value: 'alias' }, { name: '🧹 فصل إدارة', value: 'dismiss' }, { name: '🎭 رول منيو', value: 'rolemenu' }, { name: '➕ أوتو رول', value: 'autorole' }, { name: '➕ رول أدد', value: 'roleadd' }, { name: '➖ رول ريموف', value: 'roleremove' }, { name: '🏆 الفائز (إعلان يدوي)', value: 'winner' }, { name: '📊 توب تذاكر', value: 'ticket_top' }, { name: '📊 تذكرة ستات', value: 'ticket_mystats' }, { name: '📢 استدعاء عضو', value: 'call' }, { name: '💤 AFK', value: 'afk' })))
         .addSubcommand(sub => sub
         .setName('remove')
         .setDescription('حذف اختصار')
@@ -315,7 +316,8 @@ async function handleList(interaction) {
     // 🧹 إزالة التكرارات الحرفية أولاً
     const removed = await removeExactDuplicates(guildId);
     const aliases = await models_1.CommandAlias.find({ guildId }).sort({ alias: 1 }).lean();
-    if (!aliases.length) {
+    const builtins = (0, builtinAliases_1.builtinAliasesForDisplay)();
+    if (!aliases.length && !builtins.length) {
         await interaction.reply({ content: '📭 لا توجد اختصارات مضافة بعد', ephemeral: true });
         return;
     }
@@ -331,6 +333,10 @@ async function handleList(interaction) {
     const entries = [...grouped.entries()];
     const lines = [];
     let omitted = 0;
+    // 🧩 الاختصارات المدمجة — تُضاف دائماً للقائمة (لا تُحذفها عدا بتقديم تحديث)
+    for (const b of builtins) {
+        lines.push(`> \`${b.alias}\` ← \`/${b.command}\` (مدمج)`);
+    }
     for (const [alias, commands] of entries) {
         const line = `> \`${alias}\` ← ${commands.join('، ')}`;
         if (lines.join('\n').length + line.length > 3600) {
@@ -345,7 +351,8 @@ async function handleList(interaction) {
         .setDescription(lines.join('\n') +
         (omitted > 0 ? `\n\n> ➕ **${omitted}** اختصار آخر — استخدم \`/alias remove\` لإدارة البقية` : ''))
         .setFooter({
-        text: `${grouped.size} اختصار فريد • ${aliases.length} ارتباط` +
+        text: `${grouped.size + builtins.length} اختصار فريد • ${aliases.length} ارتباط` +
+            (builtins.length ? ` • 🧩 ${builtins.length} مدمج` : '') +
             (removed > 0 ? ` • 🧹 حُذف ${removed} تكرار` : ''),
     })
         .setTimestamp();
