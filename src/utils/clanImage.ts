@@ -27,12 +27,24 @@ function ensureFonts(): boolean {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { GlobalFonts } = require('@napi-rs/canvas');
     const dir = path.join(__dirname, '..', '..', 'assets', 'fonts');
-    const needed = ['NotoSansArabic-Regular.ttf', 'NotoSansArabic-Bold.ttf', 'NotoSans-Regular.ttf', 'NotoSans-Bold.ttf'];
+    const needed = [
+      'NotoSansArabic-Regular.ttf',
+      'NotoSansArabic-Bold.ttf',
+      'NotoSans-Regular.ttf',
+      'NotoSans-Bold.ttf',
+      'Tajawal-Bold.ttf',
+      'Tajawal-Regular.ttf',
+    ];
     if (needed.every((f) => fs.existsSync(path.join(dir, f)))) {
       GlobalFonts.registerFromPath(path.join(dir, 'NotoSansArabic-Regular.ttf'), 'OmniArabic');
       GlobalFonts.registerFromPath(path.join(dir, 'NotoSansArabic-Bold.ttf'), 'OmniArabic');
       GlobalFonts.registerFromPath(path.join(dir, 'NotoSans-Regular.ttf'), 'OmniSans');
       GlobalFonts.registerFromPath(path.join(dir, 'NotoSans-Bold.ttf'), 'OmniSans');
+      // ⚠️ خط عربي بحت (Noto Sans Arabic) لا يحتوي حروفاً لاتينية —
+      // أسماء مثل «Kf7» أو «Vold» كانت تُرسم مربعات فاضية تشبه 007/0000.
+      // Tajawal يغطي العربية + اللاتينية + الأرقام معاً، فنستخدمه للأسماء المختلطة.
+      GlobalFonts.registerFromPath(path.join(dir, 'Tajawal-Bold.ttf'), 'OmniMixBold');
+      GlobalFonts.registerFromPath(path.join(dir, 'Tajawal-Regular.ttf'), 'OmniMix');
       useBundledFonts = true;
       return true;
     }
@@ -47,6 +59,30 @@ function formatNum(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' م';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + ' ألف';
   return String(n);
+}
+
+/** أرقام عربية/فارسية → لاتينية (حتى تظهر الأسماء القديمة بشكل صحيح) */
+const ARABIC_DIGITS: Record<string, string> = {
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+  '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+  '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+};
+
+/**
+ * تنظيف النص قبل الرسم:
+ *   - إزالة محارف التحكم بالاتجاه (LRM/RLM/...) التي تُلخبط الترتيب
+ *   - تحويل الأرقام العربية/الفارسية إلى لاتينية
+ *   - إزالة الإيموجي (لا يوجد خط إيموجي مضمّن → تظهر مربعات فاضية)
+ *   - ضغط المسافات
+ */
+function sanitizeText(input: unknown): string {
+  return String(input ?? '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/[٠-٩۰-۹]/g, (d) => ARABIC_DIGITS[d] ?? d)
+    .replace(/\p{Extended_Pictographic}|[\u{FE0E}\u{FE0F}\u{200D}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function formatVoice(mins: number): string {
@@ -106,10 +142,12 @@ export async function renderClanLeaderboard(
   ctx.fillStyle = '#f1c40f';
   ctx.fillText('أفضل العشائر', width / 2, 56);
 
-  if (useBundledFonts) ctx.font = 'Regular 26px OmniSans';
+  // اسم السيرفر — قد يكون عربياً أو لاتينياً أو مختلطاً
+  const safeGuildName = sanitizeText(guildName) || 'Server';
+  if (useBundledFonts) ctx.font = 'Regular 26px OmniMix';
   else ctx.font = '26px sans-serif';
   ctx.fillStyle = '#94a3b8';
-  ctx.fillText(`${guildName}`, width / 2, 114);
+  ctx.fillText(safeGuildName, width / 2, 114);
 
   const counts = `${totalRows} عشيرة ، تُحسب تلقائياً من نشاط الأعضاء`;
   if (useBundledFonts) ctx.font = 'Regular 18px OmniArabic';
@@ -159,8 +197,8 @@ export async function renderClanLeaderboard(
     // اسم العشيرة + الإحصائيات
     const nameX = x + 96;
     ctx.textAlign = 'right';
-    const name = entry.name.slice(0, 26);
-    if (useBundledFonts) ctx.font = 'Bold 34px OmniArabic';
+    const name = (sanitizeText(entry.name) || '—').slice(0, 26);
+    if (useBundledFonts) ctx.font = 'Bold 34px OmniMixBold';
     else ctx.font = 'bold 34px sans-serif';
     ctx.fillStyle = '#f8fafc';
     ctx.fillText(name, width - x - 30, y + 34);
