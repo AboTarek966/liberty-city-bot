@@ -2,7 +2,7 @@
 // Omni Bot - Auto Reply (صورة/كلمة في قنوات محددة)
 // ============================================
 
-import { AttachmentBuilder, EmbedBuilder, Message, PermissionFlagsBits } from 'discord.js';
+import { AttachmentBuilder, Message, PermissionFlagsBits } from 'discord.js';
 import { getGuildSettings } from '../models';
 import { autoReplyAttachmentName, getAutoReplyImageBuffer } from './autoReplyImage';
 
@@ -76,20 +76,18 @@ export async function handleAutoReply(message: Message): Promise<boolean> {
   lastChannelSent.set(channelKey, now);
   pruneCooldowns(now);
 
-  // 🖼️ بناء الرد — صورة من الجهاز + نص، أو رابط صورة، أو نص فقط
+  // 🖼️ بناء الرد — الصورة تُرسل كمرفق مباشر بدون Embed
+  //    (الـ Embed كان يعرض خلفيته الداكنة حول الشفافية = هوامش سوداء)
   let payload: any;
   if (deviceImage) {
     const attachmentName = autoReplyAttachmentName(String(cfg.imageMimeType || 'image/jpeg'));
-    const embed = new EmbedBuilder().setImage(`attachment://${attachmentName}`).setColor(0x2b2d31);
-    if (text) embed.setDescription(text);
     payload = {
-      embeds: [embed],
+      ...(text ? { content: text } : {}),
       files: [new AttachmentBuilder(deviceImage, { name: attachmentName })],
     };
   } else if (imageUrl) {
-    const embed = new EmbedBuilder().setImage(imageUrl).setColor(0x2b2d31);
-    if (text) embed.setDescription(text);
-    payload = { embeds: [embed] };
+    // رابط صورة مباشر: يُرسل كنص حتى يعرضه ديسكورد كصورة فقط بدون إطار Embed
+    payload = { content: text ? `${text}\n${imageUrl}` : imageUrl };
   } else {
     payload = { content: text };
   }

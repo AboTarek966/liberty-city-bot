@@ -532,22 +532,18 @@ const handler = {
                 }
                 if (deviceImage) {
                     const attachmentName = (0, autoReplyImage_1.autoReplyAttachmentName)(String(a.imageMimeType || 'image/jpeg'));
-                    const embed = new discord_js_1.EmbedBuilder()
-                        .setImage(`attachment://${attachmentName}`)
-                        .setColor(0x1abc9c);
-                    if (text)
-                        embed.setDescription(text);
+                    // 🖼️ نفس شكل الرد الفعلي: مرفق مباشر بدون Embed حتى لا تظهر خلفية داكنة حول الصورة
                     await interaction.followUp({
-                        embeds: [embed],
+                        ...(text ? { content: text } : {}),
                         files: [new discord_js_1.AttachmentBuilder(deviceImage, { name: attachmentName })],
                         ephemeral: true,
                     });
                 }
                 else if (imageUrl) {
-                    const embed = new discord_js_1.EmbedBuilder().setImage(imageUrl).setColor(0x1abc9c);
-                    if (text)
-                        embed.setDescription(text);
-                    await interaction.followUp({ embeds: [embed], ephemeral: true });
+                    await interaction.followUp({
+                        content: text ? `${text}\n${imageUrl}` : imageUrl,
+                        ephemeral: true,
+                    });
                 }
                 else {
                     await interaction.followUp({ content: text, ephemeral: true });

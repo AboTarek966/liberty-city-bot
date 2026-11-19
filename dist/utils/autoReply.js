@@ -76,23 +76,19 @@ async function handleAutoReply(message) {
         lastSent.set(memberKey, now);
     lastChannelSent.set(channelKey, now);
     pruneCooldowns(now);
-    // 🖼️ بناء الرد — صورة من الجهاز + نص، أو رابط صورة، أو نص فقط
+    // 🖼️ بناء الرد — الصورة تُرسل كمرفق مباشر بدون Embed
+    //    (الـ Embed كان يعرض خلفيته الداكنة حول الشفافية = هوامش سوداء)
     let payload;
     if (deviceImage) {
         const attachmentName = (0, autoReplyImage_1.autoReplyAttachmentName)(String(cfg.imageMimeType || 'image/jpeg'));
-        const embed = new discord_js_1.EmbedBuilder().setImage(`attachment://${attachmentName}`).setColor(0x2b2d31);
-        if (text)
-            embed.setDescription(text);
         payload = {
-            embeds: [embed],
+            ...(text ? { content: text } : {}),
             files: [new discord_js_1.AttachmentBuilder(deviceImage, { name: attachmentName })],
         };
     }
     else if (imageUrl) {
-        const embed = new discord_js_1.EmbedBuilder().setImage(imageUrl).setColor(0x2b2d31);
-        if (text)
-            embed.setDescription(text);
-        payload = { embeds: [embed] };
+        // رابط صورة مباشر: يُرسل كنص حتى يعرضه ديسكورد كصورة فقط بدون إطار Embed
+        payload = { content: text ? `${text}\n${imageUrl}` : imageUrl };
     }
     else {
         payload = { content: text };
