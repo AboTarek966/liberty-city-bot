@@ -136,6 +136,8 @@ class SecurityHandler {
     restoreTimers = new Map();
     // 🔒 مقفل استعادة لكل سيرفر — يمنع إنشاء قنوات مكرّرة عند التزامن
     restoreLocks = new Map();
+    // ♻️ استعادة فورية للهدف المحذوف نفسه (حتى لو أُنشئ بعد آخر نسخة احتياطية)
+    pendingStructureRestore = new Map();
     // 👢 المطرودون بانتظار إرسال رابط الدعوة (استعادة تلقائية)
     //    الطرد لا يُلغى في ديسكورد — الطريقة الوحيدة لإرجاعهم هي الرابط
     kickedQueue = new Map();
@@ -329,6 +331,10 @@ class SecurityHandler {
         this.renameTracker.delete(guildId);
         this.hierarchyState.delete(guildId);
         this.restoreLocks.delete(guildId);
+        const pendingRestore = this.pendingStructureRestore.get(guildId);
+        if (pendingRestore?.timer)
+            clearTimeout(pendingRestore.timer);
+        this.pendingStructureRestore.delete(guildId);
         this.kickedQueue.delete(guildId);
         this.nukeTracker.delete(guildId);
         this.auditStream.delete(guildId);
@@ -412,6 +418,11 @@ class SecurityHandler {
                 clearTimeout(timer);
             this.restoreTimers.clear();
             this.restoreLocks.clear();
+            for (const pending of this.pendingStructureRestore.values()) {
+                if (pending.timer)
+                    clearTimeout(pending.timer);
+            }
+            this.pendingStructureRestore.clear();
             for (const timer of this.kickedTimers.values())
                 clearTimeout(timer);
             this.kickedTimers.clear();
@@ -616,6 +627,23 @@ class SecurityHandler {
     ]);
     static isBotSabotageAction(action) {
         return SecurityHandler.BOT_SABOTAGE_ACTIONS.has(action);
+    }
+    // ☢️ إجراءات هيكلية لا يُسمح بها لأي بوت — حتى المعتمد — من أول مرة.
+    //    البوت المعتمد قد ينشئ قناة تذكرة (طبيعي)، لكنه لا يحذف قناة/رول أبداً.
+    static BOT_STRUCTURAL_KILL = new Set([
+        discord_js_1.AuditLogEvent.ChannelDelete,
+        discord_js_1.AuditLogEvent.RoleDelete,
+        discord_js_1.AuditLogEvent.ThreadDelete,
+        discord_js_1.AuditLogEvent.GuildUpdate,
+        discord_js_1.AuditLogEvent.WebhookCreate,
+        discord_js_1.AuditLogEvent.WebhookDelete,
+        discord_js_1.AuditLogEvent.IntegrationCreate,
+        discord_js_1.AuditLogEvent.IntegrationUpdate,
+        discord_js_1.AuditLogEvent.IntegrationDelete,
+        discord_js_1.AuditLogEvent.AutoModerationRuleDelete,
+    ]);
+    static isBotStructuralKill(action) {
+        return SecurityHandler.BOT_STRUCTURAL_KILL.has(action);
     }
     /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
     ingestAuditEntry(entry, guildId) {
@@ -921,7 +949,7 @@ class SecurityHandler {
         }
     }
     // عقوبة سريعة بالمعرّف (ban/kick) أو سحب رولات (strip)
-    async punishById(guild, executor, action, reason) {
+    async punishById(guild, executor, action, reason, opts = {}) {
         if (executor.id === guild.ownerId)
             return '⏭️ المالك مستثنى';
         if (executor.id === this.client.user?.id)
@@ -930,9 +958,11 @@ class SecurityHandler {
         if (devId && executor.id === devId)
             return '⏭️ مطوّر البوت مستثنى';
         const isBotActor = this.executorIsBot(guild, executor);
+        // 🔥 التخريب الهيكلي (حذف قناة/رول) يتجاوز الجدار الوقائي — حتى لو معه Administrator
+        const bypass = isBotActor || !!opts.bypassStrikes;
         // 🛡️ الجدار الوقائي: المخالفة الأولى (لأعضاء فقط) لا تُحظر ولا تُطرد — تحييد فقط
-        //    🤖 البوتات: صفر تسامح — لا ضربة أولى، الحظر مباشرة.
-        if (!isBotActor && (action === 'ban' || action === 'kick') && this.takeStrike(guild.id, executor.id) === 'first') {
+        //    🤖 البوتات + الهجوم الهيكلي: صفر تسامح — الحظر مباشرة.
+        if (!bypass && (action === 'ban' || action === 'kick') && this.takeStrike(guild.id, executor.id) === 'first') {
             const stripped = await this.stripRolesById(guild, executor.id, reason);
             return stripped
                 ? '🛡️ الطبقة الوقائية: مخالفة أولى — سُحبت الصلاحيات فقط، بدون حظر/طرد (الحظر عند التكرار)'
@@ -942,7 +972,7 @@ class SecurityHandler {
             return '🔔 تنبيه فقط';
         if (action === 'ban') {
             const ok = await this.banUserById(guild, executor.id, reason, executor.id, {
-                bypassStrikes: isBotActor,
+                bypassStrikes: bypass,
             });
             return ok ? '🔨 تم حظر المخالف فوراً' : '⚠️ تعذّر تنفيذ الحظر';
         }
@@ -1047,11 +1077,12 @@ class SecurityHandler {
      * 🛡️ تحييد فوري: حظر بالمعرّف، ولو فشل (هرمية/صلاحيات) يسحب كل رولاته،
      *    ولو فشل الاثنان يرجع نتيجة صريحة بدل السكوت.
      */
-    async neutralizeById(guild, executor, cfg, reason, forceBan = false) {
+    async neutralizeById(guild, executor, cfg, reason, forceBan = false, opts = {}) {
         this.startIncident(guild.id, executor.id);
         const isBotActor = this.executorIsBot(guild, executor);
-        // 🤖 أي بوت = حظر دائم من أول مرة، مهما كان وضع antiNuke أو الإجراء المحدد.
-        const action = forceBan || isBotActor || cfg?.mode !== 'react' ? 'ban' : (cfg?.action ?? 'ban');
+        // 🔥 الحظر الفوري: أي بوت، أو تخريب هيكلي (حتى صاحب Administrator)، أو وضع المنع
+        const bypass = isBotActor || !!opts.bypassStrikes;
+        const action = forceBan || bypass || cfg?.mode !== 'react' ? 'ban' : (cfg?.action ?? 'ban');
         if (action === 'alert')
             return '🔔 تنبيه فقط';
         if (action === 'strip') {
@@ -1063,10 +1094,12 @@ class SecurityHandler {
                 : '⚠️ تعذّر سحب الصلاحيات';
         }
         if (action === 'kick') {
-            return this.punishById(guild, executor, 'kick', reason);
+            return this.punishById(guild, executor, 'kick', reason, {
+                bypassStrikes: bypass,
+            });
         }
-        // ban: أسرع مسار — بالمعرّف مباشرة (البوتات بلا ضربة أولى)
-        if (await this.banUserById(guild, executor.id, reason, executor.id, { bypassStrikes: isBotActor })) {
+        // ban: أسرع مسار — بالمعرّف مباشرة (بدون ضربة أولى عند الهجوم الهيكلي)
+        if (await this.banUserById(guild, executor.id, reason, executor.id, { bypassStrikes: bypass })) {
             return '🔨 حظر فوري ✅';
         }
         // احتياطي: تجريد الصلاحيات حتى لو تعذّر الحظر بسبب الهرمية
@@ -1092,7 +1125,7 @@ class SecurityHandler {
         }
         threatScore_1.globalThreat.add(guild.id, isBotActor ? 8 : 4, `anti-nuke: ${label}`);
         void this.client.protectionHandler?.applyBeastMode?.(guild, settings);
-        const text = await this.neutralizeById(guild, executor, cfg, reason, (opts.forceBan ?? false) || isBotActor);
+        const text = await this.neutralizeById(guild, executor, cfg, reason, (opts.forceBan ?? false) || isBotActor, { bypassStrikes: opts.bypassStrikes === true || isBotActor });
         // احذف الهدف الذي أنشأه للتو (قناة/رول)
         if (opts.targetId && opts.deleteTargetKind) {
             if (opts.deleteTargetKind === 'channel') {
@@ -1710,6 +1743,19 @@ class SecurityHandler {
                 !this.isPreemptivelyWhitelisted(settings, executor.id) &&
                 SecurityHandler.isBotSabotageAction(entry.action)) {
                 await this.handleUnapprovedBotSabotage(guild, executor, entry, settings, cfg);
+                return;
+            }
+            // ☢️ بوابة صفر التسامح الهيكلي — تعمل قبل وحدات /shield وقبل مفتاح antiNuke
+            //    وقبل قوائم القنوات/الرولات المستهدفة. أي حذف قناة/رول/ثريد أو تعديل
+            //    بنية السيرفر = إيقاف فوري من أول مرة، حتى لصاحب Administrator أو البوت المعتمد.
+            //    (ريثما يُنفَّذ الحذف لا يمكن اعتراضه — لكن العقوبة والاستعادة من أول لحظة)
+            const structuralAction = entry.action;
+            if (SecurityHandler.isBotStructuralKill(structuralAction)) {
+                await this.handleInstantViolation(guild, executor, settings, cfg, `تخريب هيكلي — ${this.auditActionLabel(structuralAction)}`, {
+                    forceBan: true,
+                    bypassStrikes: true,
+                    targetId: entry.targetId ?? undefined,
+                });
                 return;
             }
             // 📋 Role/Channel whitelist for anti-nuke
@@ -3616,15 +3662,21 @@ class SecurityHandler {
             if (!channel?.guild)
                 return;
             const settings = await (0, models_1.getGuildSettings)(channel.guild.id);
-            const cfg = settings.protection?.antiNuke;
-            if (!cfg?.enabled)
-                return;
+            // ☢️ صفر تسامح هيكلي: حذف القناة لا يمكن تعطيله بمفتاح antiNuke
+            const cfg = settings.protection?.antiNuke ?? {
+                enabled: true,
+                threshold: 1,
+                timeWindow: 10000,
+                action: 'ban',
+                mode: 'prevent',
+                autoRestore: true,
+            };
             const count = this.track(channel.guild.id, 'channel', cfg.timeWindow ?? 10000);
             // ⚡ استجابة فورية من أول حذف — "مايقدر اساسا يحذف قنوات" (العتبة القديمة3/10ث كانت تسمح بحذفين بلا رد)
             if (count < 1)
                 return;
             this.deletionTracker.get(channel.guild.id).channel = [];
-            await this.respondMassDeletion(channel.guild, settings, cfg, 'channel', discord_js_1.AuditLogEvent.ChannelDelete, channel.id);
+            await this.respondMassDeletion(channel.guild, settings, cfg, 'channel', discord_js_1.AuditLogEvent.ChannelDelete, channel.id, { kind: 'channel', snapshot: this.snapshotDeletedChannel(channel) });
         }
         catch (error) {
             logger.error(`onChannelDelete error: ${error.message}`);
@@ -3635,15 +3687,21 @@ class SecurityHandler {
             if (!role?.guild || role.id === role.guild.id)
                 return;
             const settings = await (0, models_1.getGuildSettings)(role.guild.id);
-            const cfg = settings.protection?.antiNuke;
-            if (!cfg?.enabled)
-                return;
+            // ☢️ صفر تسامح هيكلي: حذف الرول لا يمكن تعطيله بمفتاح antiNuke
+            const cfg = settings.protection?.antiNuke ?? {
+                enabled: true,
+                threshold: 1,
+                timeWindow: 10000,
+                action: 'ban',
+                mode: 'prevent',
+                autoRestore: true,
+            };
             const count = this.track(role.guild.id, 'role', cfg.timeWindow ?? 10000);
             // ⚡ استجابة فورية من أول حذف رول
             if (count < 1)
                 return;
             this.deletionTracker.get(role.guild.id).role = [];
-            await this.respondMassDeletion(role.guild, settings, cfg, 'role', discord_js_1.AuditLogEvent.RoleDelete, role.id);
+            await this.respondMassDeletion(role.guild, settings, cfg, 'role', discord_js_1.AuditLogEvent.RoleDelete, role.id, { kind: 'role', snapshot: this.snapshotDeletedRole(role) });
         }
         catch (error) {
             logger.error(`onRoleDelete error: ${error.message}`);
@@ -3865,7 +3923,7 @@ class SecurityHandler {
             return null;
         }
     }
-    async respondMassDeletion(guild, settings, cfg, type, auditType, targetId) {
+    async respondMassDeletion(guild, settings, cfg, type, auditType, targetId, deletedTarget) {
         const labels = {
             channel: { emoji: '📢', label: 'قنوات' },
             role: { emoji: '🎭', label: 'رولات' },
@@ -3874,6 +3932,7 @@ class SecurityHandler {
         };
         const executor = await this.findExecutor(guild, auditType, targetId, 1500, 15000);
         const windowSec = Math.round((cfg.timeWindow ?? 10000) / 1000);
+        const executorIsBot = executor ? this.executorIsBot(guild, executor) : false;
         // ⏱ استجابة فورية — لكن صامتة لو المنفّذ هو البوت نفسه
         if (executor && executor.id === this.client.user?.id) {
             logger.info(`⏭️ Anti-Nuke: تخطّي — المنفّذ هو البوت نفسه (${type} في ${guild.name})`);
@@ -3890,12 +3949,17 @@ class SecurityHandler {
             return;
         }
         // 👑 القائمة البيضاء: استثناء وقائي فقط — عملية واحدة مسموحة، والانفجار السريع = هجوم
+        //    🤖 البوتات ممنوعة من المساحة الموثوقة تماماً: أول حذف = عقوبة فورية.
         const preWhitelisted = executor ? this.isPreemptivelyWhitelisted(settings, executor.id) : false;
         const burstWindow = cfg.timeWindow ?? 10000;
-        if (executor && preWhitelisted && (type === 'channel' || type === 'role')) {
+        if (executor && preWhitelisted && !executorIsBot && (type === 'channel' || type === 'role')) {
             const count = this.trackActionOnce(guild.id, executor.id, type, targetId, burstWindow);
             if (count < Math.max(2, cfg.threshold ?? 2))
                 return;
+        }
+        // ♻️ استعادة فورية للهدف المحذوف نفسه — تنطلق مع العقوبة لا بعدها
+        if (deletedTarget?.snapshot) {
+            this.queueStructureRestore(guild.id, deletedTarget.kind, deletedTarget.snapshot);
         }
         // 🔨 الحظر/الطرد: عملية واحدة قد تكون مشروعة — 2+ خلال 10 ثوانٍ = هجوم
         if ((type === 'ban' || type === 'kick') && executor) {
@@ -3909,13 +3973,16 @@ class SecurityHandler {
             ? guild.members.unban(targetId, 'Omni Anti-Nuke: إلغاء حظر الضحية تلقائياً').catch(() => { })
             : Promise.resolve());
         // 🛡️ وضع المنع الوقائي: أول عملية اعتداء = حظر فوري
-        // 🤖 أي بوت غير مصرح = حظر دائم دائماً (حتى في وضع التفاعل) — لا يكفي الطرد
-        const executorIsBot = executor ? this.executorIsBot(guild, executor) : false;
+        // ☢️ حذف قناة/رول = صفر تسامح هيكلي: حظر دائماً حتى لو الوضع "تفاعل" أو الإجراء "تنبيه"
+        // 🤖 أي بوت = حظر دائم دائماً — لا يكفي الطرد
+        const structuralDeletion = type === 'channel' || type === 'role';
         const preventMode = cfg.mode !== 'react';
-        const effectiveAction = preventMode || executorIsBot ? 'ban' : (cfg.action ?? 'kick');
+        const effectiveAction = structuralDeletion || preventMode || executorIsBot ? 'ban' : (cfg.action ?? 'kick');
         // ♻️ الاستعادة تبدأ الآن فوراً — بالتوازي مع العقوبة والتنبيه (لا ننتظر شيئاً)
-        const restoreP = (type === 'channel' || type === 'role') && cfg.autoRestore !== false && !trusted
-            ? this.runAutoRestore(guild, settings, type)
+        //    نُفرّغ أولاً لقطة الهدف المحذوف نفسه، ثم نكمل استعادة النسخة الاحتياطية
+        const restoreP = (structuralDeletion) && cfg.autoRestore !== false && !trusted
+            ? this.waitForStructureRestore(guild.id)
+                .then(() => this.runAutoRestore(guild, settings, type))
                 .then(() => this.cleanupSuspicious(guild).catch(() => { }))
                 .catch((err) => logger.error(`runAutoRestore failed: ${err?.message ?? err}`))
             : Promise.resolve();
@@ -3937,7 +4004,10 @@ class SecurityHandler {
             }
             const reason = `Omni Anti-Nuke: ${labels[type].label} — ردّ فوري${preventMode ? ' (وضع المنع)' : ''}`;
             // ⚡ عقوبة بالمعرّف مباشرة — أسرع مسار ممكن (بدون جلب عضو أو سحب رولات متسلسل)
-            punishP = this.punishById(guild, executor, effectiveAction, reason);
+            // ☢️ حذف قناة/رول يتجاوز جدار الضربات — حتى صاحب Administrator يُحظر من أول مرة
+            punishP = this.punishById(guild, executor, effectiveAction, reason, {
+                bypassStrikes: executorIsBot || structuralDeletion,
+            });
             // 🧹 حذف كل ما أنشأه المهاجم (قنوات/رولات/ويب هوكس) — بالتوازي
             purgeP = this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
             actionText = preventMode ? '🛡️ وضع المنع: تحييد فوري جارٍ…' : '⏳ تنفيذ العقوبة…';
@@ -3985,6 +4055,236 @@ class SecurityHandler {
         }
         logger.warn(`🚨 Anti-Nuke (فوري): ${type} في ${guild.name} | executor=${executor?.tag ?? 'unknown'} | ${actionText}`);
         void restoreP;
+    }
+    // --------------------------------------------
+    // ♻️ استعادة فورية للهدف المحذوف نفسه من كائن الحدث
+    //    (تعمل حتى لو الهدف أُنشئ بعد آخر نسخة احتياطية — الاسم/النوع/الأب/الصلاحيات/الأعضاء)
+    // --------------------------------------------
+    /** 📸 لقطة كاملة لقناة لحظة حذفها */
+    snapshotDeletedChannel(channel) {
+        if (!channel?.name)
+            return null;
+        const overwrites = [];
+        try {
+            const values = channel.permissionOverwrites?.cache?.values?.() ?? [];
+            for (const ow of values) {
+                overwrites.push({
+                    id: String(ow.id),
+                    type: Number(ow.type),
+                    allow: ow.allow?.bitfield?.toString?.() ?? ow.allow?.toString?.() ?? '0',
+                    deny: ow.deny?.bitfield?.toString?.() ?? ow.deny?.toString?.() ?? '0',
+                });
+            }
+        }
+        catch {
+            /* لا شيء */
+        }
+        return {
+            id: String(channel.id),
+            name: channel.name,
+            type: Number(channel.type),
+            position: typeof channel.position === 'number' ? channel.position : 0,
+            topic: channel.topic ?? null,
+            parentId: channel.parentId ?? null,
+            nsfw: !!channel.nsfw,
+            rateLimitPerUser: Number(channel.rateLimitPerUser) || 0,
+            bitrate: Number(channel.bitrate) || undefined,
+            userLimit: Number(channel.userLimit) || undefined,
+            permissionOverwrites: overwrites,
+        };
+    }
+    /** 📸 لقطة كاملة لرول لحظة حذفه (بما فيهم أعضاؤه) */
+    snapshotDeletedRole(role) {
+        if (!role?.name)
+            return null;
+        const memberIds = [];
+        try {
+            const values = role.members?.values?.() ?? [];
+            for (const member of values)
+                memberIds.push(String(member.id));
+        }
+        catch {
+            /* لا شيء */
+        }
+        return {
+            id: String(role.id),
+            name: role.name,
+            color: role.hexColor ?? '#000000',
+            permissions: role.permissions?.bitfield?.toString?.() ?? '0',
+            hoist: !!role.hoist,
+            mentionable: !!role.mentionable,
+            position: typeof role.position === 'number' ? role.position : 0,
+            memberIds,
+        };
+    }
+    /** ♻️ جدولة استعادة فورية — تُجمَّع الحذفات المتتابعة في دفعة واحدة */
+    queueStructureRestore(guildId, kind, snapshot) {
+        if (!snapshot?.name)
+            return;
+        let bucket = this.pendingStructureRestore.get(guildId);
+        if (!bucket) {
+            bucket = { channels: new Map(), roles: new Map() };
+            this.pendingStructureRestore.set(guildId, bucket);
+        }
+        const key = `${snapshot.id || snapshot.name}:${snapshot.type ?? kind}`;
+        if (kind === 'channel')
+            bucket.channels.set(key, snapshot);
+        else
+            bucket.roles.set(key, snapshot);
+        if (bucket.timer)
+            return;
+        bucket.timer = setTimeout(() => {
+            void this.flushStructureRestore(guildId);
+        }, 500);
+        bucket.timer.unref?.();
+    }
+    /** ♻️ استعادة فورية لما تم جدولته (تُستدعى من المؤقت أو قبل النسخة الاحتياطية) */
+    async waitForStructureRestore(guildId) {
+        const bucket = this.pendingStructureRestore.get(guildId);
+        if (!bucket)
+            return;
+        if (bucket.timer)
+            clearTimeout(bucket.timer);
+        await this.flushStructureRestore(guildId);
+    }
+    async flushStructureRestore(guildId) {
+        const bucket = this.pendingStructureRestore.get(guildId);
+        if (!bucket)
+            return;
+        this.pendingStructureRestore.delete(guildId);
+        if (bucket.timer)
+            clearTimeout(bucket.timer);
+        const guild = this.client.guilds.cache.get(guildId);
+        if (!guild || (!bucket.channels.size && !bucket.roles.size))
+            return;
+        // 🔒 لا نتنافس مع استعادة نسخة احتياطية جارية — ننتظرها ثم نكمل (تمنع التكرار)
+        const inflight = this.restoreLocks.get(guildId);
+        if (inflight)
+            await inflight.catch(() => { });
+        try {
+            if (bucket.roles.size) {
+                await this.restoreDeletedRoles(guild, [...bucket.roles.values()]);
+            }
+            if (bucket.channels.size) {
+                await this.restoreDeletedChannels(guild, [...bucket.channels.values()]);
+            }
+        }
+        catch (error) {
+            logger.warn(`Structure restore failed in ${guild.name}: ${error.message}`);
+        }
+    }
+    /** إعادة الرولات المحذوفة بنفس الاسم/اللون/الصلاحيات + إرجاعها لأعضائها */
+    async restoreDeletedRoles(guild, snapshots) {
+        const incident = this.activeIncidents.get(guild.id);
+        const blocked = new Set();
+        if (incident?.attackerId)
+            blocked.add(String(incident.attackerId));
+        let restored = 0;
+        for (const snap of snapshots) {
+            if (!snap?.name || (0, securityNames_1.isMaliciousSecurityName)(snap.name))
+                continue;
+            const exists = guild.roles.cache.find(r => r.name === snap.name && r.id !== guild.id);
+            if (exists)
+                continue;
+            try {
+                this.noteSelfCreatedName(guild.id, 'role', snap.name);
+                const created = await guild.roles.create({
+                    name: snap.name,
+                    color: snap.color || undefined,
+                    permissions: BigInt(snap.permissions || '0'),
+                    hoist: !!snap.hoist,
+                    mentionable: !!snap.mentionable,
+                    reason: 'Omni — استعادة فورية: رول حُذف أثناء تخريب',
+                });
+                this.noteSelfCreated(guild.id, 'role', created.id);
+                restored++;
+                if (Number(snap.position) > 0) {
+                    await created.setPosition(Number(snap.position)).catch(() => { });
+                }
+                for (const memberId of snap.memberIds || []) {
+                    const id = String(memberId);
+                    if (!id || id === guild.ownerId || blocked.has(id))
+                        continue;
+                    const member = guild.members.cache.get(id) ||
+                        (await guild.members.fetch(id).catch(() => null));
+                    if (member) {
+                        await member.roles.add(created, 'Omni — إرجاع الرول لأعضائه الأصليين').catch(() => { });
+                    }
+                }
+            }
+            catch (error) {
+                logger.warn(`restoreDeletedRole "${snap.name}" failed in ${guild.name}: ${error.message}`);
+            }
+            await sleep(500);
+        }
+        if (restored > 0) {
+            logger.info(`♻️ Restored ${restored} deleted role(s) in ${guild.name}`);
+        }
+        return restored;
+    }
+    /** إعادة القنوات المحذوفة بنفس الاسم/النوع/الأب/الموضوع/الصلاحيات */
+    async restoreDeletedChannels(guild, snapshots) {
+        const sorted = [...snapshots].sort((a, b) => {
+            const aCat = Number(a.type) === discord_js_1.ChannelType.GuildCategory ? 0 : 1;
+            const bCat = Number(b.type) === discord_js_1.ChannelType.GuildCategory ? 0 : 1;
+            if (aCat !== bCat)
+                return aCat - bCat;
+            return Number(a.position || 0) - Number(b.position || 0);
+        });
+        let restored = 0;
+        for (const snap of sorted) {
+            if (!snap?.name || !RESTORABLE_CHANNEL_TYPES.includes(Number(snap.type)))
+                continue;
+            if ((0, securityNames_1.isMaliciousSecurityName)(snap.name))
+                continue;
+            const exists = guild.channels.cache.find(c => c.name === snap.name && Number(c.type) === Number(snap.type)) || guild.channels.cache.get(String(snap.id));
+            if (exists)
+                continue;
+            try {
+                const parent = snap.parentId
+                    ? guild.channels.cache.get(String(snap.parentId))
+                    : undefined;
+                const isVoice = Number(snap.type) === discord_js_1.ChannelType.GuildVoice ||
+                    Number(snap.type) === discord_js_1.ChannelType.GuildStageVoice;
+                this.noteSelfCreatedName(guild.id, 'channel', snap.name);
+                const created = await guild.channels.create({
+                    name: snap.name,
+                    type: Number(snap.type),
+                    ...(snap.topic ? { topic: snap.topic } : {}),
+                    ...(snap.nsfw ? { nsfw: true } : {}),
+                    ...(snap.rateLimitPerUser ? { rateLimitPerUser: snap.rateLimitPerUser } : {}),
+                    ...(isVoice && snap.bitrate ? { bitrate: snap.bitrate } : {}),
+                    ...(isVoice && snap.userLimit ? { userLimit: snap.userLimit } : {}),
+                    ...(parent ? { parent: parent.id } : {}),
+                    reason: 'Omni — استعادة فورية: قناة حُذفت أثناء تخريب',
+                });
+                this.noteSelfCreated(guild.id, 'channel', created.id);
+                restored++;
+                if (Number(snap.position) > 0) {
+                    await created.setPosition(Number(snap.position)).catch(() => { });
+                }
+                for (const ow of snap.permissionOverwrites || []) {
+                    if (!ow?.id)
+                        continue;
+                    const isRole = guild.roles.cache.has(String(ow.id)) || Number(ow.type) === 0;
+                    await created.permissionOverwrites
+                        .edit(String(ow.id), {
+                        allow: BigInt(ow.allow || '0'),
+                        deny: BigInt(ow.deny || '0'),
+                        type: isRole ? 'role' : 'member',
+                    }, 'Omni — إرجاع صلاحيات القناة')
+                        .catch(() => { });
+                }
+            }
+            catch (error) {
+                logger.warn(`restoreDeletedChannel "${snap.name}" failed in ${guild.name}: ${error.message}`);
+            }
+            await sleep(500);
+        }
+        if (restored > 0) {
+            logger.info(`♻️ Restored ${restored} deleted channel(s) in ${guild.name}`);
+        }
+        return restored;
     }
     // (تمت إزالة سطر مستوى التسلّم — البوت صامت تماماً ولا يرسل رسائل عن الرولات الأعلى)
     // ♻️ الاستعادة التلقائية — تعيد القنوات والرولات المفقودة من آخر نسخة احتياطية

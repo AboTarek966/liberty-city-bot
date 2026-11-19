@@ -40,6 +40,7 @@ export declare class SecurityHandler {
     private hierarchyState;
     private restoreTimers;
     private restoreLocks;
+    private pendingStructureRestore;
     private kickedQueue;
     private kickedTimers;
     private topWatchdogs;
@@ -89,6 +90,8 @@ export declare class SecurityHandler {
     private static readonly DANGEROUS_BOT_PERMS;
     private static readonly BOT_SABOTAGE_ACTIONS;
     private static isBotSabotageAction;
+    private static readonly BOT_STRUCTURAL_KILL;
+    private static isBotStructuralKill;
     /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
     ingestAuditEntry(entry: any, guildId?: string): void;
     private getCachedAuditLogs;
@@ -284,6 +287,19 @@ export declare class SecurityHandler {
     /** رابط دعوة دائم — يستخدم الموجود أو ينشئ واحداً جديداً */
     getInviteLink(guild: Guild): Promise<string | null>;
     private respondMassDeletion;
+    /** 📸 لقطة كاملة لقناة لحظة حذفها */
+    private snapshotDeletedChannel;
+    /** 📸 لقطة كاملة لرول لحظة حذفه (بما فيهم أعضاؤه) */
+    private snapshotDeletedRole;
+    /** ♻️ جدولة استعادة فورية — تُجمَّع الحذفات المتتابعة في دفعة واحدة */
+    private queueStructureRestore;
+    /** ♻️ استعادة فورية لما تم جدولته (تُستدعى من المؤقت أو قبل النسخة الاحتياطية) */
+    private waitForStructureRestore;
+    private flushStructureRestore;
+    /** إعادة الرولات المحذوفة بنفس الاسم/اللون/الصلاحيات + إرجاعها لأعضائها */
+    private restoreDeletedRoles;
+    /** إعادة القنوات المحذوفة بنفس الاسم/النوع/الأب/الموضوع/الصلاحيات */
+    private restoreDeletedChannels;
     private runAutoRestore;
     onMemberJoin(member: GuildMember): Promise<boolean>;
     private announceBotDemotion;
