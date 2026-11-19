@@ -60,6 +60,9 @@ export declare class SecurityHandler {
     private botGuardTimers;
     private botGuardInFlight;
     private botGuardBackoff;
+    private botAdmissionDecisions;
+    private botAdmissionInFlight;
+    private botInviterHints;
     private rogueBotIds;
     private rogueBotsLoaded;
     private recentBans;
@@ -84,6 +87,8 @@ export declare class SecurityHandler {
     private auditLogCache;
     private static readonly TRUSTED_BOT_IDS;
     private static readonly DANGEROUS_BOT_PERMS;
+    private static readonly BOT_SABOTAGE_ACTIONS;
+    private static isBotSabotageAction;
     /** يستقبل سجل التدقيق لحظة وصوله من Gateway (بدون REST) */
     ingestAuditEntry(entry: any, guildId?: string): void;
     private getCachedAuditLogs;
@@ -168,8 +173,26 @@ export declare class SecurityHandler {
     private doPurgeAttackerArtifacts;
     /** بوت غير مصرح قام بفعل خطير → حظر فوري + حذف ما أنشأه + حادث نشط */
     private handleRogueBot;
-    /** يمنع أي بوت غير مصرح من الدخول — حظر فوري بالمعرّف */
+    /** 🔎 آخر من أضاف هذا البوت (BotAdd) — بثّ فوري ثم REST مع إعادة محاولة قصيرة */
+    private resolveBotInviter;
+    /** 👑 اعتماد بوت أضافه المالك — يُحفظ في قائمة البوتات المعتمدة فقط */
+    private approveBot;
+    /** ⚖️ معاقبة من أضاف بوتاً غير مصرح به — البوت يُحظر، والمضيف يُحاسب */
+    private punishBotInviter;
+    /**
+     * 🚪 بوابة قبول البوتات — صفر تسامح:
+     *   • المالك/المطوّر يضيف بوتاً → اعتماد تلقائي وحفظه في القائمة المعتمدة.
+     *   • أي شخص آخر يضيف بوتاً → حظر البوت فوراً + معاقبة المضيف.
+     *   • تعذّر تحديد المضيف → رفض افتراضي (لن يبدأ أصلاً).
+     * @returns true إذا تم منع/حظر البوت
+     */
+    private decideBotAdmission;
+    /** يمنع أي بوت غير مصرح من الدخول — قرار صفر تسامح قبل أن يبدأ */
     private guardBotJoin;
+    /** 🚨 بوت غير مصرح قام بعمل تخريبي — إيقاف فوري قبل أي إكمال */
+    private handleUnapprovedBotSabotage;
+    /** تسمية عربية مختصرة لإجراء في سجل التدقيق */
+    private auditActionLabel;
     /** يستقبل كل سجل تدقيق من Gateway — يستخدمه للكشف الفوري الاستباقي */
     onAuditEntry(entry: any, guildArg?: Guild): Promise<void>;
     startDangerousBotWatchdog(guild: Guild): void;
