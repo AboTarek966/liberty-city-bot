@@ -21,7 +21,7 @@ function buildOrderCard(order, _prefix, payeeId) {
         `🧾 **المطلوب تحويله:** ${(0, store_1.formatCredits)(order.amount)} (بعد خصم ProBot ${order.taxPercent ?? 5}%)`,
         payeeId ? `💳 **أمر الدفع:** \`${(0, store_1.buildTransferCommand)(payeeId, order.amount)}\`` : null,
         '',
-        '> 🔔 العميل يؤكد أنه دفع — راجع التحويل، وبعد ما يصلك الصافي اضغط **تم التسليم والاستلام**.',
+        '> 🔔 المشتري يبلغ أنه دفع — الإثبات هو رسالة ProBot بتأكيد التحويل في التكت (المشتري + المستلم + المبلغ)؛ بعد ما يصلك الصافي اضغط **تم التسليم والاستلام**.',
     ]
         .filter(Boolean)
         .join('\n'))

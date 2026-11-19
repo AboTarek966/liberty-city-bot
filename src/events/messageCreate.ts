@@ -53,7 +53,7 @@ import { runHoneypot } from '../utils/honeypot';
 import { handleBotAbuse } from '../utils/botAbuse';
 import { checkTimeoutability, describeTimeoutApiError } from '../utils/moderationGuard';
 import { handleAutoReply } from '../utils/autoReply';
-import { handleAutoCreditTransfer } from '../utils/autoCreditFulfill';
+import { handleProbotCreditConfirmation, recordCreditCommandAttempt } from '../utils/autoCreditFulfill';
 
 const logger = createLogger('Event:MessageCreate');
 
@@ -144,6 +144,10 @@ const event: Event = {
         return;
       }
       if (message.author.bot) {
+        // 💳 رسالة تأكيد التحويل من ProBot نفسه — الإثبات الوحيد للدفع
+        void handleProbotCreditConfirmation(message).catch((err: any) =>
+          logger.error(`probot-confirmation handler error: ${err?.message || err}`)
+        );
         void client.securityHandler.onBotMessage(message).catch(() => {});
         return;
       }
@@ -153,12 +157,14 @@ const event: Event = {
     if (message.author.bot) return;
     if (message.webhookId) return;
 
-    // 💳 الاكتشاف التلقائي لتحويل الكريديت — مطابقة دقيقة (المشتري + المستلم + المبلغ)
-    //    رسالة تحتوي أمر الدفع الخاص بطلب معلق → تأكيد واستلام تلقائياً بدون ضغط أي زر
+    // 💳 كاش قصير المدى لأوامر الدفع — المشتري لازم يكتب الأمر، والبوت لا يعتمده كدفع؛
+    //    يُستخدم فقط لمطابقة المشتري عند وصول رسالة تأكيد من ProBot نفسها
     if (message.guild && /\bcredit/i.test(message.content) && message.content.length <= 120) {
-      void handleAutoCreditTransfer(message).catch((err: any) =>
-        logger.error(`auto-credit handler error: ${err?.message || err}`)
-      );
+      try {
+        recordCreditCommandAttempt(message);
+      } catch (err: any) {
+        logger.error(`credit-attempt cache error: ${err?.message || err}`);
+      }
     }
 
     const isDM = !message.guild;

@@ -199,7 +199,7 @@ async function fulfillStoreOrder(client, input) {
         const logChannelId = store?.logChannelId;
         const confirmedEmbed = new discord_js_1.EmbedBuilder()
             .setColor(0x57f287)
-            .setTitle('🤖 تم التسليم تلقائياً — اكتُشف أمر الدفع')
+            .setTitle('🤖 تم التسليم تلقائياً — تأكيد من رسالة ProBot')
             .setDescription([
             `${emoji} **العنصر:** ${order.projectName}`,
             `🏷️ **النوع:** ${meta.emoji} ${meta.label}`,
@@ -212,7 +212,7 @@ async function fulfillStoreOrder(client, input) {
             stockLine,
             roleLine,
             '',
-            '> 🤖 البوت رصد تحويل كريديت مطابق تماماً للمبلغ وأمر الدفع الخاص بالطلب — سُجّل الدفع فوراً وتم التسليم.',
+            '> 🤖 البوت قرأ رسالة تأكيد ProBot نفسها (المشتري + المستلم + المبلغ) وتطابقها مع الطلب — سُجّل الدفع فوراً وتم التسليم.',
         ]
             .filter(Boolean)
             .join('\n'))
