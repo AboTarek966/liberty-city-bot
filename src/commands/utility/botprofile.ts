@@ -12,6 +12,7 @@ import {
   Attachment,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -47,7 +48,8 @@ const command: Command = {
       perms.has(PermissionFlagsBits.ManageGuild) ||
       perms.has(PermissionFlagsBits.Administrator)
     );
-    const isOwner = interaction.user.id === interaction.guild?.ownerId;
+    const isOwner =
+      interaction.user.id === interaction.guild?.ownerId || isEnvBotOwner(interaction.user.id);
 
     if (!hasAdminPerms && !isOwner) {
       await interaction.reply({

@@ -17,6 +17,7 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings } from '../../models';
 import { createLogger, mapWithConcurrency } from '../../utils/helpers';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const logger = createLogger('JailCommand');
 
@@ -87,7 +88,8 @@ const command: Command = {
 
     // التحقق من أن رتبة المنفذ أعلى من رتبة العضو (المالك يستثنى)
     const executorMember = interaction.member as GuildMember;
-    const isOwner = interaction.user.id === guild.ownerId;
+    const isOwner =
+      interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
     if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
       await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
       return;

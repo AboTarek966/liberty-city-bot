@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const models_1 = require("../../models");
 const autoReplyImage_1 = require("../../utils/autoReplyImage");
 const DEFAULTS = {
@@ -49,7 +50,8 @@ function isManager(interaction) {
         return false;
     return (perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
         perms.has(discord_js_1.PermissionFlagsBits.Administrator) ||
-        interaction.user.id === interaction.guild?.ownerId);
+        interaction.user.id === interaction.guild?.ownerId ||
+        (0, botOwner_1.isEnvBotOwner)(interaction.user.id));
 }
 const command = {
     data: new discord_js_1.SlashCommandBuilder()

@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
+import { isEnvBotOwner } from '../../utils/botOwner';
 import { getGuildSettings, invalidateGuildSettings } from '../../models';
 import {
   downloadAutoReplyAttachment,
@@ -63,7 +64,8 @@ function isManager(interaction: ChatInputCommandInteraction): boolean {
   return (
     perms.has(PermissionFlagsBits.ManageGuild) ||
     perms.has(PermissionFlagsBits.Administrator) ||
-    interaction.user.id === interaction.guild?.ownerId
+    interaction.user.id === interaction.guild?.ownerId ||
+    isEnvBotOwner(interaction.user.id)
   );
 }
 

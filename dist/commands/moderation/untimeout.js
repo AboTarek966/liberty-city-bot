@@ -38,6 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('untimeout')
@@ -61,7 +62,7 @@ const command = {
             return;
         }
         const executorMember = interaction.member;
-        const isOwner = interaction.user.id === guild.ownerId;
+        const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
             await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
             return;

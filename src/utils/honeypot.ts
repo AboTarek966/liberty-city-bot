@@ -12,6 +12,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { getGuildSettings } from '../models';
+import { isEnvBotOwner } from '../utils/botOwner';
 import { createLogger } from './helpers';
 import { Colors } from './embeds';
 import { securityAlertsSilent } from './securityAlerts';
@@ -57,6 +58,7 @@ export async function runHoneypot(message: Message): Promise<boolean> {
   // تجاهل الإداريين إن كان الخيار مفعّلاً
   if (hp.ignoreAdmins !== false && member) {
     const isAdmin =
+      isEnvBotOwner(member.id) ||
       member.permissions.has(PermissionFlagsBits.Administrator) ||
       member.permissions.has(PermissionFlagsBits.ManageGuild);
     if (isAdmin) return false;

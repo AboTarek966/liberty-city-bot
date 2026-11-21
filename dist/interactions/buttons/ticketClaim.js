@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'ticket_claim',
     async execute(interaction) {
@@ -17,7 +18,8 @@ const handler = {
             const member = interaction.guild.members.cache.get(interaction.user.id) ??
                 (await interaction.guild.members.fetch(interaction.user.id));
             const settings = await (0, models_1.getGuildSettings)(interaction.guild.id);
-            const canClaim = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+            const canClaim = (0, botOwner_1.isEnvBotOwner)(member.id) ||
+                member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
                 member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
                 (settings.tickets.adminRoleIds || []).some((id) => member.roles.cache.has(id)) ||
                 (settings.tickets.supportRoleIds || []).some((id) => member.roles.cache.has(id));

@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const discord_js_2 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const rouletteGame_1 = require("../../utils/rouletteGame");
 function playerFromMember(member) {
     return {
@@ -81,7 +82,8 @@ const handler = {
             const isCreator = game.players[0]?.id === interaction.user.id;
             const isAdmin = interaction.guild.ownerId === interaction.user.id ||
                 perms?.has?.(discord_js_2.PermissionFlagsBits.ManageGuild) ||
-                perms?.has?.(discord_js_2.PermissionFlagsBits.Administrator);
+                perms?.has?.(discord_js_2.PermissionFlagsBits.Administrator) ||
+                (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
             if (!isCreator && !isAdmin) {
                 await interaction.reply({
                     content: '⛔ الزر ده لمنشئ اللعبة أو لإدارة السيرفر فقط.',

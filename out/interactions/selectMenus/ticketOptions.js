@@ -7,6 +7,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'ticket_options',
     async execute(interaction) {
@@ -22,7 +23,8 @@ const handler = {
                 // ---------- 🤝 استلام التذكرة ----------
                 case 'claim': {
                     const settings = await (0, models_1.getGuildSettings)(selectInteraction.guild.id);
-                    const canClaim = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+                    const canClaim = (0, botOwner_1.isEnvBotOwner)(member.id) ||
+                        member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
                         member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
                         (settings.tickets.adminRoleIds || []).some((id) => member.roles.cache.has(id)) ||
                         (settings.tickets.supportRoleIds || []).some((id) => member.roles.cache.has(id));
@@ -37,7 +39,8 @@ const handler = {
                 // ---------- ↩️ إلغاء الاستلام ----------
                 case 'unclaim': {
                     const settings = await (0, models_1.getGuildSettings)(selectInteraction.guild.id);
-                    const canUnclaim = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+                    const canUnclaim = (0, botOwner_1.isEnvBotOwner)(member.id) ||
+                        member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
                         member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
                         (settings.tickets.adminRoleIds || []).some((id) => member.roles.cache.has(id)) ||
                         (settings.tickets.supportRoleIds || []).some((id) => member.roles.cache.has(id));

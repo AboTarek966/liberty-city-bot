@@ -4,6 +4,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'ticket_add_member_modal',
     async execute(interaction) {
@@ -32,7 +33,7 @@ const handler = {
                 return;
             }
             const byMember = await interaction.guild.members.fetch(interaction.user.id);
-            if (!byMember.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+            if (!byMember.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) && !(0, botOwner_1.isEnvBotOwner)(byMember.id)) {
                 await interaction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات' });
                 return;
             }

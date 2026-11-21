@@ -17,6 +17,7 @@ import {
 import { Event } from '../handlers/EventHandler';
 import { OmniClient } from '../OmniClient';
 import { createLogger, formatDuration } from '../utils/helpers';
+import { isEnvBotOwner } from '../utils/botOwner';
 import { getGuildSettings, Warning, MuteRole, Ticket } from '../models';
 import { ICommandAlias } from '../models/CommandAlias';
 import { Colors } from '../utils/embeds';
@@ -809,6 +810,7 @@ export async function executeAliasCommand(
     if (!member || !message.guild) return;
 
     const isAdmin =
+      isEnvBotOwner(member.id) ||
       member.permissions.has(PermissionFlagsBits.Administrator) ||
       member.permissions.has(PermissionFlagsBits.ManageGuild);
     if (!isAdmin) {
@@ -902,7 +904,8 @@ export async function executeAliasCommand(
 
   // Permission check (same permissions as the slash command)
   if (command.permissions && command.permissions.length > 0) {
-    const hasPermission = command.permissions.every(p => member.permissions.has(p));
+    const hasPermission =
+      isEnvBotOwner(member.id) || command.permissions.every(p => member.permissions.has(p));
     if (!hasPermission) {
       logger.info(`Alias denied: ${message.author.tag} lacks permissions for "${commandName}"`);
       await respond(message, '❌ ليس لديك الصلاحيات الكافية لاستخدام هذا الأمر');
@@ -1925,7 +1928,9 @@ async function handleAIResponse(message: Message, client: OmniClient): Promise<v
 
   if (message.member) {
     const memberPerms = message.member.permissions;
-    isPrivileged = !!memberPerms && (memberPerms.has(PermissionFlagsBits.Administrator) || memberPerms.has(PermissionFlagsBits.ManageGuild));
+    isPrivileged =
+      isEnvBotOwner(message.author.id) ||
+      (!!memberPerms && (memberPerms.has(PermissionFlagsBits.Administrator) || memberPerms.has(PermissionFlagsBits.ManageGuild)));
     userContext.isPrivileged = isPrivileged;
     userContext.username = message.member.displayName || message.author.username;
     userContext.roleNames = message.member.roles.cache

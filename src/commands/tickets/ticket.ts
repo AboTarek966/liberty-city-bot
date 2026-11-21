@@ -15,6 +15,7 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, Ticket } from '../../models';
 import { buildTicketTopPage, sanitizeTicketTopPeriod } from '../../utils/ticketTop';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -269,7 +270,10 @@ async function handleImage(interaction: ChatInputCommandInteraction, client: Omn
 // Idle Auto-Close (الإغلاق التلقائي عند الخمول)
 // --------------------------------------------
 async function handleIdle(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if (
+    !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) &&
+    !isEnvBotOwner(interaction.user.id)
+  ) {
     await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
     return;
   }
@@ -520,7 +524,13 @@ async function handleClaim(interaction: ChatInputCommandInteraction, client: Omn
   const isSupport = settings.tickets.supportRoleIds.some((r: string) => member.roles.cache.has(r));
   const isAdminRole = settings.tickets.adminRoleIds.some((r: string) => member.roles.cache.has(r));
 
-  if (!isSupport && !isAdminRole && !member.permissions.has(PermissionFlagsBits.Administrator) && !member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+  if (
+    !isSupport &&
+    !isAdminRole &&
+    !member.permissions.has(PermissionFlagsBits.Administrator) &&
+    !member.permissions.has(PermissionFlagsBits.ManageChannels) &&
+    !isEnvBotOwner(member.id)
+  ) {
     await interaction.editReply({
       content: '❌ يجب أن تكون من فريق الدعم لاستلام التذاكر',
     });

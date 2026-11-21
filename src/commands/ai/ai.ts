@@ -13,6 +13,7 @@ import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
 import { getGuildSettings, AIConfig } from '../../models';
 import { config } from '../../config';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -308,7 +309,10 @@ async function handleInfo(interaction: ChatInputCommandInteraction, client: Omni
 // --------------------------------------------
 async function handleConfig(interaction: ChatInputCommandInteraction, client: OmniClient): Promise<void> {
   // Check permissions
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if (
+    !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) &&
+    !isEnvBotOwner(interaction.user.id)
+  ) {
     await interaction.reply({
       content: '❌ تحتاج صلاحية إدارة السيرفر لتغيير الإعدادات',
       ephemeral: true,

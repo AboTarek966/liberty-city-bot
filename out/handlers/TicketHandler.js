@@ -12,6 +12,7 @@ const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const ticketMessages_1 = require("../utils/ticketMessages");
 const helpers_2 = require("../utils/helpers");
+const botOwner_1 = require("../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('TicketHandler');
 /** الأنواع الافتراضية عندما لا يحدد المشرف أي أنواع */
 exports.DEFAULT_TICKET_TYPES = [
@@ -21,6 +22,9 @@ exports.DEFAULT_TICKET_TYPES = [
 ];
 function isTicketStaff(args) {
     const { member, guildOwnerId } = args;
+    // 👑 مطوّر/مالك البوت يتصرف كإدارة عليا حتى بدون ملكية السيرفر أو رولات الدعم
+    if ((0, botOwner_1.isEnvBotOwner)(member.id))
+        return true;
     // رولات فريق الدعم + رولات الإدارة العليا
     const staffRoles = [...(args.supportRoleIds || []), ...(args.adminRoleIds || [])];
     if (staffRoles.length > 0) {
@@ -52,6 +56,9 @@ function isTicketStaff(args) {
 }
 function canReopenTicket(args) {
     const { ticket, member, guildOwnerId } = args;
+    // 👑 مطوّر/مالك البوت يستطيع إعادة فتح أي تذكرة
+    if ((0, botOwner_1.isEnvBotOwner)(member.id))
+        return true;
     // من أغلقها يعاد فتحها دائماً
     if (ticket.closedBy && ticket.closedBy === member.id)
         return true;
@@ -660,7 +667,8 @@ class TicketHandler {
         if (!ticket)
             throw new Error('لم يتم العثور على التذكرة');
         // 🛡️ من يحق له الاستلام؟ أي إداري/دعم موجود (صلاحية إدارية أو رول إداري/دعم)
-        const canClaim = claimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+        const canClaim = (0, botOwner_1.isEnvBotOwner)(claimedBy.id) ||
+            claimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
             claimedBy.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
             (settings.tickets.adminRoleIds || []).some((id) => claimedBy.roles.cache.has(id)) ||
             (settings.tickets.supportRoleIds || []).some((id) => claimedBy.roles.cache.has(id));
@@ -756,7 +764,8 @@ class TicketHandler {
         // 🛡️ نفس صلاحية الاستلام: إداري/دعم يقدر يلغي الاستلام —
         //    سواء كان هو المستلم أو إداري/دعم آخر (لتسليم التذكرة لزميل)
         const settings = await (0, models_1.getGuildSettings)(guild.id);
-        const canUnclaim = unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+        const canUnclaim = (0, botOwner_1.isEnvBotOwner)(unclaimedBy.id) ||
+            unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
             unclaimedBy.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) ||
             (settings.tickets.adminRoleIds || []).some((id) => unclaimedBy.roles.cache.has(id)) ||
             (settings.tickets.supportRoleIds || []).some((id) => unclaimedBy.roles.cache.has(id));

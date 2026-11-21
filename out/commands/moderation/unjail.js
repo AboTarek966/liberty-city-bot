@@ -41,6 +41,7 @@ const models_1 = require("../../models");
 const helpers_1 = require("../../utils/helpers");
 const embeds_1 = require("../../utils/embeds");
 const helpers_2 = require("../../utils/helpers");
+const botOwner_1 = require("../../utils/botOwner");
 const logger = (0, helpers_2.createLogger)('UnjailCommand');
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -79,7 +80,7 @@ const command = {
         }
         // التحقق من أن رتبة المنفذ أعلى من رتبة العضو (المالك يستثنى)
         const executorMember = interaction.member;
-        const isOwner = interaction.user.id === guild.ownerId;
+        const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
             await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
             return;

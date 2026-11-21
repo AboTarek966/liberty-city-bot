@@ -38,6 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('promote')
@@ -79,8 +80,8 @@ const command = {
             await interaction.reply({ content: '❌ رتبة البوت يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
             return;
         }
-        // التحقق من أن رتبة المنفذ أعلى من رتبة العضو (المالك يستثنى)
-        const isOwner = interaction.user.id === guild.ownerId;
+        // التحقق من أن رتبة المنفذ أعلى من رتبة العضو (المالك ومطوّر البوت يستثنيان)
+        const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
             await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
             return;
@@ -110,7 +111,7 @@ const command = {
             const botTopRole = guild.members.me.roles.highest;
             const executorTopRole = executorMember.roles.highest;
             const memberTopRole = member.roles.highest;
-            const isOwner = interaction.user.id === guild.ownerId;
+            const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
             // ابحث عن جميع الرتب فوق رتبة العضو الحالية
             const higherRoles = guild.roles.cache
                 .filter(r => r.position > memberTopRole.position && // أعلى من رتبة العضو الحالية

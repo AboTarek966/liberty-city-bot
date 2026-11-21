@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const handler: SelectMenuHandler = {
   id: 'ticket_add_user',
@@ -21,7 +22,7 @@ const handler: SelectMenuHandler = {
 
     try {
       const byMember = await userSelect.guild.members.fetch(userSelect.user.id);
-      if (!byMember.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      if (!byMember.permissions.has(PermissionFlagsBits.ManageChannels) && !isEnvBotOwner(byMember.id)) {
         await userSelect.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لإضافة أعضاء' });
         return;
       }

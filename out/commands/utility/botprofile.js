@@ -7,6 +7,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('botprofile')
@@ -26,7 +27,7 @@ const command = {
         const perms = member?.permissions;
         const hasAdminPerms = !!perms && (perms.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
             perms.has(discord_js_1.PermissionFlagsBits.Administrator));
-        const isOwner = interaction.user.id === interaction.guild?.ownerId;
+        const isOwner = interaction.user.id === interaction.guild?.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         if (!hasAdminPerms && !isOwner) {
             await interaction.reply({
                 content: '❌ تحتاج صلاحية **إدارة السيرفر** (أو تكون مالك السيرفر) لتغيير مظهر البوت',

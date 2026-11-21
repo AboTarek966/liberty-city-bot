@@ -14,6 +14,7 @@ import {
 import { SelectMenuHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
 import { Ticket, getGuildSettings } from '../../models';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const handler: SelectMenuHandler = {
   id: 'ticket_options',
@@ -34,6 +35,7 @@ const handler: SelectMenuHandler = {
         case 'claim': {
           const settings = await getGuildSettings(selectInteraction.guild.id);
           const canClaim =
+            isEnvBotOwner(member.id) ||
             member.permissions.has(PermissionFlagsBits.Administrator) ||
             member.permissions.has(PermissionFlagsBits.ManageChannels) ||
             (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||
@@ -51,6 +53,7 @@ const handler: SelectMenuHandler = {
         case 'unclaim': {
           const settings = await getGuildSettings(selectInteraction.guild.id);
           const canUnclaim =
+            isEnvBotOwner(member.id) ||
             member.permissions.has(PermissionFlagsBits.Administrator) ||
             member.permissions.has(PermissionFlagsBits.ManageChannels) ||
             (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||

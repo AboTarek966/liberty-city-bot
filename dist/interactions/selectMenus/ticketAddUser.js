@@ -5,6 +5,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'ticket_add_user',
     async execute(interaction) {
@@ -15,7 +16,7 @@ const handler = {
         await userSelect.deferReply({ ephemeral: true });
         try {
             const byMember = await userSelect.guild.members.fetch(userSelect.user.id);
-            if (!byMember.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+            if (!byMember.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) && !(0, botOwner_1.isEnvBotOwner)(byMember.id)) {
                 await userSelect.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات لإضافة أعضاء' });
                 return;
             }

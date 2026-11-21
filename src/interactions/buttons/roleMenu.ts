@@ -5,6 +5,7 @@
 import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { getGuildSettings } from '../../models';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
   id: 'rolemenu',
@@ -51,7 +52,11 @@ const handler: ButtonHandler = {
       await interaction.editReply({ content: '❌ الرتبة أعلى من رتبة البوت' });
       return;
     }
-    if (member.roles.highest.position <= role.position && !member.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (
+      member.roles.highest.position <= role.position &&
+      !member.permissions.has(PermissionFlagsBits.Administrator) &&
+      !isEnvBotOwner(member.id)
+    ) {
       await interaction.editReply({ content: '❌ لا يمكنك الحصول على رتبة أعلى من رتبتك' });
       return;
     }

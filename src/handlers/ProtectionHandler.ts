@@ -15,6 +15,7 @@ import {
 } from 'discord.js';
 import { config } from '../config';
 import { createLogger } from '../utils/helpers';
+import { isEnvBotOwner } from '../utils/botOwner';
 import { getGuildSettings, GuildSettings } from '../models';
 import { setLockdown } from '../utils/lockdown';
 import { globalThreat } from '../utils/threatScore';
@@ -219,7 +220,8 @@ export class ProtectionHandler {
         .find((o: any) => o.channelId === message.channel.id)?.disabled || []
     );
 
-    const hasAdministrator = message.member.permissions.has(PermissionFlagsBits.Administrator);
+    const hasAdministrator =
+      isEnvBotOwner(message.author.id) || message.member.permissions.has(PermissionFlagsBits.Administrator);
     const isAdmin = hasAdministrator ||
                     message.member.permissions.has(PermissionFlagsBits.ManageMessages);
 

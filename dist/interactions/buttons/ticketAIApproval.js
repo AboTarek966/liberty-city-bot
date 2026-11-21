@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../../utils/helpers");
 const models_1 = require("../../models");
+const botOwner_1 = require("../../utils/botOwner");
 const embeds_1 = require("../../utils/embeds");
 const logger = (0, helpers_1.createLogger)('Button:TicketAIApproval');
 function buildDisabledRow(approvalId) {
@@ -51,7 +52,8 @@ const handler = {
         const settings = await (0, models_1.getGuildSettings)(interaction.guild.id);
         const adminRoleIds = settings.tickets?.adminRoleIds || [];
         const supportRoleIds = settings.tickets?.supportRoleIds || [];
-        const hasPermission = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+        const hasPermission = (0, botOwner_1.isEnvBotOwner)(member.id) ||
+            member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
             member.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
             adminRoleIds.some(id => member.roles.cache.has(id)) ||
             supportRoleIds.some(id => member.roles.cache.has(id));

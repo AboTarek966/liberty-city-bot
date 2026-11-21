@@ -18,6 +18,7 @@ import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
 import { createLogger } from '../../utils/helpers';
 import { getGuildSettings } from '../../models';
+import { isEnvBotOwner } from '../../utils/botOwner';
 import { Colors } from '../../utils/embeds';
 
 const logger = createLogger('Button:TicketAIApproval');
@@ -73,6 +74,7 @@ const handler: ButtonHandler = {
     const supportRoleIds = settings.tickets?.supportRoleIds || [];
 
     const hasPermission =
+      isEnvBotOwner(member.id) ||
       member.permissions.has(PermissionFlagsBits.Administrator) ||
       member.permissions.has(PermissionFlagsBits.ManageGuild) ||
       adminRoleIds.some(id => member.roles.cache.has(id)) ||

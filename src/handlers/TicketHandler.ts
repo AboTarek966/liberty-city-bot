@@ -23,6 +23,7 @@ import { ticketEmbed, ticketTranscriptEmbed, createEmbed, Colors } from '../util
 import { DEFAULT_TICKET_WELCOME_MESSAGE, renderTicketWelcome } from '../utils/ticketMessages';
 import { generateId, generateNumericId } from '../utils/helpers';
 import { OmniClient } from '../OmniClient';
+import { isEnvBotOwner } from '../utils/botOwner';
 
 const logger = createLogger('TicketHandler');
 
@@ -108,6 +109,9 @@ export interface StaffAccessArgs {
 export function isTicketStaff(args: StaffAccessArgs): boolean {
   const { member, guildOwnerId } = args;
 
+  // 👑 مطوّر/مالك البوت يتصرف كإدارة عليا حتى بدون ملكية السيرفر أو رولات الدعم
+  if (isEnvBotOwner(member.id)) return true;
+
   // رولات فريق الدعم + رولات الإدارة العليا
   const staffRoles = [...(args.supportRoleIds || []), ...(args.adminRoleIds || [])];
   if (staffRoles.length > 0) {
@@ -137,6 +141,9 @@ export function isTicketStaff(args: StaffAccessArgs): boolean {
 
 export function canReopenTicket(args: ReopenAccessArgs): boolean {
   const { ticket, member, guildOwnerId } = args;
+
+  // 👑 مطوّر/مالك البوت يستطيع إعادة فتح أي تذكرة
+  if (isEnvBotOwner(member.id)) return true;
 
   // من أغلقها يعاد فتحها دائماً
   if (ticket.closedBy && ticket.closedBy === member.id) return true;
@@ -832,6 +839,7 @@ export class TicketHandler {
 
     // 🛡️ من يحق له الاستلام؟ أي إداري/دعم موجود (صلاحية إدارية أو رول إداري/دعم)
     const canClaim =
+      isEnvBotOwner(claimedBy.id) ||
       claimedBy.permissions.has(PermissionFlagsBits.Administrator) ||
       claimedBy.permissions.has(PermissionFlagsBits.ManageChannels) ||
       (settings.tickets.adminRoleIds || []).some((id: string) => claimedBy.roles.cache.has(id)) ||
@@ -959,6 +967,7 @@ export class TicketHandler {
     //    سواء كان هو المستلم أو إداري/دعم آخر (لتسليم التذكرة لزميل)
     const settings = await getGuildSettings(guild.id);
     const canUnclaim =
+      isEnvBotOwner(unclaimedBy.id) ||
       unclaimedBy.permissions.has(PermissionFlagsBits.Administrator) ||
       unclaimedBy.permissions.has(PermissionFlagsBits.ManageChannels) ||
       (settings.tickets.adminRoleIds || []).some((id: string) => unclaimedBy.roles.cache.has(id)) ||

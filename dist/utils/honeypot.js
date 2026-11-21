@@ -9,6 +9,7 @@ exports.honeypotActionLabel = honeypotActionLabel;
 exports.runHoneypot = runHoneypot;
 const discord_js_1 = require("discord.js");
 const models_1 = require("../models");
+const botOwner_1 = require("../utils/botOwner");
 const helpers_1 = require("./helpers");
 const embeds_1 = require("./embeds");
 const securityAlerts_1 = require("./securityAlerts");
@@ -47,7 +48,8 @@ async function runHoneypot(message) {
         (await message.guild.members.fetch(message.author.id).catch(() => null));
     // تجاهل الإداريين إن كان الخيار مفعّلاً
     if (hp.ignoreAdmins !== false && member) {
-        const isAdmin = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+        const isAdmin = (0, botOwner_1.isEnvBotOwner)(member.id) ||
+            member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
             member.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild);
         if (isAdmin)
             return false;

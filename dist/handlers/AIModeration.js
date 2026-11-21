@@ -48,6 +48,7 @@ const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const rolePicker_1 = require("../utils/rolePicker");
+const botOwner_1 = require("../utils/botOwner");
 const moderationGuard_1 = require("../utils/moderationGuard");
 const logger = (0, helpers_1.createLogger)('AIModeration');
 // ⚠️ الترتيب مهم: "رفع الكتم" يجب أن يُفحص قبل "كتم"
@@ -331,7 +332,7 @@ async function executeAIModeration(message, client, question) {
     let allowed;
     if (hierarchyActions.includes(hit.action)) {
         const targetMember = target.member || (await message.guild.members.fetch(target.user.id).catch(() => null));
-        const isOwner = message.guild.ownerId === message.author.id;
+        const isOwner = message.guild.ownerId === message.author.id || (0, botOwner_1.isEnvBotOwner)(message.author.id);
         const isAdmin = message.member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
         allowed =
             isOwner ||
@@ -339,7 +340,8 @@ async function executeAIModeration(message, client, question) {
                 (!!targetMember && message.member.roles.highest.position > targetMember.roles.highest.position);
     }
     else {
-        allowed = message.member.permissions.has(hit.permission);
+        allowed =
+            (0, botOwner_1.isEnvBotOwner)(message.author.id) || message.member.permissions.has(hit.permission);
     }
     if (!allowed) {
         logger.info(`⛔ Denied: ${message.author.tag} lacks permission for ${hit.action}`);
@@ -510,7 +512,7 @@ async function executeAIModeration(message, client, question) {
                     throw new Error('لا يمكن حذف رول مدار (بوتات/تكاملات)');
                 if (role.position >= guild.members.me.roles.highest.position)
                     throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد حذفه');
-                if (message.author.id !== guild.ownerId && role.position >= message.member.roles.highest.position)
+                if (!(0, botOwner_1.isEnvBotOwner)(message.author.id) && message.author.id !== guild.ownerId && role.position >= message.member.roles.highest.position)
                     throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد حذفه');
                 await role.delete(`${reason} | بواسطة ${moderator.user.tag}`);
                 embed = new discord_js_1.EmbedBuilder()
@@ -533,7 +535,7 @@ async function executeAIModeration(message, client, question) {
                     throw new Error('العضو يملك هذا الرول بالفعل');
                 if (role.position >= guild.members.me.roles.highest.position)
                     throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المضاف');
-                const isOwner = message.author.id === guild.ownerId;
+                const isOwner = message.author.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(message.author.id);
                 const executorMember = message.member;
                 if (!(0, rolePicker_1.canManageTarget)(guild, executorMember, member))
                     throw new Error('لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك');
@@ -560,7 +562,7 @@ async function executeAIModeration(message, client, question) {
                     throw new Error('العضو لا يملك هذا الرول أصلاً');
                 if (role.position >= guild.members.me.roles.highest.position)
                     throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد إزالته');
-                const isOwner = message.author.id === guild.ownerId;
+                const isOwner = message.author.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(message.author.id);
                 const executorMember = message.member;
                 if (!(0, rolePicker_1.canManageTarget)(guild, executorMember, member))
                     throw new Error('لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك');
@@ -582,7 +584,7 @@ async function executeAIModeration(message, client, question) {
                 const botTopRole = guild.members.me.roles.highest;
                 const executorTopRole = message.member.roles.highest;
                 const memberTopRole = member.roles.highest;
-                const isOwner = message.author.id === guild.ownerId;
+                const isOwner = message.author.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(message.author.id);
                 if (!(0, rolePicker_1.canManageTarget)(guild, message.member, member))
                     throw new Error('لا يمكنك ترقية عضو رتبته أعلى منك أو مساوية لرتبتك');
                 const higherRoles = guild.roles.cache

@@ -12,6 +12,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -45,7 +46,8 @@ const command: Command = {
     }
 
     const executorMember = interaction.member as GuildMember;
-    const isOwner = interaction.user.id === guild.ownerId;
+    const isOwner =
+      interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
     if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
       await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
       return;

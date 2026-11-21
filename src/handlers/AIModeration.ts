@@ -13,6 +13,7 @@ import { createLogger, mapWithConcurrency } from '../utils/helpers';
 import { getGuildSettings } from '../models';
 import { Colors } from '../utils/embeds';
 import { canManageTarget } from '../utils/rolePicker';
+import { isEnvBotOwner } from '../utils/botOwner';
 import { checkTimeoutability, describeTimeoutApiError } from '../utils/moderationGuard';
 
 const logger = createLogger('AIModeration');
@@ -357,14 +358,16 @@ export async function executeAIModeration(
   if (hierarchyActions.includes(hit.action)) {
     const targetMember =
       target.member || (await message.guild.members.fetch(target.user.id).catch(() => null));
-    const isOwner = message.guild.ownerId === message.author.id;
+    const isOwner =
+      message.guild.ownerId === message.author.id || isEnvBotOwner(message.author.id);
     const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
     allowed =
       isOwner ||
       isAdmin ||
       (!!targetMember && message.member.roles.highest.position > targetMember.roles.highest.position);
   } else {
-    allowed = message.member.permissions.has(hit.permission);
+    allowed =
+      isEnvBotOwner(message.author.id) || message.member.permissions.has(hit.permission);
   }
   if (!allowed) {
     logger.info(`⛔ Denied: ${message.author.tag} lacks permission for ${hit.action}`);
@@ -547,7 +550,7 @@ export async function executeAIModeration(
         if (role.managed) throw new Error('لا يمكن حذف رول مدار (بوتات/تكاملات)');
         if (role.position >= guild.members.me!.roles.highest.position) 
           throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد حذفه');
-        if (message.author.id !== guild.ownerId && role.position >= (message.member as GuildMember).roles.highest.position)
+        if (!isEnvBotOwner(message.author.id) && message.author.id !== guild.ownerId && role.position >= (message.member as GuildMember).roles.highest.position)
           throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد حذفه');
         
         await role.delete(`${reason} | بواسطة ${moderator.user.tag}`);
@@ -575,7 +578,8 @@ export async function executeAIModeration(
         if (role.position >= guild.members.me!.roles.highest.position)
           throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المضاف');
         
-        const isOwner = message.author.id === guild.ownerId;
+        const isOwner =
+          message.author.id === guild.ownerId || isEnvBotOwner(message.author.id);
         const executorMember = message.member as GuildMember;
         if (!canManageTarget(guild, executorMember, member))
           throw new Error('لا يمكنك إعطاء رول لعضو رتبته أعلى منك أو مساوية لرتبتك');
@@ -608,7 +612,8 @@ export async function executeAIModeration(
         if (role.position >= guild.members.me!.roles.highest.position)
           throw new Error('رتبة البوت يجب أن تكون أعلى من الرول المراد إزالته');
         
-        const isOwner = message.author.id === guild.ownerId;
+        const isOwner =
+          message.author.id === guild.ownerId || isEnvBotOwner(message.author.id);
         const executorMember = message.member as GuildMember;
         if (!canManageTarget(guild, executorMember, member))
           throw new Error('لا يمكنك إزالة رول من عضو رتبته أعلى منك أو مساوية لرتبتك');
@@ -636,7 +641,8 @@ export async function executeAIModeration(
         const botTopRole = guild.members.me!.roles.highest;
         const executorTopRole = (message.member as GuildMember).roles.highest;
         const memberTopRole = member.roles.highest;
-        const isOwner = message.author.id === guild.ownerId;
+        const isOwner =
+          message.author.id === guild.ownerId || isEnvBotOwner(message.author.id);
         if (!canManageTarget(guild, message.member as GuildMember, member))
           throw new Error('لا يمكنك ترقية عضو رتبته أعلى منك أو مساوية لرتبتك');
         

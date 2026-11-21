@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'rolemenu',
     async execute(interaction) {
@@ -41,7 +42,9 @@ const handler = {
             await interaction.editReply({ content: '❌ الرتبة أعلى من رتبة البوت' });
             return;
         }
-        if (member.roles.highest.position <= role.position && !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
+        if (member.roles.highest.position <= role.position &&
+            !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) &&
+            !(0, botOwner_1.isEnvBotOwner)(member.id)) {
             await interaction.editReply({ content: '❌ لا يمكنك الحصول على رتبة أعلى من رتبتك' });
             return;
         }

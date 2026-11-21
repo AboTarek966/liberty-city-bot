@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const config_1 = require("../../config");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('ai')
@@ -217,7 +218,8 @@ async function handleInfo(interaction, client) {
 // --------------------------------------------
 async function handleConfig(interaction, client) {
     // Check permissions
-    if (!interaction.memberPermissions?.has(discord_js_1.PermissionFlagsBits.ManageGuild)) {
+    if (!interaction.memberPermissions?.has(discord_js_1.PermissionFlagsBits.ManageGuild) &&
+        !(0, botOwner_1.isEnvBotOwner)(interaction.user.id)) {
         await interaction.reply({
             content: '❌ تحتاج صلاحية إدارة السيرفر لتغيير الإعدادات',
             ephemeral: true,

@@ -40,6 +40,7 @@ exports.handleAliasPickSelect = handleAliasPickSelect;
 exports.executeAliasCommand = executeAliasCommand;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
+const botOwner_1 = require("../utils/botOwner");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const AIModeration_1 = require("../handlers/AIModeration");
@@ -726,7 +727,8 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
         const member = message.member;
         if (!member || !message.guild)
             return;
-        const isAdmin = member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
+        const isAdmin = (0, botOwner_1.isEnvBotOwner)(member.id) ||
+            member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
             member.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild);
         if (!isAdmin) {
             await respond(message, '⛔ **هذا الأمر للإدارة فقط** — يحتاج صلاحية مدير السيرفر أو إدارة السيرفر.');
@@ -802,7 +804,7 @@ async function executeAliasCommand(message, client, commandName, args, shortcut)
     }
     // Permission check (same permissions as the slash command)
     if (command.permissions && command.permissions.length > 0) {
-        const hasPermission = command.permissions.every(p => member.permissions.has(p));
+        const hasPermission = (0, botOwner_1.isEnvBotOwner)(member.id) || command.permissions.every(p => member.permissions.has(p));
         if (!hasPermission) {
             logger.info(`Alias denied: ${message.author.tag} lacks permissions for "${commandName}"`);
             await respond(message, '❌ ليس لديك الصلاحيات الكافية لاستخدام هذا الأمر');
@@ -1749,7 +1751,9 @@ async function handleAIResponse(message, client) {
     };
     if (message.member) {
         const memberPerms = message.member.permissions;
-        isPrivileged = !!memberPerms && (memberPerms.has(discord_js_1.PermissionFlagsBits.Administrator) || memberPerms.has(discord_js_1.PermissionFlagsBits.ManageGuild));
+        isPrivileged =
+            (0, botOwner_1.isEnvBotOwner)(message.author.id) ||
+                (!!memberPerms && (memberPerms.has(discord_js_1.PermissionFlagsBits.Administrator) || memberPerms.has(discord_js_1.PermissionFlagsBits.ManageGuild)));
         userContext.isPrivileged = isPrivileged;
         userContext.username = message.member.displayName || message.author.username;
         userContext.roleNames = message.member.roles.cache

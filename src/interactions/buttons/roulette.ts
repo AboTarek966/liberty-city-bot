@@ -5,6 +5,7 @@
 import { ButtonInteraction, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { PermissionFlagsBits } from 'discord.js';
+import { isEnvBotOwner } from '../../utils/botOwner';
 import {
   rouletteGames,
   addToRouletteLobby,
@@ -100,7 +101,8 @@ const handler: ButtonHandler = {
       const isAdmin =
         interaction.guild!.ownerId === interaction.user.id ||
         perms?.has?.(PermissionFlagsBits.ManageGuild) ||
-        perms?.has?.(PermissionFlagsBits.Administrator);
+        perms?.has?.(PermissionFlagsBits.Administrator) ||
+        isEnvBotOwner(interaction.user.id);
       if (!isCreator && !isAdmin) {
         await interaction.reply({
           content: '⛔ الزر ده لمنشئ اللعبة أو لإدارة السيرفر فقط.',

@@ -5,6 +5,7 @@
 import { ModalSubmitInteraction, PermissionFlagsBits } from 'discord.js';
 import { ModalHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const handler: ModalHandler = {
   id: 'ticket_add_member_modal',
@@ -40,7 +41,7 @@ const handler: ModalHandler = {
       }
 
       const byMember = await interaction.guild.members.fetch(interaction.user.id);
-      if (!byMember.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      if (!byMember.permissions.has(PermissionFlagsBits.ManageChannels) && !isEnvBotOwner(byMember.id)) {
         await interaction.editReply({ content: '❌ تحتاج صلاحية إدارة القنوات' });
         return;
       }

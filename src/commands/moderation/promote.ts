@@ -13,6 +13,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -69,8 +70,9 @@ const command: Command = {
       return;
     }
 
-    // التحقق من أن رتبة المنفذ أعلى من رتبة العضو (المالك يستثنى)
-    const isOwner = interaction.user.id === guild.ownerId;
+    // التحقق من أن رتبة المنفذ أعلى من رتبة العضو (المالك ومطوّر البوت يستثنيان)
+    const isOwner =
+      interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
     if (!isOwner && executorMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
       await interaction.reply({ content: '❌ رتبتك يجب أن تكون أعلى من رتبة العضو', ephemeral: true });
       return;
@@ -104,7 +106,8 @@ const command: Command = {
       const botTopRole = guild.members.me!.roles.highest;
       const executorTopRole = executorMember.roles.highest;
       const memberTopRole = member.roles.highest;
-      const isOwner = interaction.user.id === guild.ownerId;
+      const isOwner =
+        interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
        
       // ابحث عن جميع الرتب فوق رتبة العضو الحالية
       const higherRoles = guild.roles.cache

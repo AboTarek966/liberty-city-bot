@@ -6,6 +6,7 @@ import { ButtonInteraction, PermissionFlagsBits } from 'discord.js';
 import { ButtonHandler } from '../../handlers/InteractionHandler';
 import { OmniClient } from '../../OmniClient';
 import { getGuildSettings } from '../../models';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
   id: 'ticket_claim',
@@ -23,6 +24,7 @@ const handler: ButtonHandler = {
 
       const settings = await getGuildSettings(interaction.guild.id);
       const canClaim =
+        isEnvBotOwner(member.id) ||
         member.permissions.has(PermissionFlagsBits.Administrator) ||
         member.permissions.has(PermissionFlagsBits.ManageChannels) ||
         (settings.tickets.adminRoleIds || []).some((id: string) => member.roles.cache.has(id)) ||

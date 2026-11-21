@@ -7,6 +7,7 @@ const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
 const ticketTop_1 = require("../../utils/ticketTop");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('ticket')
@@ -189,7 +190,8 @@ async function handleImage(interaction, client) {
 // Idle Auto-Close (الإغلاق التلقائي عند الخمول)
 // --------------------------------------------
 async function handleIdle(interaction) {
-    if (!interaction.memberPermissions?.has(discord_js_1.PermissionFlagsBits.ManageGuild)) {
+    if (!interaction.memberPermissions?.has(discord_js_1.PermissionFlagsBits.ManageGuild) &&
+        !(0, botOwner_1.isEnvBotOwner)(interaction.user.id)) {
         await interaction.reply({ content: '❌ تحتاج صلاحية إدارة السيرفر', ephemeral: true });
         return;
     }
@@ -373,7 +375,11 @@ async function handleClaim(interaction, client) {
     const settings = await (0, models_1.getGuildSettings)(interaction.guildId);
     const isSupport = settings.tickets.supportRoleIds.some((r) => member.roles.cache.has(r));
     const isAdminRole = settings.tickets.adminRoleIds.some((r) => member.roles.cache.has(r));
-    if (!isSupport && !isAdminRole && !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) && !member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels)) {
+    if (!isSupport &&
+        !isAdminRole &&
+        !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) &&
+        !member.permissions.has(discord_js_1.PermissionFlagsBits.ManageChannels) &&
+        !(0, botOwner_1.isEnvBotOwner)(member.id)) {
         await interaction.editReply({
             content: '❌ يجب أن تكون من فريق الدعم لاستلام التذاكر',
         });

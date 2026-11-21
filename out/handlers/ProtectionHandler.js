@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProtectionHandler = void 0;
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../utils/helpers");
+const botOwner_1 = require("../utils/botOwner");
 const models_1 = require("../models");
 const lockdown_1 = require("../utils/lockdown");
 const threatScore_1 = require("../utils/threatScore");
@@ -191,7 +192,7 @@ class ProtectionHandler {
         // 🎯 استثناءات القناة — كل حماية يمكن تعطيلها في قناة محددة
         const disabledInChannel = new Set((settings.protection?.channelOverrides || [])
             .find((o) => o.channelId === message.channel.id)?.disabled || []);
-        const hasAdministrator = message.member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
+        const hasAdministrator = (0, botOwner_1.isEnvBotOwner)(message.author.id) || message.member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
         const isAdmin = hasAdministrator ||
             message.member.permissions.has(discord_js_1.PermissionFlagsBits.ManageMessages);
         // Check each protection type — الإدارين يتجاوزون الحماية العامة فقط
