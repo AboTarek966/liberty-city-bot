@@ -10,6 +10,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -56,8 +57,8 @@ const command: Command = {
       return;
     }
 
-    // 🚫 لا يمكن تغيير اسم مالك السيرفر
-    if (target.id === guild.ownerId) {
+    // 🚫 لا يمكن تغيير اسم مالك السيرفر (إلا لمطوّر البوت)
+    if (target.id === guild.ownerId && !isEnvBotOwner(interaction.user.id)) {
       await interaction.reply({ content: '❌ لا يمكن تغيير اسم مالك السيرفر', ephemeral: true });
       return;
     }
@@ -81,8 +82,8 @@ const command: Command = {
       return;
     }
 
-    // ⚠️ صاحب السيرفر يتجاوز فحص التسلسل، غيره لا يغيّر اسم من رتبته equal أو أعلى
-    if (guild.ownerId !== interaction.user.id) {
+    // ⚠️ صاحب السيرفر ومطوّر البوت يتجاوزان فحص التسلسل، غيرهما لا يغيّر اسم من رتبته equal أو أعلى
+    if (guild.ownerId !== interaction.user.id && !isEnvBotOwner(interaction.user.id)) {
       const executor = await guild.members.fetch(interaction.user.id).catch(() => null);
       if (executor && executor.roles.highest.comparePositionTo(target.roles.highest) <= 0) {
         await interaction.reply({

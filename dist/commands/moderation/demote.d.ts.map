@@ -1,1 +1,1 @@
-{"version":3,"file":"demote.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/demote.ts"],"names":[],"mappings":"AAqBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AA8BxD,QAAA,MAAM,OAAO,EAAE,OAoKd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"demote.d.ts","sourceRoot":"","sources":["../../../src/commands/moderation/demote.ts"],"names":[],"mappings":"AAqBA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AA+BxD,QAAA,MAAM,OAAO,EAAE,OAqKd,CAAC;AAEF,eAAe,OAAO,CAAC"}

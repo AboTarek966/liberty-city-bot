@@ -7,11 +7,15 @@ exports.isSettingsAllowed = isSettingsAllowed;
 const discord_js_1 = require("discord.js");
 const settingsPanel_1 = require("../../utils/settingsPanel");
 const models_1 = require("../../models");
-/** هل يملك هذا المستخدم صلاحية استخدام لوحة الإعدادات؟ — مالك السيرفر فقط + من سمح له */
-function isSettingsAllowed(guild, userId, allowlist) {
+const botOwner_1 = require("../../utils/botOwner");
+/** هل يملك هذا المستخدم صلاحية استخدام لوحة الإعدادات؟ — مالك السيرفر أو مالك/مطوّر البوت + من سمح له */
+async function isSettingsAllowed(client, guild, userId, allowlist) {
     if (!guild || !userId)
         return false;
     if (guild.ownerId === userId)
+        return true;
+    // 🛠️ مالك/مطوّر البوت — يتجاوز بوابة مالك السيرفر
+    if (await (0, botOwner_1.isBotOwner)(client, userId))
         return true;
     return Array.isArray(allowlist) && allowlist.map(String).includes(String(userId));
 }
@@ -27,10 +31,10 @@ const command = {
         const allowlist = settings && Array.isArray(settings?.settingsAllowlist)
             ? settings.settingsAllowlist.map(String)
             : [];
-        // المالك دائماً مسموح له — غيره فقط من أضافه هو عبر /settings-access
-        if (!isSettingsAllowed(guild, interaction.user.id, allowlist)) {
+        // المالك ومطوّر البوت دائماً مسموحان — غيرهما فقط من أضافهم المالك عبر /settings-access
+        if (!(await isSettingsAllowed(interaction.client, guild, interaction.user.id, allowlist))) {
             await interaction.reply({
-                content: '❌ **الإعدادات محصورة بمالك السيرفر فقط** — حتى لو كانت رتبتك أعلى رول في السيرفر.\n' +
+                content: '❌ **الإعدادات محصورة بمالك السيرفر أو مالك/مطوّر البوت** — حتى لو كانت رتبتك أعلى رول في السيرفر.\n' +
                     '> 👑 المالك يملك السماح لك عبر الأمر `/settings-access add @أنت` ثم تفتح الإعدادات مرة أخرى.',
                 ephemeral: true,
             });

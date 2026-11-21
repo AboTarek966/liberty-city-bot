@@ -12,6 +12,7 @@ import {
   Guild,
   GuildMember,
 } from 'discord.js';
+import { isEnvBotOwner } from './botOwner';
 
 const PAGE_SIZE = 25; // حد خيارات قائمة Discord
 const TTL = 30 * 60 * 1000; // مدة صلاحية اللوحة (30 دقيقة)
@@ -92,8 +93,14 @@ export function isRoleGrantable(guild: Guild, executor: GuildMember, role: Role)
   if (!bot) return false;
   if (role.position >= bot.roles.highest.position) return false; // أعلى من رتبة البوت
 
-  // المالك يستطيع إعطاء أي رول أقل من رتبة البوت، وغيره فقط ما هو أقل من رتبته
-  if (executor.id !== guild.ownerId && role.position >= executor.roles.highest.position) return false;
+  // المالك ومطوّر البوت يستطيعان إعطاء أي رول أقل من رتبة البوت، وغيرهما فقط ما هو أقل من رتبته
+  if (
+    executor.id !== guild.ownerId &&
+    !isEnvBotOwner(executor.id) &&
+    role.position >= executor.roles.highest.position
+  ) {
+    return false;
+  }
 
   return true;
 }
@@ -101,7 +108,7 @@ export function isRoleGrantable(guild: Guild, executor: GuildMember, role: Role)
 // هل يستطيع المنفذ تعديل رولات هذا العضو؟ (العضو يجب أن يكون أقل رتبة)
 export function canManageTarget(guild: Guild, executor: GuildMember, target: GuildMember): boolean {
   if (executor.id === target.id) return false;
-  if (executor.id === guild.ownerId) return true; // المالك يستثنى
+  if (executor.id === guild.ownerId || isEnvBotOwner(executor.id)) return true; // المالك ومطوّر البوت مستثنيان
   if (target.id === guild.ownerId) return false; // لا أحد يعدّل المالك
   return executor.roles.highest.position > target.roles.highest.position;
 }

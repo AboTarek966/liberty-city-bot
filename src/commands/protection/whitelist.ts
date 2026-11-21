@@ -28,8 +28,15 @@ export async function canManageWhitelist(client: Client, guild: Guild, userId: s
   return member.roles.highest.position === guild.roles.highest.position;
 }
 
-/** 👑 إضافة/إزالة **بوت** من أي وايت ليست = مالك السيرفر الرسمي صاحب التاج 👑 فقط — لا أعلى رول ولا مالك البوت */
-function canManageBotWhitelist(guild: Guild, userId: string): boolean {
+/** 👑 إضافة/إزالة **بوت** من أي وايت ليست = مالك السيرفر أو مالك/مطوّر البوت — لا أعلى رول */
+export async function canManageBotWhitelist(
+  client: Client,
+  guild: Guild,
+  userId: string
+): Promise<boolean> {
+  // 🛠️ مالك/مطوّر البوت — يتجاوز بوابة مالك السيرفر
+  if (await isBotOwner(client, userId)) return true;
+  // 👑 مالك السيرفر صاحب التاج
   return !!guild && guild.ownerId === userId;
 }
 
@@ -103,15 +110,15 @@ const command: Command = {
       const reason = interaction.options.getString('reason') || 'لا يوجد سبب';
 
       // 🔒 إضافة بشر للوايت ليست = مالك البوت أو صاحب أعلى رول في السيرفر فقط
-      //    🔒 إضافة **بوت** = مالك السيرفر صاحب التاج 👑 فقط — لا أحد غيره يقدر أبداً
+      //    🔒 إضافة **بوت** = مالك السيرفر أو مالك/مطوّر البوت — لا أحد غيرهما
       const allowed = user.bot
-        ? canManageBotWhitelist(guild, interaction.user.id)
+        ? await canManageBotWhitelist(interaction.client, guild, interaction.user.id)
         : await canManageWhitelist(interaction.client, guild, interaction.user.id);
       if (!allowed) {
         await interaction.editReply({
           content: user.bot
-            ? '⛔ **إضافة بوت للوايت ليست محصورة بمالك السيرفر صاحب التاج 👑 فقط**\n' +
-              'حتى صاحب أعلى رول أو مالك البوت مو قادرين يضيفونه — لو بوتك تبيه مرخص، لازم يرفعه المالك الرسمي.'
+            ? '⛔ **إضافة بوت للوايت ليست محصورة بمالك السيرفر أو مالك/مطوّر البوت فقط**\n' +
+              'حتى صاحب أعلى رول مو قادر يضيفه — لو بوتك تبيه مرخص، لازم يرفعه المالك الرسمي أو مطوّر البوت.'
             : '🔒 **إضافة أي عضو للقائمة البيضاء محصورة بمالك البوت وصاحب أعلى رول في السيرفر فقط**\n' +
               'إذا كنت تحتاج استثناء شخص معين، تواصل مع 👑 صاحب أعلى رول أو 🛠️ مالك البوت.',
         });
@@ -169,14 +176,14 @@ const command: Command = {
       const user = interaction.options.getUser('user', true);
 
       // 🔒 إزالة بشر من الوايت ليست = مالك البوت أو صاحب أعلى رول في السيرفر فقط
-      //    🔒 إزالة **بوت** = مالك السيرفر صاحب التاج 👑 فقط
+      //    🔒 إزالة **بوت** = مالك السيرفر أو مالك/مطوّر البوت
       const removeAllowed = user.bot
-        ? canManageBotWhitelist(guild, interaction.user.id)
+        ? await canManageBotWhitelist(interaction.client, guild, interaction.user.id)
         : await canManageWhitelist(interaction.client, guild, interaction.user.id);
       if (!removeAllowed) {
         await interaction.editReply({
           content: user.bot
-            ? '⛔ **إزالة بوت من الوايت ليست محصورة بمالك السيرفر صاحب التاج 👑 فقط**'
+            ? '⛔ **إزالة بوت من الوايت ليست محصورة بمالك السيرفر أو مالك/مطوّر البوت فقط**'
             : '🔒 **إزالة أي عضو من القائمة البيضاء محصورة بمالك البوت أو صاحب أعلى رول في السيرفر**',
         });
         return;

@@ -45,6 +45,7 @@ const models_1 = require("../models");
 const helpers_1 = require("../utils/helpers");
 const moderationGuard_1 = require("../utils/moderationGuard");
 const rolePicker_1 = require("../utils/rolePicker");
+const botOwner_1 = require("../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('AITools');
 // 🔎 حل الرول من ID أو اسم (لما الـ AI يمرّر اسم الرول بدل ID)
 function resolveRoleByIdOrName(guild, input) {
@@ -1188,7 +1189,7 @@ function canEditRole(guild, executor, role) {
         return false;
     if (role.managed)
         return false;
-    const isOwner = executor.id === guild.ownerId;
+    const isOwner = executor.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(executor.id);
     const isAdmin = executor.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
     const myPos = guild.members.me?.roles.highest.position ?? 0;
     if (!isOwner && !isAdmin && executor.roles.highest.position <= role.position)
@@ -1472,8 +1473,9 @@ registerTool('rename_member', {
         const member = await guild.members.fetch(String(targetId)).catch(() => null);
         if (!member)
             return { success: false, message: '❌ العضو غير موجود' };
-        if (member.id === guild.ownerId)
+        if (member.id === guild.ownerId && !(0, botOwner_1.isEnvBotOwner)(executor.id)) {
             return { success: false, message: '❌ لا يمكن تغيير اسم المالك' };
+        }
         if (member.roles.highest.position >= (guild.members.me?.roles.highest.position ?? 0)) {
             return { success: false, message: '❌ رتبة العضو أعلى من رتبتي' };
         }
@@ -3088,7 +3090,8 @@ function musicHandlerOf(client) {
 function canControlMusic(guild, executor) {
     return sameVoiceChannel(guild, executor) ||
         executor.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild) ||
-        executor.id === guild.ownerId;
+        executor.id === guild.ownerId ||
+        (0, botOwner_1.isEnvBotOwner)(executor.id);
 }
 registerTool('music_play', {
     description: 'تشغيل أغنية أو إضافة بحث/رابط لقائمة الموسيقى (لازم تكون في قناة صوتية)',
@@ -3482,7 +3485,8 @@ async function executeAITool(toolName, args, context) {
     // فحص صلاحيات: الأدمن فقط للأدوات adminOnly
     if (tool.adminOnly) {
         const isAdmin = context.executor.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ||
-            context.executor.id === context.guild.ownerId;
+            context.executor.id === context.guild.ownerId ||
+            (0, botOwner_1.isEnvBotOwner)(context.executor.id);
         if (!isAdmin) {
             return { success: false, message: '❌ هذه الأداة للإدارة فقط (تحتاج Administrator أو مالك)' };
         }
@@ -3490,7 +3494,7 @@ async function executeAITool(toolName, args, context) {
     // 👑 الأدوات الخطيرة: مالك السيرفر (أو مطوّر البوت) فقط — باقي الإدارة لا يقدر يطلبها إطلاقاً
     if (tool.dangerous) {
         const devId = process.env.DEVELOPER_USER_ID;
-        const isOwner = context.executor.id === context.guild.ownerId;
+        const isOwner = context.executor.id === context.guild.ownerId || (0, botOwner_1.isEnvBotOwner)(context.executor.id);
         const isDev = !!devId && context.executor.id === devId;
         if (!isOwner && !isDev) {
             return {

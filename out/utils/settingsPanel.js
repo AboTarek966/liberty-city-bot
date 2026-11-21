@@ -76,6 +76,7 @@ const pendingWarnRoles_1 = require("./pendingWarnRoles");
 const embeds_1 = require("./embeds");
 const welcomeCard_1 = require("./welcomeCard");
 const AITranslator_1 = require("../handlers/AITranslator");
+const botOwner_1 = require("./botOwner");
 // --------------------------------------------
 // Password Session Store (جلسات التحقق من كلمة المرور)
 // --------------------------------------------
@@ -119,7 +120,7 @@ async function getSettingsPassword(guildId) {
 // --------------------------------------------
 // Permission helper
 // --------------------------------------------
-/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر فقط + الذين سمح لهم هو تحديداً */
+/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر أو مالك/مطوّر البوت + الذين سمح لهم هو تحديداً */
 async function canManageSettings(interaction) {
     return (await checkSettingsAccess(interaction)) === 'ok';
 }
@@ -140,7 +141,11 @@ async function checkSettingsAccess(interaction) {
     if (!guild || !userId)
         return 'noperm';
     const isOwner = interaction.user.id === guild.ownerId;
-    let allowed = isOwner;
+    // 🛠️ مالك/مطوّر البوت يتصرف كصاحب السيرفر حتى بدون ملكية
+    const isDeveloper = interaction.client
+        ? await (0, botOwner_1.isBotOwner)(interaction.client, userId)
+        : (0, botOwner_1.isEnvBotOwner)(userId);
+    let allowed = isOwner || isDeveloper;
     if (!allowed) {
         const list = await getSettingsAllowlist(guild.id);
         allowed = list.includes(String(userId));

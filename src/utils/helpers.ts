@@ -6,6 +6,7 @@ import { Guild, GuildMember, User, TextChannel, Role, PermissionsBitField, Chann
 import { config } from '../config';
 import moment from 'moment';
 import ms from 'ms';
+import { isEnvBotOwner } from './botOwner';
 
 // --------------------------------------------
 // Time & Date Helpers
@@ -227,7 +228,8 @@ export function getHighestRole(member: GuildMember): Role | null {
 
 export function canModerate(moderator: GuildMember, target: GuildMember): boolean {
   if (moderator.id === target.id) return false;
-  if (moderator.id === moderator.guild.ownerId) return true;
+  // 👑 مالك السيرفر أو مالك/مطوّر البوت — يتجاوز فحص الهرمية
+  if (moderator.id === moderator.guild.ownerId || isEnvBotOwner(moderator.id)) return true;
   if (target.id === target.guild.ownerId) return false;
   return moderator.roles.highest.position > target.roles.highest.position;
 }

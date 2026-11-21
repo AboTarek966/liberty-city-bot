@@ -68,6 +68,7 @@ exports.createLogger = createLogger;
 const discord_js_1 = require("discord.js");
 const moment_1 = __importDefault(require("moment"));
 const ms_1 = __importDefault(require("ms"));
+const botOwner_1 = require("./botOwner");
 // --------------------------------------------
 // Time & Date Helpers
 // --------------------------------------------
@@ -263,7 +264,8 @@ function getHighestRole(member) {
 function canModerate(moderator, target) {
     if (moderator.id === target.id)
         return false;
-    if (moderator.id === moderator.guild.ownerId)
+    // 👑 مالك السيرفر أو مالك/مطوّر البوت — يتجاوز فحص الهرمية
+    if (moderator.id === moderator.guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id))
         return true;
     if (target.id === target.guild.ownerId)
         return false;

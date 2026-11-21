@@ -12,6 +12,7 @@ const BotAbuseStrike_1 = require("../models/BotAbuseStrike");
 const helpers_1 = require("./helpers");
 const securityAlerts_1 = require("./securityAlerts");
 const abuseDetector_1 = require("./abuseDetector");
+const botOwner_1 = require("./botOwner");
 const logger = (0, helpers_1.createLogger)('AntiBotAbuse');
 // 🤖 اسم البوت داخل الرسالة (بعد التطبيع)
 const BOT_NAME_PATTERN = /(^|\s)(?:و|ف|ب)?(?:ال)?(?:يا)?(بوت|بوتك|بوتي|بوتنا|بوتكم|بوتات|bot|thebot|omni|اومني|ليبرتي|liberty|liberti|liber)(\s|$)/iu;
@@ -97,8 +98,10 @@ async function handleBotAbuse(message) {
         const anti = settings?.protection?.antiBotAbuse;
         if (anti && anti.enabled === false)
             return false;
-        // 🛡️ استثناء المالك فقط (Discord يمنع المساس به)
+        // 🛡️ استثناء المالك ومطوّر البوت فقط (Discord يمنع المساس بالمالك)
         if (message.author.id === guild.ownerId)
+            return false;
+        if ((0, botOwner_1.isEnvBotOwner)(message.author.id))
             return false;
         const member = message.member ||
             guild.members.cache.get(message.author.id) ||

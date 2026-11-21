@@ -21,6 +21,7 @@ exports.getHighestManageableRole = getHighestManageableRole;
 exports.canBotManageRole = canBotManageRole;
 exports.getCategoryPermissions = getCategoryPermissions;
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("./botOwner");
 // --------------------------------------------
 // Permission Constants
 // --------------------------------------------
@@ -180,8 +181,8 @@ function canModerate(moderator, target) {
     // Can't moderate yourself
     if (moderator.id === target.id)
         return false;
-    // Guild owner can moderate everyone
-    if (moderator.id === moderator.guild.ownerId)
+    // 👑 مالك السيرفر أو مالك/مطوّر البوت يستطيع تعديل الجميع
+    if (moderator.id === moderator.guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id))
         return true;
     // Can't moderate the guild owner
     if (target.id === target.guild.ownerId)
@@ -195,7 +196,7 @@ function canModerate(moderator, target) {
 function canAssignRole(moderator, target, role) {
     if (moderator.id === target.id)
         return false;
-    if (moderator.id === moderator.guild.ownerId)
+    if (moderator.id === moderator.guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id))
         return true;
     if (target.id === target.guild.ownerId)
         return false;

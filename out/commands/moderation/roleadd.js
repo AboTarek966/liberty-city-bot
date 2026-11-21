@@ -38,6 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
+const botOwner_1 = require("../../utils/botOwner");
 const rolePicker_1 = require("../../utils/rolePicker");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -61,7 +62,7 @@ const command = {
         const member = interaction.options.getMember('user');
         const reason = interaction.options.getString('reason') || 'إضافة رول';
         const executorMember = interaction.member;
-        const isOwner = interaction.user.id === guild.ownerId;
+        const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         // ✅ كل الرولات المحددة في نفس الأمر (role حتى role5)
         const requestedRoles = ['role', 'role2', 'role3', 'role4', 'role5']
             .map(n => interaction.options.getRole(n))

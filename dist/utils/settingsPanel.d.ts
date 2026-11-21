@@ -21,7 +21,7 @@ export declare function clearPasswordVerified(userId: string): void;
  * الحصول على كلمة مرور الإعدادات من قاعدة البيانات (أو الافتراضية)
  */
 export declare function getSettingsPassword(guildId: string): Promise<string>;
-/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر فقط + الذين سمح لهم هو تحديداً */
+/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر أو مالك/مطوّر البوت + الذين سمح لهم هو تحديداً */
 export declare function canManageSettings(interaction: ChatInputCommandInteraction | {
     member: any;
     user: any;

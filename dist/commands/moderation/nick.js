@@ -6,6 +6,7 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('nick')
@@ -41,8 +42,8 @@ const command = {
             await interaction.reply({ content: '❌ لا يمكن تغيير اسمي', ephemeral: true });
             return;
         }
-        // 🚫 لا يمكن تغيير اسم مالك السيرفر
-        if (target.id === guild.ownerId) {
+        // 🚫 لا يمكن تغيير اسم مالك السيرفر (إلا لمطوّر البوت)
+        if (target.id === guild.ownerId && !(0, botOwner_1.isEnvBotOwner)(interaction.user.id)) {
             await interaction.reply({ content: '❌ لا يمكن تغيير اسم مالك السيرفر', ephemeral: true });
             return;
         }
@@ -63,8 +64,8 @@ const command = {
             });
             return;
         }
-        // ⚠️ صاحب السيرفر يتجاوز فحص التسلسل، غيره لا يغيّر اسم من رتبته equal أو أعلى
-        if (guild.ownerId !== interaction.user.id) {
+        // ⚠️ صاحب السيرفر ومطوّر البوت يتجاوزان فحص التسلسل، غيرهما لا يغيّر اسم من رتبته equal أو أعلى
+        if (guild.ownerId !== interaction.user.id && !(0, botOwner_1.isEnvBotOwner)(interaction.user.id)) {
             const executor = await guild.members.fetch(interaction.user.id).catch(() => null);
             if (executor && executor.roles.highest.comparePositionTo(target.roles.highest) <= 0) {
                 await interaction.reply({

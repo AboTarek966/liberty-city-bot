@@ -13,6 +13,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -45,7 +46,8 @@ const command: Command = {
     }
 
     const executorMember = interaction.member as GuildMember;
-    const isOwner = interaction.user.id === guild.ownerId;
+    const isOwner =
+      interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
 
     // لا يمكن تعديل رولات مالك السيرفر (إلا لو كان المنفذ هو المالك نفسه)
     if (member.id === guild.ownerId && !isOwner) {

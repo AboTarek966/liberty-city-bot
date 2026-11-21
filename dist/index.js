@@ -8,6 +8,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const OmniClient_1 = require("./OmniClient");
 const helpers_1 = require("./utils/helpers");
+const botOwner_1 = require("./utils/botOwner");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
@@ -166,6 +167,15 @@ async function main() {
     // Initialize the bot
     try {
         await client.initialize();
+        // 👑 تجهيز مالك/مطوّر البوت مبكراً (بيئة + مالك التطبيق) لتُستخدم البوابات المتزامنة فوراً
+        try {
+            const ownerIds = await (0, botOwner_1.getBotOwnerIds)(client);
+            const devEnv = process.env.DEVELOPER_USER_ID ? 'set' : 'unset';
+            const ownerEnv = process.env.OWNER_ID ? 'set' : 'unset';
+            logger.info(`👑 Bot owners resolved: ${ownerIds.length} (DEVELOPER_USER_ID=${devEnv}, OWNER_ID=${ownerEnv})`);
+            persist(`OWNERS resolved=${ownerIds.length} devEnv=${devEnv} ownerEnv=${ownerEnv}`);
+        }
+        catch { /* لا نعطل الإقلاع */ }
         // Register slash commands
         await client.registerCommands();
         // Set initial status

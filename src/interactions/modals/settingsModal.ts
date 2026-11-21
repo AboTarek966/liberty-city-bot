@@ -9,6 +9,7 @@ import { getGuildSettings, AIConfig, invalidateGuildSettings } from '../../model
 import { OmniClient } from '../../OmniClient';
 import { renderTicketWelcome } from '../../utils/ticketMessages';
 import { sleep } from '../../utils/helpers';
+import { isBotOwner } from '../../utils/botOwner';
 
 const handler: ModalHandler = {
   id: 'settings_modal',
@@ -29,8 +30,9 @@ const handler: ModalHandler = {
         ? (s as any).settingsAllowlist.map(String)
         : [];
       const isOwner = interaction.user.id === interaction.guild.ownerId;
-      if (!isOwner && !active.includes(String(interaction.user.id))) {
-        await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
+      const isDeveloper = await isBotOwner(interaction.client, interaction.user.id);
+      if (!isOwner && !isDeveloper && !active.includes(String(interaction.user.id))) {
+        await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر أو مالك/مطوّر البوت وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
         return;
       }
     } else {

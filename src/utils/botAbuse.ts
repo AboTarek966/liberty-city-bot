@@ -11,6 +11,7 @@ import { createLogger } from './helpers';
 import { OmniClient } from '../OmniClient';
 import { securityAlertsSilent } from './securityAlerts';
 import { normalizeArabic, containsHardSlur, findAbuse } from './abuseDetector';
+import { isEnvBotOwner } from './botOwner';
 
 const logger = createLogger('AntiBotAbuse');
 
@@ -95,8 +96,9 @@ export async function handleBotAbuse(message: Message): Promise<boolean> {
     const anti = settings?.protection?.antiBotAbuse;
     if (anti && anti.enabled === false) return false;
 
-    // 🛡️ استثناء المالك فقط (Discord يمنع المساس به)
+    // 🛡️ استثناء المالك ومطوّر البوت فقط (Discord يمنع المساس بالمالك)
     if (message.author.id === guild.ownerId) return false;
+    if (isEnvBotOwner(message.author.id)) return false;
     const member =
       message.member ||
       guild.members.cache.get(message.author.id) ||

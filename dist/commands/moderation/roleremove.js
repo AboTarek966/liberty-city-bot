@@ -38,6 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const embeds_1 = require("../../utils/embeds");
+const botOwner_1 = require("../../utils/botOwner");
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('roleremove')
@@ -59,7 +60,7 @@ const command = {
             return;
         }
         const executorMember = interaction.member;
-        const isOwner = interaction.user.id === guild.ownerId;
+        const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         // لا يمكن تعديل رولات مالك السيرفر (إلا لو كان المنفذ هو المالك نفسه)
         if (member.id === guild.ownerId && !isOwner) {
             await interaction.reply({ content: '❌ لا يمكن تعديل رولات مالك السيرفر', ephemeral: true });

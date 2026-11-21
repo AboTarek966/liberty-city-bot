@@ -5,17 +5,25 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  PermissionFlagsBits,
+  Client,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { buildPanel } from '../../utils/settingsPanel';
 import { getGuildSettings } from '../../models';
+import { isBotOwner } from '../../utils/botOwner';
 
-/** هل يملك هذا المستخدم صلاحية استخدام لوحة الإعدادات؟ — مالك السيرفر فقط + من سمح له */
-export function isSettingsAllowed(guild: any, userId: string, allowlist: string[]): boolean {
+/** هل يملك هذا المستخدم صلاحية استخدام لوحة الإعدادات؟ — مالك السيرفر أو مالك/مطوّر البوت + من سمح له */
+export async function isSettingsAllowed(
+  client: Client,
+  guild: any,
+  userId: string,
+  allowlist: string[]
+): Promise<boolean> {
   if (!guild || !userId) return false;
   if (guild.ownerId === userId) return true;
+  // 🛠️ مالك/مطوّر البوت — يتجاوز بوابة مالك السيرفر
+  if (await isBotOwner(client, userId)) return true;
   return Array.isArray(allowlist) && allowlist.map(String).includes(String(userId));
 }
 
@@ -35,11 +43,11 @@ const command: Command = {
         ? (settings as any).settingsAllowlist.map(String)
         : [];
 
-    // المالك دائماً مسموح له — غيره فقط من أضافه هو عبر /settings-access
-    if (!isSettingsAllowed(guild, interaction.user.id, allowlist)) {
+    // المالك ومطوّر البوت دائماً مسموحان — غيرهما فقط من أضافهم المالك عبر /settings-access
+    if (!(await isSettingsAllowed(interaction.client, guild, interaction.user.id, allowlist))) {
       await interaction.reply({
         content:
-          '❌ **الإعدادات محصورة بمالك السيرفر فقط** — حتى لو كانت رتبتك أعلى رول في السيرفر.\n' +
+          '❌ **الإعدادات محصورة بمالك السيرفر أو مالك/مطوّر البوت** — حتى لو كانت رتبتك أعلى رول في السيرفر.\n' +
           '> 👑 المالك يملك السماح لك عبر الأمر `/settings-access add @أنت` ثم تفتح الإعدادات مرة أخرى.',
         ephemeral: true,
       });

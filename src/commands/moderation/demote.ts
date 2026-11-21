@@ -20,6 +20,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../handlers/CommandHandler';
+import { isEnvBotOwner } from '../../utils/botOwner';
 import { getGuildSettings } from '../../models';
 import { Colors } from '../../utils/embeds';
 import { createLogger } from '../../utils/helpers';
@@ -78,7 +79,8 @@ const command: Command = {
     }
 
     const executor = interaction.member as GuildMember | null;
-    const isOwner = interaction.user.id === guild.ownerId;
+    const isOwner =
+      interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
     const hasAdmin = isOwner || !!executor?.permissions.has(PermissionFlagsBits.Administrator);
     if (!hasAdmin) {
       await interaction.reply({

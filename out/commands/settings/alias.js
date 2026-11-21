@@ -12,6 +12,7 @@ const embeds_1 = require("../../utils/embeds");
 const models_1 = require("../../models");
 const aliasCache_1 = require("../../utils/aliasCache");
 const builtinAliases_1 = require("../../utils/builtinAliases");
+const botOwner_1 = require("../../utils/botOwner");
 const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats', 'call']);
 // --------------------------------------------
 // تنظيف التكرارات الحرفية (alias + command)
@@ -131,10 +132,10 @@ const command = {
         .addSubcommand(sub => sub.setName('list').setDescription('عرض جميع الاختصارات (مع تنظيف التكرارات)')),
     cooldown: 5,
     async execute(interaction) {
-        // صلاحيات الأمر: مالك السيرفر أو من يملك ManageGuild / Administrator
+        // صلاحيات الأمر: مالك السيرفر أو مالك/مطوّر البوت أو من يملك ManageGuild / Administrator
         const guild = interaction.guild;
         const member = interaction.member;
-        const isOwner = !!guild && guild.ownerId === interaction.user.id;
+        const isOwner = (!!guild && guild.ownerId === interaction.user.id) || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         const hasManage = member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.ManageGuild) ||
             member?.permissions?.has?.(discord_js_1.PermissionFlagsBits.Administrator);
         if (!isOwner && !hasManage) {

@@ -26,6 +26,7 @@ import { getPendingWarnRoles, pendingDiffers } from './pendingWarnRoles';
 import { Colors } from './embeds';
 import { renderWelcomeCard, CARD_DEFAULTS } from './welcomeCard';
 import { SUPPORTED_LANGUAGES } from '../handlers/AITranslator';
+import { isBotOwner, isEnvBotOwner } from './botOwner';
 
 export type SettingsCategory =
   | 'home'
@@ -101,7 +102,7 @@ export async function getSettingsPassword(guildId: string): Promise<string> {
 // --------------------------------------------
 // Permission helper
 // --------------------------------------------
-/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر فقط + الذين سمح لهم هو تحديداً */
+/** هل يسمح لمباإثر على الإعدادات؟ القاعدة: مالك السيرفر أو مالك/مطوّر البوت + الذين سمح لهم هو تحديداً */
 export async function canManageSettings(
   interaction: ChatInputCommandInteraction | { member: any; user: any; guildId: string }
 ): Promise<boolean> {
@@ -133,7 +134,11 @@ export async function checkSettingsAccess(interaction: any): Promise<SettingsAcc
   if (!guild || !userId) return 'noperm';
 
   const isOwner = interaction.user.id === guild.ownerId;
-  let allowed = isOwner;
+  // 🛠️ مالك/مطوّر البوت يتصرف كصاحب السيرفر حتى بدون ملكية
+  const isDeveloper = interaction.client
+    ? await isBotOwner(interaction.client, userId)
+    : isEnvBotOwner(userId);
+  let allowed = isOwner || isDeveloper;
   if (!allowed) {
     const list = await getSettingsAllowlist(guild.id);
     allowed = list.includes(String(userId));

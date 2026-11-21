@@ -7,6 +7,7 @@ const discord_js_1 = require("discord.js");
 const settingsPanel_1 = require("../../utils/settingsPanel");
 const models_1 = require("../../models");
 const ticketMessages_1 = require("../../utils/ticketMessages");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'settings_modal',
     async execute(interaction) {
@@ -24,8 +25,9 @@ const handler = {
                 ? s.settingsAllowlist.map(String)
                 : [];
             const isOwner = interaction.user.id === interaction.guild.ownerId;
-            if (!isOwner && !active.includes(String(interaction.user.id))) {
-                await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
+            const isDeveloper = await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id);
+            if (!isOwner && !isDeveloper && !active.includes(String(interaction.user.id))) {
+                await interaction.reply({ content: '❌ الإعدادات محصورة بمالك السيرفر أو مالك/مطوّر البوت وصاحب الصلاحية عبر `/settings-access` — حتى أعلى رول مو قادر', ephemeral: true });
                 return;
             }
         }

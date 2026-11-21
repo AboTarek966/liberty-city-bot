@@ -13,6 +13,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { OmniClient } from '../../OmniClient';
 import { Colors } from '../../utils/embeds';
+import { isEnvBotOwner } from '../../utils/botOwner';
 import {
   createRolePickerState,
   buildRolePicker,
@@ -58,7 +59,8 @@ const command: Command = {
     const member = interaction.options.getMember('user') as GuildMember;
     const reason = interaction.options.getString('reason') || 'إضافة رول';
     const executorMember = interaction.member as GuildMember;
-    const isOwner = interaction.user.id === guild.ownerId;
+    const isOwner =
+      interaction.user.id === guild.ownerId || isEnvBotOwner(interaction.user.id);
 
     // ✅ كل الرولات المحددة في نفس الأمر (role حتى role5)
     const requestedRoles = (['role', 'role2', 'role3', 'role4', 'role5'] as const)

@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const helpers_1 = require("../../utils/helpers");
 const staffRoles_1 = require("../../utils/staffRoles");
+const botOwner_1 = require("../../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('StaffRoles');
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -21,10 +22,10 @@ const command = {
             return;
         }
         const member = interaction.guild.members.cache.get(interaction.user.id);
-        const isOwner = interaction.guild.ownerId === interaction.user.id;
+        const isOwner = interaction.guild.ownerId === interaction.user.id || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         const isAdmin = member?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator) ?? false;
         if (!isOwner && !isAdmin) {
-            await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو من يملك Administrator فقط.' });
+            await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو مالك/مطوّر البوت أو من يملك Administrator فقط.' });
             return;
         }
         const result = await (0, staffRoles_1.ensureStaffRoles)(interaction.guild);

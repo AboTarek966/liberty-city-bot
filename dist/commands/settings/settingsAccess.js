@@ -8,15 +8,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const embeds_1 = require("../../utils/embeds");
+const botOwner_1 = require("../../utils/botOwner");
 async function requireServerOwner(interaction) {
     if (!interaction.guild) {
         await interaction.reply({ content: '❌ هذا الأمر يعمل داخل السيرفر فقط.', ephemeral: true });
         return false;
     }
-    if (interaction.guild.ownerId !== interaction.user.id) {
+    if (interaction.guild.ownerId !== interaction.user.id &&
+        !(await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id))) {
         await interaction.reply({
-            content: '❌ **هذا الأمر لمالك السيرفر فقط** (صاحب التاج 👑).\n' +
-                'حتى أعلى رول في السيرفر مو قادر يستخدم هذا الأمر أو يفتح الإعدادات بدون إذنك.',
+            content: '❌ **هذا الأمر لمالك السيرفر أو مالك/مطوّر البوت فقط** (صاحب التاج 👑 أو 🛠️ مطوّر البوت).\n' +
+                'حتى أعلى رول في السيرفر مو قادر يستخدم هذا الأمر أو يفتح الإعدادات بدون إذن.',
             ephemeral: true,
         });
         return false;
@@ -26,8 +28,8 @@ async function requireServerOwner(interaction) {
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('settings-access')
-        .setDescription('🔐 التحكم بمن يقدر يستخدم لوحة الإعدادات — مالك السيرفر فقط')
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator)
+        .setDescription('🔐 التحكم بمن يقدر يستخدم لوحة الإعدادات — مالك السيرفر أو مالك/مطوّر البوت')
+        .setDefaultMemberPermissions(0)
         .setDMPermission(false)
         .addSubcommand((sub) => sub
         .setName('add')
@@ -127,7 +129,7 @@ const command = {
             await settings.save();
             (0, models_1.invalidateGuildSettings)(guild.id);
             await interaction.editReply({
-                content: '♻️ مُسح كل المخوّلين — الإعدادات الآن مقفلة على **مالك السيرفر فقط** (عداه ما أحد يقدر، حتى لا أعلى رول).',
+                content: '♻️ مُسح كل المخوّلين — الإعدادات الآن مقفلة على **مالك السيرفر ومالك/مطوّر البوت فقط** (عداهم ما أحد يقدر، حتى لا أعلى رول).',
             });
             return;
         }

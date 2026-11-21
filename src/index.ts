@@ -4,6 +4,7 @@
 
 import { OmniClient } from './OmniClient';
 import { createLogger } from './utils/helpers';
+import { getBotOwnerIds } from './utils/botOwner';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -152,6 +153,17 @@ async function main(): Promise<void> {
   // Initialize the bot
   try {
     await client.initialize();
+
+    // 👑 تجهيز مالك/مطوّر البوت مبكراً (بيئة + مالك التطبيق) لتُستخدم البوابات المتزامنة فوراً
+    try {
+      const ownerIds = await getBotOwnerIds(client);
+      const devEnv = process.env.DEVELOPER_USER_ID ? 'set' : 'unset';
+      const ownerEnv = process.env.OWNER_ID ? 'set' : 'unset';
+      logger.info(
+        `👑 Bot owners resolved: ${ownerIds.length} (DEVELOPER_USER_ID=${devEnv}, OWNER_ID=${ownerEnv})`
+      );
+      persist(`OWNERS resolved=${ownerIds.length} devEnv=${devEnv} ownerEnv=${ownerEnv}`);
+    } catch { /* لا نعطل الإقلاع */ }
 
     // Register slash commands
     await client.registerCommands();

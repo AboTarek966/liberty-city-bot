@@ -14,6 +14,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { rouletteGames, cleanupStoppedGame } from '../../utils/rouletteGame';
 import { createLogger } from '../../utils/helpers';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const logger = createLogger('RouletteStop');
 
@@ -35,10 +36,10 @@ const command: Command = {
 
     const guild = interaction.guild;
     const member = guild.members.cache.get(interaction.user.id);
-    const isOwner = guild.ownerId === interaction.user.id;
+    const isOwner = guild.ownerId === interaction.user.id || isEnvBotOwner(interaction.user.id);
     const hasManage = member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false;
     if (!isOwner && !hasManage) {
-      await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو من يملك ManageGuild فقط.' });
+      await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو مالك/مطوّر البوت أو من يملك ManageGuild فقط.' });
       return;
     }
 

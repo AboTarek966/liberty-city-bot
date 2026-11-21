@@ -40,6 +40,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const rolePicker_1 = require("../../utils/rolePicker");
 const embeds_1 = require("../../utils/embeds");
+const botOwner_1 = require("../../utils/botOwner");
 const handler = {
     id: 'rolepick_btn',
     async execute(interaction) {
@@ -122,7 +123,7 @@ const handler = {
                     .catch(() => { });
                 return;
             }
-            const isOwner = executor.id === guild.ownerId;
+            const isOwner = executor.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(executor.id);
             const botTop = guild.members.me?.roles.highest.position ?? 0;
             const execTop = executor.roles.highest.position;
             const grantable = [];

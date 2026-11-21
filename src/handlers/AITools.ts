@@ -31,6 +31,7 @@ import { getGuildSettings, ModerationCase } from '../models';
 import { createLogger } from '../utils/helpers';
 import { checkTimeoutability, describeTimeoutApiError } from '../utils/moderationGuard';
 import { canManageTarget, isRoleGrantable } from '../utils/rolePicker';
+import { isEnvBotOwner } from '../utils/botOwner';
 
 const logger = createLogger('AITools');
 
@@ -1157,7 +1158,7 @@ function parsePermList(v: any): { perms: { name: string; bit: bigint }[]; unknow
 function canEditRole(guild: Guild, executor: GuildMember, role: Role): boolean {
   if (role.id === guild.id) return false;
   if (role.managed) return false;
-  const isOwner = executor.id === guild.ownerId;
+  const isOwner = executor.id === guild.ownerId || isEnvBotOwner(executor.id);
   const isAdmin = executor.permissions.has(PermissionFlagsBits.Administrator);
   const myPos = guild.members.me?.roles.highest.position ?? 0;
   if (!isOwner && !isAdmin && executor.roles.highest.position <= role.position) return false;
@@ -1420,7 +1421,9 @@ registerTool('rename_member', {
     if (!targetId) return { success: false, message: '❌ حدد العضو أو منشنِه' };
     const member = await guild.members.fetch(String(targetId)).catch(() => null);
     if (!member) return { success: false, message: '❌ العضو غير موجود' };
-    if (member.id === guild.ownerId) return { success: false, message: '❌ لا يمكن تغيير اسم المالك' };
+    if (member.id === guild.ownerId && !isEnvBotOwner(executor.id)) {
+      return { success: false, message: '❌ لا يمكن تغيير اسم المالك' };
+    }
     if (member.roles.highest.position >= (guild.members.me?.roles.highest.position ?? 0)) {
       return { success: false, message: '❌ رتبة العضو أعلى من رتبتي' };
     }
@@ -2922,7 +2925,8 @@ function musicHandlerOf(client: any): any {
 function canControlMusic(guild: Guild, executor: GuildMember): boolean {
   return sameVoiceChannel(guild, executor) ||
     executor.permissions.has(PermissionFlagsBits.ManageGuild) ||
-    executor.id === guild.ownerId;
+    executor.id === guild.ownerId ||
+    isEnvBotOwner(executor.id);
 }
 
 registerTool('music_play', {
@@ -3316,7 +3320,8 @@ export async function executeAITool(
   // فحص صلاحيات: الأدمن فقط للأدوات adminOnly
   if (tool.adminOnly) {
     const isAdmin = context.executor.permissions.has(PermissionFlagsBits.Administrator) ||
-                    context.executor.id === context.guild.ownerId;
+                    context.executor.id === context.guild.ownerId ||
+                    isEnvBotOwner(context.executor.id);
     if (!isAdmin) {
       return { success: false, message: '❌ هذه الأداة للإدارة فقط (تحتاج Administrator أو مالك)' };
     }
@@ -3325,7 +3330,8 @@ export async function executeAITool(
   // 👑 الأدوات الخطيرة: مالك السيرفر (أو مطوّر البوت) فقط — باقي الإدارة لا يقدر يطلبها إطلاقاً
   if (tool.dangerous) {
     const devId = process.env.DEVELOPER_USER_ID;
-    const isOwner = context.executor.id === context.guild.ownerId;
+    const isOwner =
+      context.executor.id === context.guild.ownerId || isEnvBotOwner(context.executor.id);
     const isDev = !!devId && context.executor.id === devId;
     if (!isOwner && !isDev) {
       return {

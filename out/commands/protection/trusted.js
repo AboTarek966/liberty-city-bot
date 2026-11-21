@@ -9,6 +9,7 @@ const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const embeds_1 = require("../../utils/embeds");
 const trustedWhitelist_1 = require("../../utils/trustedWhitelist");
+const botOwner_1 = require("../../utils/botOwner");
 const MAX_TRUSTED = 50;
 function ensureTrustedWhitelist(settings) {
     if (!settings.protection)
@@ -46,10 +47,11 @@ async function requireServerOwner(interaction) {
         });
         return false;
     }
-    if (interaction.guild.ownerId !== interaction.user.id) {
+    if (interaction.guild.ownerId !== interaction.user.id &&
+        !(await (0, botOwner_1.isBotOwner)(interaction.client, interaction.user.id))) {
         await interaction.reply({
-            content: '❌ **هذا الأمر لمالك السيرفر فقط** (صاحب التاج 👑).\n' +
-                'لا يكفي أن تكون أدمن أو صاحب أعلى رول — إدارة الوايت ليست الموثوقة محصورة بمالك السيرفر.',
+            content: '❌ **هذا الأمر لمالك السيرفر أو مالك/مطوّر البوت فقط** (صاحب التاج 👑 أو 🛠️ مطوّر البوت).\n' +
+                'لا يكفي أن تكون أدمن أو صاحب أعلى رول — إدارة الوايت ليست الموثوقة محصورة بهما.',
             ephemeral: true,
         });
         return false;
@@ -69,8 +71,8 @@ function limitsLine(tw) {
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('trusted')
-        .setDescription('👑 إدارة الوايت ليست الموثوقة — مالك السيرفر فقط (مساحة محدودة تحت الحماية)')
-        .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.Administrator)
+        .setDescription('👑 إدارة الوايت ليست الموثوقة — مالك السيرفر أو مالك/مطوّر البوت (مساحة محدودة تحت الحماية)')
+        .setDefaultMemberPermissions(0)
         .setDMPermission(false)
         .addSubcommand((sub) => sub
         .setName('add')

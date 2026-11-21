@@ -245,9 +245,13 @@ export class CommandHandler {
         return;
       }
 
-      const hasPermission = command.permissions.every(perm => 
-        member.permissions.has(perm) || member.permissions.has(PermissionFlagsBits.Administrator)
-      );
+      // 🛠️ مالك/مطوّر البوت يتجاوز فحص صلاحيات الأمر البرمجي — يتصرف كصاحب السيرفر
+      const isOwnerBypass = await isBotOwner(this.client, interaction.user.id);
+      const hasPermission =
+        isOwnerBypass ||
+        command.permissions.every(perm =>
+          member.permissions.has(perm) || member.permissions.has(PermissionFlagsBits.Administrator)
+        );
 
       if (!hasPermission) {
         await interaction.reply({

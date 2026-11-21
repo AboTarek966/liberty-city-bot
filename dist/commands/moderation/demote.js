@@ -13,6 +13,7 @@
 // الاختصار "تنتيل" مدمج (builtin) ويظهر في /alias list.
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
+const botOwner_1 = require("../../utils/botOwner");
 const models_1 = require("../../models");
 const embeds_1 = require("../../utils/embeds");
 const helpers_1 = require("../../utils/helpers");
@@ -62,7 +63,7 @@ const command = {
             return;
         }
         const executor = interaction.member;
-        const isOwner = interaction.user.id === guild.ownerId;
+        const isOwner = interaction.user.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         const hasAdmin = isOwner || !!executor?.permissions.has(discord_js_1.PermissionFlagsBits.Administrator);
         if (!hasAdmin) {
             await interaction.reply({

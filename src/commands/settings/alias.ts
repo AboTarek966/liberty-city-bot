@@ -21,6 +21,7 @@ import { Colors } from '../../utils/embeds';
 import { CommandAlias } from '../../models';
 import { invalidateAliasCache } from '../../utils/aliasCache';
 import { builtinAliasesForDisplay } from '../../utils/builtinAliases';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const SPECIAL_COMMANDS = new Set(['ticket_top', 'ticket_mystats', 'call']);
 
@@ -272,10 +273,11 @@ const command: Command = {
   cooldown: 5,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    // صلاحيات الأمر: مالك السيرفر أو من يملك ManageGuild / Administrator
+    // صلاحيات الأمر: مالك السيرفر أو مالك/مطوّر البوت أو من يملك ManageGuild / Administrator
     const guild = interaction.guild;
     const member = interaction.member as any;
-    const isOwner = !!guild && guild.ownerId === interaction.user.id;
+    const isOwner =
+      (!!guild && guild.ownerId === interaction.user.id) || isEnvBotOwner(interaction.user.id);
     const hasManage =
       member?.permissions?.has?.(PermissionFlagsBits.ManageGuild) ||
       member?.permissions?.has?.(PermissionFlagsBits.Administrator);

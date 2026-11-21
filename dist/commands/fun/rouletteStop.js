@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const rouletteGame_1 = require("../../utils/rouletteGame");
 const helpers_1 = require("../../utils/helpers");
+const botOwner_1 = require("../../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('RouletteStop');
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
@@ -24,10 +25,10 @@ const command = {
         }
         const guild = interaction.guild;
         const member = guild.members.cache.get(interaction.user.id);
-        const isOwner = guild.ownerId === interaction.user.id;
+        const isOwner = guild.ownerId === interaction.user.id || (0, botOwner_1.isEnvBotOwner)(interaction.user.id);
         const hasManage = member?.permissions.has(discord_js_1.PermissionFlagsBits.ManageGuild) ?? false;
         if (!isOwner && !hasManage) {
-            await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو من يملك ManageGuild فقط.' });
+            await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو مالك/مطوّر البوت أو من يملك ManageGuild فقط.' });
             return;
         }
         // أبحث عن أي لعبة جارية في هذه القناة

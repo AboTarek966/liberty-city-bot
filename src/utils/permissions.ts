@@ -10,6 +10,7 @@ import {
   TextChannel, 
   Role 
 } from 'discord.js';
+import { isEnvBotOwner } from './botOwner';
 
 // --------------------------------------------
 // Permission Constants
@@ -199,8 +200,8 @@ export function canModerate(moderator: GuildMember, target: GuildMember): boolea
   // Can't moderate yourself
   if (moderator.id === target.id) return false;
   
-  // Guild owner can moderate everyone
-  if (moderator.id === moderator.guild.ownerId) return true;
+  // 👑 مالك السيرفر أو مالك/مطوّر البوت يستطيع تعديل الجميع
+  if (moderator.id === moderator.guild.ownerId || isEnvBotOwner(moderator.id)) return true;
   
   // Can't moderate the guild owner
   if (target.id === target.guild.ownerId) return false;
@@ -214,7 +215,7 @@ export function canModerate(moderator: GuildMember, target: GuildMember): boolea
  */
 export function canAssignRole(moderator: GuildMember, target: GuildMember, role: Role): boolean {
   if (moderator.id === target.id) return false;
-  if (moderator.id === moderator.guild.ownerId) return true;
+  if (moderator.id === moderator.guild.ownerId || isEnvBotOwner(moderator.id)) return true;
   if (target.id === target.guild.ownerId) return false;
   
   // The moderator's highest role must be higher than the role being assigned

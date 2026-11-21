@@ -1,1 +1,1 @@
-{"version":3,"file":"createstaffroles.d.ts","sourceRoot":"","sources":["../../../src/commands/roles/createstaffroles.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAMxD,QAAA,MAAM,OAAO,EAAE,OA6Cd,CAAC;AAEF,eAAe,OAAO,CAAC"}
+{"version":3,"file":"createstaffroles.d.ts","sourceRoot":"","sources":["../../../src/commands/roles/createstaffroles.ts"],"names":[],"mappings":"AAWA,OAAO,EAAE,OAAO,EAAE,MAAM,+BAA+B,CAAC;AAOxD,QAAA,MAAM,OAAO,EAAE,OA8Cd,CAAC;AAEF,eAAe,OAAO,CAAC"}

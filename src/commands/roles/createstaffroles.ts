@@ -12,6 +12,7 @@ import {
 import { Command } from '../../handlers/CommandHandler';
 import { createLogger } from '../../utils/helpers';
 import { ensureStaffRoles, STAFF_ROLES } from '../../utils/staffRoles';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const logger = createLogger('StaffRoles');
 
@@ -31,10 +32,11 @@ const command: Command = {
       return;
     }
     const member = interaction.guild.members.cache.get(interaction.user.id);
-    const isOwner = interaction.guild.ownerId === interaction.user.id;
+    const isOwner =
+      interaction.guild.ownerId === interaction.user.id || isEnvBotOwner(interaction.user.id);
     const isAdmin = member?.permissions.has(PermissionFlagsBits.Administrator) ?? false;
     if (!isOwner && !isAdmin) {
-      await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو من يملك Administrator فقط.' });
+      await interaction.editReply({ content: '⛔ هذا الأمر لمالك السيرفر أو مالك/مطوّر البوت أو من يملك Administrator فقط.' });
       return;
     }
 

@@ -42,6 +42,7 @@ const helpers_1 = require("../utils/helpers");
 const models_1 = require("../models");
 const embeds_1 = require("../utils/embeds");
 const helpers_2 = require("../utils/helpers");
+const botOwner_1 = require("../utils/botOwner");
 const logger = (0, helpers_1.createLogger)('ModerationHandler');
 // --------------------------------------------
 // Moderation Handler Class
@@ -496,7 +497,7 @@ class ModerationHandler {
         if (target.roles.cache.has(role.id)) {
             throw new Error(`العضو يملك رول ${role.name} بالفعل`);
         }
-        const isOwner = moderator.id === guild.ownerId;
+        const isOwner = moderator.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id);
         if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
             throw new Error('رتبتك يجب أن تكون أعلى من الرول المضاف');
         }
@@ -545,7 +546,7 @@ class ModerationHandler {
         if (!roleIds.length) {
             throw new Error('لم يتم تحديد أي رول');
         }
-        const isOwner = moderator.id === guild.ownerId;
+        const isOwner = moderator.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id);
         const toAdd = [];
         const skipped = [];
         for (const roleId of roleIds) {
@@ -648,7 +649,7 @@ class ModerationHandler {
         if (!target.roles.cache.has(role.id)) {
             throw new Error(`العضو لا يملك رول ${role.name}`);
         }
-        const isOwner = moderator.id === guild.ownerId;
+        const isOwner = moderator.id === guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id);
         if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
             throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد إزالتها');
         }
@@ -744,7 +745,8 @@ class ModerationHandler {
             return true; // Can always moderate users not in guild
         if (moderator.id === target.id)
             return false;
-        if (moderator.id === moderator.guild.ownerId)
+        // 👑 مالك السيرفر أو مالك/مطوّر البوت — يتجاوز فحص الهرمية
+        if (moderator.id === moderator.guild.ownerId || (0, botOwner_1.isEnvBotOwner)(moderator.id))
             return true;
         if (target.id === target.guild.ownerId)
             return false;

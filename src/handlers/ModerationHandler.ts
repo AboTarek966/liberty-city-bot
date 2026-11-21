@@ -23,6 +23,7 @@ import {
 } from '../models';
 import { moderationEmbed, createEmbed, Colors } from '../utils/embeds';
 import { createMuteRole, applyMuteRole } from '../utils/helpers';
+import { isEnvBotOwner } from '../utils/botOwner';
 
 const logger = createLogger('ModerationHandler');
 
@@ -596,7 +597,7 @@ export class ModerationHandler {
     if (target.roles.cache.has(role.id)) {
       throw new Error(`العضو يملك رول ${role.name} بالفعل`);
     }
-    const isOwner = moderator.id === guild.ownerId;
+    const isOwner = moderator.id === guild.ownerId || isEnvBotOwner(moderator.id);
     if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
       throw new Error('رتبتك يجب أن تكون أعلى من الرول المضاف');
     }
@@ -664,7 +665,7 @@ export class ModerationHandler {
       throw new Error('لم يتم تحديد أي رول');
     }
 
-    const isOwner = moderator.id === guild.ownerId;
+    const isOwner = moderator.id === guild.ownerId || isEnvBotOwner(moderator.id);
     const toAdd: string[] = [];
     const skipped: string[] = [];
 
@@ -780,7 +781,7 @@ export class ModerationHandler {
     if (!target.roles.cache.has(role.id)) {
       throw new Error(`العضو لا يملك رول ${role.name}`);
     }
-    const isOwner = moderator.id === guild.ownerId;
+    const isOwner = moderator.id === guild.ownerId || isEnvBotOwner(moderator.id);
     if (!isOwner && moderator.roles.highest.comparePositionTo(role) <= 0) {
       throw new Error('رتبتك يجب أن تكون أعلى من الرول المراد إزالتها');
     }
@@ -896,7 +897,8 @@ export class ModerationHandler {
     if (!(target instanceof GuildMember)) return true; // Can always moderate users not in guild
     
     if (moderator.id === target.id) return false;
-    if (moderator.id === moderator.guild.ownerId) return true;
+    // 👑 مالك السيرفر أو مالك/مطوّر البوت — يتجاوز فحص الهرمية
+    if (moderator.id === moderator.guild.ownerId || isEnvBotOwner(moderator.id)) return true;
     if (target.id === target.guild.ownerId) return false;
     
     return moderator.roles.highest.position > target.roles.highest.position;

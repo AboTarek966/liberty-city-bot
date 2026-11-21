@@ -13,6 +13,7 @@ import {
   canManageTarget,
 } from '../../utils/rolePicker';
 import { Colors } from '../../utils/embeds';
+import { isEnvBotOwner } from '../../utils/botOwner';
 
 const handler: ButtonHandler = {
   id: 'rolepick_btn',
@@ -107,7 +108,7 @@ const handler: ButtonHandler = {
         return;
       }
 
-      const isOwner = executor.id === guild.ownerId;
+      const isOwner = executor.id === guild.ownerId || isEnvBotOwner(executor.id);
       const botTop = guild.members.me?.roles.highest.position ?? 0;
       const execTop = executor.roles.highest.position;
 
