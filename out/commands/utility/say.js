@@ -7,46 +7,85 @@ const discord_js_1 = require("discord.js");
 const models_1 = require("../../models");
 const aliasCache_1 = require("../../utils/aliasCache");
 const messageCreate_1 = require("../../events/messageCreate");
+/** خيارات الملفات المتاحة في الأمر (كل خيار يستوعب ملفاً واحداً) */
+const FILE_OPTIONS = ['file', 'file2', 'file3'];
 const command = {
     data: new discord_js_1.SlashCommandBuilder()
         .setName('say')
-        .setDescription('إرسال نص باسم البوت (ويدعم تنفيذ اختصارات/أوامر الألياس)')
+        .setDescription('إرسال نص و/أو ملفات من جهازك باسم البوت (ويدعم تنفيذ اختصارات/أوامر الألياس)')
         .addStringOption(option => option
         .setName('text')
-        .setDescription('النص المراد إرساله (يمكن أن يكون اختصار أمر مثل .روليت أو أمر ألياس)')
-        .setRequired(true)
+        .setDescription('النص المراد إرساله (اختياري إذا كنت سترفع ملفاً)')
+        .setRequired(false)
         .setMaxLength(2000))
+        .addAttachmentOption(option => option
+        .setName('file')
+        .setDescription('📎 ملف أو صورة من جهازك (اختياري)')
+        .setRequired(false))
+        .addAttachmentOption(option => option
+        .setName('file2')
+        .setDescription('📎 ملف أو صورة ثاني (اختياري)')
+        .setRequired(false))
+        .addAttachmentOption(option => option
+        .setName('file3')
+        .setDescription('📎 ملف أو صورة ثالث (اختياري)')
+        .setRequired(false))
         .setDefaultMemberPermissions(discord_js_1.PermissionFlagsBits.ManageMessages)
         .setDMPermission(false),
     cooldown: 3,
     permissions: [discord_js_1.PermissionFlagsBits.ManageMessages],
     async execute(interaction) {
-        const text = interaction.options.getString('text', true);
+        const rawText = interaction.options.getString('text') || '';
+        const text = rawText.trim();
+        const attachments = FILE_OPTIONS
+            .map(name => interaction.options.getAttachment(name))
+            .filter((a) => !!a);
         if (!interaction.guild || !interaction.channel) {
             await interaction.reply({ content: '❌ هذا الأمر يعمل في السيرفر فقط', ephemeral: true });
             return;
         }
-        // إرسال النص باسم البوت
+        if (!text && attachments.length === 0) {
+            await interaction.reply({ content: '❌ اكتب نصاً أو ارفع ملفاً واحداً على الأقل', ephemeral: true });
+            return;
+        }
+        // إرسال النص/الملفات باسم البوت
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ content: '✅ تم الإرسال', ephemeral: true }).catch(() => { });
         }
+        const files = attachments.map(a => new discord_js_1.AttachmentBuilder(a.url, { name: a.name, description: a.description || undefined }));
         const channel = interaction.channel;
+        let sent = false;
         if (channel && typeof channel.send === 'function') {
-            await channel.send({
-                content: text,
-                allowedMentions: { parse: ['everyone', 'roles', 'users'] },
-            }).catch(() => { });
+            try {
+                await channel.send({
+                    content: text || undefined,
+                    files,
+                    allowedMentions: { parse: ['everyone', 'roles', 'users'] },
+                });
+                sent = true;
+            }
+            catch {
+                /* يُبلَّغ عن الفشل بالأسفل */
+            }
+        }
+        if (!sent) {
+            await interaction
+                .editReply({ content: '❌ فشل إرسال الرسالة — تأكد من صلاحية **إرسال الرسائل/الملفات** في القناة' })
+                .catch(() => { });
+            return;
         }
         // محاولة تنفيذ النص كاختصار/أمر ألياس (مثل .روليت أو أمر إعطاء رول عبر alias)
-        try {
-            await tryExecuteAliasFromSay(interaction, text);
-        }
-        catch {
-            // لا نُفشل /say إذا فشل تنفيذ الأمر
+        if (text) {
+            try {
+                await tryExecuteAliasFromSay(interaction, text, attachments);
+            }
+            catch {
+                // لا نُفشل /say إذا فشل تنفيذ الأمر
+            }
         }
     },
 };
-async function tryExecuteAliasFromSay(interaction, text) {
+async function tryExecuteAliasFromSay(interaction, text, attachments = []) {
     const guild = interaction.guild;
     if (!guild)
         return;
@@ -119,7 +158,7 @@ async function tryExecuteAliasFromSay(interaction, text) {
             repliedUser: null,
             everyone: /@everyone/.test(text),
         },
-        attachments: new Map(),
+        attachments: new Map(attachments.map(a => [a.id, a])),
         reference: null,
         deletable: false,
         delete: async () => { },
