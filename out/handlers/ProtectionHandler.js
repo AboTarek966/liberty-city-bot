@@ -128,13 +128,9 @@ class ProtectionHandler {
             try {
                 const member = await message.guild.members.fetch(executor.id).catch(() => null);
                 if (member && !member.permissions.has(discord_js_1.PermissionFlagsBits.Administrator)) {
-                    // 🛡️ الجدار الوقائي: أول مرة = حذف الويب هوك + تنبيه فقط؛ الطرد عند التكرار
-                    const first = this.client.securityHandler?.takeStrike?.(message.guild.id, executor.id) === 'first';
-                    if (first) {
-                        logger.info(`🛡️ Shield: Webhook Spam Death Note first offense for ${executor.tag} — no kick (alert only)`);
-                    }
-                    else {
-                        await member.kick('Omni — Anti-Webhook-Spam (Death Note)');
+                    const isWhitelisted = this.client.securityHandler?.isPreemptivelyWhitelisted?.(settings, executor.id) ?? false;
+                    if (!isWhitelisted) {
+                        await member.kick('Omni — Anti-Webhook-Spam (Death Note)').catch(() => { });
                         punished = true;
                     }
                 }
@@ -430,37 +426,38 @@ class ProtectionHandler {
     // --------------------------------------------
     async executeAction(message, action, settings) {
         try {
-            // Delete the message first
-            if (message.deletable) {
-                await message.delete().catch(() => { });
-            }
-            // Send warning to user
-            const warningEmbed = {
-                color: 0xff3366,
-                title: '⚠️ تم حذف رسالتك',
-                description: `سبب: ${action.reason}`,
-                footer: { text: `${message.guild?.name || 'Omni'} • Protection` },
-                timestamp: new Date().toISOString(),
-            };
-            const warningMessage = message.channel.isTextBased() && 'send' in message.channel
-                ? await message.channel.send({
-                    embeds: [warningEmbed],
-                }).catch(() => null)
-                : null;
-            // Auto-delete warning after 5 seconds
-            if (warningMessage) {
-                setTimeout(() => {
-                    warningMessage.delete().catch(() => { });
-                }, 5000);
-            }
-            // Execute action on user
+            // ⚡ حذف الرسالة (لا ينتظر العقوبة — يعمل في الخلفية)
+            const deleteTask = message.deletable
+                ? message.delete().catch(() => { })
+                : Promise.resolve();
+            // ⚡ العقوبة أولاً — أسرع ردّ حماية ممكن (لا مهلة "مخالفة أولى" هنا)
             await this.executeUserAction(message, action);
-            // Log to mod logs channel
-            await this.logAction(message, action, settings);
+            // ⚡ التحذير + السجل في الخلفية — لا يعطّلان الاستجابة
+            void this.sendProtectionWarning(message, action).catch(() => { });
+            void this.logAction(message, action, settings).catch(() => { });
+            void deleteTask;
             logger.info(`Protection action ${action.type} on ${message.author.tag}: ${action.reason}`);
         }
         catch (error) {
             logger.error('Failed to execute protection action:', error);
+        }
+    }
+    /** تحذير القناة — منفصل ليعمل في الخلفية دون تأخير العقوبة */
+    async sendProtectionWarning(message, action) {
+        const warningEmbed = {
+            color: 0xff3366,
+            title: '⚠️ تم حذف رسالتك',
+            description: `سبب: ${action.reason}`,
+            footer: { text: `${message.guild?.name || 'Omni'} • Protection` },
+            timestamp: new Date().toISOString(),
+        };
+        if (!message.channel.isTextBased() || !('send' in message.channel))
+            return;
+        const warningMessage = await message.channel.send({ embeds: [warningEmbed] }).catch(() => null);
+        if (warningMessage) {
+            setTimeout(() => {
+                warningMessage.delete().catch(() => { });
+            }, 5000);
         }
     }
     // --------------------------------------------
@@ -481,20 +478,16 @@ class ProtectionHandler {
                 await member.timeout(action.duration || 300000, action.reason).catch(() => { });
                 break;
             case 'kick':
-                // 🛡️ الجدار الوقائي: أول مخالفة من رسائل الحماية (سبام/روابط...) = تحذير فقط، بدون طرد/حظر
-                if (this.client.securityHandler?.takeStrike?.(message.guildId, message.author.id) === 'first')
-                    break;
+                // ⚡ عقوبة فورية — لا مهلة "مخالفة أولى" (رغبة صريحة: منع الهجوم قبل حدوثه)
                 await member.kick(action.reason).catch(() => { });
                 break;
             case 'ban':
-                // 🚫 Anti-Explicit / أفعال صريحة: حظر فوري بدون "التحذير قبل الحظر" (الجدار الوقائي)
-                if (!action.directBan && this.client.securityHandler?.takeStrike?.(message.guildId, message.author.id) === 'first')
-                    break;
+                // ⚡ حظر فوري — لا "تحذير قبل الحظر" (رغبة صريحة: منع الهجوم قبل حدوثه)
                 await message.guild?.members.ban(message.author.id, {
                     reason: action.reason,
                     deleteMessageSeconds: action.directBan ? 86400 : 3600,
                 }).catch((err) => {
-                    logger.warn(`Anti-Explicit ban failed for ${message.author?.tag ?? message.author?.id}: ${err?.message ?? err}`);
+                    logger.warn(`Protection ban failed for ${message.author?.tag ?? message.author?.id}: ${err?.message ?? err}`);
                 });
                 break;
         }
@@ -572,10 +565,13 @@ class ProtectionHandler {
         const recentJoins = tracker.timestamps.length;
         const suspicionPoints = tracker.points.reduce((a, b) => a + b, 0);
         const weighted = recentJoins + suspicionPoints;
+        // ⚡ نافذة "سريع" — كشف الهجوم في 10 ثوانٍ (قبل عتبة 60 ثانية)
+        const fastJoins = tracker.timestamps.filter(t => now - t <= 10_000).length;
         // Beast Mode: إذا كان الوضع مرتفعاً/حرجاً، طرد المنضمين المشبوهين فوراً (حتى تحت العتبة)
+        // ⚡ أسرع: حتى "مرتفع" (elevated) — طرد الحسابات جديدة جداً فوراً (قبل اكتمال الهجوم)
         if (beastEnabled && !whitelisted) {
             const snap = threatScore_1.globalThreat.get(guildId, now);
-            if ((snap.level === 'high' || snap.level === 'critical') && joinScore.suspicious) {
+            if ((snap.level === 'elevated' || snap.level === 'high' || snap.level === 'critical') && joinScore.points >= 4) {
                 const action = {
                     type: (beast.suspiciousJoinAction === 'ban' ? 'ban' : 'kick'),
                     reason: 'Beast Mode — منضم مشبوه أثناء تهديد مرتفع',
@@ -583,6 +579,17 @@ class ProtectionHandler {
                 threatScore_1.globalThreat.add(guildId, 2, 'suspicious join during threat');
                 void this.applyBeastMode(member.guild, settings);
                 return { isRaid: true, action };
+            }
+            if (snap.level === 'high' || snap.level === 'critical') {
+                if (joinScore.suspicious) {
+                    const action = {
+                        type: (beast.suspiciousJoinAction === 'ban' ? 'ban' : 'kick'),
+                        reason: 'Beast Mode — منضم مشبوه أثناء تهديد مرتفع',
+                    };
+                    threatScore_1.globalThreat.add(guildId, 2, 'suspicious join during threat');
+                    void this.applyBeastMode(member.guild, settings);
+                    return { isRaid: true, action };
+                }
             }
             if (snap.level === 'critical' && !whitelisted && member.user.bot === false) {
                 // في الوضع الحرج: طرد أي حساب جديد (< 30 يوم) حتى لو wasn't flagged
@@ -594,8 +601,10 @@ class ProtectionHandler {
             }
         }
         // Determine raid trigger
+        // ⚡ triggers أسرع: 3 انضمامات within 10s، أو 2 مشبوه within 10s بـ 5 نقاط
         const suspiciousTrigger = beastEnabled && recentJoins >= Math.max(3, Math.ceil(threshold / 2)) && suspicionPoints >= threshold;
-        const isRaid = recentJoins > threshold || suspiciousTrigger;
+        const fastTrigger = fastJoins >= 3 || (fastJoins >= 2 && suspicionPoints >= 5);
+        const isRaid = recentJoins > threshold || suspiciousTrigger || fastTrigger;
         if (!isRaid) {
             // record mild threat for suspicious joins
             if (joinScore.suspicious)
@@ -730,18 +739,26 @@ class ProtectionHandler {
     // Lockdown
     // --------------------------------------------
     async lockdown(guild) {
-        const channels = guild.channels.cache.filter((c) => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
-        for (const channel of channels.values()) {
-            try {
-                await channel.permissionOverwrites.edit(guild.roles.everyone, {
-                    SendMessages: false,
-                    Connect: false,
-                }, { reason: 'Anti-Raid Lockdown' });
+        const channels = [...guild.channels.cache.values()].filter((c) => c.type === discord_js_1.ChannelType.GuildText || c.type === discord_js_1.ChannelType.GuildVoice);
+        // ⚡ توازي: 6 قنوات في كل مرة (بدلاً من تتابعية)
+        const queue = channels;
+        let cursor = 0;
+        const worker = async () => {
+            while (cursor < queue.length) {
+                const channel = queue[cursor++];
+                try {
+                    await channel.permissionOverwrites.edit(guild.roles.everyone, {
+                        SendMessages: false,
+                        Connect: false,
+                    }, { reason: 'Anti-Raid Lockdown' });
+                }
+                catch (error) {
+                    logger.error(`Failed to lockdown channel ${channel.name}:`, error);
+                }
             }
-            catch (error) {
-                logger.error(`Failed to lockdown channel ${channel.name}:`, error);
-            }
-        }
+        };
+        const workers = Array.from({ length: Math.min(6, queue.length) }, worker);
+        await Promise.all(workers);
         logger.info(`Locked down guild ${guild.name}`);
     }
     // --------------------------------------------

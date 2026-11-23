@@ -18,29 +18,19 @@ const event: Event = {
     const client = member.client as OmniClient;
 
     try {
-      // Anti-Raid check
-      const raidResult = await client.protectionHandler.checkRaid(member);
+      // ⚡ Anti-Raid + Anti-Bot بالتوازي — استجابة أسرع
+      const [raidResult, botKicked] = await Promise.all([
+        client.protectionHandler.checkRaid(member).catch(() => ({ isRaid: false } as any)),
+        client.securityHandler.onMemberJoin(member).catch(() => false),
+      ]);
       if (raidResult.isRaid && raidResult.action) {
         // 👑 القائمة البيضاء: استثناء من الحظر الوقائي حتى أثناء الرايد
         const whitelisted = await client.securityHandler
           .isPreemptivelyWhitelistedInGuild(member.guild.id, member.id)
           .catch(() => false);
-        if (whitelisted) {
-          logger.info(`Raid action skipped for whitelisted member ${member.user.tag}`);
-        } else {
+        if (!whitelisted) {
           logger.warn(`Raid detected in ${member.guild.name}!`);
-
-          // 🛡️ الجدار الوقائي: الاشتباه الأولى = تنبيه + تصعيد (بدون طرد/حظر)؛ العقوبة عند التكرار
-          const raidStrike = client.securityHandler?.takeStrike?.(member.guild.id, member.id);
-          const firstRaid = raidStrike === 'first';
-          if (firstRaid) {
-            logger.info(`🛡️ Shield: raid first offense for ${member.user.tag} — alert-only, no kick/ban`);
-            await logRaid(member, `${raidResult.action.reason} (تحذير وقائي أول — بدون عقوبة)`);
-            // تحقق: لا نُكمل بقية الحماية الانضمامية لهذا الظالم؟ نكمل للمعالجة العادية التالية فقط إن لم تُقفل
-            return;
-          }
-
-          // Execute raid action
+          // ⚡ عقوبة فورية — لا "مخالفة أولى" (كل منضم في هجوم يُطرد فوراً)
           if (raidResult.action.type === 'kick' || raidResult.action.type === 'ban') {
             if (raidResult.action.type === 'ban') {
               await member.ban({ reason: raidResult.action.reason }).catch(() => {});
@@ -48,15 +38,11 @@ const event: Event = {
               await member.kick(raidResult.action.reason).catch(() => {});
             }
           }
-
-          // Log the raid
-          await logRaid(member, raidResult.action.reason);
+          void logRaid(member, raidResult.action.reason).catch(() => {});
           return;
         }
+        logger.info(`Raid action skipped for whitelisted member ${member.user.tag}`);
       }
-
-      // 🛡️ Anti-Bot: طرد بوت غير مصرح به (يُتخطى الترحيب تلقائياً)
-      const botKicked = await client.securityHandler.onMemberJoin(member);
       if (botKicked) return;
 
       // 🕵️ Anti-Alt Detection — كشف الحسابات البديلة

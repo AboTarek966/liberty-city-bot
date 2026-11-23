@@ -6,9 +6,9 @@ export interface ThreatSnapshot {
     lastEventAt: number;
 }
 export declare const THREAT_THRESHOLDS: {
-    readonly elevated: 6;
-    readonly high: 14;
-    readonly critical: 24;
+    readonly elevated: 4;
+    readonly high: 10;
+    readonly critical: 20;
 };
 export declare class ThreatTracker {
     private events;

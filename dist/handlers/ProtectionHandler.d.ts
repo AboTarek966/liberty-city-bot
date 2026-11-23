@@ -33,6 +33,8 @@ export declare class ProtectionHandler {
     private static readonly EXPLICIT_DOMAIN_RE;
     private checkAntiExplicit;
     private executeAction;
+    /** تحذير القناة — منفصل ليعمل في الخلفية دون تأخير العقوبة */
+    private sendProtectionWarning;
     private executeUserAction;
     private logAction;
     checkRaid(member: GuildMember): Promise<{

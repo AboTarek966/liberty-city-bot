@@ -5,7 +5,8 @@
 // ============================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.globalThreat = exports.ThreatTracker = exports.THREAT_THRESHOLDS = void 0;
-exports.THREAT_THRESHOLDS = { elevated: 6, high: 14, critical: 24 };
+// ⚡ عتبات أسرع: نرفع مستوى التهديد قبل اكتمال الهجوم (كانت 6/14/24)
+exports.THREAT_THRESHOLDS = { elevated: 4, high: 10, critical: 20 };
 const DECAY_MS = 15 * 60 * 1000;
 const MAX_EVENTS_PER_GUILD = 300;
 class ThreatTracker {

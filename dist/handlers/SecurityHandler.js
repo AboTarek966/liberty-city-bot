@@ -2175,7 +2175,7 @@ class SecurityHandler {
                 else if (!trusted && nuke?.enabled) {
                     // 🛡️ الجدار الوقائي: المخالفة الأولى = حذف آثاره + تنبيه فقط (بدون حظر/طرد)
                     // التكرار المؤكّد = تحييد (neutralizeById محمي بـ strikes)
-                    const text = await this.neutralizeById(guild, creator, nuke, 'Omni — سبام ويب هوك (Anti-Nuke)', nuke.mode !== 'react');
+                    const text = await this.neutralizeById(guild, creator, nuke, 'Omni — سبام ويب هوك (Anti-Nuke)', nuke.mode !== 'react', { bypassStrikes: true });
                     actionText += `\n${text}`;
                     // 🧹 احذف كل ويب هوكاته الأخرى حتى لا يكمل من واحدة ثانية
                     try {
@@ -2581,12 +2581,14 @@ class SecurityHandler {
                     .catch(() => { });
             }
             else {
+                // ⚡ الوحدات الحرجة: تجاوز جدار الضربات (عقوبة فورية)
+                const moduleBypass = forceBan || mod.severity === 'critical';
                 await this.handleInstantViolation(guild, executor, settings, {
                     ...(settings?.protection?.antiNuke || {}),
                     action: configuredAction,
-                    mode: forceBan ? 'prevent' : 'react',
+                    mode: moduleBypass ? 'prevent' : 'react',
                     logChannel: cfg?.logChannel || settings?.protection?.antiNuke?.logChannel,
-                }, label, { forceBan, targetId: entry.targetId, allowanceKey: `module:${mod.key}` });
+                }, label, { forceBan: moduleBypass, targetId: entry.targetId, allowanceKey: `module:${mod.key}`, bypassStrikes: moduleBypass });
             }
             logger.warn(`🛡️ Security module [${mod.key}]: ${label} in ${guild.name} | executor=${this.userLabel(executor)} | ${count}/${effectiveLimit}`);
             return true;
@@ -3622,7 +3624,7 @@ class SecurityHandler {
                 catch { }
                 const prevent = cfg.mode !== 'react';
                 const action = prevent ? 'ban' : (cfg.action ?? 'kick');
-                const text = await this.punishById(guild, executor, action, 'Omni — بوت أنشأ ثريد (Anti-Nuke)');
+                const text = await this.punishById(guild, executor, action, 'Omni — بوت أنشأ ثريد (Anti-Nuke)', { bypassStrikes: true });
                 await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
                 void this.getAlertChannel(guild, settings, cfg.logChannel)
                     .then(ch => ch
@@ -3642,7 +3644,7 @@ class SecurityHandler {
             catch { }
             const prevent = cfg.mode !== 'react';
             const action = isBot || prevent ? 'ban' : (cfg.action ?? 'kick');
-            const text = await this.punishById(guild, executor, action, 'Omni — إنشاء ثريدات جماعي');
+            const text = await this.punishById(guild, executor, action, 'Omni — إنشاء ثريدات جماعي', { bypassStrikes: isBot });
             await this.purgeAttackerArtifacts(guild, executor.id).catch(() => 0);
             void this.getAlertChannel(guild, settings, cfg.logChannel)
                 .then(ch => ch

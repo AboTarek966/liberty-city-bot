@@ -12,7 +12,8 @@ export interface ThreatSnapshot {
   lastEventAt: number;
 }
 
-export const THREAT_THRESHOLDS = { elevated: 6, high: 14, critical: 24 } as const;
+// ⚡ عتبات أسرع: نرفع مستوى التهديد قبل اكتمال الهجوم (كانت 6/14/24)
+export const THREAT_THRESHOLDS = { elevated: 4, high: 10, critical: 20 } as const;
 const DECAY_MS = 15 * 60 * 1000;
 const MAX_EVENTS_PER_GUILD = 300;
 
