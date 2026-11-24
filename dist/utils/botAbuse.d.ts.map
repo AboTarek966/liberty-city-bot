@@ -1,1 +1,1 @@
-{"version":3,"file":"botAbuse.d.ts","sourceRoot":"","sources":["../../src/utils/botAbuse.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,OAAO,EAA6B,MAAM,YAAY,CAAC;AAiEhE;;;GAGG;AACH,wBAAsB,cAAc,CAAC,OAAO,EAAE,OAAO,GAAG,OAAO,CAAC,OAAO,CAAC,CAuNvE"}
+{"version":3,"file":"botAbuse.d.ts","sourceRoot":"","sources":["../../src/utils/botAbuse.ts"],"names":[],"mappings":"AAMA,OAAO,EAAE,OAAO,EAA6B,MAAM,YAAY,CAAC;AAkEhE;;;GAGG;AACH,wBAAsB,cAAc,CAAC,OAAO,EAAE,OAAO,GAAG,OAAO,CAAC,OAAO,CAAC,CAiOvE"}

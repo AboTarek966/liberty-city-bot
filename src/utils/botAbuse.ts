@@ -11,6 +11,7 @@ import { createLogger } from './helpers';
 import { OmniClient } from '../OmniClient';
 import { securityAlertsSilent } from './securityAlerts';
 import { normalizeArabic, containsHardSlur, findAbuse } from './abuseDetector';
+import { isAbuseDirectedAtBot } from './botAbuseDirected';
 import { isEnvBotOwner } from './botOwner';
 
 const logger = createLogger('AntiBotAbuse');
@@ -112,6 +113,16 @@ export async function handleBotAbuse(message: Message): Promise<boolean> {
       // 🔍 تشخيص: رسالة موجّهة للبوت ولم تُصنّف إساءة — نسجّل النص لاكتشاف الكلمات الناقصة
       logger.debug(
         `AntiBotAbuse: رسالة للبوت خارج القاموس | ${message.author.tag} | "${(message.content || '').slice(0, 180)}"`
+      );
+      return false;
+    }
+
+    // 🎯 تقليل الإيجابيات الخاطئة: مصطلح "мягкий" (نصاب/فاشل/...) لا يُعدّ إساءة للبوت
+    //    إلا إذا كان موجّهاً فعلاً للبوت (منشن/ردّ/قرب ≤5 كلمات) أو سبّاً صريحاً (hard slur).
+    const isHard = containsHardSlur(message.content || '', badWords);
+    if (!isHard && !isAbuseDirectedAtBot(message, abuse.term, client)) {
+      logger.debug(
+        `AntiBotAbuse: إساءة غير موجهة للبوت (تجاهل) | ${message.author.tag} | term=${abuse.term} | "${(message.content || '').slice(0, 180)}"`
       );
       return false;
     }
